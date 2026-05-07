@@ -6,6 +6,7 @@ import {
   getAudioItemName,
   getAudioTrackAuthorNames,
   getModelValue,
+  isMusicaCoverArtEnabled,
   isMusicaAssignedItem,
   isSupportedAudioItem,
   parseAudioMetadata,
@@ -20,6 +21,7 @@ import type {
 async function reconcileMusicaAssignments(ctx: NexusBackendPluginContext) {
   const repositories = ctx.requireRepositories();
   const items = await repositories.items.findAll();
+  const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
 
   for (const item of items) {
     if (!isSupportedAudioItem(item)) {
@@ -36,6 +38,7 @@ async function reconcileMusicaAssignments(ctx: NexusBackendPluginContext) {
     await syncAudioTrackRecord(repositories, item, {
       structuralChanged: true,
       contentChanged: true,
+      extractEmbeddedCoverArt,
     });
   }
 }
@@ -95,6 +98,7 @@ const musicaPlugin: NexusBackendPluginModule = {
     ctx.registerIpc("audio:getByItemId", async (_event, itemId: string) => {
       try {
         const repositories = ctx.getRepositories();
+        const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
 
         if (!repositories?.items) {
           return {
@@ -126,12 +130,17 @@ const musicaPlugin: NexusBackendPluginModule = {
           ? await ensureAudioTrackWithAuthors(repositories, item, {
               structuralChanged: true,
               contentChanged: true,
+              extractEmbeddedCoverArt,
             })
           : await repositories.audio.findTrackWithAuthors(itemId);
 
-        const metadata = audioTrack ? null : await parseAudioMetadata(filePath);
+        const metadata = audioTrack
+          ? null
+          : await parseAudioMetadata(filePath, {
+              includeCovers: extractEmbeddedCoverArt,
+            });
         const metadataMimeType = metadata?.format ? (metadata.format as any).mimeType ?? null : null;
-        const picture = metadata?.common?.picture?.[0];
+        const picture = extractEmbeddedCoverArt ? metadata?.common?.picture?.[0] : null;
         const authors = getAudioTrackAuthorNames(audioTrack);
         const audioFile = {
           id: String(getModelValue(item, "id") ?? itemId),
@@ -139,7 +148,9 @@ const musicaPlugin: NexusBackendPluginModule = {
           title: getModelValue(audioTrack, "name") || getAudioItemName(item),
           duration: getModelValue(audioTrack, "duration") ?? metadata?.format?.duration ?? null,
           mimeType: getModelValue(audioTrack, "mimeType") ?? metadataMimeType,
-          cover: getModelValue(audioTrack, "cover") ?? (picture ? bufferToDataUrl(picture.data, picture.format) : null),
+          cover: extractEmbeddedCoverArt
+            ? (getModelValue(audioTrack, "cover") ?? (picture ? bufferToDataUrl(picture.data, picture.format) : null))
+            : null,
           genre: getModelValue(audioTrack, "genre") ?? null,
           album: getModelValue(audioTrack, "album") ?? null,
           authors,
@@ -174,11 +185,12 @@ const musicaPlugin: NexusBackendPluginModule = {
             console.error("[musica] Error reconciliando assignments live:", error);
           });
       },
-      { emitCurrent: false },
+      { emitCurrent: true },
     );
   },
   onItemSync: async (ctx, payload) => {
     const assignedToMusica = await isMusicaAssignedItem(ctx, payload.item);
+    const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
 
     if (!assignedToMusica) {
       await ctx.requireRepositories().audio.deleteTrack(String(getModelValue(payload.item, "id") ?? ""));
@@ -188,6 +200,7 @@ const musicaPlugin: NexusBackendPluginModule = {
     await syncAudioTrackRecord(ctx.requireRepositories(), payload.item, {
       structuralChanged: payload.structuralChanged,
       contentChanged: payload.contentChanged,
+      extractEmbeddedCoverArt,
     });
   },
 };

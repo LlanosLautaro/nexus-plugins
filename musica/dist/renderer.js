@@ -225,6 +225,22 @@ function PluginMetadataForm({ itemId, formInstance, onSubmitted }) {
   )));
 }
 
+// ../nexus-plugins/musica/src/plugin-settings.js
+var MUSICA_SETTINGS_DEFAULTS = Object.freeze({
+  extractEmbeddedCoverArt: true
+});
+function normalizeMusicaSettings(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      ...MUSICA_SETTINGS_DEFAULTS
+    };
+  }
+  return {
+    ...MUSICA_SETTINGS_DEFAULTS,
+    ...value
+  };
+}
+
 // ../nexus-plugins/musica/src/renderer-helpers.js
 var MUSICA_ENGINE_ID = "nexus.musica.audio";
 var SUPPORTED_AUDIO_EXTENSIONS = /* @__PURE__ */ new Set([
@@ -279,7 +295,8 @@ function buildFolderOptions(byId = {}, rootId = null) {
   })).filter((option) => option.rootPath).sort((left, right) => left.rootPath.localeCompare(right.rootPath));
 }
 function readEngineAssignments(settingsValue) {
-  const assignments = Array.isArray(settingsValue?.engineAssignments) ? settingsValue.engineAssignments : [];
+  const normalizedSettings = normalizeMusicaSettings(settingsValue);
+  const assignments = Array.isArray(normalizedSettings.engineAssignments) ? normalizedSettings.engineAssignments : [];
   return assignments.filter((assignment) => assignment?.engineId === MUSICA_ENGINE_ID).map((assignment) => ({
     engineId: MUSICA_ENGINE_ID,
     rootPath: normalizeRelativePath(assignment.rootPath),
@@ -287,9 +304,10 @@ function readEngineAssignments(settingsValue) {
   })).filter((assignment) => assignment.rootPath);
 }
 function writeEngineAssignments(settingsValue, assignments) {
-  const retainedAssignments = Array.isArray(settingsValue?.engineAssignments) ? settingsValue.engineAssignments.filter((assignment) => assignment?.engineId !== MUSICA_ENGINE_ID) : [];
+  const normalizedSettings = normalizeMusicaSettings(settingsValue);
+  const retainedAssignments = Array.isArray(normalizedSettings.engineAssignments) ? normalizedSettings.engineAssignments.filter((assignment) => assignment?.engineId !== MUSICA_ENGINE_ID) : [];
   return {
-    ...settingsValue || {},
+    ...normalizedSettings,
     engineAssignments: [
       ...retainedAssignments,
       ...assignments.map((assignment) => ({

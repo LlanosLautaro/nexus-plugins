@@ -11,6 +11,10 @@
     "renderer": "./dist/renderer.js"
   },
   "contributes": {
+    "settings": {
+      "schema": "./settings/schema.json",
+      "defaults": "./settings/defaults.json"
+    },
     "engines": [
       {
         "id": "nexus.musica.audio",

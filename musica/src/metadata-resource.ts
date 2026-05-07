@@ -14,6 +14,7 @@ import {
   getAudioTrackAuthorNames,
   getAudioItemName,
   getModelValue,
+  isMusicaCoverArtEnabled,
   isMusicaAssignedItem,
   isSupportedAudioItem,
   replaceAudioAuthors,
@@ -266,7 +267,11 @@ const audioTrackMetadataResource: MetadataResourceDefinition = {
 
     const repositories = ctx.requireRepositories();
     const item = await requireAudioItem(repositories, itemId);
-    const track = await ensureAudioTrackWithAuthors(repositories, item);
+    const track = await ensureAudioTrackWithAuthors(repositories, item, {
+      structuralChanged: true,
+      contentChanged: true,
+      extractEmbeddedCoverArt: await isMusicaCoverArtEnabled(ctx),
+    });
 
     if (!track) {
       throw new Error("No se pudo inicializar el registro derivado de audio.");
@@ -290,12 +295,14 @@ const audioTrackMetadataResource: MetadataResourceDefinition = {
 
     const repositories = ctx.requireRepositories();
     const item = await requireAudioItem(repositories, itemId);
+    const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
 
     const normalizedValues = normalizeTrackFormValues(item, values);
     const track =
       (await ensureAudioTrackWithAuthors(repositories, item, {
         structuralChanged: true,
         contentChanged: true,
+        extractEmbeddedCoverArt,
       })) ?? null;
 
     let renameResult: any = null;
@@ -327,8 +334,8 @@ const audioTrackMetadataResource: MetadataResourceDefinition = {
           bitrate: getModelValue(track, "bitrate") ?? null,
           sampleRate: getModelValue(track, "sampleRate") ?? null,
           bitsPerSample: getModelValue(track, "bitsPerSample") ?? null,
-          cover: getModelValue(track, "cover") ?? null,
-          coverMimeType: getModelValue(track, "coverMimeType") ?? null,
+          cover: extractEmbeddedCoverArt ? (getModelValue(track, "cover") ?? null) : null,
+          coverMimeType: extractEmbeddedCoverArt ? (getModelValue(track, "coverMimeType") ?? null) : null,
           lastScannedAt: getModelValue(track, "lastScannedAt") ?? null,
           ...trackPayload,
         });

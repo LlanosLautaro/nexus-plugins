@@ -14052,6 +14052,41 @@ function getPluginSettingsStateKey(pluginId) {
   return `plugins.settings.${pluginId}`;
 }
 
+// ../nexus-plugins/musica/src/plugin-settings.js
+var MUSICA_SETTINGS_DEFAULTS = Object.freeze({
+  extractEmbeddedCoverArt: true
+});
+function normalizeMusicaSettings(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      ...MUSICA_SETTINGS_DEFAULTS
+    };
+  }
+  return {
+    ...MUSICA_SETTINGS_DEFAULTS,
+    ...value
+  };
+}
+function isMusicaEmbeddedCoverArtEnabled(value) {
+  return normalizeMusicaSettings(value).extractEmbeddedCoverArt !== false;
+}
+function resolveEmbeddedCoverPayload({
+  enabled = true,
+  cover = null,
+  coverMimeType = null
+} = {}) {
+  if (!enabled) {
+    return {
+      cover: null,
+      coverMimeType: null
+    };
+  }
+  return {
+    cover: cover ?? null,
+    coverMimeType: coverMimeType ?? null
+  };
+}
+
 // ../nexus-plugins/musica/src/audio-indexing.ts
 var AUDIO_EXTENSIONS = /* @__PURE__ */ new Set([
   "aac",
@@ -14138,14 +14173,24 @@ function assignmentMatchesPath(assignment, relativeItemPath) {
   return !suffix.includes("/");
 }
 async function getMusicaEngineAssignments(ctx) {
-  const settingsValue = ctx.settings?.get ? await ctx.settings.get() : await ctx.state.get(
+  const rawSettingsValue = ctx.settings?.get ? await ctx.settings.get() : await ctx.state.get(
     getPluginSettingsStateKey(ctx.pluginId || "nexus.musica")
   );
+  const settingsValue = normalizeMusicaSettings(rawSettingsValue);
   const assignments = Array.isArray(settingsValue?.engineAssignments) ? settingsValue.engineAssignments : [];
   return assignments.filter((assignment) => assignment?.engineId === "nexus.musica.audio").map((assignment) => ({
     rootPath: normalizeRelativePath(assignment.rootPath),
     recursive: typeof assignment.recursive === "boolean" ? assignment.recursive : true
   })).filter((assignment) => assignment.rootPath);
+}
+async function getMusicaPluginSettings(ctx) {
+  const rawSettingsValue = ctx.settings?.get ? await ctx.settings.get() : await ctx.state.get(
+    getPluginSettingsStateKey(ctx.pluginId || "nexus.musica")
+  );
+  return normalizeMusicaSettings(rawSettingsValue);
+}
+async function isMusicaCoverArtEnabled(ctx) {
+  return isMusicaEmbeddedCoverArtEnabled(await getMusicaPluginSettings(ctx));
 }
 async function isMusicaAssignedItem(ctx, item) {
   if (!isSupportedAudioItem(item)) {
@@ -14176,12 +14221,12 @@ function extractAuthors(metadata) {
   const fromArtist = typeof metadata?.common?.artist === "string" ? [metadata.common.artist] : [];
   return dedupeStrings([...fromArtists, ...fromArtist]);
 }
-async function parseAudioMetadata(filePath) {
+async function parseAudioMetadata(filePath, { includeCovers = true } = {}) {
   if (!filePath || !import_node_fs.default.existsSync(filePath)) {
     return null;
   }
   try {
-    return await parseFile(filePath, { skipCovers: false });
+    return await parseFile(filePath, { skipCovers: !includeCovers });
   } catch (error) {
     console.warn("music-metadata fallo para", filePath, error);
     return null;
@@ -14208,7 +14253,8 @@ async function replaceAudioAuthors(repositories, audioId, authorNames) {
 }
 async function ensureAudioTrackWithAuthors(repositories, item, options = {
   structuralChanged: true,
-  contentChanged: true
+  contentChanged: true,
+  extractEmbeddedCoverArt: true
 }) {
   const itemId = String(getModelValue(item, "id") ?? "");
   let track = await findAudioTrackWithAuthors(repositories, itemId);
@@ -14232,9 +14278,12 @@ async function syncAudioTrackRecord(repositories, item, options) {
     return existingTrack;
   }
   const filePath = getModelValue(item, "path");
-  const metadata = typeof filePath === "string" && filePath ? await parseAudioMetadata(filePath) : null;
+  const extractEmbeddedCoverArt = options.extractEmbeddedCoverArt !== false;
+  const metadata = typeof filePath === "string" && filePath ? await parseAudioMetadata(filePath, {
+    includeCovers: extractEmbeddedCoverArt
+  }) : null;
   const metadataCompleted = Boolean(getModelValue(existingTrack, "metadataCompleted"));
-  const picture = metadata?.common?.picture?.[0];
+  const picture = extractEmbeddedCoverArt ? metadata?.common?.picture?.[0] : null;
   const authorNames = extractAuthors(metadata);
   const currentTrackName = getModelValue(existingTrack, "name");
   const shouldRefreshNameFromFile = options.structuralChanged || !metadataCompleted && !currentTrackName;
@@ -14246,6 +14295,11 @@ async function syncAudioTrackRecord(repositories, item, options) {
     bitsPerSample: Number.isFinite(metadata?.format?.bitsPerSample) ? metadata.format.bitsPerSample : null,
     lastScannedAt: /* @__PURE__ */ new Date()
   };
+  const embeddedCoverPayload = resolveEmbeddedCoverPayload({
+    enabled: extractEmbeddedCoverArt,
+    cover: picture ? bufferToDataUrl(picture.data, picture.format) : null,
+    coverMimeType: picture?.format ?? null
+  });
   const editablePayload = {
     name: getAudioItemName(item),
     genre: Array.isArray(metadata?.common?.genre) ? metadata.common.genre.filter(Boolean).join(", ") : null,
@@ -14253,8 +14307,7 @@ async function syncAudioTrackRecord(repositories, item, options) {
     year: Number.isFinite(metadata?.common?.year) ? metadata.common.year : null,
     trackNumber: Number.isFinite(metadata?.common?.track?.no) ? metadata.common.track.no : null,
     discNumber: Number.isFinite(metadata?.common?.disk?.no) ? metadata.common.disk.no : null,
-    cover: picture ? bufferToDataUrl(picture.data, picture.format) : null,
-    coverMimeType: picture?.format ?? null
+    ...embeddedCoverPayload
   };
   const payload = existingTrack ? {
     id: itemId,
@@ -14265,8 +14318,8 @@ async function syncAudioTrackRecord(repositories, item, options) {
     year: getModelValue(existingTrack, "year"),
     trackNumber: getModelValue(existingTrack, "trackNumber"),
     discNumber: getModelValue(existingTrack, "discNumber"),
-    cover: !metadataCompleted && !getModelValue(existingTrack, "cover") && editablePayload.cover ? editablePayload.cover : getModelValue(existingTrack, "cover"),
-    coverMimeType: !metadataCompleted && !getModelValue(existingTrack, "coverMimeType") && editablePayload.coverMimeType ? editablePayload.coverMimeType : getModelValue(existingTrack, "coverMimeType"),
+    cover: extractEmbeddedCoverArt ? !metadataCompleted && !getModelValue(existingTrack, "cover") && editablePayload.cover ? editablePayload.cover : getModelValue(existingTrack, "cover") : null,
+    coverMimeType: extractEmbeddedCoverArt ? !metadataCompleted && !getModelValue(existingTrack, "coverMimeType") && editablePayload.coverMimeType ? editablePayload.coverMimeType : getModelValue(existingTrack, "coverMimeType") : null,
     metadataCompleted,
     ...technicalPayload
   } : {
@@ -14573,7 +14626,11 @@ var audioTrackMetadataResource = {
     ensureVariantId(variantId);
     const repositories = ctx.requireRepositories();
     const item = await requireAudioItem(repositories, itemId);
-    const track = await ensureAudioTrackWithAuthors(repositories, item);
+    const track = await ensureAudioTrackWithAuthors(repositories, item, {
+      structuralChanged: true,
+      contentChanged: true,
+      extractEmbeddedCoverArt: await isMusicaCoverArtEnabled(ctx)
+    });
     if (!track) {
       throw new Error("No se pudo inicializar el registro derivado de audio.");
     }
@@ -14593,10 +14650,12 @@ var audioTrackMetadataResource = {
     ensureVariantId(variantId);
     const repositories = ctx.requireRepositories();
     const item = await requireAudioItem(repositories, itemId);
+    const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
     const normalizedValues = normalizeTrackFormValues(item, values);
     const track = await ensureAudioTrackWithAuthors(repositories, item, {
       structuralChanged: true,
-      contentChanged: true
+      contentChanged: true,
+      extractEmbeddedCoverArt
     }) ?? null;
     let renameResult = null;
     try {
@@ -14623,8 +14682,8 @@ var audioTrackMetadataResource = {
           bitrate: getModelValue(track, "bitrate") ?? null,
           sampleRate: getModelValue(track, "sampleRate") ?? null,
           bitsPerSample: getModelValue(track, "bitsPerSample") ?? null,
-          cover: getModelValue(track, "cover") ?? null,
-          coverMimeType: getModelValue(track, "coverMimeType") ?? null,
+          cover: extractEmbeddedCoverArt ? getModelValue(track, "cover") ?? null : null,
+          coverMimeType: extractEmbeddedCoverArt ? getModelValue(track, "coverMimeType") ?? null : null,
           lastScannedAt: getModelValue(track, "lastScannedAt") ?? null,
           ...trackPayload
         });
@@ -14670,6 +14729,7 @@ function registerMusicaMetadataResources(ctx) {
 async function reconcileMusicaAssignments(ctx) {
   const repositories = ctx.requireRepositories();
   const items = await repositories.items.findAll();
+  const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
   for (const item of items) {
     if (!isSupportedAudioItem(item)) {
       continue;
@@ -14681,7 +14741,8 @@ async function reconcileMusicaAssignments(ctx) {
     }
     await syncAudioTrackRecord(repositories, item, {
       structuralChanged: true,
-      contentChanged: true
+      contentChanged: true,
+      extractEmbeddedCoverArt
     });
   }
 }
@@ -14739,6 +14800,7 @@ var musicaPlugin = {
     ctx.registerIpc("audio:getByItemId", async (_event, itemId) => {
       try {
         const repositories = ctx.getRepositories();
+        const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
         if (!repositories?.items) {
           return {
             ok: false,
@@ -14762,11 +14824,14 @@ var musicaPlugin = {
         const itemAssignedToMusica = await isMusicaAssignedItem(ctx, item);
         const audioTrack = itemAssignedToMusica ? await ensureAudioTrackWithAuthors(repositories, item, {
           structuralChanged: true,
-          contentChanged: true
+          contentChanged: true,
+          extractEmbeddedCoverArt
         }) : await repositories.audio.findTrackWithAuthors(itemId);
-        const metadata = audioTrack ? null : await parseAudioMetadata(filePath);
+        const metadata = audioTrack ? null : await parseAudioMetadata(filePath, {
+          includeCovers: extractEmbeddedCoverArt
+        });
         const metadataMimeType = metadata?.format ? metadata.format.mimeType ?? null : null;
-        const picture = metadata?.common?.picture?.[0];
+        const picture = extractEmbeddedCoverArt ? metadata?.common?.picture?.[0] : null;
         const authors = getAudioTrackAuthorNames(audioTrack);
         const audioFile = {
           id: String(getModelValue(item, "id") ?? itemId),
@@ -14774,7 +14839,7 @@ var musicaPlugin = {
           title: getModelValue(audioTrack, "name") || getAudioItemName(item),
           duration: getModelValue(audioTrack, "duration") ?? metadata?.format?.duration ?? null,
           mimeType: getModelValue(audioTrack, "mimeType") ?? metadataMimeType,
-          cover: getModelValue(audioTrack, "cover") ?? (picture ? bufferToDataUrl(picture.data, picture.format) : null),
+          cover: extractEmbeddedCoverArt ? getModelValue(audioTrack, "cover") ?? (picture ? bufferToDataUrl(picture.data, picture.format) : null) : null,
           genre: getModelValue(audioTrack, "genre") ?? null,
           album: getModelValue(audioTrack, "album") ?? null,
           authors,
@@ -14803,18 +14868,20 @@ var musicaPlugin = {
           console.error("[musica] Error reconciliando assignments live:", error);
         });
       },
-      { emitCurrent: false }
+      { emitCurrent: true }
     );
   },
   onItemSync: async (ctx, payload) => {
     const assignedToMusica = await isMusicaAssignedItem(ctx, payload.item);
+    const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
     if (!assignedToMusica) {
       await ctx.requireRepositories().audio.deleteTrack(String(getModelValue(payload.item, "id") ?? ""));
       return;
     }
     await syncAudioTrackRecord(ctx.requireRepositories(), payload.item, {
       structuralChanged: payload.structuralChanged,
-      contentChanged: payload.contentChanged
+      contentChanged: payload.contentChanged,
+      extractEmbeddedCoverArt
     });
   }
 };

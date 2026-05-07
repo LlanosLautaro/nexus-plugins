@@ -1,3 +1,5 @@
+import { normalizeMusicaSettings } from "./plugin-settings.js";
+
 export const MUSICA_ENGINE_ID = "nexus.musica.audio";
 
 const SUPPORTED_AUDIO_EXTENSIONS = new Set([
@@ -76,8 +78,9 @@ export function buildFolderOptions(byId = {}, rootId = null) {
 }
 
 export function readEngineAssignments(settingsValue) {
-  const assignments = Array.isArray(settingsValue?.engineAssignments)
-    ? settingsValue.engineAssignments
+  const normalizedSettings = normalizeMusicaSettings(settingsValue);
+  const assignments = Array.isArray(normalizedSettings.engineAssignments)
+    ? normalizedSettings.engineAssignments
     : [];
 
   return assignments
@@ -92,12 +95,13 @@ export function readEngineAssignments(settingsValue) {
 }
 
 export function writeEngineAssignments(settingsValue, assignments) {
-  const retainedAssignments = Array.isArray(settingsValue?.engineAssignments)
-    ? settingsValue.engineAssignments.filter((assignment) => assignment?.engineId !== MUSICA_ENGINE_ID)
+  const normalizedSettings = normalizeMusicaSettings(settingsValue);
+  const retainedAssignments = Array.isArray(normalizedSettings.engineAssignments)
+    ? normalizedSettings.engineAssignments.filter((assignment) => assignment?.engineId !== MUSICA_ENGINE_ID)
     : [];
 
   return {
-    ...(settingsValue || {}),
+    ...normalizedSettings,
     engineAssignments: [
       ...retainedAssignments,
       ...assignments.map((assignment) => ({

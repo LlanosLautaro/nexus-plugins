@@ -3,6 +3,11 @@ import path from "node:path";
 import { parseFile } from "music-metadata";
 import type { VaultRepositories } from "../../../nexus-backend/src/backend/vault-runtime/db/repositories.ts";
 import { getPluginSettingsStateKey } from "../../../nexus-backend/src/plugins/state-keys.ts";
+import {
+  isMusicaEmbeddedCoverArtEnabled,
+  normalizeMusicaSettings,
+  resolveEmbeddedCoverPayload,
+} from "./plugin-settings.js";
 
 const AUDIO_EXTENSIONS = new Set([
   "aac",
@@ -132,11 +137,12 @@ export async function getMusicaEngineAssignments(ctx: {
   settings?: { get: () => Promise<Record<string, unknown>> };
   state: { get: (key: string) => Promise<unknown> };
 }) {
-  const settingsValue = ctx.settings?.get
+  const rawSettingsValue = ctx.settings?.get
     ? await ctx.settings.get()
     : await ctx.state.get(
         getPluginSettingsStateKey(ctx.pluginId || "nexus.musica"),
       );
+  const settingsValue = normalizeMusicaSettings(rawSettingsValue);
   const assignments = Array.isArray((settingsValue as any)?.engineAssignments)
     ? (settingsValue as any).engineAssignments
     : [];
@@ -149,6 +155,28 @@ export async function getMusicaEngineAssignments(ctx: {
         typeof assignment.recursive === "boolean" ? assignment.recursive : true,
     }))
     .filter((assignment: any) => assignment.rootPath);
+}
+
+export async function getMusicaPluginSettings(ctx: {
+  pluginId?: string;
+  settings?: { get: () => Promise<Record<string, unknown>> };
+  state: { get: (key: string) => Promise<unknown> };
+}) {
+  const rawSettingsValue = ctx.settings?.get
+    ? await ctx.settings.get()
+    : await ctx.state.get(
+        getPluginSettingsStateKey(ctx.pluginId || "nexus.musica"),
+      );
+
+  return normalizeMusicaSettings(rawSettingsValue);
+}
+
+export async function isMusicaCoverArtEnabled(ctx: {
+  pluginId?: string;
+  settings?: { get: () => Promise<Record<string, unknown>> };
+  state: { get: (key: string) => Promise<unknown> };
+}) {
+  return isMusicaEmbeddedCoverArtEnabled(await getMusicaPluginSettings(ctx));
 }
 
 export async function isMusicaAssignedItem(
@@ -197,13 +225,16 @@ export function extractAuthors(metadata: any) {
   return dedupeStrings([...fromArtists, ...fromArtist]);
 }
 
-export async function parseAudioMetadata(filePath: string) {
+export async function parseAudioMetadata(
+  filePath: string,
+  { includeCovers = true }: { includeCovers?: boolean } = {},
+) {
   if (!filePath || !fs.existsSync(filePath)) {
     return null;
   }
 
   try {
-    return await parseFile(filePath, { skipCovers: false });
+    return await parseFile(filePath, { skipCovers: !includeCovers });
   } catch (error) {
     console.warn("music-metadata fallo para", filePath, error);
     return null;
@@ -251,6 +282,7 @@ export async function ensureAudioTrackWithAuthors(
   options = {
     structuralChanged: true,
     contentChanged: true,
+    extractEmbeddedCoverArt: true,
   },
 ) {
   const itemId = String(getModelValue(item, "id") ?? "");
@@ -272,6 +304,7 @@ export async function syncAudioTrackRecord(
   options: {
     structuralChanged: boolean;
     contentChanged: boolean;
+    extractEmbeddedCoverArt?: boolean;
   },
 ) {
   const itemId = String(getModelValue(item, "id") ?? "");
@@ -290,9 +323,14 @@ export async function syncAudioTrackRecord(
   }
 
   const filePath = getModelValue(item, "path");
-  const metadata = typeof filePath === "string" && filePath ? await parseAudioMetadata(filePath) : null;
+  const extractEmbeddedCoverArt = options.extractEmbeddedCoverArt !== false;
+  const metadata = typeof filePath === "string" && filePath
+    ? await parseAudioMetadata(filePath, {
+        includeCovers: extractEmbeddedCoverArt,
+      })
+    : null;
   const metadataCompleted = Boolean(getModelValue(existingTrack, "metadataCompleted"));
-  const picture = metadata?.common?.picture?.[0];
+  const picture = extractEmbeddedCoverArt ? metadata?.common?.picture?.[0] : null;
   const authorNames = extractAuthors(metadata);
   const currentTrackName = getModelValue(existingTrack, "name");
   const shouldRefreshNameFromFile =
@@ -309,6 +347,12 @@ export async function syncAudioTrackRecord(
     lastScannedAt: new Date(),
   };
 
+  const embeddedCoverPayload = resolveEmbeddedCoverPayload({
+    enabled: extractEmbeddedCoverArt,
+    cover: picture ? bufferToDataUrl(picture.data, picture.format) : null,
+    coverMimeType: picture?.format ?? null,
+  });
+
   const editablePayload = {
     name: getAudioItemName(item),
     genre: Array.isArray(metadata?.common?.genre)
@@ -318,8 +362,7 @@ export async function syncAudioTrackRecord(
     year: Number.isFinite(metadata?.common?.year) ? metadata.common.year : null,
     trackNumber: Number.isFinite(metadata?.common?.track?.no) ? metadata.common.track.no : null,
     discNumber: Number.isFinite(metadata?.common?.disk?.no) ? metadata.common.disk.no : null,
-    cover: picture ? bufferToDataUrl(picture.data, picture.format) : null,
-    coverMimeType: picture?.format ?? null,
+    ...embeddedCoverPayload,
   };
 
   const payload = existingTrack
@@ -332,14 +375,18 @@ export async function syncAudioTrackRecord(
         year: getModelValue(existingTrack, "year"),
         trackNumber: getModelValue(existingTrack, "trackNumber"),
         discNumber: getModelValue(existingTrack, "discNumber"),
-        cover:
-          !metadataCompleted && !getModelValue(existingTrack, "cover") && editablePayload.cover
-            ? editablePayload.cover
-            : getModelValue(existingTrack, "cover"),
-        coverMimeType:
-          !metadataCompleted && !getModelValue(existingTrack, "coverMimeType") && editablePayload.coverMimeType
-            ? editablePayload.coverMimeType
-            : getModelValue(existingTrack, "coverMimeType"),
+        cover: extractEmbeddedCoverArt
+          ? (!metadataCompleted && !getModelValue(existingTrack, "cover") && editablePayload.cover
+              ? editablePayload.cover
+              : getModelValue(existingTrack, "cover"))
+          : null,
+        coverMimeType: extractEmbeddedCoverArt
+          ? (!metadataCompleted &&
+            !getModelValue(existingTrack, "coverMimeType") &&
+            editablePayload.coverMimeType
+              ? editablePayload.coverMimeType
+              : getModelValue(existingTrack, "coverMimeType"))
+          : null,
         metadataCompleted,
         ...technicalPayload,
       }

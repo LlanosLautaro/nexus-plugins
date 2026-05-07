@@ -1,0 +1,20 @@
+{
+  "title": "Preferencias de musica",
+  "description": "Settings declarativos del plugin musical. Los cambios de esta seccion aplican en vivo al guardar.",
+  "sections": [
+    {
+      "id": "audio-indexing",
+      "title": "Indexacion derivada",
+      "description": "Controla como el plugin persiste metadata visual derivada para los audios reclamados por musica.",
+      "fields": [
+        {
+          "name": "extractEmbeddedCoverArt",
+          "type": "boolean",
+          "label": "Extraer portada embebida",
+          "description": "Lee y guarda la portada embebida de cada audio asignado. Si lo desactivas, la reconciliacion live limpia cover y coverMimeType derivados.",
+          "applyMode": "live"
+        }
+      ]
+    }
+  ]
+}
