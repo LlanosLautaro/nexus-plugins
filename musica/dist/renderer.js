@@ -668,21 +668,37 @@ function createEmptyAssignment() {
     recursive: true
   };
 }
+function getAssignmentsSignature(assignments) {
+  return JSON.stringify(
+    Array.isArray(assignments) ? assignments.map((assignment) => ({
+      rootPath: String(assignment?.rootPath || ""),
+      recursive: Boolean(assignment?.recursive)
+    })) : []
+  );
+}
 function MusicaSettingsSection({ ctx }) {
   const baseSettings = ctx.settings.useValue();
+  const persistedAssignments = useMemo3(
+    () => readEngineAssignments(baseSettings),
+    [baseSettings]
+  );
+  const persistedAssignmentsSignature = useMemo3(
+    () => getAssignmentsSignature(persistedAssignments),
+    [persistedAssignments]
+  );
   const [draftAssignments, setDraftAssignments] = useState3(
-    () => readEngineAssignments(baseSettings)
+    () => persistedAssignments
   );
   const [saving, setSaving] = useState3(false);
   const [notice, setNotice] = useState3("");
   const [error, setError] = useState3("");
-  const folderOptions = useMemo3(() => {
-    const itemsState = ctx.getItems();
-    return buildFolderOptions(itemsState.byId, itemsState.rootId);
-  }, [ctx]);
+  const itemsState = ctx.getItems();
+  const folderOptions = buildFolderOptions(itemsState.byId, itemsState.rootId);
   useEffect3(() => {
-    setDraftAssignments(readEngineAssignments(baseSettings));
-  }, [baseSettings]);
+    setDraftAssignments(
+      (currentValue) => getAssignmentsSignature(currentValue) === persistedAssignmentsSignature ? currentValue : persistedAssignments
+    );
+  }, [persistedAssignmentsSignature]);
   const handleSave = async () => {
     setSaving(true);
     setError("");

@@ -1,9 +1,9 @@
 const { useEffect, useMemo, useState } = window.React;
 import {
   buildFolderOptions,
-  MUSICA_ENGINE_ID,
-  readEngineAssignments,
-  writeEngineAssignments,
+  BOOKS_ENGINE_ID,
+  readBooksEngineAssignments,
+  writeBooksEngineAssignments,
 } from "./renderer-helpers.js";
 
 function createEmptyAssignment() {
@@ -24,10 +24,10 @@ function getAssignmentsSignature(assignments) {
   );
 }
 
-export default function MusicaSettingsSection({ ctx }) {
+export default function BooksSettingsSection({ ctx }) {
   const baseSettings = ctx.settings.useValue();
   const persistedAssignments = useMemo(
-    () => readEngineAssignments(baseSettings),
+    () => readBooksEngineAssignments(baseSettings),
     [baseSettings],
   );
   const persistedAssignmentsSignature = useMemo(
@@ -59,31 +59,31 @@ export default function MusicaSettingsSection({ ctx }) {
 
     try {
       const normalizedAssignments = draftAssignments.filter((assignment) => assignment.rootPath);
-      const nextSettings = writeEngineAssignments(baseSettings, normalizedAssignments);
+      const nextSettings = writeBooksEngineAssignments(baseSettings, normalizedAssignments);
 
       await ctx.settings.set(nextSettings);
-      setNotice("Carpetas guardadas. Musica ya reacciona en vivo a estas asignaciones.");
+      setNotice("Carpetas guardadas. Books reacciona en vivo a estas asignaciones.");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "No se pudieron guardar las carpetas musicales.");
+      setError(saveError instanceof Error ? saveError.message : "No se pudieron guardar las carpetas.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="musicaPluginSettings">
-      <div className="musicaPluginSettings__copy">
-        <strong>Carpetas reclamadas por el engine musical</strong>
+    <div className="booksPluginSettings">
+      <div className="booksPluginSettings__copy">
+        <strong>Carpetas reclamadas por Books</strong>
         <p>
-          Solo los audios dentro de estas carpetas se trataran como musica indexada por
-          <code>{MUSICA_ENGINE_ID}</code>.
+          Solo los PDFs dentro de estas carpetas se trataran como biblioteca indexada por
+          <code>{BOOKS_ENGINE_ID}</code>.
         </p>
       </div>
 
-      <div className="musicaPluginSettings__list">
+      <div className="booksPluginSettings__list">
         {draftAssignments.length ? (
           draftAssignments.map((assignment, index) => (
-            <div className="musicaPluginSettings__row" key={`${assignment.rootPath}-${index}`}>
+            <div className="booksPluginSettings__row" key={`${assignment.rootPath}-${index}`}>
               <select
                 value={assignment.rootPath}
                 onChange={(event) =>
@@ -108,7 +108,7 @@ export default function MusicaSettingsSection({ ctx }) {
                 ))}
               </select>
 
-              <label className="musicaPluginSettings__checkbox">
+              <label className="booksPluginSettings__checkbox">
                 <input
                   type="checkbox"
                   checked={assignment.recursive}
@@ -131,7 +131,7 @@ export default function MusicaSettingsSection({ ctx }) {
 
               <button
                 type="button"
-                className="musicaPluginSettings__secondaryButton"
+                className="booksPluginSettings__secondaryButton"
                 onClick={() =>
                   setDraftAssignments((currentValue) =>
                     currentValue.filter((_entry, entryIndex) => entryIndex !== index),
@@ -144,17 +144,16 @@ export default function MusicaSettingsSection({ ctx }) {
             </div>
           ))
         ) : (
-          <div className="musicaPluginSettings__empty">
-            Sin carpetas asignadas todavia. Fuera de estas carpetas, los audios usaran el
-            fallback global del host.
+          <div className="booksPluginSettings__empty">
+            Sin carpetas asignadas todavia. Fuera de estas carpetas, los PDFs siguen usando el viewer host.
           </div>
         )}
       </div>
 
-      <div className="musicaPluginSettings__actions">
+      <div className="booksPluginSettings__actions">
         <button
           type="button"
-          className="musicaPluginSettings__secondaryButton"
+          className="booksPluginSettings__secondaryButton"
           onClick={() =>
             setDraftAssignments((currentValue) => [...currentValue, createEmptyAssignment()])
           }
@@ -164,7 +163,7 @@ export default function MusicaSettingsSection({ ctx }) {
         </button>
         <button
           type="button"
-          className="musicaPluginSettings__primaryButton"
+          className="booksPluginSettings__primaryButton"
           onClick={() => void handleSave()}
           disabled={saving}
         >
@@ -172,8 +171,8 @@ export default function MusicaSettingsSection({ ctx }) {
         </button>
       </div>
 
-      {notice ? <div className="musicaPluginSettings__notice">{notice}</div> : null}
-      {error ? <div className="musicaPluginSettings__error">{error}</div> : null}
+      {notice ? <div className="booksPluginSettings__notice">{notice}</div> : null}
+      {error ? <div className="booksPluginSettings__error">{error}</div> : null}
     </div>
   );
 }

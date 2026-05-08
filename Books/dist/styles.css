@@ -1,0 +1,495 @@
+.booksPluginSettings,
+.booksLibrary__panel,
+.booksEngine__panel {
+  border: 1px solid var(--color-line);
+  background: var(--shell-panel-bg);
+}
+
+.booksPluginSettings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.booksPluginSettings__copy,
+.booksLibrary__detailHeader,
+.booksEngine__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.booksPluginSettings__copy strong,
+.booksPluginSettings__copy h1,
+.booksLibrary__detailHeader strong,
+.booksLibrary__detailHeader h1,
+.booksEngine__copy strong,
+.booksEngine__copy h1 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.2;
+  color: var(--color-text);
+}
+.booksPluginSettings__copy p,
+.booksPluginSettings__copy span,
+.booksLibrary__detailHeader p,
+.booksLibrary__detailHeader span,
+.booksEngine__copy p,
+.booksEngine__copy span {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.booksPluginSettings__copy code {
+  margin-left: 4px;
+  color: var(--color-text);
+}
+
+.booksPluginSettings__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.booksPluginSettings__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.booksPluginSettings__row select,
+.booksEngine__progressRow input[type=range],
+.booksLibrary__progressEditor input[type=range] {
+  width: 100%;
+}
+
+.booksPluginSettings__row select,
+.booksPluginSettings__secondaryButton,
+.booksPluginSettings__primaryButton,
+.booksLibrary__iconButton,
+.booksLibrary__secondaryButton,
+.booksLibrary__choiceButton,
+.booksEngine__toolbar button,
+.booksEngine__choiceButton,
+.booksEngine__secondaryButton {
+  min-height: 30px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-pill);
+  color: var(--color-text-soft);
+  font-weight: 700;
+}
+
+.booksPluginSettings__secondaryButton,
+.booksPluginSettings__primaryButton,
+.booksLibrary__iconButton,
+.booksLibrary__secondaryButton,
+.booksLibrary__choiceButton,
+.booksEngine__toolbar button,
+.booksEngine__choiceButton,
+.booksEngine__secondaryButton {
+  cursor: pointer;
+}
+.booksPluginSettings__secondaryButton:hover:not(:disabled),
+.booksPluginSettings__primaryButton:hover:not(:disabled),
+.booksLibrary__iconButton:hover:not(:disabled),
+.booksLibrary__secondaryButton:hover:not(:disabled),
+.booksLibrary__choiceButton:hover:not(:disabled),
+.booksEngine__toolbar button:hover:not(:disabled),
+.booksEngine__choiceButton:hover:not(:disabled),
+.booksEngine__secondaryButton:hover:not(:disabled) {
+  border-color: var(--color-line-strong);
+  background: var(--surface-hover);
+  color: var(--color-text);
+}
+.booksPluginSettings__secondaryButton:disabled,
+.booksPluginSettings__primaryButton:disabled,
+.booksLibrary__iconButton:disabled,
+.booksLibrary__secondaryButton:disabled,
+.booksLibrary__choiceButton:disabled,
+.booksEngine__toolbar button:disabled,
+.booksEngine__choiceButton:disabled,
+.booksEngine__secondaryButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.booksPluginSettings__primaryButton,
+.booksLibrary__choiceButton.is-active,
+.booksEngine__choiceButton.is-active {
+  border-color: var(--color-line-strong);
+  color: var(--color-text);
+  background: var(--explorer-item-active, var(--surface-hover));
+}
+
+.booksPluginSettings__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-soft);
+}
+
+.booksPluginSettings__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.booksPluginSettings__notice,
+.booksPluginSettings__error,
+.booksLibrary__state,
+.booksEngine__state {
+  padding: 12px 14px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface-inset);
+  color: var(--color-text-muted);
+}
+
+.booksPluginSettings__error,
+.booksLibrary__state--error,
+.booksEngine__state--error {
+  border-color: var(--color-danger-soft, var(--color-line-strong));
+  color: var(--color-danger, var(--color-text));
+}
+
+.booksLibrary {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--shell-bg);
+  container-type: inline-size;
+}
+
+.booksLibrary__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px 14px;
+  border-bottom: 1px solid var(--color-line);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--shell-bg-strong) 90%, transparent), color-mix(in srgb, var(--shell-bg) 96%, transparent));
+}
+
+.booksLibrary__eyebrow {
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.booksLibrary__titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.booksLibrary__titleBlock strong {
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.booksLibrary__controls {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.booksLibrary__searchField,
+.booksLibrary__sortField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.booksLibrary__controlLabel {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.booksLibrary__searchField input,
+.booksLibrary__sortField select {
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--shell-panel-bg);
+  color: var(--color-text);
+  padding: 0 12px;
+}
+
+.booksLibrary__searchField input {
+  width: min(360px, 46vw);
+}
+
+.booksLibrary__sortField select {
+  width: 180px;
+}
+
+.booksLibrary__iconButton {
+  width: 32px;
+  padding: 0;
+}
+
+.booksLibrary__content {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.booksLibrary__virtualViewport {
+  width: 100%;
+  min-width: 0;
+}
+
+.booksLibrary__virtualGrid {
+  position: relative;
+  width: 100%;
+  min-height: 0;
+}
+
+.booksLibrary__card {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  background: var(--shell-panel-bg);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  border-radius: 8px;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+.booksLibrary__card:hover, .booksLibrary__card:focus-visible {
+  border-color: var(--color-line-strong);
+  background: color-mix(in srgb, var(--shell-panel-bg) 84%, var(--surface-hover));
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--color-shadow, #000) 12%, transparent);
+}
+
+.booksLibrary__coverFrame {
+  position: relative;
+  aspect-ratio: 0.72;
+  overflow: hidden;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--shell-bg-strong) 82%, transparent), color-mix(in srgb, var(--color-surface-inset) 94%, transparent));
+  border-bottom: 1px solid var(--color-line);
+}
+
+.booksLibrary__coverFrameViewport {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: none;
+  background: #fff;
+}
+
+.booksLibrary__coverPlaceholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
+}
+
+.booksLibrary__coverPlaceholder--fallback {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--shell-bg-strong) 76%, transparent), color-mix(in srgb, var(--color-surface-inset) 92%, transparent));
+}
+
+.booksLibrary__coverShade {
+  position: absolute;
+  inset: auto 0 0;
+  height: 34%;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, #000 18%, transparent));
+  pointer-events: none;
+}
+
+.booksLibrary__coverInteractionBlock {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
+
+.booksLibrary__cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 12px 13px;
+}
+
+.booksLibrary__cardTitle,
+.booksLibrary__cardAuthor {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.booksLibrary__cardTitle {
+  color: var(--color-text);
+  display: -webkit-box;
+  min-height: 2.55em;
+  line-height: 1.28;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.booksLibrary__cardAuthor {
+  min-height: 1.35em;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.booksLibrary__progressBlock,
+.booksEngine__progressRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.booksLibrary__progressTrack {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-line) 72%, transparent);
+}
+
+.booksLibrary__progressFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--gradient-active, var(--explorer-item-active, var(--surface-hover)));
+}
+
+.booksLibrary__progressValue {
+  color: var(--color-text-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.booksLibrary__status,
+.booksEngine__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-pill);
+  color: var(--color-text-soft);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.booksEngine {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--shell-bg);
+}
+
+.booksEngine__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--shell-titlebar-bg);
+}
+
+.booksEngine__toolbarGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.booksEngine__toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 0 10px;
+}
+
+.booksEngine__body {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+.booksEngine__viewerShell {
+  min-height: 0;
+  padding: 12px;
+  background: color-mix(in srgb, var(--color-surface-inset) 96%, transparent);
+}
+
+.booksEngine__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface-inset);
+}
+
+.booksEngine__aside {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  border-left: 1px solid var(--color-line);
+  background: var(--shell-bg-strong);
+}
+
+.booksEngine__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+}
+
+@media (max-width: 1040px) {
+  .booksLibrary__topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .booksLibrary__controls {
+    align-items: stretch;
+  }
+  .booksLibrary__searchField input,
+  .booksLibrary__sortField select {
+    width: 100%;
+  }
+  .booksEngine__body {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .booksEngine__aside {
+    border-left: 0;
+    border-top: 1px solid var(--color-line);
+  }
+}
+@media (max-width: 760px) {
+  .booksPluginSettings__row {
+    grid-template-columns: 1fr;
+  }
+  .booksLibrary__content {
+    padding: 12px;
+  }
+  .booksEngine__viewerShell,
+  .booksEngine__aside {
+    padding: 12px;
+  }
+}
