@@ -1,0 +1,464 @@
+.trainingPlugin {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--shell-bg);
+  container-type: inline-size;
+}
+
+.trainingPlugin__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-line);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--shell-bg-strong) 90%, transparent), color-mix(in srgb, var(--shell-bg) 96%, transparent));
+}
+
+.trainingPlugin__titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.trainingPlugin__titleBlock strong {
+  color: var(--color-text);
+  font-size: 1rem;
+  line-height: 1.2;
+}
+.trainingPlugin__titleBlock span {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.trainingPlugin__topbarActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trainingPlugin__modeButton,
+.trainingPlugin__primaryButton,
+.trainingPlugin__secondaryButton,
+.trainingPlugin__iconButton,
+.trainingPlugin__chipButton,
+.trainingPlugin__stepButton {
+  min-height: 32px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-pill);
+  color: var(--color-text-soft);
+  font-weight: 700;
+}
+
+.trainingPlugin__modeButton,
+.trainingPlugin__primaryButton,
+.trainingPlugin__secondaryButton,
+.trainingPlugin__iconButton,
+.trainingPlugin__chipButton,
+.trainingPlugin__stepButton {
+  cursor: pointer;
+}
+.trainingPlugin__modeButton:hover:not(:disabled), .trainingPlugin__modeButton:focus-visible:not(:disabled),
+.trainingPlugin__primaryButton:hover:not(:disabled),
+.trainingPlugin__primaryButton:focus-visible:not(:disabled),
+.trainingPlugin__secondaryButton:hover:not(:disabled),
+.trainingPlugin__secondaryButton:focus-visible:not(:disabled),
+.trainingPlugin__iconButton:hover:not(:disabled),
+.trainingPlugin__iconButton:focus-visible:not(:disabled),
+.trainingPlugin__chipButton:hover:not(:disabled),
+.trainingPlugin__chipButton:focus-visible:not(:disabled),
+.trainingPlugin__stepButton:hover:not(:disabled),
+.trainingPlugin__stepButton:focus-visible:not(:disabled) {
+  border-color: var(--color-line-strong);
+  background: var(--surface-hover);
+  color: var(--color-text);
+}
+.trainingPlugin__modeButton:disabled,
+.trainingPlugin__primaryButton:disabled,
+.trainingPlugin__secondaryButton:disabled,
+.trainingPlugin__iconButton:disabled,
+.trainingPlugin__chipButton:disabled,
+.trainingPlugin__stepButton:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+
+.trainingPlugin__modeButton.is-active {
+  border-color: var(--explorer-item-active-border);
+  background: var(--explorer-item-active);
+  color: var(--color-text);
+}
+
+.trainingPlugin__primaryButton {
+  border-color: var(--explorer-item-active-border);
+  background: var(--gradient-active, var(--explorer-item-active));
+  color: var(--color-text);
+}
+
+.trainingPlugin__secondaryButton {
+  padding: 0 12px;
+}
+
+.trainingPlugin__iconButton {
+  width: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trainingPlugin__content {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+}
+
+.trainingPlugin__sidebar {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-right: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--shell-bg-strong) 96%, transparent);
+}
+
+.trainingPlugin__searchField,
+.trainingPlugin__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.trainingPlugin__searchField span,
+.trainingPlugin__field span {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.trainingPlugin__searchField input,
+.trainingPlugin__field input,
+.trainingPlugin__field textarea,
+.trainingPlugin__field select,
+.trainingPlugin__inlineField input,
+.trainingPlugin__inlineField select {
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid var(--color-line);
+  background: var(--surface-field);
+  color: var(--color-text);
+  padding: 0 12px;
+}
+
+.trainingPlugin__field textarea {
+  min-height: 84px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.trainingPlugin__searchField input {
+  width: 100%;
+}
+
+.trainingPlugin__modeToggle {
+  display: flex;
+  gap: 8px;
+}
+
+.trainingPlugin__list {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
+}
+
+.trainingPlugin__listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.trainingPlugin__listHeaderCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.trainingPlugin__listHeaderCopy strong {
+  color: var(--color-text);
+  font-size: 0.92rem;
+}
+.trainingPlugin__listHeaderCopy span {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.trainingPlugin__listCard {
+  padding: 11px 12px;
+  border: 1px solid var(--color-line);
+  background: var(--shell-panel-bg);
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+.trainingPlugin__listCard:hover, .trainingPlugin__listCard:focus-visible {
+  border-color: var(--color-line-strong);
+  background: color-mix(in srgb, var(--shell-panel-bg) 84%, var(--surface-hover));
+  transform: translateY(-1px);
+}
+
+.trainingPlugin__listCard.is-active {
+  border-color: var(--explorer-item-active-border);
+  background: var(--explorer-item-active);
+}
+
+.trainingPlugin__listCardTitle {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.trainingPlugin__listCardMeta,
+.trainingPlugin__listCardSummary {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.trainingPlugin__detail {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px;
+}
+
+.trainingPlugin__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border: 1px solid var(--color-line);
+  background: var(--shell-panel-bg);
+  padding: 14px;
+}
+
+.trainingPlugin__panelCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.trainingPlugin__panelCopy strong {
+  color: var(--color-text);
+  font-size: 0.98rem;
+}
+.trainingPlugin__panelCopy span {
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.trainingPlugin__formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.trainingPlugin__field--wide,
+.trainingPlugin__field--full {
+  grid-column: 1/-1;
+}
+
+.trainingPlugin__fieldRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.trainingPlugin__inlineField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trainingPlugin__inlineField label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.trainingPlugin__buttonRow,
+.trainingPlugin__chipRow,
+.trainingPlugin__stepHeader,
+.trainingPlugin__stepActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trainingPlugin__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-pill);
+  color: var(--color-text-soft);
+}
+
+.trainingPlugin__chipLabel {
+  white-space: nowrap;
+}
+
+.trainingPlugin__chipRemove {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.trainingPlugin__selectorList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.trainingPlugin__selectorItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--shell-panel-bg) 92%, transparent);
+}
+
+.trainingPlugin__selectorItemMain {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.trainingPlugin__selectorItemMain strong {
+  color: var(--color-text);
+  font-size: 0.84rem;
+}
+.trainingPlugin__selectorItemMain span {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+}
+
+.trainingPlugin__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trainingPlugin__step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--shell-panel-bg) 92%, transparent);
+}
+
+.trainingPlugin__stepHeader {
+  justify-content: space-between;
+}
+
+.trainingPlugin__stepTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.trainingPlugin__stepTitle strong {
+  color: var(--color-text);
+}
+.trainingPlugin__stepTitle span {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.trainingPlugin__state {
+  padding: 12px 14px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface-inset);
+  color: var(--color-text-muted);
+}
+
+.trainingPlugin__state--error {
+  border-color: var(--color-border-danger, var(--color-line-strong));
+  color: var(--color-danger, var(--color-text));
+  background: var(--surface-danger-soft);
+}
+
+.trainingPlugin__empty {
+  padding: 14px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface-inset);
+  color: var(--color-text-muted);
+}
+
+.trainingPlugin__empty strong {
+  color: var(--color-text);
+}
+
+@media (max-width: 1060px) {
+  .trainingPlugin__content {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 280px) minmax(0, 1fr);
+  }
+  .trainingPlugin__sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+}
+@media (max-width: 760px) {
+  .trainingPlugin__topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .trainingPlugin__topbarActions {
+    width: 100%;
+  }
+  .trainingPlugin__modeToggle,
+  .trainingPlugin__buttonRow,
+  .trainingPlugin__chipRow,
+  .trainingPlugin__stepHeader,
+  .trainingPlugin__stepActions {
+    width: 100%;
+  }
+  .trainingPlugin__modeButton,
+  .trainingPlugin__primaryButton,
+  .trainingPlugin__secondaryButton {
+    flex: 1 1 auto;
+  }
+  .trainingPlugin__formGrid,
+  .trainingPlugin__fieldRow {
+    grid-template-columns: 1fr;
+  }
+  .trainingPlugin__detail {
+    padding: 12px;
+  }
+}
