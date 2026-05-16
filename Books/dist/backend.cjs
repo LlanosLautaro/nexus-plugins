@@ -33,17 +33,6 @@ __export(backend_exports, {
 });
 module.exports = __toCommonJS(backend_exports);
 
-// src/shared/electron.ts
-var rawElectronMain = globalThis.__electronMain;
-function hasElectronApp(value) {
-  return Boolean(value && typeof value === "object" && "app" in value);
-}
-var electronMain = hasElectronApp(rawElectronMain) ? rawElectronMain : rawElectronMain?.default;
-if (!electronMain) {
-  throw new Error("Electron main API no estA disponible en el runtime ESM");
-}
-var electron = electronMain;
-
 // ../nexus-plugins/Books/src/book-indexing.ts
 var import_promises = __toESM(require("node:fs/promises"));
 var import_node_path2 = __toESM(require("node:path"));
@@ -690,21 +679,289 @@ function registerBooksSchema(ctx) {
   ensureBooksSchema(ctx.requireRepositories().sqlite);
 }
 
+// ../nexus-plugins/Books/src/cover-preview-renderer.ts
+var import_node_path4 = __toESM(require("node:path"));
+var import_node_url = require("node:url");
+
+// src/shared/electron.ts
+var rawElectronMain = globalThis.__electronMain;
+function hasElectronApp(value) {
+  return Boolean(value && typeof value === "object" && "app" in value);
+}
+var electronMain = hasElectronApp(rawElectronMain) ? rawElectronMain : rawElectronMain?.default;
+if (!electronMain) {
+  throw new Error("Electron main API no estA disponible en el runtime ESM");
+}
+var electron = electronMain;
+
+// src/shared/runtime-paths.ts
+var import_node_path3 = __toESM(require("node:path"), 1);
+function getProjectRootPath() {
+  return process.cwd();
+}
+function resolveFromProjectRoot(...segments) {
+  return import_node_path3.default.join(getProjectRootPath(), ...segments);
+}
+function getNodeModulesPath() {
+  return resolveFromProjectRoot("node_modules");
+}
+
+// ../nexus-plugins/Books/src/cover-preview-renderer.ts
+var { BrowserWindow } = electron;
+var COVER_PREVIEW_WIDTH = 220;
+var COVER_PREVIEW_HEIGHT = 320;
+var RENDER_TIMEOUT_MS = 2e4;
+var RENDERER_BOOTSTRAP_URL = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Books PDF Cover Renderer</title>
+    <style>
+      html, body {
+        margin: 0;
+        background: #ffffff;
+      }
+    </style>
+  </head>
+  <body></body>
+</html>`)} `;
+function createTimeoutError(filePath) {
+  return new Error(`[books] Timeout renderizando portada PDF en backend: ${filePath}`);
+}
+function withTimeout(promise, timeoutMs, filePath) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(createTimeoutError(filePath));
+    }, timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      }
+    );
+  });
+}
+function createRenderScript(filePath, pdfModuleUrl, workerModuleUrl, wasmUrl) {
+  return `(async () => {
+    const { readFile } = require("node:fs/promises");
+    const { GlobalWorkerOptions, VerbosityLevel, getDocument } = await import(${JSON.stringify(pdfModuleUrl)});
+    const workerModuleUrl = ${JSON.stringify(workerModuleUrl)};
+    const wasmUrl = ${JSON.stringify(wasmUrl)};
+    const filePath = ${JSON.stringify(filePath)};
+    const targetWidth = ${COVER_PREVIEW_WIDTH};
+
+    GlobalWorkerOptions.workerSrc = workerModuleUrl;
+    globalThis.__booksPdfWorkerModule ||= await import(workerModuleUrl);
+
+    function createCoverPreviewDataUrl(sourceCanvas) {
+      const sourceWidth = Math.max(1, sourceCanvas.width || 1);
+      const sourceHeight = Math.max(1, sourceCanvas.height || 1);
+      const scale = Math.min(1, targetWidth / sourceWidth);
+
+      if (scale >= 0.999) {
+        return sourceCanvas.toDataURL("image/jpeg", 0.76);
+      }
+
+      const thumbnailCanvas = document.createElement("canvas");
+      thumbnailCanvas.width = Math.max(1, Math.round(sourceWidth * scale));
+      thumbnailCanvas.height = Math.max(1, Math.round(sourceHeight * scale));
+      const thumbnailContext = thumbnailCanvas.getContext("2d", { alpha: false });
+
+      if (!thumbnailContext) {
+        return sourceCanvas.toDataURL("image/jpeg", 0.76);
+      }
+
+      thumbnailContext.fillStyle = "#ffffff";
+      thumbnailContext.fillRect(0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
+      thumbnailContext.drawImage(sourceCanvas, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
+      return thumbnailCanvas.toDataURL("image/jpeg", 0.76);
+    }
+
+    let loadingTask = null;
+    let pdfDocument = null;
+    let renderTask = null;
+
+    try {
+      const fileBuffer = await readFile(filePath);
+      loadingTask = getDocument({
+        data: new Uint8Array(fileBuffer),
+        useSystemFonts: true,
+        wasmUrl,
+        verbosity: VerbosityLevel.ERRORS,
+      });
+      pdfDocument = await loadingTask.promise;
+
+      const page = await pdfDocument.getPage(1);
+      const baseViewport = page.getViewport({ scale: 1 });
+      const renderViewport = page.getViewport({
+        scale: targetWidth / Math.max(baseViewport.width, 1),
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(renderViewport.width));
+      canvas.height = Math.max(1, Math.round(renderViewport.height));
+
+      const context = canvas.getContext("2d", { alpha: false });
+
+      if (!context) {
+        throw new Error("No se pudo abrir el contexto 2D para la portada backend.");
+      }
+
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      renderTask = page.render({
+        canvasContext: context,
+        viewport: renderViewport,
+      });
+      await renderTask.promise;
+      page.cleanup();
+
+      return createCoverPreviewDataUrl(canvas);
+    } finally {
+      if (renderTask?.cancel) {
+        try {
+          renderTask.cancel();
+        } catch {}
+      }
+
+      if (pdfDocument?.destroy) {
+        try {
+          await pdfDocument.destroy();
+        } catch {}
+      }
+
+      if (loadingTask?.destroy) {
+        try {
+          await loadingTask.destroy();
+        } catch {}
+      }
+    }
+  })();`;
+}
+function createPdfCoverPreviewRenderer() {
+  let renderWindow = null;
+  let renderWindowReady = null;
+  let renderQueue = Promise.resolve();
+  const nodeModulesPath = getNodeModulesPath();
+  const pdfModuleUrl = (0, import_node_url.pathToFileURL)(
+    import_node_path4.default.join(nodeModulesPath, "pdfjs-dist", "legacy", "build", "pdf.mjs")
+  ).href;
+  const workerModuleUrl = (0, import_node_url.pathToFileURL)(
+    import_node_path4.default.join(nodeModulesPath, "pdfjs-dist", "legacy", "build", "pdf.worker.mjs")
+  ).href;
+  const wasmUrl = `${(0, import_node_url.pathToFileURL)(import_node_path4.default.join(nodeModulesPath, "pdfjs-dist", "wasm")).href}/`;
+  const resetWindow = async () => {
+    const windowToClose = renderWindow;
+    renderWindow = null;
+    renderWindowReady = null;
+    if (windowToClose && !windowToClose.isDestroyed()) {
+      windowToClose.destroy();
+    }
+  };
+  const ensureWindow = async () => {
+    if (renderWindow && !renderWindow.isDestroyed()) {
+      return renderWindow;
+    }
+    if (renderWindowReady) {
+      return renderWindowReady;
+    }
+    renderWindowReady = (async () => {
+      renderWindow = new BrowserWindow({
+        show: false,
+        width: COVER_PREVIEW_WIDTH,
+        height: COVER_PREVIEW_HEIGHT,
+        useContentSize: true,
+        autoHideMenuBar: true,
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false,
+          webSecurity: false,
+          backgroundThrottling: false
+        }
+      });
+      renderWindow.on("closed", () => {
+        renderWindow = null;
+        renderWindowReady = null;
+      });
+      await renderWindow.loadURL(RENDERER_BOOTSTRAP_URL.trim());
+      return renderWindow;
+    })();
+    try {
+      return await renderWindowReady;
+    } catch (error) {
+      await resetWindow();
+      throw error;
+    }
+  };
+  const renderOnce = async (filePath) => {
+    const browserWindow = await ensureWindow();
+    const script = createRenderScript(filePath, pdfModuleUrl, workerModuleUrl, wasmUrl);
+    const previewDataUrl = await withTimeout(
+      browserWindow.webContents.executeJavaScript(script, true),
+      RENDER_TIMEOUT_MS,
+      filePath
+    );
+    return typeof previewDataUrl === "string" ? previewDataUrl.trim() : "";
+  };
+  const render = async (filePath) => {
+    const normalizedPath = String(filePath || "").trim();
+    if (!normalizedPath) {
+      return "";
+    }
+    const performRender = async () => {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          return await renderOnce(normalizedPath);
+        } catch (error) {
+          await resetWindow();
+          if (attempt === 1) {
+            throw error;
+          }
+        }
+      }
+      return "";
+    };
+    const queuedRender = renderQueue.then(performRender, performRender);
+    renderQueue = queuedRender.then(
+      () => void 0,
+      () => void 0
+    );
+    return queuedRender;
+  };
+  return {
+    render,
+    async stop() {
+      renderQueue = Promise.resolve();
+      await resetWindow();
+    }
+  };
+}
+
 // ../nexus-plugins/Books/src/backend.ts
-var COVER_PREVIEW_SIZE = Object.freeze({
-  width: 220,
-  height: 320
-});
-var COVER_PREVIEW_WARM_CONCURRENCY = 10;
-var COVER_PREVIEW_LIST_PRIME_COUNT = 30;
+var COVER_PREVIEW_WARM_CONCURRENCY = 2;
+var COVER_PREVIEW_LIST_PRIME_COUNT = 4;
 var activeCoverPreviewWarmQueue = null;
 function createCoverPreviewWarmQueue(ctx) {
   let stopped = false;
   let activeCount = 0;
   const queuedItemIds = [];
+  const skippedItemIds = /* @__PURE__ */ new Set();
+  const pdfCoverPreviewRenderer = createPdfCoverPreviewRenderer();
   const pendingPromises = /* @__PURE__ */ new Map();
+  const rememberWarmFailure = (itemId, filePath, error) => {
+    skippedItemIds.add(itemId);
+    console.warn("[books] No se pudo precalentar la portada en backend:", {
+      itemId,
+      filePath,
+      error
+    });
+  };
   const generateCoverPreview = async (itemId) => {
-    if (stopped || !itemId) {
+    if (stopped || !itemId || skippedItemIds.has(itemId)) {
       return false;
     }
     const item = await ctx.requireRepositories().items.findById(itemId);
@@ -724,23 +981,17 @@ function createCoverPreviewWarmQueue(ctx) {
       return false;
     }
     try {
-      const thumbnail = await electron.nativeImage.createThumbnailFromPath(
-        filePath,
-        COVER_PREVIEW_SIZE
-      );
-      if (!thumbnail || thumbnail.isEmpty()) {
+      const coverPreview = await pdfCoverPreviewRenderer.render(filePath);
+      if (!coverPreview) {
+        skippedItemIds.add(itemId);
         return false;
       }
       await updateBookCoverPreview(ctx, itemId, {
-        coverPreview: thumbnail.toDataURL()
+        coverPreview
       });
       return true;
     } catch (error) {
-      console.warn("[books] No se pudo precalentar la portada en backend:", {
-        itemId,
-        filePath,
-        error
-      });
+      rememberWarmFailure(itemId, filePath, error);
       return false;
     }
   };
@@ -773,7 +1024,7 @@ function createCoverPreviewWarmQueue(ctx) {
   return {
     queue(itemId) {
       const normalizedItemId = String(itemId || "");
-      if (!normalizedItemId || stopped) {
+      if (!normalizedItemId || stopped || skippedItemIds.has(normalizedItemId)) {
         return Promise.resolve(false);
       }
       const existingPending = pendingPromises.get(normalizedItemId);
@@ -804,13 +1055,22 @@ function createCoverPreviewWarmQueue(ctx) {
       }
       await Promise.all(normalizedIds.map((itemId) => this.queue(itemId)));
     },
-    stop() {
+    async stop() {
       stopped = true;
       queuedItemIds.length = 0;
+      skippedItemIds.clear();
       for (const pending of pendingPromises.values()) {
         pending.resolve(false);
       }
       pendingPromises.clear();
+      await pdfCoverPreviewRenderer.stop();
+    },
+    invalidate(itemId) {
+      const normalizedItemId = String(itemId || "");
+      if (!normalizedItemId) {
+        return;
+      }
+      skippedItemIds.delete(normalizedItemId);
     }
   };
 }
@@ -837,7 +1097,7 @@ var booksPlugin = {
       if (activeCoverPreviewWarmQueue === coverPreviewWarmQueue) {
         activeCoverPreviewWarmQueue = null;
       }
-      coverPreviewWarmQueue.stop();
+      void coverPreviewWarmQueue.stop();
     });
     ctx.registerIpc("books:list", async () => {
       try {
@@ -938,6 +1198,9 @@ var booksPlugin = {
     if (book && !book.coverPreview) {
       const itemId = String(book.itemId || "");
       if (itemId) {
+        if (payload.structuralChanged || payload.contentChanged) {
+          activeCoverPreviewWarmQueue?.invalidate(itemId);
+        }
         activeCoverPreviewWarmQueue?.queue(itemId);
       }
     }

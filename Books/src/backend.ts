@@ -2,7 +2,6 @@ import type {
   NexusBackendPluginContext,
   NexusBackendPluginModule,
 } from "../../../nexus-backend/src/plugins/types.ts";
-import { electron } from "../../../nexus-backend/src/shared/electron.js";
 import {
   ensureBookRecord,
   getBookByItemId,
@@ -13,13 +12,10 @@ import {
   updateBookCoverPreview,
   updateBookState,
 } from "./book-indexing";
+import { createPdfCoverPreviewRenderer } from "./cover-preview-renderer";
 
-const COVER_PREVIEW_SIZE = Object.freeze({
-  width: 220,
-  height: 320,
-});
-const COVER_PREVIEW_WARM_CONCURRENCY = 10;
-const COVER_PREVIEW_LIST_PRIME_COUNT = 30;
+const COVER_PREVIEW_WARM_CONCURRENCY = 2;
+const COVER_PREVIEW_LIST_PRIME_COUNT = 4;
 
 let activeCoverPreviewWarmQueue: ReturnType<typeof createCoverPreviewWarmQueue> | null = null;
 
@@ -27,6 +23,8 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
   let stopped = false;
   let activeCount = 0;
   const queuedItemIds: string[] = [];
+  const skippedItemIds = new Set<string>();
+  const pdfCoverPreviewRenderer = createPdfCoverPreviewRenderer();
   const pendingPromises = new Map<
     string,
     {
@@ -35,8 +33,18 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
     }
   >();
 
+  const rememberWarmFailure = (itemId: string, filePath: string, error: unknown) => {
+    skippedItemIds.add(itemId);
+
+    console.warn("[books] No se pudo precalentar la portada en backend:", {
+      itemId,
+      filePath,
+      error,
+    });
+  };
+
   const generateCoverPreview = async (itemId: string) => {
-    if (stopped || !itemId) {
+    if (stopped || !itemId || skippedItemIds.has(itemId)) {
       return false;
     }
 
@@ -63,25 +71,19 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
     }
 
     try {
-      const thumbnail = await electron.nativeImage.createThumbnailFromPath(
-        filePath,
-        COVER_PREVIEW_SIZE,
-      );
+      const coverPreview = await pdfCoverPreviewRenderer.render(filePath);
 
-      if (!thumbnail || thumbnail.isEmpty()) {
+      if (!coverPreview) {
+        skippedItemIds.add(itemId);
         return false;
       }
 
       await updateBookCoverPreview(ctx, itemId, {
-        coverPreview: thumbnail.toDataURL(),
+        coverPreview,
       });
       return true;
     } catch (error) {
-      console.warn("[books] No se pudo precalentar la portada en backend:", {
-        itemId,
-        filePath,
-        error,
-      });
+      rememberWarmFailure(itemId, filePath, error);
       return false;
     }
   };
@@ -125,7 +127,7 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
     queue(itemId: string) {
       const normalizedItemId = String(itemId || "");
 
-      if (!normalizedItemId || stopped) {
+      if (!normalizedItemId || stopped || skippedItemIds.has(normalizedItemId)) {
         return Promise.resolve(false);
       }
 
@@ -167,13 +169,25 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
       await Promise.all(normalizedIds.map((itemId) => this.queue(itemId)));
     },
 
-    stop() {
+    async stop() {
       stopped = true;
       queuedItemIds.length = 0;
+      skippedItemIds.clear();
       for (const pending of pendingPromises.values()) {
         pending.resolve(false);
       }
       pendingPromises.clear();
+      await pdfCoverPreviewRenderer.stop();
+    },
+
+    invalidate(itemId: string) {
+      const normalizedItemId = String(itemId || "");
+
+      if (!normalizedItemId) {
+        return;
+      }
+
+      skippedItemIds.delete(normalizedItemId);
     },
   };
 }
@@ -205,7 +219,7 @@ const booksPlugin: NexusBackendPluginModule = {
         activeCoverPreviewWarmQueue = null;
       }
 
-      coverPreviewWarmQueue.stop();
+      void coverPreviewWarmQueue.stop();
     });
 
     ctx.registerIpc("books:list", async () => {
@@ -344,6 +358,10 @@ const booksPlugin: NexusBackendPluginModule = {
       const itemId = String(book.itemId || "");
 
       if (itemId) {
+        if (payload.structuralChanged || payload.contentChanged) {
+          activeCoverPreviewWarmQueue?.invalidate(itemId);
+        }
+
         activeCoverPreviewWarmQueue?.queue(itemId);
       }
     }
