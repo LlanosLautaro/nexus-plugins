@@ -31789,8 +31789,11 @@ var { ipcRenderer: ipcRenderer2 } = window.require("electron");
 var BOOK_GRID_ASPECT_RATIO = 0.72;
 var BOOK_GRID_BODY_HEIGHT = 114;
 var BOOK_GRID_OVERSCAN_ROWS = 1;
-var COVER_PREVIEW_BACKEND_RETRY_DELAYS_MS = [0, 180, 900];
+var COVER_PREVIEW_BACKEND_RETRY_DELAYS_MS = [0, 320, 1400, 3200];
+var COVER_PREVIEW_RETRY_COOLDOWN_MS = 12e3;
 var sessionCoverPreviewCache = /* @__PURE__ */ new Map();
+var sessionCoverPreviewPendingCache = /* @__PURE__ */ new Map();
+var sessionCoverPreviewMissCache = /* @__PURE__ */ new Map();
 function getSessionCoverPreviewCacheKey(itemId, resolvedFilePath) {
   return String(itemId || resolvedFilePath || "");
 }
@@ -31803,7 +31806,26 @@ function writeSessionCoverPreview(itemId, resolvedFilePath, previewSrc) {
   if (!cacheKey || !previewSrc) {
     return;
   }
+  sessionCoverPreviewMissCache.delete(cacheKey);
   sessionCoverPreviewCache.set(cacheKey, previewSrc);
+}
+function rememberSessionCoverPreviewMiss(itemId, resolvedFilePath) {
+  const cacheKey = getSessionCoverPreviewCacheKey(itemId, resolvedFilePath);
+  if (!cacheKey) {
+    return;
+  }
+  sessionCoverPreviewMissCache.set(cacheKey, Date.now());
+}
+function shouldRetrySessionCoverPreview(itemId, resolvedFilePath) {
+  const cacheKey = getSessionCoverPreviewCacheKey(itemId, resolvedFilePath);
+  if (!cacheKey) {
+    return false;
+  }
+  const lastMissAt = sessionCoverPreviewMissCache.get(cacheKey);
+  if (!lastMissAt) {
+    return true;
+  }
+  return Date.now() - lastMissAt >= COVER_PREVIEW_RETRY_COOLDOWN_MS;
 }
 var BOOK_SORT_OPTIONS = [
   { value: "added", label: "Mas recientes" },
@@ -31873,6 +31895,38 @@ async function requestCachedCoverPreview(itemId) {
   }
   return response?.data?.coverPreview ? String(response.data.coverPreview) : null;
 }
+function requestSessionCoverPreview(itemId, resolvedFilePath) {
+  const cacheKey = getSessionCoverPreviewCacheKey(itemId, resolvedFilePath);
+  if (!cacheKey || !itemId) {
+    return Promise.resolve(null);
+  }
+  const cachedPreview = readSessionCoverPreview(itemId, resolvedFilePath);
+  if (cachedPreview) {
+    return Promise.resolve(cachedPreview);
+  }
+  const pendingPromise = sessionCoverPreviewPendingCache.get(cacheKey);
+  if (pendingPromise) {
+    return pendingPromise;
+  }
+  const nextPromise = (async () => {
+    for (const delayMs of COVER_PREVIEW_BACKEND_RETRY_DELAYS_MS) {
+      if (delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+      const previewSrc = await requestCachedCoverPreview(itemId);
+      if (previewSrc) {
+        writeSessionCoverPreview(itemId, resolvedFilePath, previewSrc);
+        return previewSrc;
+      }
+    }
+    rememberSessionCoverPreviewMiss(itemId, resolvedFilePath);
+    return null;
+  })().catch(() => null).finally(() => {
+    sessionCoverPreviewPendingCache.delete(cacheKey);
+  });
+  sessionCoverPreviewPendingCache.set(cacheKey, nextPromise);
+  return nextPromise;
+}
 function BookCoverPreview({ book }) {
   const filePath = book?.item?.path || "";
   const itemId = book?.itemId || "";
@@ -31883,9 +31937,12 @@ function BookCoverPreview({ book }) {
   const [previewSrc, setPreviewSrc] = useState3(initialPreviewSrc);
   useEffect3(() => {
     const cachedPreview = book?.coverPreview || readSessionCoverPreview(itemId, resolvedFilePath);
+    if (book?.coverPreview) {
+      writeSessionCoverPreview(itemId, resolvedFilePath, book.coverPreview);
+    }
     setPreviewSrc(cachedPreview);
     setPreviewReady(Boolean(cachedPreview));
-    setShouldLoad(true);
+    setShouldLoad(Boolean(cachedPreview) || shouldRetrySessionCoverPreview(itemId, resolvedFilePath));
   }, [book?.coverPreview, itemId, resolvedFilePath]);
   useEffect3(() => {
     if (!shouldLoad || !resolvedFilePath || previewSrc) {
@@ -31894,30 +31951,23 @@ function BookCoverPreview({ book }) {
     let cancelled = false;
     const loadPreview = async () => {
       try {
-        for (const delayMs of COVER_PREVIEW_BACKEND_RETRY_DELAYS_MS) {
-          if (delayMs > 0) {
-            await new Promise((resolve) => setTimeout(resolve, delayMs));
-          }
-          if (cancelled) {
-            return;
-          }
-          const cachedPreview = await requestCachedCoverPreview(itemId);
-          if (cancelled) {
-            return;
-          }
-          if (!cachedPreview) {
-            continue;
-          }
+        const cachedPreview = await requestSessionCoverPreview(itemId, resolvedFilePath);
+        if (cancelled) {
+          return;
+        }
+        if (cachedPreview) {
           writeSessionCoverPreview(itemId, resolvedFilePath, cachedPreview);
           setPreviewSrc(cachedPreview);
           setPreviewReady(true);
           return;
         }
+        setShouldLoad(false);
         setPreviewReady(false);
       } catch {
         if (cancelled) {
           return;
         }
+        setShouldLoad(false);
         setPreviewReady(false);
       }
     };

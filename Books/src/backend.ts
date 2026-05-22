@@ -14,8 +14,14 @@ import {
 } from "./book-indexing";
 import { createPdfCoverPreviewRenderer } from "./cover-preview-renderer";
 
-const COVER_PREVIEW_WARM_CONCURRENCY = 2;
-const COVER_PREVIEW_LIST_PRIME_COUNT = 4;
+const COVER_PREVIEW_WARM_CONCURRENCY = 3;
+const COVER_PREVIEW_LIST_PRIME_COUNT = 6;
+
+function getBooksCoverPreviewPriority(item: any) {
+  const lastOpenedAt = Date.parse(String(item?.lastOpenedAt || "")) || 0;
+  const addedAt = Date.parse(String(item?.addedAt || "")) || 0;
+  return Math.max(lastOpenedAt, addedAt);
+}
 
 let activeCoverPreviewWarmQueue: ReturnType<typeof createCoverPreviewWarmQueue> | null = null;
 
@@ -225,24 +231,32 @@ const booksPlugin: NexusBackendPluginModule = {
     ctx.registerIpc("books:list", async () => {
       try {
         const initialBooks = await listBooks(ctx);
-        const uncachedItemIds = initialBooks
+        const uncachedBooks = initialBooks
           .filter((book) => !book?.coverPreview)
+          .sort((left, right) => getBooksCoverPreviewPriority(right) - getBooksCoverPreviewPriority(left));
+        const prioritizedItemIds = uncachedBooks
+          .slice(0, COVER_PREVIEW_LIST_PRIME_COUNT)
+          .map((book) => String(book?.itemId || ""))
+          .filter(Boolean);
+        const backgroundItemIds = uncachedBooks
+          .slice(COVER_PREVIEW_LIST_PRIME_COUNT)
           .map((book) => String(book?.itemId || ""))
           .filter(Boolean);
 
-        if (uncachedItemIds.length) {
-          void coverPreviewWarmQueue
-            .prime(uncachedItemIds.slice(0, COVER_PREVIEW_LIST_PRIME_COUNT))
+        if (prioritizedItemIds.length) {
+          await coverPreviewWarmQueue
+            .prime(prioritizedItemIds)
             .catch((error) => {
               console.warn("[books] Fallo el precalentado prioritario de portadas:", error);
             });
-          coverPreviewWarmQueue.queueMany(
-            uncachedItemIds.slice(COVER_PREVIEW_LIST_PRIME_COUNT),
-          );
+        }
+
+        if (backgroundItemIds.length) {
+          coverPreviewWarmQueue.queueMany(backgroundItemIds);
         }
 
         return createSuccess({
-          books: initialBooks,
+          books: prioritizedItemIds.length ? await listBooks(ctx) : initialBooks,
         });
       } catch (error) {
         return createError(error, "No se pudo listar la biblioteca Books.");
