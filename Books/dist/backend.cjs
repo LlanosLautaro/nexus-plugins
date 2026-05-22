@@ -684,11 +684,12 @@ var import_node_path4 = __toESM(require("node:path"));
 var import_node_url = require("node:url");
 
 // src/shared/electron.ts
-var rawElectronMain = globalThis.__electronMain;
 function hasElectronApp(value) {
   return Boolean(value && typeof value === "object" && "app" in value);
 }
-var electronMain = hasElectronApp(rawElectronMain) ? rawElectronMain : rawElectronMain?.default;
+var processElectronMain = process.__electronMain;
+var globalElectronMain = globalThis.__electronMain;
+var electronMain = (hasElectronApp(processElectronMain) ? processElectronMain : null) ?? (hasElectronApp(globalElectronMain) ? globalElectronMain : null) ?? (processElectronMain && typeof processElectronMain === "object" && "default" in processElectronMain && hasElectronApp(processElectronMain.default) ? processElectronMain.default : null) ?? (globalElectronMain && typeof globalElectronMain === "object" && "default" in globalElectronMain && hasElectronApp(globalElectronMain.default) ? globalElectronMain.default : null);
 if (!electronMain) {
   throw new Error("Electron main API no estA disponible en el runtime ESM");
 }
@@ -697,6 +698,9 @@ var electron = electronMain;
 // src/shared/runtime-paths.ts
 var import_node_path3 = __toESM(require("node:path"), 1);
 function getProjectRootPath() {
+  if (electron.app.isPackaged) {
+    return electron.app.getAppPath();
+  }
   return process.cwd();
 }
 function resolveFromProjectRoot(...segments) {
@@ -1104,15 +1108,15 @@ var booksPlugin = {
         const initialBooks = await listBooks(ctx);
         const uncachedItemIds = initialBooks.filter((book) => !book?.coverPreview).map((book) => String(book?.itemId || "")).filter(Boolean);
         if (uncachedItemIds.length) {
-          await coverPreviewWarmQueue.prime(
-            uncachedItemIds.slice(0, COVER_PREVIEW_LIST_PRIME_COUNT)
-          );
+          void coverPreviewWarmQueue.prime(uncachedItemIds.slice(0, COVER_PREVIEW_LIST_PRIME_COUNT)).catch((error) => {
+            console.warn("[books] Fallo el precalentado prioritario de portadas:", error);
+          });
           coverPreviewWarmQueue.queueMany(
             uncachedItemIds.slice(COVER_PREVIEW_LIST_PRIME_COUNT)
           );
         }
         return createSuccess({
-          books: await listBooks(ctx)
+          books: initialBooks
         });
       } catch (error) {
         return createError(error, "No se pudo listar la biblioteca Books.");

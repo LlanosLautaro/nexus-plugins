@@ -1,19 +1,43 @@
-const { useEffect, useMemo, useState } = window.React;
-import { BookIcon, ExternalIcon, RefreshIcon, ZoomInIcon, ZoomOutIcon } from "./icons.jsx";
+const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
+import {
+  BookIcon,
+  ExternalIcon,
+  RefreshIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
+} from "./icons.jsx";
+import BooksPdfViewer from "./BooksPdfViewer.jsx";
 import {
   BOOKS_LIBRARY_VIEW_ID,
   BOOK_READING_STATUSES,
   formatDateTime,
   formatPercent,
   getReadingStatusLabel,
+  queueBooksEditorLogEvent,
   resolveVaultFilePath,
 } from "./renderer-helpers.js";
 
 const { ipcRenderer, shell } = window.require("electron");
-const { pathToFileURL } = window.require("url");
+
+const PDF_VIEWER_CLOSE_SETTLE_MS = 32;
 
 function clampZoom(value) {
   return Math.max(50, Math.min(220, value));
+}
+
+function waitForNextPaint(count = 2) {
+  return new Promise((resolve) => {
+    const step = (remaining) => {
+      if (remaining <= 0) {
+        resolve();
+        return;
+      }
+
+      window.requestAnimationFrame(() => step(remaining - 1));
+    };
+
+    step(count);
+  });
 }
 
 function StatePill({ status }) {
@@ -24,22 +48,75 @@ function StatePill({ status }) {
   );
 }
 
-export default function BooksDocumentEngine({ itemId, filePath, hostApi }) {
+export default function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
   const [zoom, setZoom] = useState(100);
+  const [isClosingViewer, setIsClosingViewer] = useState(false);
+  const preclosePromiseRef = useRef(null);
+  const latestPayloadRef = useRef({
+    filePath,
+    tabId: tabId || null,
+  });
+
   const resolvedFilePath = useMemo(() => resolveVaultFilePath(filePath), [filePath]);
 
-  const viewerUrl = useMemo(() => {
-    if (!resolvedFilePath) {
-      return "";
+  latestPayloadRef.current = {
+    filePath: resolvedFilePath || filePath,
+    tabId: tabId || null,
+  };
+
+  const prepareViewerForClose = useCallback((reason = "unknown") => {
+    if (preclosePromiseRef.current) {
+      return preclosePromiseRef.current;
     }
 
-    return `${pathToFileURL(resolvedFilePath).href}#toolbar=1&navpanes=0&zoom=${zoom}`;
-  }, [resolvedFilePath, zoom]);
+    const latestPayload = latestPayloadRef.current;
+
+    queueBooksEditorLogEvent(
+      "books.document.viewer.cleanup.start",
+      "Books comenzo a retirar el viewer PDF.js antes de cerrar la tab.",
+      {
+        reason,
+        tabId: latestPayload.tabId,
+        filePath: latestPayload.filePath,
+      },
+    );
+
+    const startedAt = performance.now();
+    setIsClosingViewer(true);
+    preclosePromiseRef.current = waitForNextPaint(2).then(async () => {
+      await new Promise((resolve) => setTimeout(resolve, PDF_VIEWER_CLOSE_SETTLE_MS));
+      preclosePromiseRef.current = null;
+      queueBooksEditorLogEvent(
+        "books.document.viewer.cleanup",
+        "El engine PDF de Books retiro el viewer PDF.js antes de desmontarse.",
+        {
+          reason,
+          tabId: latestPayload.tabId,
+          filePath: latestPayload.filePath,
+          settleDelayMs: PDF_VIEWER_CLOSE_SETTLE_MS,
+          elapsedMs: Number((performance.now() - startedAt).toFixed(1)),
+        },
+      );
+      return true;
+    });
+
+    return preclosePromiseRef.current;
+  }, []);
+
+  useEffect(() => {
+    if (!tabId || typeof hostApi?.registerTabCloseHandler !== "function") {
+      return undefined;
+    }
+
+    return hostApi.registerTabCloseHandler(tabId, () =>
+      prepareViewerForClose("tab-close-handler"),
+    );
+  }, [hostApi, tabId, prepareViewerForClose]);
 
   useEffect(() => {
     if (!itemId) {
@@ -47,6 +124,7 @@ export default function BooksDocumentEngine({ itemId, filePath, hostApi }) {
     }
 
     let cancelled = false;
+    setIsClosingViewer(false);
 
     const loadBook = async () => {
       setLoading(true);
@@ -159,11 +237,11 @@ export default function BooksDocumentEngine({ itemId, filePath, hostApi }) {
 
       <div className="booksEngine__body">
         <div className="booksEngine__viewerShell">
-          <iframe
-            key={`${viewerUrl}:${reloadToken}`}
-            className="booksEngine__frame"
-            title={book?.title || "Books document"}
-            src={viewerUrl}
+          <BooksPdfViewer
+            filePath={resolvedFilePath}
+            zoom={zoom}
+            reloadToken={reloadToken}
+            closing={isClosingViewer}
           />
         </div>
 

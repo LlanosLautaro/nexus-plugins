@@ -10,6 +10,8 @@ import {
 } from "./plugin-settings.js";
 
 const path = window.require("node:path");
+const fs = window.require("node:fs");
+const { Buffer } = window.require("node:buffer");
 
 export {
   BOOKS_ENGINE_ID,
@@ -20,6 +22,31 @@ export {
 };
 
 const SUPPORTED_BOOK_EXTENSIONS = new Set(["pdf"]);
+const MOJIBAKE_HINT_RE = /[ÂÃâ]/;
+
+function repairLikelyMojibakePath(candidatePath) {
+  const normalizedCandidatePath = path.normalize(String(candidatePath || ""));
+
+  if (!normalizedCandidatePath || fs.existsSync(normalizedCandidatePath)) {
+    return normalizedCandidatePath;
+  }
+
+  if (!MOJIBAKE_HINT_RE.test(normalizedCandidatePath)) {
+    return normalizedCandidatePath;
+  }
+
+  try {
+    const repairedPath = path.normalize(
+      Buffer.from(normalizedCandidatePath, "latin1").toString("utf8"),
+    );
+
+    if (repairedPath && repairedPath !== normalizedCandidatePath && fs.existsSync(repairedPath)) {
+      return repairedPath;
+    }
+  } catch {}
+
+  return normalizedCandidatePath;
+}
 
 export function getFileExtension(filePath) {
   const fileName = String(filePath || "")
@@ -71,23 +98,25 @@ export function resolveVaultFilePath(filePath) {
   }
 
   if (path.isAbsolute(rawPath)) {
-    return path.normalize(rawPath);
+    return repairLikelyMojibakePath(rawPath);
   }
 
   const normalizedRelativePath = normalizeRelativePath(rawPath);
   const vaultContentPath = String(window?.vault?.contentPath || "").trim();
 
   if (vaultContentPath) {
-    return path.join(vaultContentPath, normalizedRelativePath);
+    return repairLikelyMojibakePath(path.join(vaultContentPath, normalizedRelativePath));
   }
 
   const vaultBasePath = String(window?.vault?.path || "").trim();
 
   if (vaultBasePath) {
-    return path.join(vaultBasePath, "content", normalizedRelativePath);
+    return repairLikelyMojibakePath(
+      path.join(vaultBasePath, "content", normalizedRelativePath),
+    );
   }
 
-  return path.normalize(rawPath);
+  return repairLikelyMojibakePath(rawPath);
 }
 
 export function buildFolderOptions(byId = {}, rootId = null) {
@@ -130,4 +159,19 @@ export function formatDateTime(value) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+export function queueBooksEditorLogEvent(event, message, data = null, level = "info") {
+  try {
+    window.__queueNexusDevLogEvent?.({
+      process: "renderer",
+      surface: "editors",
+      subsystem: "renderer.editors.books",
+      shard: "43-renderer-editors.jsonl",
+      level,
+      event,
+      message,
+      data,
+    });
+  } catch {}
 }

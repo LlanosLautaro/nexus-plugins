@@ -231,16 +231,18 @@ const booksPlugin: NexusBackendPluginModule = {
           .filter(Boolean);
 
         if (uncachedItemIds.length) {
-          await coverPreviewWarmQueue.prime(
-            uncachedItemIds.slice(0, COVER_PREVIEW_LIST_PRIME_COUNT),
-          );
+          void coverPreviewWarmQueue
+            .prime(uncachedItemIds.slice(0, COVER_PREVIEW_LIST_PRIME_COUNT))
+            .catch((error) => {
+              console.warn("[books] Fallo el precalentado prioritario de portadas:", error);
+            });
           coverPreviewWarmQueue.queueMany(
             uncachedItemIds.slice(COVER_PREVIEW_LIST_PRIME_COUNT),
           );
         }
 
         return createSuccess({
-          books: await listBooks(ctx),
+          books: initialBooks,
         });
       } catch (error) {
         return createError(error, "No se pudo listar la biblioteca Books.");

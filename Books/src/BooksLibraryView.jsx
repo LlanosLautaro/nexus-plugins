@@ -1,41 +1,14 @@
-import { GlobalWorkerOptions, VerbosityLevel, getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-
 const { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } = window.React;
 import { BookIcon, RefreshIcon } from "./icons.jsx";
 import { formatPercent, resolveVaultFilePath } from "./renderer-helpers.js";
 
 const { ipcRenderer } = window.require("electron");
-const fs = window.require("node:fs/promises");
 
 const BOOK_GRID_ASPECT_RATIO = 0.72;
 const BOOK_GRID_BODY_HEIGHT = 114;
 const BOOK_GRID_OVERSCAN_ROWS = 1;
-const COVER_PREVIEW_BACKEND_WAIT_MS = 180;
-const LOCAL_PDF_RENDER_CONCURRENCY = 3;
-
-let pdfWorkerReady = false;
-let pdfWorkerModulePromise = null;
-let activeLocalPdfRenderCount = 0;
-const queuedLocalPdfRenders = [];
+const COVER_PREVIEW_BACKEND_RETRY_DELAYS_MS = [0, 180, 900];
 const sessionCoverPreviewCache = new Map();
-
-async function ensurePdfWorker() {
-  if (pdfWorkerReady) {
-    return;
-  }
-
-  const workerUrl = new URL("./pdf.worker.mjs", import.meta.url);
-  GlobalWorkerOptions.workerSrc = workerUrl.href;
-
-  pdfWorkerModulePromise ||= import(/* @vite-ignore */ workerUrl.href).then((workerModule) => {
-    globalThis.pdfjsWorker = workerModule;
-    pdfWorkerReady = true;
-    return workerModule;
-  });
-
-  await pdfWorkerModulePromise;
-  pdfWorkerReady = true;
-}
 
 function getSessionCoverPreviewCacheKey(itemId, resolvedFilePath) {
   return String(itemId || resolvedFilePath || "");
@@ -54,62 +27,6 @@ function writeSessionCoverPreview(itemId, resolvedFilePath, previewSrc) {
   }
 
   sessionCoverPreviewCache.set(cacheKey, previewSrc);
-}
-
-function enqueueLocalPdfRender(task) {
-  return new Promise((resolve, reject) => {
-    queuedLocalPdfRenders.push({
-      task,
-      resolve,
-      reject,
-    });
-
-    const pumpLocalPdfRenders = () => {
-      while (activeLocalPdfRenderCount < LOCAL_PDF_RENDER_CONCURRENCY && queuedLocalPdfRenders.length) {
-        const nextEntry = queuedLocalPdfRenders.shift();
-
-        if (!nextEntry) {
-          continue;
-        }
-
-        activeLocalPdfRenderCount += 1;
-        Promise.resolve()
-          .then(() => nextEntry.task())
-          .then(nextEntry.resolve, nextEntry.reject)
-          .finally(() => {
-            activeLocalPdfRenderCount = Math.max(0, activeLocalPdfRenderCount - 1);
-            pumpLocalPdfRenders();
-          });
-      }
-    };
-
-    pumpLocalPdfRenders();
-  });
-}
-
-function createCoverPreviewDataUrl(sourceCanvas) {
-  const maxWidth = 220;
-  const sourceWidth = Math.max(1, sourceCanvas.width || 1);
-  const sourceHeight = Math.max(1, sourceCanvas.height || 1);
-  const scale = Math.min(1, maxWidth / sourceWidth);
-
-  if (scale >= 0.999) {
-    return sourceCanvas.toDataURL("image/jpeg", 0.76);
-  }
-
-  const thumbnailCanvas = document.createElement("canvas");
-  thumbnailCanvas.width = Math.max(1, Math.round(sourceWidth * scale));
-  thumbnailCanvas.height = Math.max(1, Math.round(sourceHeight * scale));
-  const thumbnailContext = thumbnailCanvas.getContext("2d", { alpha: false });
-
-  if (!thumbnailContext) {
-    return sourceCanvas.toDataURL("image/jpeg", 0.76);
-  }
-
-  thumbnailContext.fillStyle = "#ffffff";
-  thumbnailContext.fillRect(0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
-  thumbnailContext.drawImage(sourceCanvas, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
-  return thumbnailCanvas.toDataURL("image/jpeg", 0.76);
 }
 
 const BOOK_SORT_OPTIONS = [
@@ -204,16 +121,12 @@ async function requestCachedCoverPreview(itemId) {
 }
 
 function BookCoverPreview({ book }) {
-  const containerRef = useRef(null);
-  const canvasRef = useRef(null);
   const filePath = book?.item?.path || "";
   const itemId = book?.itemId || "";
-  const title = book?.title || "";
   const resolvedFilePath = useMemo(() => resolveVaultFilePath(filePath), [filePath]);
   const initialPreviewSrc =
     book?.coverPreview || readSessionCoverPreview(itemId, resolvedFilePath);
   const [shouldLoad, setShouldLoad] = useState(Boolean(initialPreviewSrc));
-  const [previewError, setPreviewError] = useState("");
   const [previewReady, setPreviewReady] = useState(Boolean(initialPreviewSrc));
   const [previewSrc, setPreviewSrc] = useState(initialPreviewSrc);
 
@@ -221,7 +134,6 @@ function BookCoverPreview({ book }) {
     const cachedPreview =
       book?.coverPreview || readSessionCoverPreview(itemId, resolvedFilePath);
 
-    setPreviewError("");
     setPreviewSrc(cachedPreview);
     setPreviewReady(Boolean(cachedPreview));
     setShouldLoad(true);
@@ -235,144 +147,39 @@ function BookCoverPreview({ book }) {
     let cancelled = false;
 
     const loadPreview = async () => {
-      let loadingTask = null;
-      let pdfDocument = null;
-      let renderTask = null;
-
       try {
-        const cachedPreview = await requestCachedCoverPreview(itemId);
+        for (const delayMs of COVER_PREVIEW_BACKEND_RETRY_DELAYS_MS) {
+          if (delayMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+          }
 
-        if (cancelled) {
-          return;
-        }
+          if (cancelled) {
+            return;
+          }
 
-        if (cachedPreview) {
+          const cachedPreview = await requestCachedCoverPreview(itemId);
+
+          if (cancelled) {
+            return;
+          }
+
+          if (!cachedPreview) {
+            continue;
+          }
+
           writeSessionCoverPreview(itemId, resolvedFilePath, cachedPreview);
-          setPreviewError("");
           setPreviewSrc(cachedPreview);
           setPreviewReady(true);
           return;
         }
 
-        if (itemId) {
-          await new Promise((resolve) => setTimeout(resolve, COVER_PREVIEW_BACKEND_WAIT_MS));
-
-          if (cancelled) {
-            return;
-          }
-
-          const warmedPreview = await requestCachedCoverPreview(itemId);
-
-          if (cancelled) {
-            return;
-          }
-
-          if (warmedPreview) {
-            writeSessionCoverPreview(itemId, resolvedFilePath, warmedPreview);
-            setPreviewError("");
-            setPreviewSrc(warmedPreview);
-            setPreviewReady(true);
-            return;
-          }
-        }
-
-        const nextPreviewSrc = await enqueueLocalPdfRender(async () => {
-          await ensurePdfWorker();
-          const fileBuffer = await fs.readFile(resolvedFilePath);
-          const canvas = canvasRef.current;
-
-          if (cancelled) {
-            return "";
-          }
-
-          if (!canvas) {
-            throw new Error("No se pudo inicializar el canvas de portada.");
-          }
-
-          loadingTask = getDocument({
-            data: new Uint8Array(fileBuffer),
-            useSystemFonts: true,
-            wasmUrl: new URL("./wasm/", import.meta.url).href,
-            verbosity: VerbosityLevel.ERRORS,
-          });
-          pdfDocument = await loadingTask.promise;
-
-          if (cancelled) {
-            await pdfDocument.destroy();
-            return "";
-          }
-
-          const page = await pdfDocument.getPage(1);
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          const targetWidth = Math.max(containerRef.current?.clientWidth || 180, 180);
-          const baseViewport = page.getViewport({ scale: 1 });
-          const renderViewport = page.getViewport({
-            scale: targetWidth / Math.max(baseViewport.width, 1),
-          });
-          const context = canvas.getContext("2d", { alpha: false });
-
-          if (!context) {
-            throw new Error("No se pudo abrir el contexto 2D de portada.");
-          }
-
-          canvas.width = Math.max(1, Math.round(renderViewport.width * devicePixelRatio));
-          canvas.height = Math.max(1, Math.round(renderViewport.height * devicePixelRatio));
-          canvas.style.width = "100%";
-          canvas.style.height = "100%";
-
-          context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-          context.fillStyle = "#ffffff";
-          context.fillRect(0, 0, renderViewport.width, renderViewport.height);
-
-          renderTask = page.render({
-            canvasContext: context,
-            viewport: renderViewport,
-          });
-          await renderTask.promise;
-
-          if (cancelled) {
-            await pdfDocument.destroy();
-            return "";
-          }
-
-          return createCoverPreviewDataUrl(canvas);
-        });
-
-        if (!nextPreviewSrc) {
-          return;
-        }
-
-        writeSessionCoverPreview(itemId, resolvedFilePath, nextPreviewSrc);
-        setPreviewError("");
-        setPreviewSrc(nextPreviewSrc);
-        setPreviewReady(true);
-
-        await pdfDocument.destroy();
-      } catch (error) {
+        setPreviewReady(false);
+      } catch {
         if (cancelled) {
           return;
         }
 
-        console.error("[books] No se pudo renderizar la portada PDF:", {
-          filePath: resolvedFilePath,
-          error,
-        });
-        setPreviewError(
-          error instanceof Error ? error.message : "No se pudo renderizar la portada PDF.",
-        );
         setPreviewReady(false);
-      } finally {
-        if (renderTask?.cancel) {
-          try {
-            renderTask.cancel();
-          } catch {}
-        }
-
-        if (loadingTask?.destroy) {
-          try {
-            await loadingTask.destroy();
-          } catch {}
-        }
       }
     };
 
@@ -384,7 +191,7 @@ function BookCoverPreview({ book }) {
   }, [itemId, previewSrc, resolvedFilePath, shouldLoad]);
 
   return (
-    <div ref={containerRef} className="booksLibrary__coverFrame" aria-hidden="true">
+    <div className="booksLibrary__coverFrame" aria-hidden="true">
       {previewSrc ? (
         <img
           src={previewSrc}
@@ -398,23 +205,9 @@ function BookCoverPreview({ book }) {
           }}
         />
       ) : null}
-      {!previewSrc && shouldLoad ? (
-        <canvas
-          ref={canvasRef}
-          className="booksLibrary__coverFrameViewport"
-          role="img"
-          aria-label={`Portada ${title || "PDF"}`}
-          style={{ opacity: previewReady ? 1 : 0 }}
-        />
-      ) : null}
       {!previewReady ? (
         <div
-          className={[
-            "booksLibrary__coverPlaceholder",
-            previewError && "booksLibrary__coverPlaceholder--fallback",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+          className="booksLibrary__coverPlaceholder"
         >
           <BookIcon size={26} />
         </div>
