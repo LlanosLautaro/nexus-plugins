@@ -365,6 +365,7 @@ var chatRendererPlugin = {
       title: "Chat",
       icon: ChatIcon,
       tone: "code",
+      surface: "workspace",
       component: (props) => /* @__PURE__ */ React.createElement(ChatView, { ...props, ctx })
     });
     ctx.registerSideToolbarButton({
@@ -382,10 +383,8 @@ var chatRendererPlugin = {
         });
       },
       isActive: ({ getState }) => {
-        const state = getState();
-        const tabs = state.data.tabs || [];
-        const activeTab = tabs.find((tab) => tab.id === state.data.activeTabId);
-        return activeTab?.kind === "view" && activeTab.viewId === CHAT_VIEW_ID;
+        const workspaceSurface = getState().data.workspaceSurface;
+        return workspaceSurface?.kind === "workspace-view" && workspaceSurface.viewId === CHAT_VIEW_ID;
       }
     });
   },

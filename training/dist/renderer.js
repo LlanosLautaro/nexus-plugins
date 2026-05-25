@@ -1245,6 +1245,7 @@ var trainingRendererPlugin = {
       title: "Entrenamientos",
       icon: TrainingIcon,
       tone: "document",
+      surface: "workspace",
       component: (props) => /* @__PURE__ */ React.createElement(TrainingView_default, { ...props, ctx })
     });
     ctx.registerSideToolbarButton({
@@ -1262,10 +1263,8 @@ var trainingRendererPlugin = {
         });
       },
       isActive: ({ getState }) => {
-        const state = getState();
-        const tabs = state.data.tabs || [];
-        const activeTab = tabs.find((tab) => tab.id === state.data.activeTabId);
-        return activeTab?.kind === "view" && activeTab.viewId === "nexus.training.workspace";
+        const workspaceSurface = getState().data.workspaceSurface;
+        return workspaceSurface?.kind === "workspace-view" && workspaceSurface.viewId === "nexus.training.workspace";
       }
     });
   },

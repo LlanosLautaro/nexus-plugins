@@ -32,6 +32,7 @@ const finanzasRendererPlugin = {
       title: "Finanzas",
       icon: WalletIcon,
       tone: "data",
+      surface: "workspace",
       component: (props) => <PersonalFinanceView {...props} ctx={ctx} />,
     });
 
@@ -50,10 +51,11 @@ const finanzasRendererPlugin = {
         });
       },
       isActive: ({ getState }) => {
-        const state = getState();
-        const tabs = state.data.tabs || [];
-        const activeTab = tabs.find((tab) => tab.id === state.data.activeTabId);
-        return activeTab?.kind === "view" && activeTab.viewId === FINANCE_DASHBOARD_VIEW_ID;
+        const workspaceSurface = getState().data.workspaceSurface;
+        return (
+          workspaceSurface?.kind === "workspace-view"
+          && workspaceSurface.viewId === FINANCE_DASHBOARD_VIEW_ID
+        );
       },
     });
   },

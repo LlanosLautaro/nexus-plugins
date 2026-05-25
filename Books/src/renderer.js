@@ -38,6 +38,7 @@ const booksRendererPlugin = {
       title: "Books",
       icon: BookIcon,
       tone: "document",
+      surface: "workspace",
       component: (props) => <BooksLibraryView {...props} ctx={ctx} />,
     });
 
@@ -56,10 +57,11 @@ const booksRendererPlugin = {
         });
       },
       isActive: ({ getState }) => {
-        const state = getState();
-        const tabs = state.data.tabs || [];
-        const activeTab = tabs.find((tab) => tab.id === state.data.activeTabId);
-        return activeTab?.kind === "view" && activeTab.viewId === BOOKS_LIBRARY_VIEW_ID;
+        const workspaceSurface = getState().data.workspaceSurface;
+        return (
+          workspaceSurface?.kind === "workspace-view"
+          && workspaceSurface.viewId === BOOKS_LIBRARY_VIEW_ID
+        );
       },
     });
 

@@ -32,6 +32,7 @@ const chatRendererPlugin = {
       title: "Chat",
       icon: ChatIcon,
       tone: "code",
+      surface: "workspace",
       component: (props) => <ChatView {...props} ctx={ctx} />,
     });
 
@@ -50,10 +51,11 @@ const chatRendererPlugin = {
         });
       },
       isActive: ({ getState }) => {
-        const state = getState();
-        const tabs = state.data.tabs || [];
-        const activeTab = tabs.find((tab) => tab.id === state.data.activeTabId);
-        return activeTab?.kind === "view" && activeTab.viewId === CHAT_VIEW_ID;
+        const workspaceSurface = getState().data.workspaceSurface;
+        return (
+          workspaceSurface?.kind === "workspace-view"
+          && workspaceSurface.viewId === CHAT_VIEW_ID
+        );
       },
     });
   },
