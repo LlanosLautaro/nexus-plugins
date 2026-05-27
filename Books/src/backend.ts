@@ -2,6 +2,7 @@ import type {
   NexusBackendPluginContext,
   NexusBackendPluginModule,
 } from "../../../nexus-backend/src/plugins/types.ts";
+import { createDevLogger } from "../../../nexus-backend/src/shared/dev-log.js";
 import {
   ensureBookRecord,
   getBookByItemId,
@@ -13,9 +14,54 @@ import {
   updateBookState,
 } from "./book-indexing";
 import { createPdfCoverPreviewRenderer } from "./cover-preview-renderer";
+import {
+  normalizeRelativePath,
+  readBooksEngineAssignments,
+  writeBooksEngineAssignments,
+} from "./plugin-settings.js";
 
 const COVER_PREVIEW_WARM_CONCURRENCY = 3;
 const COVER_PREVIEW_LIST_PRIME_COUNT = 6;
+const booksBackendLogger = createDevLogger("backend.plugins.books");
+
+async function hydrateResolvedItem(ctx: NexusBackendPluginContext, item: any) {
+  if (!item?.id) {
+    return item;
+  }
+
+  const location = await ctx.resolveItemLocation(String(item.id));
+
+  if (!location) {
+    return item;
+  }
+
+  return {
+    ...item,
+    path: location.path,
+    relative_path: location.relativePath,
+    contentRelativePath: location.contentRelativePath,
+  };
+}
+
+async function hydrateResolvedBookItems(ctx: NexusBackendPluginContext, books: any[]) {
+  return Promise.all(
+    (Array.isArray(books) ? books : []).map(async (book) => {
+      if (!book?.item?.id) {
+        return book;
+      }
+
+      return {
+        ...book,
+        item: await hydrateResolvedItem(ctx, book.item),
+      };
+    }),
+  );
+}
+
+async function hydrateResolvedBook(ctx: NexusBackendPluginContext, book: any) {
+  const [hydratedBook] = await hydrateResolvedBookItems(ctx, book ? [book] : []);
+  return hydratedBook || book || null;
+}
 
 function getBooksCoverPreviewPriority(item: any) {
   const lastOpenedAt = Date.parse(String(item?.lastOpenedAt || "")) || 0;
@@ -30,6 +76,7 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
   let activeCount = 0;
   const queuedItemIds: string[] = [];
   const skippedItemIds = new Set<string>();
+  const queuedAtByItemId = new Map<string, number>();
   const pdfCoverPreviewRenderer = createPdfCoverPreviewRenderer();
   const pendingPromises = new Map<
     string,
@@ -39,12 +86,21 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
     }
   >();
 
-  const rememberWarmFailure = (itemId: string, filePath: string, error: unknown) => {
+  const rememberWarmFailure = (itemId: string, filePath: string, error: unknown, queueWaitMs: number | null) => {
     skippedItemIds.add(itemId);
+
+    booksBackendLogger.warn("books.coverWarm.failure", "Fallo precalentando portada en backend.", {
+      itemId,
+      filePath,
+      queueWaitMs,
+      queuedCount: queuedItemIds.length,
+      activeCount,
+    });
 
     console.warn("[books] No se pudo precalentar la portada en backend:", {
       itemId,
       filePath,
+      queueWaitMs,
       error,
     });
   };
@@ -54,7 +110,8 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
       return false;
     }
 
-    const item = await ctx.requireRepositories().items.findById(itemId);
+    const rawItem = await ctx.requireRepositories().items.findById(itemId);
+    const item = await hydrateResolvedItem(ctx, rawItem);
 
     if (!item || item.type !== "file") {
       return false;
@@ -71,6 +128,11 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
     }
 
     const filePath = String(item.path || "");
+    const queuedAt = queuedAtByItemId.get(itemId);
+    const queueWaitMs =
+      typeof queuedAt === "number"
+        ? Number((Date.now() - queuedAt).toFixed(2))
+        : null;
 
     if (!filePath) {
       return false;
@@ -89,7 +151,7 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
       });
       return true;
     } catch (error) {
-      rememberWarmFailure(itemId, filePath, error);
+      rememberWarmFailure(itemId, filePath, error, queueWaitMs);
       return false;
     }
   };
@@ -123,6 +185,7 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
         })
         .finally(() => {
           pendingPromises.delete(itemId);
+          queuedAtByItemId.delete(itemId);
           activeCount = Math.max(0, activeCount - 1);
           pump();
         });
@@ -152,6 +215,7 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
         promise,
         resolve: resolvePending,
       });
+      queuedAtByItemId.set(normalizedItemId, Date.now());
       queuedItemIds.push(normalizedItemId);
       pump();
       return promise;
@@ -179,6 +243,7 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
       stopped = true;
       queuedItemIds.length = 0;
       skippedItemIds.clear();
+      queuedAtByItemId.clear();
       for (const pending of pendingPromises.values()) {
         pending.resolve(false);
       }
@@ -212,6 +277,55 @@ function createError(error: unknown, fallbackMessage: string) {
   };
 }
 
+async function migrateBooksAssignmentIdsIfNeeded(ctx: NexusBackendPluginContext, settingsValue: Record<string, unknown>) {
+  const assignments = readBooksEngineAssignments(settingsValue);
+
+  if (!assignments.some((assignment) => !assignment.rootItemId && assignment.rootPath)) {
+    return null;
+  }
+
+  const items = await ctx.requireRepositories().items.findAll();
+  const folderEntries = await Promise.all(
+    items
+      .filter((item) => item?.type === "folder")
+      .map(async (item) => {
+        const location = await ctx.resolveItemLocation(String(item.id || ""));
+        return [
+          normalizeRelativePath(location?.contentRelativePath || ""),
+          String(item.id || ""),
+        ] as const;
+      }),
+  );
+  const folderIdByRelativePath = new Map(
+    folderEntries.filter(([relativePath, itemId]) => relativePath && itemId),
+  );
+
+  let changed = false;
+  const migratedAssignments = assignments.map((assignment) => {
+    if (assignment.rootItemId || !assignment.rootPath) {
+      return assignment;
+    }
+
+    const resolvedRootItemId = folderIdByRelativePath.get(
+      normalizeRelativePath(assignment.rootPath),
+    );
+
+    if (!resolvedRootItemId) {
+      return assignment;
+    }
+
+    changed = true;
+    return {
+      ...assignment,
+      rootItemId: resolvedRootItemId,
+    };
+  });
+
+  return changed
+    ? writeBooksEngineAssignments(settingsValue, migratedAssignments)
+    : null;
+}
+
 const booksPlugin: NexusBackendPluginModule = {
   ensureSchema(ctx: NexusBackendPluginContext) {
     registerBooksSchema(ctx);
@@ -229,8 +343,9 @@ const booksPlugin: NexusBackendPluginModule = {
     });
 
     ctx.registerIpc("books:list", async () => {
+      const startedAt = Date.now();
       try {
-        const initialBooks = await listBooks(ctx);
+        const initialBooks = await hydrateResolvedBookItems(ctx, await listBooks(ctx));
         const uncachedBooks = initialBooks
           .filter((book) => !book?.coverPreview)
           .sort((left, right) => getBooksCoverPreviewPriority(right) - getBooksCoverPreviewPriority(left));
@@ -255,8 +370,21 @@ const booksPlugin: NexusBackendPluginModule = {
           coverPreviewWarmQueue.queueMany(backgroundItemIds);
         }
 
+        const durationMs = Number((Date.now() - startedAt).toFixed(2));
+        if (durationMs >= 250 || backgroundItemIds.length >= 50) {
+          booksBackendLogger.warn("books.list.done", "Listado Books con trabajo de portadas asociado.", {
+            durationMs,
+            totalBooks: initialBooks.length,
+            uncachedCount: uncachedBooks.length,
+            prioritizedCount: prioritizedItemIds.length,
+            backgroundQueuedCount: backgroundItemIds.length,
+          });
+        }
+
         return createSuccess({
-          books: prioritizedItemIds.length ? await listBooks(ctx) : initialBooks,
+          books: prioritizedItemIds.length
+            ? await hydrateResolvedBookItems(ctx, await listBooks(ctx))
+            : initialBooks,
         });
       } catch (error) {
         return createError(error, "No se pudo listar la biblioteca Books.");
@@ -305,7 +433,7 @@ const booksPlugin: NexusBackendPluginModule = {
         }
 
         return createSuccess({
-          book: await getBookByItemId(ctx, itemId, { markOpened }),
+          book: await hydrateResolvedBook(ctx, await getBookByItemId(ctx, itemId, { markOpened })),
         });
       } catch (error) {
         return createError(error, "No se pudo cargar el libro.");
@@ -321,10 +449,13 @@ const booksPlugin: NexusBackendPluginModule = {
         }
 
         return createSuccess({
-          book: await updateBookState(ctx, itemId, {
-            readingStatus: payload?.readingStatus,
-            progressPercent: payload?.progressPercent,
-          }),
+          book: await hydrateResolvedBook(
+            ctx,
+            await updateBookState(ctx, itemId, {
+              readingStatus: payload?.readingStatus,
+              progressPercent: payload?.progressPercent,
+            }),
+          ),
         });
       } catch (error) {
         return createError(error, "No se pudo actualizar el libro.");
@@ -343,7 +474,7 @@ const booksPlugin: NexusBackendPluginModule = {
         }
 
         return createSuccess({
-          book: await markBookOpened(ctx, itemId),
+          book: await hydrateResolvedBook(ctx, await markBookOpened(ctx, itemId)),
         });
       } catch (error) {
         return createError(error, "No se pudo registrar la apertura del libro.");
@@ -352,9 +483,18 @@ const booksPlugin: NexusBackendPluginModule = {
 
     let reconcileQueue = Promise.resolve();
     ctx.settings.subscribe(
-      () => {
+      (settingsValue) => {
         reconcileQueue = reconcileQueue
-          .then(() => reconcileBooksAssignments(ctx))
+          .then(async () => {
+            const migratedSettings = await migrateBooksAssignmentIdsIfNeeded(ctx, settingsValue);
+
+            if (migratedSettings) {
+              await ctx.settings.set(migratedSettings);
+              return;
+            }
+
+            await reconcileBooksAssignments(ctx);
+          })
           .catch((error) => {
             console.error("[books] Error reconciliando assignments live:", error);
           });
@@ -364,7 +504,8 @@ const booksPlugin: NexusBackendPluginModule = {
   },
 
   async onItemSync(ctx, payload) {
-    const book = await ensureBookRecord(ctx, payload.item, {
+    const resolvedItem = await hydrateResolvedItem(ctx, payload.item);
+    const book = await ensureBookRecord(ctx, resolvedItem, {
       structuralChanged: payload.structuralChanged,
       contentChanged: payload.contentChanged,
       markOpened: false,
@@ -376,6 +517,13 @@ const booksPlugin: NexusBackendPluginModule = {
       if (itemId) {
         if (payload.structuralChanged || payload.contentChanged) {
           activeCoverPreviewWarmQueue?.invalidate(itemId);
+        }
+
+        if (payload.structuralChanged && !payload.contentChanged) {
+          booksBackendLogger.warn("books.onItemSync.structuralPreviewQueue", "Rename/move estructural llego a cola de portadas Books.", {
+            itemId,
+            itemPath: String(resolvedItem?.path || ""),
+          });
         }
 
         activeCoverPreviewWarmQueue?.queue(itemId);

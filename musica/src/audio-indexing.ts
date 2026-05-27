@@ -5,7 +5,9 @@ import type { VaultRepositories } from "../../../nexus-backend/src/backend/vault
 import { getPluginSettingsStateKey } from "../../../nexus-backend/src/plugins/state-keys.ts";
 import {
   isMusicaEmbeddedCoverArtEnabled,
+  normalizeRelativePath,
   normalizeMusicaSettings,
+  readMusicaEngineAssignments,
   resolveEmbeddedCoverPayload,
 } from "./plugin-settings.js";
 
@@ -81,15 +83,6 @@ export function isSupportedAudioItem(item: any) {
   return AUDIO_EXTENSIONS.has(path.extname(filePath).replace(/^\./, "").toLowerCase());
 }
 
-function normalizeRelativePath(value: string | null | undefined) {
-  return String(value || "")
-    .replace(/\\/g, "/")
-    .replace(/^\.?\//, "")
-    .replace(/\/+/g, "/")
-    .replace(/\/$/, "")
-    .trim();
-}
-
 function getContentRelativePath(contentPath: string, itemPath: string | null | undefined) {
   const normalizedContentPath = String(contentPath || "").replace(/\\/g, "/").replace(/\/$/, "");
   const normalizedItemPath = String(itemPath || "").replace(/\\/g, "/");
@@ -105,8 +98,35 @@ function getContentRelativePath(contentPath: string, itemPath: string | null | u
   return "";
 }
 
+async function assignmentMatchesItemById(
+  repositories: VaultRepositories,
+  item: any,
+  assignment: { rootItemId?: string; recursive?: boolean },
+) {
+  const rootItemId = String(assignment?.rootItemId || "").trim();
+
+  if (!rootItemId) {
+    return false;
+  }
+
+  let currentParentId = String(getModelValue(item, "parentId") ?? "").trim();
+  let depth = 1;
+
+  while (currentParentId) {
+    if (currentParentId === rootItemId) {
+      return assignment.recursive !== false || depth === 1;
+    }
+
+    const parentItem = await repositories.items.findById(currentParentId);
+    currentParentId = String(getModelValue(parentItem, "parentId") ?? "").trim();
+    depth += 1;
+  }
+
+  return false;
+}
+
 function assignmentMatchesPath(
-  assignment: { rootPath: string; recursive: boolean },
+  assignment: { rootPath?: string; recursive?: boolean },
   relativeItemPath: string,
 ) {
   const normalizedRoot = normalizeRelativePath(assignment.rootPath);
@@ -124,7 +144,7 @@ function assignmentMatchesPath(
     return false;
   }
 
-  if (assignment.recursive) {
+  if (assignment.recursive !== false) {
     return true;
   }
 
@@ -142,19 +162,7 @@ export async function getMusicaEngineAssignments(ctx: {
     : await ctx.state.get(
         getPluginSettingsStateKey(ctx.pluginId || "nexus.musica"),
       );
-  const settingsValue = normalizeMusicaSettings(rawSettingsValue);
-  const assignments = Array.isArray((settingsValue as any)?.engineAssignments)
-    ? (settingsValue as any).engineAssignments
-    : [];
-
-  return assignments
-    .filter((assignment: any) => assignment?.engineId === "nexus.musica.audio")
-    .map((assignment: any) => ({
-      rootPath: normalizeRelativePath(assignment.rootPath),
-      recursive:
-        typeof assignment.recursive === "boolean" ? assignment.recursive : true,
-    }))
-    .filter((assignment: any) => assignment.rootPath);
+  return readMusicaEngineAssignments(normalizeMusicaSettings(rawSettingsValue));
 }
 
 export async function getMusicaPluginSettings(ctx: {
@@ -185,6 +193,7 @@ export async function isMusicaAssignedItem(
     vault: { contentPath: string };
     settings?: { get: () => Promise<Record<string, unknown>> };
     state: { get: (key: string) => Promise<unknown> };
+    requireRepositories: () => VaultRepositories;
   },
   item: any,
 ) {
@@ -202,7 +211,19 @@ export async function isMusicaAssignedItem(
   }
 
   const assignments = await getMusicaEngineAssignments(ctx);
-  return assignments.some((assignment) => assignmentMatchesPath(assignment, relativeItemPath));
+  const repositories = ctx.requireRepositories();
+
+  for (const assignment of assignments) {
+    if (await assignmentMatchesItemById(repositories, item, assignment)) {
+      return true;
+    }
+
+    if (!assignment?.rootItemId && assignmentMatchesPath(assignment, relativeItemPath)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function dedupeStrings(values: Array<string | null | undefined>) {

@@ -31017,6 +31017,10 @@ var BOOK_READING_STATUSES = [
 var BOOKS_SETTINGS_DEFAULTS = Object.freeze({
   engineAssignments: []
 });
+function normalizeItemId(value) {
+  const normalized = String(value || "").trim();
+  return normalized || "";
+}
 function normalizeBooksSettings(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {
@@ -31031,14 +31035,18 @@ function normalizeBooksSettings(value) {
 function normalizeRelativePath(value) {
   return String(value || "").replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+/g, "/").replace(/\/$/, "").trim();
 }
+function normalizeBooksAssignment(assignment) {
+  return {
+    engineId: BOOKS_ENGINE_ID,
+    rootItemId: normalizeItemId(assignment?.rootItemId),
+    rootPath: normalizeRelativePath(assignment?.rootPath),
+    recursive: typeof assignment?.recursive === "boolean" ? assignment.recursive : true
+  };
+}
 function readBooksEngineAssignments(settingsValue) {
   const normalizedSettings = normalizeBooksSettings(settingsValue);
   const assignments = Array.isArray(normalizedSettings.engineAssignments) ? normalizedSettings.engineAssignments : [];
-  return assignments.filter((assignment) => assignment?.engineId === BOOKS_ENGINE_ID).map((assignment) => ({
-    engineId: BOOKS_ENGINE_ID,
-    rootPath: normalizeRelativePath(assignment.rootPath),
-    recursive: typeof assignment.recursive === "boolean" ? assignment.recursive : true
-  })).filter((assignment) => assignment.rootPath);
+  return assignments.filter((assignment) => assignment?.engineId === BOOKS_ENGINE_ID).map(normalizeBooksAssignment).filter((assignment) => assignment.rootItemId || assignment.rootPath);
 }
 function writeBooksEngineAssignments(settingsValue, assignments) {
   const normalizedSettings = normalizeBooksSettings(settingsValue);
@@ -31047,12 +31055,88 @@ function writeBooksEngineAssignments(settingsValue, assignments) {
     ...normalizedSettings,
     engineAssignments: [
       ...retainedAssignments,
-      ...assignments.map((assignment) => ({
-        engineId: BOOKS_ENGINE_ID,
-        rootPath: normalizeRelativePath(assignment.rootPath),
-        recursive: typeof assignment.recursive === "boolean" ? assignment.recursive : true
-      }))
+      ...assignments.map(normalizeBooksAssignment).filter((assignment) => assignment.rootItemId || assignment.rootPath)
     ]
+  };
+}
+
+// ../nexus-frontend/src/store/items/location.mjs
+function normalizeItemId2(value) {
+  const normalizedValue = String(value || "").trim();
+  return normalizedValue || "";
+}
+function normalizeName(value) {
+  return String(value || "").trim();
+}
+function trimTrailingSeparators(value) {
+  return String(value || "").replace(/[\\/]+$/, "");
+}
+function guessSeparator(...values) {
+  return values.some((value) => String(value || "").includes("\\")) ? "\\" : "/";
+}
+function joinSegments(basePath, segments, separator) {
+  const normalizedBasePath = trimTrailingSeparators(basePath);
+  if (!segments.length) {
+    return normalizedBasePath;
+  }
+  return [normalizedBasePath, ...segments].filter(Boolean).join(separator);
+}
+function joinRelativePath(segments, separator) {
+  return segments.length ? segments.join(separator) : null;
+}
+function resolveItemLocationFromItemsState(itemsState, itemId, options = {}) {
+  const byId = itemsState?.byId || {};
+  const normalizedItemId = normalizeItemId2(itemId);
+  if (!normalizedItemId) {
+    return null;
+  }
+  const item = byId[normalizedItemId];
+  if (!item) {
+    return null;
+  }
+  const visitedIds = /* @__PURE__ */ new Set();
+  const ancestorIds = [];
+  const relativeSegments = [];
+  let currentItem = item;
+  let rootItem = null;
+  while (currentItem?.id) {
+    const currentItemId = normalizeItemId2(currentItem.id);
+    if (!currentItemId || visitedIds.has(currentItemId)) {
+      return null;
+    }
+    visitedIds.add(currentItemId);
+    const currentParentId = normalizeItemId2(currentItem.parentId);
+    if (!currentParentId) {
+      rootItem = currentItem;
+      break;
+    }
+    const currentName = normalizeName(currentItem.name);
+    if (currentName) {
+      relativeSegments.push(currentName);
+    }
+    ancestorIds.push(currentParentId);
+    const parentItem = byId[currentParentId];
+    if (!parentItem) {
+      return null;
+    }
+    currentItem = parentItem;
+  }
+  if (!rootItem) {
+    return null;
+  }
+  const rootPathCandidate = options.rootPath || options.vaultContentPath || "";
+  const separator = guessSeparator(rootPathCandidate);
+  const orderedSegments = [...relativeSegments].reverse();
+  const resolvedRelativePath = joinRelativePath(orderedSegments, separator);
+  return {
+    itemId: String(item.id),
+    parentId: item.parentId ?? null,
+    name: String(item.name || ""),
+    type: item.type === "folder" ? "folder" : "file",
+    path: joinSegments(rootPathCandidate, orderedSegments, separator),
+    relativePath: resolvedRelativePath,
+    contentRelativePath: orderedSegments.length ? orderedSegments.join("/") : null,
+    ancestorIds
   };
 }
 
@@ -31096,21 +31180,6 @@ function isSupportedBookItem(item) {
     getFileExtension(item?.path || item?.name || "")
   );
 }
-function getContentRelativePath(filePath) {
-  const normalizedPath = String(filePath || "").replace(/\\/g, "/");
-  const vaultPath = String(window?.vault?.path || "").replace(/\\/g, "/").replace(/\/$/, "");
-  if (!normalizedPath) {
-    return "";
-  }
-  if (vaultPath) {
-    const contentPrefix = `${vaultPath}/content/`;
-    if (normalizedPath.startsWith(contentPrefix)) {
-      return normalizedPath.slice(contentPrefix.length);
-    }
-  }
-  const contentMatch = normalizedPath.match(/(?:^|\/)content\/(.+)$/);
-  return contentMatch?.[1] || "";
-}
 function resolveVaultFilePath(filePath) {
   const rawPath = String(filePath || "").trim();
   if (!rawPath) {
@@ -31133,12 +31202,49 @@ function resolveVaultFilePath(filePath) {
   return repairLikelyMojibakePath(rawPath);
 }
 function buildFolderOptions(byId = {}, rootId = null) {
-  return Object.values(byId).filter((item) => item?.type === "folder").map((item) => ({
-    id: item.id,
-    label: item.id === rootId ? "Vault completo" : item.name,
-    rootPath: normalizeRelativePath(getContentRelativePath(item.path || "")),
-    path: item.path || ""
-  })).filter((option) => option.rootPath).sort((left, right) => left.rootPath.localeCompare(right.rootPath));
+  return Object.values(byId).filter((item) => item?.type === "folder").map((item) => {
+    const location = resolveItemLocationFromItemsState(
+      {
+        byId,
+        rootId
+      },
+      item.id
+    );
+    return {
+      id: item.id,
+      label: item.id === rootId ? "Vault completo" : item.name,
+      rootPath: normalizeRelativePath(location?.contentRelativePath || ""),
+      path: location?.path || item.path || ""
+    };
+  }).filter((option) => option.rootPath).sort((left, right) => left.rootPath.localeCompare(right.rootPath));
+}
+function resolveFolderOptionForAssignment(assignment, folderOptions = []) {
+  const assignmentRootItemId = normalizeItemId(assignment?.rootItemId);
+  const assignmentRootPath = normalizeRelativePath(assignment?.rootPath);
+  if (assignmentRootItemId) {
+    return folderOptions.find((option) => option.id === assignmentRootItemId) || null;
+  }
+  if (!assignmentRootPath) {
+    return null;
+  }
+  return folderOptions.find((option) => option.rootPath === assignmentRootPath) || null;
+}
+function hydrateAssignmentsWithFolderOptions(assignments, folderOptions = []) {
+  return (Array.isArray(assignments) ? assignments : []).map((assignment) => {
+    const folderOption = resolveFolderOptionForAssignment(assignment, folderOptions);
+    if (!folderOption) {
+      return {
+        ...assignment,
+        rootItemId: normalizeItemId(assignment?.rootItemId),
+        rootPath: normalizeRelativePath(assignment?.rootPath)
+      };
+    }
+    return {
+      ...assignment,
+      rootItemId: folderOption.id,
+      rootPath: folderOption.rootPath
+    };
+  });
 }
 function getReadingStatusLabel(status) {
   if (status === "reading") return "Leyendo";
@@ -31783,9 +31889,187 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
   ))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__field" }, /* @__PURE__ */ React.createElement("span", null, "Ultima apertura"), /* @__PURE__ */ React.createElement("strong", null, formatDateTime(book.lastOpenedAt))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__field" }, /* @__PURE__ */ React.createElement("span", null, "Ruta"), /* @__PURE__ */ React.createElement("strong", null, resolvedFilePath || filePath)))) : /* @__PURE__ */ React.createElement("div", { className: "booksEngine__state" }, "No se pudo resolver el libro actual."), error ? /* @__PURE__ */ React.createElement("div", { className: "booksEngine__state booksEngine__state--error" }, error) : null)));
 }
 
+// ../nexus-frontend/src/utils/devLog.js
+var DEV_LOG_BATCH_CHANNEL = "dev-log:append-batch";
+var { ipcRenderer: ipcRenderer2 } = window.require("electron");
+var devLogRawConsole = {
+  debug: console.debug.bind(console),
+  log: console.log.bind(console),
+  info: console.info.bind(console),
+  warn: console.warn.bind(console),
+  error: console.error.bind(console)
+};
+var rendererDevLogState = {
+  queue: Array.isArray(window.__NEXUS_DEV_LOG_BUFFER__) ? window.__NEXUS_DEV_LOG_BUFFER__ : [],
+  flushTimer: null,
+  consoleBridgeInstalled: false,
+  ipcBridgeInstalled: false,
+  initialized: false,
+  verbose: window.localStorage?.getItem("NEXUS_DEV_LOG_VERBOSE") === "1"
+};
+window.__NEXUS_DEV_LOG_BUFFER__ = rendererDevLogState.queue;
+window.__NEXUS_DEV_LOG_RUN_ID__ = window.__NEXUS_DEV_LOG_RUN_ID__ || (globalThis.crypto?.randomUUID?.() || `renderer-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+function getRendererRunId() {
+  return window.__NEXUS_DEV_LOG_RUN_ID__;
+}
+function shouldMirrorRendererConsole(level) {
+  return level === "warn" || level === "error" || level === "fatal";
+}
+function resolveRendererScope(scope) {
+  const normalizedScope = String(scope || "").trim() || "renderer.startup";
+  if (normalizedScope.startsWith("renderer.startup")) {
+    return {
+      process: "renderer",
+      surface: "startup",
+      subsystem: normalizedScope,
+      shard: "40-renderer-startup.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("renderer.store") || normalizedScope.startsWith("renderer.items")) {
+    return {
+      process: "renderer",
+      surface: "store",
+      subsystem: normalizedScope,
+      shard: "41-renderer-store.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("renderer.explorer")) {
+    return {
+      process: "renderer",
+      surface: "explorer",
+      subsystem: normalizedScope,
+      shard: "42-renderer-explorer.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("renderer.editors")) {
+    return {
+      process: "renderer",
+      surface: "editors",
+      subsystem: normalizedScope,
+      shard: "43-renderer-editors.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("renderer.plugins")) {
+    return {
+      process: "renderer",
+      surface: "plugins",
+      subsystem: normalizedScope,
+      shard: "44-renderer-plugins.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("renderer.ipc")) {
+    return {
+      process: "renderer",
+      surface: "ipc",
+      subsystem: normalizedScope,
+      shard: "50-ipc.jsonl"
+    };
+  }
+  return {
+    process: "renderer",
+    surface: "startup",
+    subsystem: normalizedScope,
+    shard: "40-renderer-startup.jsonl"
+  };
+}
+function serializeUnknown(value, seen = /* @__PURE__ */ new WeakSet()) {
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message,
+      stack: value.stack || null,
+      cause: serializeUnknown(value.cause, seen)
+    };
+  }
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => serializeUnknown(entry, seen));
+  }
+  if (value && typeof value === "object") {
+    if (seen.has(value)) {
+      return "[circular]";
+    }
+    seen.add(value);
+    const serialized = Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, serializeUnknown(entry, seen)])
+    );
+    seen.delete(value);
+    return serialized;
+  }
+  return value ?? null;
+}
+function buildRendererEvent(partialEvent = {}) {
+  return {
+    ts: partialEvent.ts || (/* @__PURE__ */ new Date()).toISOString(),
+    rendererRunId: partialEvent.rendererRunId || getRendererRunId(),
+    process: "renderer",
+    surface: partialEvent.surface || "startup",
+    subsystem: partialEvent.subsystem || "renderer.startup",
+    level: partialEvent.level || "info",
+    event: partialEvent.event || "renderer.unspecified",
+    message: partialEvent.message || "",
+    durationMs: typeof partialEvent.durationMs === "number" ? Number(partialEvent.durationMs.toFixed(2)) : null,
+    requestId: partialEvent.requestId || null,
+    data: partialEvent.data ? serializeUnknown(partialEvent.data) : null,
+    shard: partialEvent.shard || null
+  };
+}
+function queueRendererDevLogEvent(partialEvent = {}) {
+  rendererDevLogState.queue.push(buildRendererEvent(partialEvent));
+  if (shouldMirrorRendererConsole(partialEvent.level || "info")) {
+    const rawMethod = partialEvent.level === "warn" ? devLogRawConsole.warn : devLogRawConsole.error;
+    rawMethod(partialEvent.message || partialEvent.event || "", partialEvent.data || "");
+  }
+  scheduleRendererDevLogFlush();
+}
+function scheduleRendererDevLogFlush() {
+  if (rendererDevLogState.flushTimer) {
+    return;
+  }
+  rendererDevLogState.flushTimer = window.setTimeout(() => {
+    rendererDevLogState.flushTimer = null;
+    flushRendererDevLogBuffer();
+  }, 80);
+}
+function flushRendererDevLogBuffer() {
+  if (!rendererDevLogState.queue.length) {
+    return;
+  }
+  const events = rendererDevLogState.queue.splice(0, rendererDevLogState.queue.length);
+  try {
+    ipcRenderer2.send(DEV_LOG_BATCH_CHANNEL, {
+      events
+    });
+  } catch (error) {
+    rendererDevLogState.queue.unshift(...events);
+    devLogRawConsole.error("[dev-log] No se pudo flush-ear el batch del renderer.", error);
+  }
+}
+function createRendererDevLogger(scope) {
+  const context = resolveRendererScope(scope);
+  return {
+    context,
+    debug(event, message, data = null) {
+      queueRendererDevLogEvent({ ...context, level: "debug", event, message, data });
+    },
+    info(event, message, data = null) {
+      queueRendererDevLogEvent({ ...context, level: "info", event, message, data });
+    },
+    warn(event, message, data = null) {
+      queueRendererDevLogEvent({ ...context, level: "warn", event, message, data });
+    },
+    error(event, message, data = null) {
+      queueRendererDevLogEvent({ ...context, level: "error", event, message, data });
+    }
+  };
+}
+
 // ../nexus-plugins/Books/src/BooksLibraryView.jsx
 var { startTransition, useDeferredValue, useEffect: useEffect3, useMemo: useMemo3, useRef: useRef3, useState: useState3 } = window.React;
-var { ipcRenderer: ipcRenderer2 } = window.require("electron");
+var { ipcRenderer: ipcRenderer3 } = window.require("electron");
+var booksLibraryLogger = createRendererDevLogger("renderer.plugins.books");
 var BOOK_GRID_ASPECT_RATIO = 0.72;
 var BOOK_GRID_BODY_HEIGHT = 114;
 var BOOK_GRID_OVERSCAN_ROWS = 1;
@@ -31887,11 +32171,27 @@ async function requestCachedCoverPreview(itemId) {
   if (!itemId) {
     return null;
   }
-  const response = await ipcRenderer2.invoke("books:get-cover-preview", {
+  const startedAt = performance.now();
+  const response = await ipcRenderer3.invoke("books:get-cover-preview", {
     itemId
   });
+  const durationMs = Number((performance.now() - startedAt).toFixed(2));
   if (!response?.ok) {
+    if (durationMs >= 150) {
+      booksLibraryLogger.warn("books.coverPreview.requestError", "Fallo consultando portada cacheada.", {
+        itemId,
+        durationMs,
+        error: response?.error || null
+      });
+    }
     return null;
+  }
+  if (durationMs >= 250) {
+    booksLibraryLogger.warn("books.coverPreview.requestSlow", "Consulta de portada cacheada lenta.", {
+      itemId,
+      durationMs,
+      hasPreview: Boolean(response?.data?.coverPreview)
+    });
   }
   return response?.data?.coverPreview ? String(response.data.coverPreview) : null;
 }
@@ -31909,17 +32209,36 @@ function requestSessionCoverPreview(itemId, resolvedFilePath) {
     return pendingPromise;
   }
   const nextPromise = (async () => {
+    const startedAt = performance.now();
+    let attempts = 0;
     for (const delayMs of COVER_PREVIEW_BACKEND_RETRY_DELAYS_MS) {
       if (delayMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
+      attempts += 1;
       const previewSrc = await requestCachedCoverPreview(itemId);
       if (previewSrc) {
         writeSessionCoverPreview(itemId, resolvedFilePath, previewSrc);
+        const durationMs2 = Number((performance.now() - startedAt).toFixed(2));
+        if (attempts > 1 || durationMs2 >= 500) {
+          booksLibraryLogger.warn("books.coverPreview.retried", "Portada obtenida tras reintentos o espera perceptible.", {
+            itemId,
+            attempts,
+            durationMs: durationMs2
+          });
+        }
         return previewSrc;
       }
     }
     rememberSessionCoverPreviewMiss(itemId, resolvedFilePath);
+    const durationMs = Number((performance.now() - startedAt).toFixed(2));
+    if (attempts > 1 || durationMs >= 500) {
+      booksLibraryLogger.warn("books.coverPreview.miss", "No se obtuvo portada tras consultar cache backend.", {
+        itemId,
+        attempts,
+        durationMs
+      });
+    }
     return null;
   })().catch(() => null).finally(() => {
     sessionCoverPreviewPendingCache.delete(cacheKey);
@@ -32023,15 +32342,33 @@ function BooksLibraryView({ ctx }) {
   const loadBooks = async () => {
     setError("");
     setRefreshing(true);
+    const startedAt = performance.now();
     try {
-      const response = await ipcRenderer2.invoke("books:list");
+      const response = await ipcRenderer3.invoke("books:list");
       if (!response?.ok) {
         throw new Error(response?.error || "No se pudo cargar la biblioteca Books.");
       }
+      const nextBooks = Array.isArray(response?.data?.books) ? response.data.books : [];
+      const durationMs = Number((performance.now() - startedAt).toFixed(2));
+      if (durationMs >= 250 || nextBooks.length >= 100) {
+        booksLibraryLogger.warn("books.library.loadDone", "Carga de biblioteca Books completada.", {
+          durationMs,
+          totalBooks: nextBooks.length,
+          missingInlinePreviewCount: nextBooks.filter((book) => !book?.coverPreview).length
+        });
+      }
       startTransition(() => {
-        setBooks(Array.isArray(response?.data?.books) ? response.data.books : []);
+        setBooks(nextBooks);
       });
     } catch (loadError) {
+      const durationMs = Number((performance.now() - startedAt).toFixed(2));
+      booksLibraryLogger.error("books.library.loadError", "Fallo cargando la biblioteca Books.", {
+        durationMs,
+        error: loadError instanceof Error ? {
+          name: loadError.name,
+          message: loadError.message
+        } : String(loadError)
+      });
       setError(
         loadError instanceof Error ? loadError.message : "No se pudo cargar la biblioteca Books."
       );
@@ -32041,7 +32378,11 @@ function BooksLibraryView({ ctx }) {
     }
   };
   useEffect3(() => {
+    booksLibraryLogger.info("books.library.mount", "Vista BooksLibrary montada.", null);
     void loadBooks();
+    return () => {
+      booksLibraryLogger.info("books.library.unmount", "Vista BooksLibrary desmontada.", null);
+    };
   }, []);
   useEffect3(() => {
     const contentNode = contentRef.current;
@@ -32152,6 +32493,20 @@ function BooksLibraryView({ ctx }) {
       visibleBooks
     ]
   );
+  useEffect3(() => {
+    if (loading) {
+      return;
+    }
+    const visiblePreviewMissCount = virtualizedBooks.filter(({ book }) => !book?.coverPreview).length;
+    if (visiblePreviewMissCount >= 12 || visibleBooks.length >= 300) {
+      booksLibraryLogger.warn("books.library.viewportPressure", "Viewport de Books con alta presion de previews.", {
+        totalBooks: books.length,
+        visibleBooks: visibleBooks.length,
+        renderedCards: virtualizedBooks.length,
+        visiblePreviewMissCount
+      });
+    }
+  }, [books.length, loading, visibleBooks.length, virtualizedBooks]);
   const handleOpenBook = async (book) => {
     if (!book?.item) {
       return;
@@ -32200,13 +32555,22 @@ function BooksLibraryView({ ctx }) {
 var { useEffect: useEffect4, useMemo: useMemo4, useState: useState4 } = window.React;
 function createEmptyAssignment() {
   return {
+    rootItemId: "",
     rootPath: "",
     recursive: true
   };
 }
+function getAssignmentSelectValue(assignment) {
+  if (assignment?.rootItemId) {
+    return assignment.rootItemId;
+  }
+  const rootPath = String(assignment?.rootPath || "");
+  return rootPath ? `legacy:${rootPath}` : "";
+}
 function getAssignmentsSignature(assignments) {
   return JSON.stringify(
     Array.isArray(assignments) ? assignments.map((assignment) => ({
+      rootItemId: String(assignment?.rootItemId || ""),
       rootPath: String(assignment?.rootPath || ""),
       recursive: Boolean(assignment?.recursive)
     })) : []
@@ -32214,33 +32578,51 @@ function getAssignmentsSignature(assignments) {
 }
 function BooksSettingsSection({ ctx }) {
   const baseSettings = ctx.settings.useValue();
+  const itemsState = ctx.getItems();
+  const folderOptions = buildFolderOptions(itemsState.byId, itemsState.rootId);
+  const folderOptionsById = useMemo4(
+    () => new Map(folderOptions.map((option) => [option.id, option])),
+    [folderOptions]
+  );
   const persistedAssignments = useMemo4(
     () => readBooksEngineAssignments(baseSettings),
     [baseSettings]
   );
+  const hydratedPersistedAssignments = useMemo4(
+    () => hydrateAssignmentsWithFolderOptions(persistedAssignments, folderOptions),
+    [folderOptions, persistedAssignments]
+  );
   const persistedAssignmentsSignature = useMemo4(
-    () => getAssignmentsSignature(persistedAssignments),
-    [persistedAssignments]
+    () => getAssignmentsSignature(hydratedPersistedAssignments),
+    [hydratedPersistedAssignments]
+  );
+  const legacyFolderOptions = useMemo4(
+    () => hydratedPersistedAssignments.filter(
+      (assignment) => (assignment?.rootItemId || assignment?.rootPath) && !resolveFolderOptionForAssignment(assignment, folderOptions)
+    ).map((assignment, index) => ({
+      id: assignment.rootItemId || `legacy:${assignment.rootPath}`,
+      label: `${assignment.rootPath || assignment.rootItemId} (sin resolver)`,
+      key: `${assignment.rootItemId || assignment.rootPath}:${index}`
+    })),
+    [folderOptions, hydratedPersistedAssignments]
   );
   const [draftAssignments, setDraftAssignments] = useState4(
-    () => persistedAssignments
+    () => hydratedPersistedAssignments
   );
   const [saving, setSaving] = useState4(false);
   const [notice, setNotice] = useState4("");
   const [error, setError] = useState4("");
-  const itemsState = ctx.getItems();
-  const folderOptions = buildFolderOptions(itemsState.byId, itemsState.rootId);
   useEffect4(() => {
     setDraftAssignments(
-      (currentValue) => getAssignmentsSignature(currentValue) === persistedAssignmentsSignature ? currentValue : persistedAssignments
+      (currentValue) => getAssignmentsSignature(currentValue) === persistedAssignmentsSignature ? currentValue : hydratedPersistedAssignments
     );
-  }, [persistedAssignmentsSignature]);
+  }, [hydratedPersistedAssignments, persistedAssignmentsSignature]);
   const handleSave = async () => {
     setSaving(true);
     setError("");
     setNotice("");
     try {
-      const normalizedAssignments = draftAssignments.filter((assignment) => assignment.rootPath);
+      const normalizedAssignments = draftAssignments.filter((assignment) => assignment.rootItemId);
       const nextSettings = writeBooksEngineAssignments(baseSettings, normalizedAssignments);
       await ctx.settings.set(nextSettings);
       setNotice("Carpetas guardadas. Books reacciona en vivo a estas asignaciones.");
@@ -32250,49 +32632,78 @@ function BooksSettingsSection({ ctx }) {
       setSaving(false);
     }
   };
-  return /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings" }, /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__copy" }, /* @__PURE__ */ React.createElement("strong", null, "Carpetas reclamadas por Books"), /* @__PURE__ */ React.createElement("p", null, "Solo los PDFs dentro de estas carpetas se trataran como biblioteca indexada por", /* @__PURE__ */ React.createElement("code", null, BOOKS_ENGINE_ID), ".")), /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__list" }, draftAssignments.length ? draftAssignments.map((assignment, index) => /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__row", key: `${assignment.rootPath}-${index}` }, /* @__PURE__ */ React.createElement(
-    "select",
+  return /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings" }, /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__copy" }, /* @__PURE__ */ React.createElement("strong", null, "Carpetas reclamadas por Books"), /* @__PURE__ */ React.createElement("p", null, "Solo los PDFs dentro de estas carpetas se trataran como biblioteca indexada por", /* @__PURE__ */ React.createElement("code", null, BOOKS_ENGINE_ID), ".")), /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__list" }, draftAssignments.length ? draftAssignments.map((assignment, index) => /* @__PURE__ */ React.createElement(
+    "div",
     {
-      value: assignment.rootPath,
-      onChange: (event) => setDraftAssignments(
-        (currentValue) => currentValue.map(
-          (entry, entryIndex) => entryIndex === index ? {
-            ...entry,
-            rootPath: event.target.value
-          } : entry
-        )
-      ),
-      disabled: saving
+      className: "booksPluginSettings__row",
+      key: `${assignment.rootItemId || assignment.rootPath || "empty"}-${index}`
     },
-    /* @__PURE__ */ React.createElement("option", { value: "" }, "Selecciona una carpeta"),
-    folderOptions.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.rootPath || "__vault__", value: option.rootPath }, option.rootPath || "Vault completo"))
-  ), /* @__PURE__ */ React.createElement("label", { className: "booksPluginSettings__checkbox" }, /* @__PURE__ */ React.createElement(
-    "input",
-    {
-      type: "checkbox",
-      checked: assignment.recursive,
-      onChange: (event) => setDraftAssignments(
-        (currentValue) => currentValue.map(
-          (entry, entryIndex) => entryIndex === index ? {
-            ...entry,
-            recursive: event.target.checked
-          } : entry
-        )
-      ),
-      disabled: saving
-    }
-  ), /* @__PURE__ */ React.createElement("span", null, "Recursiva")), /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      type: "button",
-      className: "booksPluginSettings__secondaryButton",
-      onClick: () => setDraftAssignments(
-        (currentValue) => currentValue.filter((_entry, entryIndex) => entryIndex !== index)
-      ),
-      disabled: saving
-    },
-    "Quitar"
-  ))) : /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__empty" }, "Sin carpetas asignadas todavia. Fuera de estas carpetas, los PDFs siguen usando el viewer host.")), /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__actions" }, /* @__PURE__ */ React.createElement(
+    /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        value: getAssignmentSelectValue(assignment),
+        onChange: (event) => setDraftAssignments(
+          (currentValue) => currentValue.map(
+            (entry, entryIndex) => entryIndex !== index ? entry : (() => {
+              const nextValue = event.target.value;
+              const nextOption = folderOptionsById.get(nextValue) || null;
+              if (!nextValue) {
+                return {
+                  ...entry,
+                  rootItemId: "",
+                  rootPath: ""
+                };
+              }
+              if (nextOption) {
+                return {
+                  ...entry,
+                  rootItemId: nextOption.id,
+                  rootPath: nextOption.rootPath
+                };
+              }
+              return {
+                ...entry,
+                rootItemId: "",
+                rootPath: nextValue.replace(/^legacy:/, "")
+              };
+            })()
+          )
+        ),
+        disabled: saving
+      },
+      /* @__PURE__ */ React.createElement("option", { value: "" }, "Selecciona una carpeta"),
+      folderOptions.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.id, value: option.id }, option.rootPath || "Vault completo")),
+      legacyFolderOptions.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.key, value: option.id }, option.label))
+    ),
+    /* @__PURE__ */ React.createElement("label", { className: "booksPluginSettings__checkbox" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "checkbox",
+        checked: assignment.recursive,
+        onChange: (event) => setDraftAssignments(
+          (currentValue) => currentValue.map(
+            (entry, entryIndex) => entryIndex === index ? {
+              ...entry,
+              recursive: event.target.checked
+            } : entry
+          )
+        ),
+        disabled: saving
+      }
+    ), /* @__PURE__ */ React.createElement("span", null, "Recursiva")),
+    /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        type: "button",
+        className: "booksPluginSettings__secondaryButton",
+        onClick: () => setDraftAssignments(
+          (currentValue) => currentValue.filter((_entry, entryIndex) => entryIndex !== index)
+        ),
+        disabled: saving
+      },
+      "Quitar"
+    )
+  )) : /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__empty" }, "Sin carpetas asignadas todavia. Fuera de estas carpetas, los PDFs siguen usando el viewer host.")), /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__actions" }, /* @__PURE__ */ React.createElement(
     "button",
     {
       type: "button",

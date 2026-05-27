@@ -33,6 +33,140 @@ __export(backend_exports, {
 });
 module.exports = __toCommonJS(backend_exports);
 
+// src/shared/electron.ts
+function hasElectronApp(value) {
+  return Boolean(value && typeof value === "object" && "app" in value);
+}
+var processElectronMain = process.__electronMain;
+var globalElectronMain = globalThis.__electronMain;
+var electronMain = (hasElectronApp(processElectronMain) ? processElectronMain : null) ?? (hasElectronApp(globalElectronMain) ? globalElectronMain : null) ?? (processElectronMain && typeof processElectronMain === "object" && "default" in processElectronMain && hasElectronApp(processElectronMain.default) ? processElectronMain.default : null) ?? (globalElectronMain && typeof globalElectronMain === "object" && "default" in globalElectronMain && hasElectronApp(globalElectronMain.default) ? globalElectronMain.default : null);
+if (!electronMain) {
+  throw new Error("Electron main API no estA disponible en el runtime ESM");
+}
+var electron = electronMain;
+
+// src/shared/dev-log.ts
+var DEV_LOG_RUNTIME_KEY = "__NEXUS_DEV_LOG_RUNTIME__";
+function getDevLogRuntime() {
+  const runtime = globalThis[DEV_LOG_RUNTIME_KEY];
+  if (!runtime || typeof runtime !== "object") {
+    return null;
+  }
+  return runtime;
+}
+function devLogResolveScope(scope) {
+  const normalizedScope = String(scope || "").trim() || "main.runtime";
+  if (normalizedScope.startsWith("bootstrap.")) {
+    return {
+      process: "bootstrap",
+      surface: "bootstrap",
+      subsystem: normalizedScope,
+      shard: "10-bootstrap.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("main.")) {
+    return {
+      process: "main",
+      surface: "main",
+      subsystem: normalizedScope,
+      shard: "20-main.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("backend.preview")) {
+    return {
+      process: "backend",
+      surface: "preview",
+      subsystem: normalizedScope,
+      shard: "32-preview.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("backend.plugins")) {
+    return {
+      process: "backend",
+      surface: "plugins",
+      subsystem: normalizedScope,
+      shard: "33-plugins-backend.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("backend.vaultRuntime") || normalizedScope.startsWith("backend.filesystem")) {
+    return {
+      process: "backend",
+      surface: "vault-runtime",
+      subsystem: normalizedScope,
+      shard: "31-vault-runtime.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("backend.")) {
+    return {
+      process: "backend",
+      surface: "backend",
+      subsystem: normalizedScope,
+      shard: "30-backend.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("ipc.")) {
+    return {
+      process: "main",
+      surface: "ipc",
+      subsystem: normalizedScope,
+      shard: "50-ipc.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("addon.directoryWatcher")) {
+    return {
+      process: "addon",
+      surface: "directory-watcher",
+      subsystem: normalizedScope,
+      shard: "60-addons-directory-watcher.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("addon.safeRecycle")) {
+    return {
+      process: "addon",
+      surface: "safe-recycle",
+      subsystem: normalizedScope,
+      shard: "61-addons-safe-recycle.jsonl"
+    };
+  }
+  return {
+    process: "main",
+    surface: "main",
+    subsystem: normalizedScope,
+    shard: "20-main.jsonl"
+  };
+}
+function devLogNormalizeContext(scopeOrContext) {
+  return typeof scopeOrContext === "string" ? devLogResolveScope(scopeOrContext) : scopeOrContext;
+}
+function devLogAppend(event) {
+  const runtime = getDevLogRuntime();
+  runtime?.devLogAppendEvent?.(event);
+}
+function devLogShouldMirrorToConsole(level) {
+  return level === "warn" || level === "error" || level === "fatal";
+}
+function createDevLogger(scopeOrContext) {
+  const context = devLogNormalizeContext(scopeOrContext);
+  const emit = (level, event, message, data = null) => {
+    devLogAppend({
+      ...context,
+      level,
+      event,
+      message,
+      data,
+      mirrorConsole: devLogShouldMirrorToConsole(level)
+    });
+  };
+  return {
+    context,
+    debug: (event, message, data = null) => emit("debug", event, message, data),
+    info: (event, message, data = null) => emit("info", event, message, data),
+    warn: (event, message, data = null) => emit("warn", event, message, data),
+    error: (event, message, data = null) => emit("error", event, message, data),
+    fatal: (event, message, data = null) => emit("fatal", event, message, data)
+  };
+}
+
 // ../nexus-plugins/Books/src/book-indexing.ts
 var import_promises = __toESM(require("node:fs/promises"));
 var import_node_path2 = __toESM(require("node:path"));
@@ -143,6 +277,10 @@ var BOOK_READING_STATUSES = [
 var BOOKS_SETTINGS_DEFAULTS = Object.freeze({
   engineAssignments: []
 });
+function normalizeItemId(value) {
+  const normalized = String(value || "").trim();
+  return normalized || "";
+}
 function normalizeBooksSettings(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {
@@ -157,18 +295,48 @@ function normalizeBooksSettings(value) {
 function normalizeRelativePath2(value) {
   return String(value || "").replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+/g, "/").replace(/\/$/, "").trim();
 }
+function normalizeBooksAssignment(assignment) {
+  return {
+    engineId: BOOKS_ENGINE_ID,
+    rootItemId: normalizeItemId(assignment?.rootItemId),
+    rootPath: normalizeRelativePath2(assignment?.rootPath),
+    recursive: typeof assignment?.recursive === "boolean" ? assignment.recursive : true
+  };
+}
 function readBooksEngineAssignments(settingsValue) {
   const normalizedSettings = normalizeBooksSettings(settingsValue);
   const assignments = Array.isArray(normalizedSettings.engineAssignments) ? normalizedSettings.engineAssignments : [];
-  return assignments.filter((assignment) => assignment?.engineId === BOOKS_ENGINE_ID).map((assignment) => ({
-    engineId: BOOKS_ENGINE_ID,
-    rootPath: normalizeRelativePath2(assignment.rootPath),
-    recursive: typeof assignment.recursive === "boolean" ? assignment.recursive : true
-  })).filter((assignment) => assignment.rootPath);
+  return assignments.filter((assignment) => assignment?.engineId === BOOKS_ENGINE_ID).map(normalizeBooksAssignment).filter((assignment) => assignment.rootItemId || assignment.rootPath);
+}
+function writeBooksEngineAssignments(settingsValue, assignments) {
+  const normalizedSettings = normalizeBooksSettings(settingsValue);
+  const retainedAssignments = Array.isArray(normalizedSettings.engineAssignments) ? normalizedSettings.engineAssignments.filter((assignment) => assignment?.engineId !== BOOKS_ENGINE_ID) : [];
+  return {
+    ...normalizedSettings,
+    engineAssignments: [
+      ...retainedAssignments,
+      ...assignments.map(normalizeBooksAssignment).filter((assignment) => assignment.rootItemId || assignment.rootPath)
+    ]
+  };
 }
 
 // ../nexus-plugins/Books/src/book-indexing.ts
 var SUPPORTED_BOOK_EXTENSIONS = /* @__PURE__ */ new Set(["pdf"]);
+async function withResolvedItemLocation(ctx, item) {
+  if (!item?.id) {
+    return item;
+  }
+  const location = await ctx.resolveItemLocation(String(item.id));
+  if (!location) {
+    return item;
+  }
+  return {
+    ...item,
+    path: location.path,
+    relative_path: location.relativePath,
+    contentRelativePath: location.contentRelativePath
+  };
+}
 function nowIso() {
   return (/* @__PURE__ */ new Date()).toISOString();
 }
@@ -342,6 +510,62 @@ function getContentRelativePath(filePath, vaultContentPath) {
 function normalizeRelativePath3(value) {
   return String(value || "").replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+/g, "/").replace(/\/$/, "").trim();
 }
+async function assignmentMatchesItemById(repositories, item, assignment) {
+  const rootItemId = String(assignment?.rootItemId || "").trim();
+  const itemId = String(item?.id || "").trim();
+  if (!rootItemId) {
+    return false;
+  }
+  if (itemId && itemId === rootItemId) {
+    return true;
+  }
+  let currentParentId = String(item?.parentId || "").trim();
+  let depth = 1;
+  while (currentParentId) {
+    if (currentParentId === rootItemId) {
+      return assignment.recursive !== false || depth === 1;
+    }
+    const parentItem = await repositories.items.findById(currentParentId);
+    currentParentId = String(parentItem?.parentId || "").trim();
+    depth += 1;
+  }
+  return false;
+}
+function assignmentMatchesItemByPath(assignment, itemRelativePath) {
+  const assignmentRoot = normalizeRelativePath3(String(assignment?.rootPath || ""));
+  if (!assignmentRoot || !itemRelativePath) {
+    return false;
+  }
+  if (itemRelativePath === assignmentRoot) {
+    return true;
+  }
+  if (!itemRelativePath.startsWith(`${assignmentRoot}/`)) {
+    return false;
+  }
+  if (assignment.recursive !== false) {
+    return true;
+  }
+  const relativeSuffix = itemRelativePath.slice(assignmentRoot.length + 1);
+  return !relativeSuffix.includes("/");
+}
+async function isBooksAssignedItemWithAssignments(ctx, item, assignments) {
+  const itemRelativePath = normalizeRelativePath3(
+    getContentRelativePath(String(item?.path || ""), ctx.vault.contentPath)
+  );
+  if (!itemRelativePath) {
+    return false;
+  }
+  const repositories = ctx.requireRepositories();
+  for (const assignment of assignments) {
+    if (await assignmentMatchesItemById(repositories, item, assignment)) {
+      return true;
+    }
+    if (!assignment?.rootItemId && assignmentMatchesItemByPath(assignment, itemRelativePath)) {
+      return true;
+    }
+  }
+  return false;
+}
 function isSupportedBookItem(item) {
   if (item?.type !== "file") {
     return false;
@@ -351,34 +575,13 @@ function isSupportedBookItem(item) {
   );
 }
 async function isBooksAssignedItem(ctx, item) {
-  if (!isSupportedBookItem(item)) {
+  const resolvedItem = await withResolvedItemLocation(ctx, item);
+  if (!isSupportedBookItem(resolvedItem)) {
     return false;
   }
   const settings = await ctx.settings.get();
   const assignments = readBooksEngineAssignments(settings);
-  const itemRelativePath = normalizeRelativePath3(
-    getContentRelativePath(String(item?.path || ""), ctx.vault.contentPath)
-  );
-  if (!itemRelativePath) {
-    return false;
-  }
-  return assignments.some((assignment) => {
-    const assignmentRoot = normalizeRelativePath3(String(assignment.rootPath || ""));
-    if (!assignmentRoot) {
-      return false;
-    }
-    if (itemRelativePath === assignmentRoot) {
-      return true;
-    }
-    if (!itemRelativePath.startsWith(`${assignmentRoot}/`)) {
-      return false;
-    }
-    if (assignment.recursive) {
-      return true;
-    }
-    const relativeSuffix = itemRelativePath.slice(assignmentRoot.length + 1);
-    return !relativeSuffix.includes("/");
-  });
+  return isBooksAssignedItemWithAssignments(ctx, resolvedItem, assignments);
 }
 function ensureBooksSchema(sqlite) {
   sqlite.exec(`
@@ -546,24 +749,25 @@ async function ensureBookRecord(ctx, item, {
   markOpened = false
 } = {}) {
   const repositories = ctx.requireRepositories();
-  const itemId = String(item?.id || "");
-  if (!itemId || !isSupportedBookItem(item) || !await isBooksAssignedItem(ctx, item)) {
+  const resolvedItem = await withResolvedItemLocation(ctx, item);
+  const itemId = String(resolvedItem?.id || "");
+  if (!itemId || !isSupportedBookItem(resolvedItem) || !await isBooksAssignedItem(ctx, resolvedItem)) {
     if (itemId) {
       await deleteBookArtifacts(ctx, itemId);
     }
     return null;
   }
   const existing = findBookByItemIdSync(repositories.sqlite, itemId);
-  const shouldRefreshMetadata = !existing || structuralChanged || contentChanged;
-  const extractedMetadata = shouldRefreshMetadata ? await parsePdfMetadata(String(item?.path || "")) : { title: null, author: null };
+  const shouldRefreshMetadata = !existing || contentChanged;
+  const extractedMetadata = shouldRefreshMetadata ? await parsePdfMetadata(String(resolvedItem?.path || "")) : { title: null, author: null };
   const addedAt = existing?.addedAt || nowIso();
-  const itemHash = normalizeOptionalText(item?.hash);
+  const itemHash = normalizeOptionalText(resolvedItem?.hash);
   const shouldResetCoverPreview = contentChanged || Boolean(existing?.coverPreview) && Boolean(itemHash) && existing?.coverPreviewSourceHash !== itemHash;
   const nextBook = {
     itemId,
-    title: extractedMetadata.title || existing?.title || getBaseName(String(item?.path || item?.name || "")) || "Documento",
+    title: extractedMetadata.title || existing?.title || getBaseName(String(resolvedItem?.path || resolvedItem?.name || "")) || "Documento",
     author: extractedMetadata.author ?? existing?.author ?? null,
-    fileFormat: getFileExtension(String(item?.path || "")) || existing?.fileFormat || "pdf",
+    fileFormat: getFileExtension(String(resolvedItem?.path || "")) || existing?.fileFormat || "pdf",
     addedAt,
     lastOpenedAt: markOpened ? nowIso() : existing?.lastOpenedAt ?? null,
     readingStatus: existing?.readingStatus || "pending",
@@ -575,7 +779,7 @@ async function ensureBookRecord(ctx, item, {
   upsertBookSync(repositories.sqlite, nextBook);
   const persisted = findBookByItemIdSync(repositories.sqlite, itemId);
   if (persisted) {
-    await syncBookSearchDocument(ctx, persisted, item);
+    await syncBookSearchDocument(ctx, persisted, resolvedItem);
   }
   return persisted;
 }
@@ -584,7 +788,7 @@ async function listBooks(ctx) {
 }
 async function getBookByItemId(ctx, itemId, { markOpened = false } = {}) {
   const repositories = ctx.requireRepositories();
-  const item = await repositories.items.findById(itemId);
+  const item = await withResolvedItemLocation(ctx, await repositories.items.findById(itemId));
   if (!item) {
     throw new Error("Item no encontrado.");
   }
@@ -602,7 +806,7 @@ async function getBookByItemId(ctx, itemId, { markOpened = false } = {}) {
 }
 async function updateBookState(ctx, itemId, patch) {
   const repositories = ctx.requireRepositories();
-  const item = await repositories.items.findById(itemId);
+  const item = await withResolvedItemLocation(ctx, await repositories.items.findById(itemId));
   if (!item) {
     throw new Error("Item no encontrado.");
   }
@@ -629,7 +833,7 @@ async function updateBookState(ctx, itemId, patch) {
 }
 async function updateBookCoverPreview(ctx, itemId, payload) {
   const repositories = ctx.requireRepositories();
-  const item = await repositories.items.findById(itemId);
+  const item = await withResolvedItemLocation(ctx, await repositories.items.findById(itemId));
   if (!item) {
     throw new Error("Item no encontrado.");
   }
@@ -661,16 +865,17 @@ async function reconcileBooksAssignments(ctx) {
   const repositories = ctx.requireRepositories();
   const items = await repositories.items.findAll();
   for (const item of items) {
-    if (!isSupportedBookItem(item)) {
+    const resolvedItem = await withResolvedItemLocation(ctx, item);
+    if (!isSupportedBookItem(resolvedItem)) {
       continue;
     }
-    if (!await isBooksAssignedItem(ctx, item)) {
+    if (!await isBooksAssignedItem(ctx, resolvedItem)) {
       await deleteBookArtifacts(ctx, String(item.id));
       continue;
     }
-    await ensureBookRecord(ctx, item, {
+    await ensureBookRecord(ctx, resolvedItem, {
       structuralChanged: true,
-      contentChanged: true,
+      contentChanged: false,
       markOpened: false
     });
   }
@@ -682,18 +887,6 @@ function registerBooksSchema(ctx) {
 // ../nexus-plugins/Books/src/cover-preview-renderer.ts
 var import_node_path4 = __toESM(require("node:path"));
 var import_node_url = require("node:url");
-
-// src/shared/electron.ts
-function hasElectronApp(value) {
-  return Boolean(value && typeof value === "object" && "app" in value);
-}
-var processElectronMain = process.__electronMain;
-var globalElectronMain = globalThis.__electronMain;
-var electronMain = (hasElectronApp(processElectronMain) ? processElectronMain : null) ?? (hasElectronApp(globalElectronMain) ? globalElectronMain : null) ?? (processElectronMain && typeof processElectronMain === "object" && "default" in processElectronMain && hasElectronApp(processElectronMain.default) ? processElectronMain.default : null) ?? (globalElectronMain && typeof globalElectronMain === "object" && "default" in globalElectronMain && hasElectronApp(globalElectronMain.default) ? globalElectronMain.default : null);
-if (!electronMain) {
-  throw new Error("Electron main API no estA disponible en el runtime ESM");
-}
-var electron = electronMain;
 
 // src/shared/runtime-paths.ts
 var import_node_path3 = __toESM(require("node:path"), 1);
@@ -948,6 +1141,39 @@ function createPdfCoverPreviewRenderer() {
 // ../nexus-plugins/Books/src/backend.ts
 var COVER_PREVIEW_WARM_CONCURRENCY = 3;
 var COVER_PREVIEW_LIST_PRIME_COUNT = 6;
+var booksBackendLogger = createDevLogger("backend.plugins.books");
+async function hydrateResolvedItem(ctx, item) {
+  if (!item?.id) {
+    return item;
+  }
+  const location = await ctx.resolveItemLocation(String(item.id));
+  if (!location) {
+    return item;
+  }
+  return {
+    ...item,
+    path: location.path,
+    relative_path: location.relativePath,
+    contentRelativePath: location.contentRelativePath
+  };
+}
+async function hydrateResolvedBookItems(ctx, books) {
+  return Promise.all(
+    (Array.isArray(books) ? books : []).map(async (book) => {
+      if (!book?.item?.id) {
+        return book;
+      }
+      return {
+        ...book,
+        item: await hydrateResolvedItem(ctx, book.item)
+      };
+    })
+  );
+}
+async function hydrateResolvedBook(ctx, book) {
+  const [hydratedBook] = await hydrateResolvedBookItems(ctx, book ? [book] : []);
+  return hydratedBook || book || null;
+}
 function getBooksCoverPreviewPriority(item) {
   const lastOpenedAt = Date.parse(String(item?.lastOpenedAt || "")) || 0;
   const addedAt = Date.parse(String(item?.addedAt || "")) || 0;
@@ -959,13 +1185,22 @@ function createCoverPreviewWarmQueue(ctx) {
   let activeCount = 0;
   const queuedItemIds = [];
   const skippedItemIds = /* @__PURE__ */ new Set();
+  const queuedAtByItemId = /* @__PURE__ */ new Map();
   const pdfCoverPreviewRenderer = createPdfCoverPreviewRenderer();
   const pendingPromises = /* @__PURE__ */ new Map();
-  const rememberWarmFailure = (itemId, filePath, error) => {
+  const rememberWarmFailure = (itemId, filePath, error, queueWaitMs) => {
     skippedItemIds.add(itemId);
+    booksBackendLogger.warn("books.coverWarm.failure", "Fallo precalentando portada en backend.", {
+      itemId,
+      filePath,
+      queueWaitMs,
+      queuedCount: queuedItemIds.length,
+      activeCount
+    });
     console.warn("[books] No se pudo precalentar la portada en backend:", {
       itemId,
       filePath,
+      queueWaitMs,
       error
     });
   };
@@ -973,7 +1208,8 @@ function createCoverPreviewWarmQueue(ctx) {
     if (stopped || !itemId || skippedItemIds.has(itemId)) {
       return false;
     }
-    const item = await ctx.requireRepositories().items.findById(itemId);
+    const rawItem = await ctx.requireRepositories().items.findById(itemId);
+    const item = await hydrateResolvedItem(ctx, rawItem);
     if (!item || item.type !== "file") {
       return false;
     }
@@ -986,6 +1222,8 @@ function createCoverPreviewWarmQueue(ctx) {
       return Boolean(book?.coverPreview);
     }
     const filePath = String(item.path || "");
+    const queuedAt = queuedAtByItemId.get(itemId);
+    const queueWaitMs = typeof queuedAt === "number" ? Number((Date.now() - queuedAt).toFixed(2)) : null;
     if (!filePath) {
       return false;
     }
@@ -1000,7 +1238,7 @@ function createCoverPreviewWarmQueue(ctx) {
       });
       return true;
     } catch (error) {
-      rememberWarmFailure(itemId, filePath, error);
+      rememberWarmFailure(itemId, filePath, error, queueWaitMs);
       return false;
     }
   };
@@ -1025,6 +1263,7 @@ function createCoverPreviewWarmQueue(ctx) {
         pending.resolve(Boolean(result));
       }).finally(() => {
         pendingPromises.delete(itemId);
+        queuedAtByItemId.delete(itemId);
         activeCount = Math.max(0, activeCount - 1);
         pump();
       });
@@ -1048,6 +1287,7 @@ function createCoverPreviewWarmQueue(ctx) {
         promise,
         resolve: resolvePending
       });
+      queuedAtByItemId.set(normalizedItemId, Date.now());
       queuedItemIds.push(normalizedItemId);
       pump();
       return promise;
@@ -1068,6 +1308,7 @@ function createCoverPreviewWarmQueue(ctx) {
       stopped = true;
       queuedItemIds.length = 0;
       skippedItemIds.clear();
+      queuedAtByItemId.clear();
       for (const pending of pendingPromises.values()) {
         pending.resolve(false);
       }
@@ -1095,6 +1336,43 @@ function createError(error, fallbackMessage) {
     error: error instanceof Error ? error.message : fallbackMessage
   };
 }
+async function migrateBooksAssignmentIdsIfNeeded(ctx, settingsValue) {
+  const assignments = readBooksEngineAssignments(settingsValue);
+  if (!assignments.some((assignment) => !assignment.rootItemId && assignment.rootPath)) {
+    return null;
+  }
+  const items = await ctx.requireRepositories().items.findAll();
+  const folderEntries = await Promise.all(
+    items.filter((item) => item?.type === "folder").map(async (item) => {
+      const location = await ctx.resolveItemLocation(String(item.id || ""));
+      return [
+        normalizeRelativePath2(location?.contentRelativePath || ""),
+        String(item.id || "")
+      ];
+    })
+  );
+  const folderIdByRelativePath = new Map(
+    folderEntries.filter(([relativePath, itemId]) => relativePath && itemId)
+  );
+  let changed = false;
+  const migratedAssignments = assignments.map((assignment) => {
+    if (assignment.rootItemId || !assignment.rootPath) {
+      return assignment;
+    }
+    const resolvedRootItemId = folderIdByRelativePath.get(
+      normalizeRelativePath2(assignment.rootPath)
+    );
+    if (!resolvedRootItemId) {
+      return assignment;
+    }
+    changed = true;
+    return {
+      ...assignment,
+      rootItemId: resolvedRootItemId
+    };
+  });
+  return changed ? writeBooksEngineAssignments(settingsValue, migratedAssignments) : null;
+}
 var booksPlugin = {
   ensureSchema(ctx) {
     registerBooksSchema(ctx);
@@ -1109,8 +1387,9 @@ var booksPlugin = {
       void coverPreviewWarmQueue.stop();
     });
     ctx.registerIpc("books:list", async () => {
+      const startedAt = Date.now();
       try {
-        const initialBooks = await listBooks(ctx);
+        const initialBooks = await hydrateResolvedBookItems(ctx, await listBooks(ctx));
         const uncachedBooks = initialBooks.filter((book) => !book?.coverPreview).sort((left, right) => getBooksCoverPreviewPriority(right) - getBooksCoverPreviewPriority(left));
         const prioritizedItemIds = uncachedBooks.slice(0, COVER_PREVIEW_LIST_PRIME_COUNT).map((book) => String(book?.itemId || "")).filter(Boolean);
         const backgroundItemIds = uncachedBooks.slice(COVER_PREVIEW_LIST_PRIME_COUNT).map((book) => String(book?.itemId || "")).filter(Boolean);
@@ -1122,8 +1401,18 @@ var booksPlugin = {
         if (backgroundItemIds.length) {
           coverPreviewWarmQueue.queueMany(backgroundItemIds);
         }
+        const durationMs = Number((Date.now() - startedAt).toFixed(2));
+        if (durationMs >= 250 || backgroundItemIds.length >= 50) {
+          booksBackendLogger.warn("books.list.done", "Listado Books con trabajo de portadas asociado.", {
+            durationMs,
+            totalBooks: initialBooks.length,
+            uncachedCount: uncachedBooks.length,
+            prioritizedCount: prioritizedItemIds.length,
+            backgroundQueuedCount: backgroundItemIds.length
+          });
+        }
         return createSuccess({
-          books: prioritizedItemIds.length ? await listBooks(ctx) : initialBooks
+          books: prioritizedItemIds.length ? await hydrateResolvedBookItems(ctx, await listBooks(ctx)) : initialBooks
         });
       } catch (error) {
         return createError(error, "No se pudo listar la biblioteca Books.");
@@ -1155,7 +1444,7 @@ var booksPlugin = {
           throw new Error("Falta itemId.");
         }
         return createSuccess({
-          book: await getBookByItemId(ctx, itemId, { markOpened })
+          book: await hydrateResolvedBook(ctx, await getBookByItemId(ctx, itemId, { markOpened }))
         });
       } catch (error) {
         return createError(error, "No se pudo cargar el libro.");
@@ -1168,10 +1457,13 @@ var booksPlugin = {
           throw new Error("Falta itemId.");
         }
         return createSuccess({
-          book: await updateBookState(ctx, itemId, {
-            readingStatus: payload?.readingStatus,
-            progressPercent: payload?.progressPercent
-          })
+          book: await hydrateResolvedBook(
+            ctx,
+            await updateBookState(ctx, itemId, {
+              readingStatus: payload?.readingStatus,
+              progressPercent: payload?.progressPercent
+            })
+          )
         });
       } catch (error) {
         return createError(error, "No se pudo actualizar el libro.");
@@ -1184,7 +1476,7 @@ var booksPlugin = {
           throw new Error("Falta itemId.");
         }
         return createSuccess({
-          book: await markBookOpened(ctx, itemId)
+          book: await hydrateResolvedBook(ctx, await markBookOpened(ctx, itemId))
         });
       } catch (error) {
         return createError(error, "No se pudo registrar la apertura del libro.");
@@ -1192,8 +1484,15 @@ var booksPlugin = {
     });
     let reconcileQueue = Promise.resolve();
     ctx.settings.subscribe(
-      () => {
-        reconcileQueue = reconcileQueue.then(() => reconcileBooksAssignments(ctx)).catch((error) => {
+      (settingsValue) => {
+        reconcileQueue = reconcileQueue.then(async () => {
+          const migratedSettings = await migrateBooksAssignmentIdsIfNeeded(ctx, settingsValue);
+          if (migratedSettings) {
+            await ctx.settings.set(migratedSettings);
+            return;
+          }
+          await reconcileBooksAssignments(ctx);
+        }).catch((error) => {
           console.error("[books] Error reconciliando assignments live:", error);
         });
       },
@@ -1201,7 +1500,8 @@ var booksPlugin = {
     );
   },
   async onItemSync(ctx, payload) {
-    const book = await ensureBookRecord(ctx, payload.item, {
+    const resolvedItem = await hydrateResolvedItem(ctx, payload.item);
+    const book = await ensureBookRecord(ctx, resolvedItem, {
       structuralChanged: payload.structuralChanged,
       contentChanged: payload.contentChanged,
       markOpened: false
@@ -1211,6 +1511,12 @@ var booksPlugin = {
       if (itemId) {
         if (payload.structuralChanged || payload.contentChanged) {
           activeCoverPreviewWarmQueue?.invalidate(itemId);
+        }
+        if (payload.structuralChanged && !payload.contentChanged) {
+          booksBackendLogger.warn("books.onItemSync.structuralPreviewQueue", "Rename/move estructural llego a cola de portadas Books.", {
+            itemId,
+            itemPath: String(resolvedItem?.path || "")
+          });
         }
         activeCoverPreviewWarmQueue?.queue(itemId);
       }

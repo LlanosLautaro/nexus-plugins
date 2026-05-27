@@ -1203,6 +1203,121 @@ var require_browser = __commonJS({
   }
 });
 
+// node_modules/has-flag/index.js
+var require_has_flag = __commonJS({
+  "node_modules/has-flag/index.js"(exports2, module2) {
+    "use strict";
+    module2.exports = (flag, argv = process.argv) => {
+      const prefix = flag.startsWith("-") ? "" : flag.length === 1 ? "-" : "--";
+      const position = argv.indexOf(prefix + flag);
+      const terminatorPosition = argv.indexOf("--");
+      return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+    };
+  }
+});
+
+// node_modules/supports-color/index.js
+var require_supports_color = __commonJS({
+  "node_modules/supports-color/index.js"(exports2, module2) {
+    "use strict";
+    var os = require("os");
+    var tty = require("tty");
+    var hasFlag = require_has_flag();
+    var { env } = process;
+    var forceColor;
+    if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
+      forceColor = 0;
+    } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
+      forceColor = 1;
+    }
+    if ("FORCE_COLOR" in env) {
+      if (env.FORCE_COLOR === "true") {
+        forceColor = 1;
+      } else if (env.FORCE_COLOR === "false") {
+        forceColor = 0;
+      } else {
+        forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
+      }
+    }
+    function translateLevel(level) {
+      if (level === 0) {
+        return false;
+      }
+      return {
+        level,
+        hasBasic: true,
+        has256: level >= 2,
+        has16m: level >= 3
+      };
+    }
+    function supportsColor(haveStream, streamIsTTY) {
+      if (forceColor === 0) {
+        return 0;
+      }
+      if (hasFlag("color=16m") || hasFlag("color=full") || hasFlag("color=truecolor")) {
+        return 3;
+      }
+      if (hasFlag("color=256")) {
+        return 2;
+      }
+      if (haveStream && !streamIsTTY && forceColor === void 0) {
+        return 0;
+      }
+      const min = forceColor || 0;
+      if (env.TERM === "dumb") {
+        return min;
+      }
+      if (process.platform === "win32") {
+        const osRelease = os.release().split(".");
+        if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
+          return Number(osRelease[2]) >= 14931 ? 3 : 2;
+        }
+        return 1;
+      }
+      if ("CI" in env) {
+        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env) || env.CI_NAME === "codeship") {
+          return 1;
+        }
+        return min;
+      }
+      if ("TEAMCITY_VERSION" in env) {
+        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
+      }
+      if (env.COLORTERM === "truecolor") {
+        return 3;
+      }
+      if ("TERM_PROGRAM" in env) {
+        const version = parseInt((env.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+        switch (env.TERM_PROGRAM) {
+          case "iTerm.app":
+            return version >= 3 ? 3 : 2;
+          case "Apple_Terminal":
+            return 2;
+        }
+      }
+      if (/-256(color)?$/i.test(env.TERM)) {
+        return 2;
+      }
+      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
+        return 1;
+      }
+      if ("COLORTERM" in env) {
+        return 1;
+      }
+      return min;
+    }
+    function getSupportLevel(stream) {
+      const level = supportsColor(stream, stream && stream.isTTY);
+      return translateLevel(level);
+    }
+    module2.exports = {
+      supportsColor: getSupportLevel,
+      stdout: translateLevel(supportsColor(true, tty.isatty(1))),
+      stderr: translateLevel(supportsColor(true, tty.isatty(2)))
+    };
+  }
+});
+
 // node_modules/debug/src/node.js
 var require_node = __commonJS({
   "node_modules/debug/src/node.js"(exports2, module2) {
@@ -1221,7 +1336,7 @@ var require_node = __commonJS({
     );
     exports2.colors = [6, 2, 3, 4, 5, 1];
     try {
-      const supportsColor = require("supports-color");
+      const supportsColor = require_supports_color();
       if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
         exports2.colors = [
           20,
@@ -14053,9 +14168,18 @@ function getPluginSettingsStateKey(pluginId) {
 }
 
 // ../nexus-plugins/musica/src/plugin-settings.js
+var MUSICA_ENGINE_ID = "nexus.musica.audio";
 var MUSICA_SETTINGS_DEFAULTS = Object.freeze({
-  extractEmbeddedCoverArt: true
+  extractEmbeddedCoverArt: true,
+  engineAssignments: []
 });
+function normalizeItemId(value) {
+  const normalized = String(value || "").trim();
+  return normalized || "";
+}
+function normalizeRelativePath(value) {
+  return String(value || "").replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+/g, "/").replace(/\/$/, "").trim();
+}
 function normalizeMusicaSettings(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {
@@ -14069,6 +14193,32 @@ function normalizeMusicaSettings(value) {
 }
 function isMusicaEmbeddedCoverArtEnabled(value) {
   return normalizeMusicaSettings(value).extractEmbeddedCoverArt !== false;
+}
+function normalizeMusicaAssignment(assignment) {
+  return {
+    engineId: MUSICA_ENGINE_ID,
+    rootItemId: normalizeItemId(assignment?.rootItemId),
+    rootPath: normalizeRelativePath(assignment?.rootPath),
+    recursive: typeof assignment?.recursive === "boolean" ? assignment.recursive : true
+  };
+}
+function readMusicaEngineAssignments(settingsValue) {
+  const normalizedSettings = normalizeMusicaSettings(settingsValue);
+  const assignments = Array.isArray(normalizedSettings.engineAssignments) ? normalizedSettings.engineAssignments : [];
+  return assignments.filter((assignment) => assignment?.engineId === MUSICA_ENGINE_ID).map(normalizeMusicaAssignment).filter((assignment) => assignment.rootItemId || assignment.rootPath);
+}
+function writeMusicaEngineAssignments(settingsValue, assignments) {
+  const normalizedSettings = normalizeMusicaSettings(settingsValue);
+  const retainedAssignments = Array.isArray(normalizedSettings.engineAssignments) ? normalizedSettings.engineAssignments.filter(
+    (assignment) => assignment?.engineId !== MUSICA_ENGINE_ID
+  ) : [];
+  return {
+    ...normalizedSettings,
+    engineAssignments: [
+      ...retainedAssignments,
+      ...assignments.map(normalizeMusicaAssignment).filter((assignment) => assignment.rootItemId || assignment.rootPath)
+    ]
+  };
 }
 function resolveEmbeddedCoverPayload({
   enabled = true,
@@ -14140,9 +14290,6 @@ function isSupportedAudioItem(item) {
   }
   return AUDIO_EXTENSIONS.has(import_node_path.default.extname(filePath).replace(/^\./, "").toLowerCase());
 }
-function normalizeRelativePath(value) {
-  return String(value || "").replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+/g, "/").replace(/\/$/, "").trim();
-}
 function getContentRelativePath(contentPath, itemPath) {
   const normalizedContentPath = String(contentPath || "").replace(/\\/g, "/").replace(/\/$/, "");
   const normalizedItemPath = String(itemPath || "").replace(/\\/g, "/");
@@ -14153,6 +14300,23 @@ function getContentRelativePath(contentPath, itemPath) {
     return normalizedItemPath.slice(normalizedContentPath.length + 1);
   }
   return "";
+}
+async function assignmentMatchesItemById(repositories, item, assignment) {
+  const rootItemId = String(assignment?.rootItemId || "").trim();
+  if (!rootItemId) {
+    return false;
+  }
+  let currentParentId = String(getModelValue(item, "parentId") ?? "").trim();
+  let depth = 1;
+  while (currentParentId) {
+    if (currentParentId === rootItemId) {
+      return assignment.recursive !== false || depth === 1;
+    }
+    const parentItem = await repositories.items.findById(currentParentId);
+    currentParentId = String(getModelValue(parentItem, "parentId") ?? "").trim();
+    depth += 1;
+  }
+  return false;
 }
 function assignmentMatchesPath(assignment, relativeItemPath) {
   const normalizedRoot = normalizeRelativePath(assignment.rootPath);
@@ -14166,7 +14330,7 @@ function assignmentMatchesPath(assignment, relativeItemPath) {
   if (!normalizedItemPath.startsWith(`${normalizedRoot}/`)) {
     return false;
   }
-  if (assignment.recursive) {
+  if (assignment.recursive !== false) {
     return true;
   }
   const suffix = normalizedItemPath.slice(normalizedRoot.length + 1);
@@ -14176,12 +14340,7 @@ async function getMusicaEngineAssignments(ctx) {
   const rawSettingsValue = ctx.settings?.get ? await ctx.settings.get() : await ctx.state.get(
     getPluginSettingsStateKey(ctx.pluginId || "nexus.musica")
   );
-  const settingsValue = normalizeMusicaSettings(rawSettingsValue);
-  const assignments = Array.isArray(settingsValue?.engineAssignments) ? settingsValue.engineAssignments : [];
-  return assignments.filter((assignment) => assignment?.engineId === "nexus.musica.audio").map((assignment) => ({
-    rootPath: normalizeRelativePath(assignment.rootPath),
-    recursive: typeof assignment.recursive === "boolean" ? assignment.recursive : true
-  })).filter((assignment) => assignment.rootPath);
+  return readMusicaEngineAssignments(normalizeMusicaSettings(rawSettingsValue));
 }
 async function getMusicaPluginSettings(ctx) {
   const rawSettingsValue = ctx.settings?.get ? await ctx.settings.get() : await ctx.state.get(
@@ -14204,7 +14363,16 @@ async function isMusicaAssignedItem(ctx, item) {
     return false;
   }
   const assignments = await getMusicaEngineAssignments(ctx);
-  return assignments.some((assignment) => assignmentMatchesPath(assignment, relativeItemPath));
+  const repositories = ctx.requireRepositories();
+  for (const assignment of assignments) {
+    if (await assignmentMatchesItemById(repositories, item, assignment)) {
+      return true;
+    }
+    if (!assignment?.rootItemId && assignmentMatchesPath(assignment, relativeItemPath)) {
+      return true;
+    }
+  }
+  return false;
 }
 function dedupeStrings(values) {
   const unique = /* @__PURE__ */ new Set();
@@ -14340,8 +14508,308 @@ async function syncAudioTrackRecord(repositories, item, options) {
 var import_node_path3 = __toESM(require("node:path"));
 
 // src/backend/vault-runtime/file-system/operations/rename-item.ts
-var import_promises2 = __toESM(require("node:fs/promises"), 1);
 var import_node_path2 = __toESM(require("node:path"), 1);
+
+// src/backend/vault-runtime/file-system/operations/fs-rename.ts
+var import_promises2 = __toESM(require("node:fs/promises"), 1);
+
+// src/shared/electron.ts
+function hasElectronApp(value) {
+  return Boolean(value && typeof value === "object" && "app" in value);
+}
+var processElectronMain = process.__electronMain;
+var globalElectronMain = globalThis.__electronMain;
+var electronMain = (hasElectronApp(processElectronMain) ? processElectronMain : null) ?? (hasElectronApp(globalElectronMain) ? globalElectronMain : null) ?? (processElectronMain && typeof processElectronMain === "object" && "default" in processElectronMain && hasElectronApp(processElectronMain.default) ? processElectronMain.default : null) ?? (globalElectronMain && typeof globalElectronMain === "object" && "default" in globalElectronMain && hasElectronApp(globalElectronMain.default) ? globalElectronMain.default : null);
+if (!electronMain) {
+  throw new Error("Electron main API no estA disponible en el runtime ESM");
+}
+
+// src/shared/dev-log.ts
+var DEV_LOG_RUNTIME_KEY = "__NEXUS_DEV_LOG_RUNTIME__";
+function getDevLogRuntime() {
+  const runtime = globalThis[DEV_LOG_RUNTIME_KEY];
+  if (!runtime || typeof runtime !== "object") {
+    return null;
+  }
+  return runtime;
+}
+function devLogResolveScope(scope) {
+  const normalizedScope = String(scope || "").trim() || "main.runtime";
+  if (normalizedScope.startsWith("bootstrap.")) {
+    return {
+      process: "bootstrap",
+      surface: "bootstrap",
+      subsystem: normalizedScope,
+      shard: "10-bootstrap.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("main.")) {
+    return {
+      process: "main",
+      surface: "main",
+      subsystem: normalizedScope,
+      shard: "20-main.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("backend.preview")) {
+    return {
+      process: "backend",
+      surface: "preview",
+      subsystem: normalizedScope,
+      shard: "32-preview.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("backend.plugins")) {
+    return {
+      process: "backend",
+      surface: "plugins",
+      subsystem: normalizedScope,
+      shard: "33-plugins-backend.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("backend.vaultRuntime") || normalizedScope.startsWith("backend.filesystem")) {
+    return {
+      process: "backend",
+      surface: "vault-runtime",
+      subsystem: normalizedScope,
+      shard: "31-vault-runtime.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("backend.")) {
+    return {
+      process: "backend",
+      surface: "backend",
+      subsystem: normalizedScope,
+      shard: "30-backend.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("ipc.")) {
+    return {
+      process: "main",
+      surface: "ipc",
+      subsystem: normalizedScope,
+      shard: "50-ipc.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("addon.directoryWatcher")) {
+    return {
+      process: "addon",
+      surface: "directory-watcher",
+      subsystem: normalizedScope,
+      shard: "60-addons-directory-watcher.jsonl"
+    };
+  }
+  if (normalizedScope.startsWith("addon.safeRecycle")) {
+    return {
+      process: "addon",
+      surface: "safe-recycle",
+      subsystem: normalizedScope,
+      shard: "61-addons-safe-recycle.jsonl"
+    };
+  }
+  return {
+    process: "main",
+    surface: "main",
+    subsystem: normalizedScope,
+    shard: "20-main.jsonl"
+  };
+}
+function devLogNormalizeContext(scopeOrContext) {
+  return typeof scopeOrContext === "string" ? devLogResolveScope(scopeOrContext) : scopeOrContext;
+}
+function devLogAppend(event) {
+  const runtime = getDevLogRuntime();
+  runtime?.devLogAppendEvent?.(event);
+}
+function devLogShouldMirrorToConsole(level) {
+  return level === "warn" || level === "error" || level === "fatal";
+}
+function createDevLogger(scopeOrContext) {
+  const context = devLogNormalizeContext(scopeOrContext);
+  const emit = (level, event, message, data = null) => {
+    devLogAppend({
+      ...context,
+      level,
+      event,
+      message,
+      data,
+      mirrorConsole: devLogShouldMirrorToConsole(level)
+    });
+  };
+  return {
+    context,
+    debug: (event, message, data = null) => emit("debug", event, message, data),
+    info: (event, message, data = null) => emit("info", event, message, data),
+    warn: (event, message, data = null) => emit("warn", event, message, data),
+    error: (event, message, data = null) => emit("error", event, message, data),
+    fatal: (event, message, data = null) => emit("fatal", event, message, data)
+  };
+}
+
+// src/backend/vault-runtime/file-system/operations/fs-rename.ts
+var renameLogger = createDevLogger("backend.filesystem");
+var RETRIABLE_RENAME_ERROR_CODES = /* @__PURE__ */ new Set(["EPERM", "EBUSY"]);
+var DEFAULT_RETRY_DELAYS_MS = [60, 160, 320];
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+async function describePathState(targetPath, fsApi) {
+  try {
+    const stats = await fsApi.lstat(targetPath);
+    return {
+      exists: true,
+      kind: stats.isDirectory() ? "directory" : stats.isFile() ? "file" : stats.isSymbolicLink() ? "symlink" : "other",
+      size: Number.isFinite(stats.size) ? stats.size : null,
+      mtimeMs: Number.isFinite(stats.mtimeMs) ? Number(stats.mtimeMs.toFixed(3)) : null
+    };
+  } catch (error) {
+    const errorCode = error?.code ?? null;
+    if (errorCode === "ENOENT") {
+      return { exists: false };
+    }
+    return {
+      exists: null,
+      errorCode,
+      errorMessage: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+function buildMissingSourceError(sourcePath) {
+  const error = new Error(`No existe la ruta origen actual: ${sourcePath}`);
+  error.code = "ENOENT";
+  return error;
+}
+function buildDestinationExistsError(targetPath) {
+  const error = new Error(`Ya existe un item en destino: ${targetPath}`);
+  error.code = "EEXIST";
+  return error;
+}
+function isRetriableRenameError(error) {
+  const code = error?.code;
+  return RETRIABLE_RENAME_ERROR_CODES.has(String(code || "").toUpperCase());
+}
+async function renamePathWithRetry(options) {
+  const {
+    from,
+    to,
+    operation,
+    itemId = null,
+    retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
+    fsApi = import_promises2.default
+  } = options;
+  const initialSourceState = await describePathState(from, fsApi);
+  const initialDestinationState = await describePathState(to, fsApi);
+  if (initialSourceState.exists === false) {
+    throw buildMissingSourceError(from);
+  }
+  if (initialDestinationState.exists === true) {
+    throw buildDestinationExistsError(to);
+  }
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
+    try {
+      await fsApi.rename(from, to);
+      if (attempt > 0) {
+        renameLogger.info(
+          "items.rename.retry.succeeded",
+          "El rename termino bien despues de un lock transitorio.",
+          {
+            operation,
+            itemId,
+            from,
+            to,
+            attempt: attempt + 1,
+            maxAttempts: retryDelaysMs.length + 1
+          }
+        );
+      }
+      return;
+    } catch (error) {
+      const sourceState = await describePathState(from, fsApi);
+      const destinationState = await describePathState(to, fsApi);
+      const attemptNumber = attempt + 1;
+      const maxAttempts = retryDelaysMs.length + 1;
+      const errorCode = error?.code ?? null;
+      if (destinationState.exists === true) {
+        renameLogger.error(
+          "items.rename.collision",
+          "El rename fallo porque el destino ya existe al momento de ejecutar la operacion.",
+          {
+            operation,
+            itemId,
+            from,
+            to,
+            attempt: attemptNumber,
+            maxAttempts,
+            errorCode,
+            sourceState,
+            destinationState
+          }
+        );
+        throw buildDestinationExistsError(to);
+      }
+      if (sourceState.exists === false) {
+        renameLogger.error(
+          "items.rename.source-missing",
+          "El rename fallo porque la ruta origen desaparecio durante la operacion.",
+          {
+            operation,
+            itemId,
+            from,
+            to,
+            attempt: attemptNumber,
+            maxAttempts,
+            errorCode,
+            sourceState,
+            destinationState
+          }
+        );
+        throw buildMissingSourceError(from);
+      }
+      if (!isRetriableRenameError(error) || attempt >= retryDelaysMs.length) {
+        renameLogger.error(
+          "items.rename.failed",
+          "El rename filesystem fallo y no se pudo recuperar.",
+          {
+            operation,
+            itemId,
+            from,
+            to,
+            attempt: attemptNumber,
+            maxAttempts,
+            errorCode,
+            errorMessage: error instanceof Error ? error.message : String(error),
+            sourceState,
+            destinationState
+          }
+        );
+        throw error;
+      }
+      const delayMs = retryDelaysMs[attempt];
+      renameLogger.warn(
+        "items.rename.retry",
+        "El rename filesystem devolvio un lock transitorio; se reintentara.",
+        {
+          operation,
+          itemId,
+          from,
+          to,
+          attempt: attemptNumber,
+          maxAttempts,
+          delayMs,
+          errorCode,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          sourceState,
+          destinationState
+        }
+      );
+      await wait(delayMs);
+    }
+  }
+}
+
+// src/backend/vault-runtime/file-system/operations/rename-item.ts
 var WINDOWS_RESERVED_NAMES = /* @__PURE__ */ new Set([
   "CON",
   "PRN",
@@ -14391,23 +14859,32 @@ function buildFileNameFromBaseName(baseName, extension) {
   const normalizedExtension = String(extension ?? "").replace(/^\./, "").trim();
   return normalizedExtension ? `${validBaseName}.${normalizedExtension}` : validBaseName;
 }
-async function renameVaultItem(item, nextNameInput) {
+async function renameVaultItem(item, nextNameInput, options = {}) {
   const nextName = assertValidItemName(nextNameInput);
+  const currentPath = String(options.currentPath || item.path || "").trim();
   if (nextName === item.name) {
     return {
       renamed: false,
       oldName: item.name,
-      oldPath: item.path,
+      oldPath: currentPath,
       oldExtension: item.extension ?? null,
       newName: item.name,
-      newPath: item.path
+      newPath: currentPath
     };
   }
+  if (!currentPath) {
+    throw new Error("No se pudo resolver la ruta actual del item a renombrar.");
+  }
   const oldName = item.name;
-  const oldPath = item.path;
+  const oldPath = currentPath;
   const oldExtension = item.extension ?? (import_node_path2.default.extname(String(oldName || "")).replace(/^\./, "") || null);
   const newPath = import_node_path2.default.join(import_node_path2.default.dirname(oldPath), nextName);
-  await import_promises2.default.rename(oldPath, newPath);
+  await renamePathWithRetry({
+    from: oldPath,
+    to: newPath,
+    operation: "update-item",
+    itemId: item?.id ?? null
+  });
   item.name = nextName;
   item.path = newPath;
   if (!item.type || item.type === "file") {
@@ -14434,7 +14911,13 @@ async function rollbackRenamedVaultItem(item, renameResult) {
   if (!renameResult?.renamed) {
     return;
   }
-  await import_promises2.default.rename(renameResult.newPath, renameResult.oldPath);
+  await renamePathWithRetry({
+    from: renameResult.newPath,
+    to: renameResult.oldPath,
+    operation: "update-item:rollback",
+    itemId: item?.id ?? null,
+    retryDelaysMs: [80, 180]
+  });
   restoreRenamedVaultItem(item, renameResult);
 }
 
@@ -14726,22 +15209,75 @@ function registerMusicaMetadataResources(ctx) {
 }
 
 // ../nexus-plugins/musica/src/backend.ts
+async function hydrateResolvedItem(ctx, item) {
+  if (!item?.id) {
+    return item;
+  }
+  const location = await ctx.resolveItemLocation(String(item.id));
+  if (!location) {
+    return item;
+  }
+  return {
+    ...item,
+    path: location.path,
+    relative_path: location.relativePath,
+    contentRelativePath: location.contentRelativePath
+  };
+}
+async function migrateMusicaAssignmentIdsIfNeeded(ctx, settingsValue) {
+  const assignments = readMusicaEngineAssignments(settingsValue);
+  if (!assignments.some((assignment) => !assignment.rootItemId && assignment.rootPath)) {
+    return null;
+  }
+  const items = await ctx.requireRepositories().items.findAll();
+  const folderEntries = await Promise.all(
+    items.filter((item) => item?.type === "folder").map(async (item) => {
+      const location = await ctx.resolveItemLocation(String(item.id || ""));
+      return [
+        normalizeRelativePath(location?.contentRelativePath || ""),
+        String(item.id || "")
+      ];
+    })
+  );
+  const folderIdByRelativePath = new Map(
+    folderEntries.filter(([relativePath, itemId]) => relativePath && itemId)
+  );
+  let changed = false;
+  const migratedAssignments = assignments.map((assignment) => {
+    if (assignment.rootItemId || !assignment.rootPath) {
+      return assignment;
+    }
+    const resolvedRootItemId = folderIdByRelativePath.get(
+      normalizeRelativePath(assignment.rootPath)
+    );
+    if (!resolvedRootItemId) {
+      return assignment;
+    }
+    changed = true;
+    return {
+      ...assignment,
+      rootItemId: resolvedRootItemId
+    };
+  });
+  return changed ? writeMusicaEngineAssignments(settingsValue, migratedAssignments) : null;
+}
 async function reconcileMusicaAssignments(ctx) {
   const repositories = ctx.requireRepositories();
   const items = await repositories.items.findAll();
   const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
   for (const item of items) {
-    if (!isSupportedAudioItem(item)) {
+    const resolvedItem = await hydrateResolvedItem(ctx, item);
+    if (!isSupportedAudioItem(resolvedItem)) {
       continue;
     }
-    const assignedToMusica = await isMusicaAssignedItem(ctx, item);
+    const assignedToMusica = await isMusicaAssignedItem(ctx, resolvedItem);
     if (!assignedToMusica) {
       await repositories.audio.deleteTrack(String(getModelValue(item, "id") ?? ""));
       continue;
     }
-    await syncAudioTrackRecord(repositories, item, {
+    await syncAudioTrackRecord(repositories, resolvedItem, {
       structuralChanged: true,
-      contentChanged: true,
+      contentChanged: false,
       extractEmbeddedCoverArt
     });
   }
@@ -14807,7 +15343,7 @@ var musicaPlugin = {
             error: "No hay un vault activo con repositorios inicializados."
           };
         }
-        const item = await repositories.items.findById(itemId);
+        const item = await hydrateResolvedItem(ctx, await repositories.items.findById(itemId));
         if (!item) {
           return {
             ok: false,
@@ -14863,8 +15399,15 @@ var musicaPlugin = {
     });
     let reconcileQueue = Promise.resolve();
     ctx.settings.subscribe(
-      () => {
-        reconcileQueue = reconcileQueue.then(() => reconcileMusicaAssignments(ctx)).catch((error) => {
+      (settingsValue) => {
+        reconcileQueue = reconcileQueue.then(async () => {
+          const migratedSettings = await migrateMusicaAssignmentIdsIfNeeded(ctx, settingsValue);
+          if (migratedSettings) {
+            await ctx.settings.set(migratedSettings);
+            return;
+          }
+          await reconcileMusicaAssignments(ctx);
+        }).catch((error) => {
           console.error("[musica] Error reconciliando assignments live:", error);
         });
       },
@@ -14872,13 +15415,14 @@ var musicaPlugin = {
     );
   },
   onItemSync: async (ctx, payload) => {
-    const assignedToMusica = await isMusicaAssignedItem(ctx, payload.item);
+    const resolvedItem = await hydrateResolvedItem(ctx, payload.item);
+    const assignedToMusica = await isMusicaAssignedItem(ctx, resolvedItem);
     const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
     if (!assignedToMusica) {
-      await ctx.requireRepositories().audio.deleteTrack(String(getModelValue(payload.item, "id") ?? ""));
+      await ctx.requireRepositories().audio.deleteTrack(String(getModelValue(resolvedItem, "id") ?? ""));
       return;
     }
-    await syncAudioTrackRecord(ctx.requireRepositories(), payload.item, {
+    await syncAudioTrackRecord(ctx.requireRepositories(), resolvedItem, {
       structuralChanged: payload.structuralChanged,
       contentChanged: payload.contentChanged,
       extractEmbeddedCoverArt

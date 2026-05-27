@@ -1,8 +1,10 @@
 const { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } = window.React;
 import { BookIcon, RefreshIcon } from "./icons.jsx";
 import { formatPercent, resolveVaultFilePath } from "./renderer-helpers.js";
+import { createRendererDevLogger } from "../../../nexus-frontend/src/utils/devLog.js";
 
 const { ipcRenderer } = window.require("electron");
+const booksLibraryLogger = createRendererDevLogger("renderer.plugins.books");
 
 const BOOK_GRID_ASPECT_RATIO = 0.72;
 const BOOK_GRID_BODY_HEIGHT = 114;
@@ -139,12 +141,29 @@ async function requestCachedCoverPreview(itemId) {
     return null;
   }
 
+  const startedAt = performance.now();
   const response = await ipcRenderer.invoke("books:get-cover-preview", {
     itemId,
   });
+  const durationMs = Number((performance.now() - startedAt).toFixed(2));
 
   if (!response?.ok) {
+    if (durationMs >= 150) {
+      booksLibraryLogger.warn("books.coverPreview.requestError", "Fallo consultando portada cacheada.", {
+        itemId,
+        durationMs,
+        error: response?.error || null,
+      });
+    }
     return null;
+  }
+
+  if (durationMs >= 250) {
+    booksLibraryLogger.warn("books.coverPreview.requestSlow", "Consulta de portada cacheada lenta.", {
+      itemId,
+      durationMs,
+      hasPreview: Boolean(response?.data?.coverPreview),
+    });
   }
 
   return response?.data?.coverPreview ? String(response.data.coverPreview) : null;
@@ -170,20 +189,44 @@ function requestSessionCoverPreview(itemId, resolvedFilePath) {
   }
 
   const nextPromise = (async () => {
+    const startedAt = performance.now();
+    let attempts = 0;
+
     for (const delayMs of COVER_PREVIEW_BACKEND_RETRY_DELAYS_MS) {
       if (delayMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
 
+      attempts += 1;
       const previewSrc = await requestCachedCoverPreview(itemId);
 
       if (previewSrc) {
         writeSessionCoverPreview(itemId, resolvedFilePath, previewSrc);
+        const durationMs = Number((performance.now() - startedAt).toFixed(2));
+
+        if (attempts > 1 || durationMs >= 500) {
+          booksLibraryLogger.warn("books.coverPreview.retried", "Portada obtenida tras reintentos o espera perceptible.", {
+            itemId,
+            attempts,
+            durationMs,
+          });
+        }
+
         return previewSrc;
       }
     }
 
     rememberSessionCoverPreviewMiss(itemId, resolvedFilePath);
+    const durationMs = Number((performance.now() - startedAt).toFixed(2));
+
+    if (attempts > 1 || durationMs >= 500) {
+      booksLibraryLogger.warn("books.coverPreview.miss", "No se obtuvo portada tras consultar cache backend.", {
+        itemId,
+        attempts,
+        durationMs,
+      });
+    }
+
     return null;
   })()
     .catch(() => null)
@@ -320,6 +363,7 @@ export default function BooksLibraryView({ ctx }) {
   const loadBooks = async () => {
     setError("");
     setRefreshing(true);
+    const startedAt = performance.now();
 
     try {
       const response = await ipcRenderer.invoke("books:list");
@@ -328,10 +372,32 @@ export default function BooksLibraryView({ ctx }) {
         throw new Error(response?.error || "No se pudo cargar la biblioteca Books.");
       }
 
+      const nextBooks = Array.isArray(response?.data?.books) ? response.data.books : [];
+      const durationMs = Number((performance.now() - startedAt).toFixed(2));
+
+      if (durationMs >= 250 || nextBooks.length >= 100) {
+        booksLibraryLogger.warn("books.library.loadDone", "Carga de biblioteca Books completada.", {
+          durationMs,
+          totalBooks: nextBooks.length,
+          missingInlinePreviewCount: nextBooks.filter((book) => !book?.coverPreview).length,
+        });
+      }
+
       startTransition(() => {
-        setBooks(Array.isArray(response?.data?.books) ? response.data.books : []);
+        setBooks(nextBooks);
       });
     } catch (loadError) {
+      const durationMs = Number((performance.now() - startedAt).toFixed(2));
+      booksLibraryLogger.error("books.library.loadError", "Fallo cargando la biblioteca Books.", {
+        durationMs,
+        error:
+          loadError instanceof Error
+            ? {
+                name: loadError.name,
+                message: loadError.message,
+              }
+            : String(loadError),
+      });
       setError(
         loadError instanceof Error
           ? loadError.message
@@ -344,7 +410,12 @@ export default function BooksLibraryView({ ctx }) {
   };
 
   useEffect(() => {
+    booksLibraryLogger.info("books.library.mount", "Vista BooksLibrary montada.", null);
     void loadBooks();
+
+    return () => {
+      booksLibraryLogger.info("books.library.unmount", "Vista BooksLibrary desmontada.", null);
+    };
   }, []);
 
   useEffect(() => {
@@ -474,6 +545,23 @@ export default function BooksLibraryView({ ctx }) {
       visibleBooks,
     ],
   );
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+
+    const visiblePreviewMissCount = virtualizedBooks.filter(({ book }) => !book?.coverPreview).length;
+
+    if (visiblePreviewMissCount >= 12 || visibleBooks.length >= 300) {
+      booksLibraryLogger.warn("books.library.viewportPressure", "Viewport de Books con alta presion de previews.", {
+        totalBooks: books.length,
+        visibleBooks: visibleBooks.length,
+        renderedCards: virtualizedBooks.length,
+        visiblePreviewMissCount,
+      });
+    }
+  }, [books.length, loading, visibleBooks.length, virtualizedBooks]);
 
   const handleOpenBook = async (book) => {
     if (!book?.item) {

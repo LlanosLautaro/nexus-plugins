@@ -1,6 +1,11 @@
-import { normalizeMusicaSettings } from "./plugin-settings.js";
-
-export const MUSICA_ENGINE_ID = "nexus.musica.audio";
+import {
+  MUSICA_ENGINE_ID,
+  normalizeItemId,
+  normalizeRelativePath,
+  readMusicaEngineAssignments,
+  writeMusicaEngineAssignments,
+} from "./plugin-settings.js";
+import { resolveItemLocationFromItemsState } from "../../../nexus-frontend/src/store/items/location.mjs";
 
 const SUPPORTED_AUDIO_EXTENSIONS = new Set([
   "aac",
@@ -55,61 +60,64 @@ export function getContentRelativePath(filePath) {
   return contentMatch?.[1] || "";
 }
 
-export function normalizeRelativePath(value) {
-  return String(value || "")
-    .replace(/\\/g, "/")
-    .replace(/^\.?\//, "")
-    .replace(/\/+/g, "/")
-    .replace(/\/$/, "")
-    .trim();
-}
-
 export function buildFolderOptions(byId = {}, rootId = null) {
   return Object.values(byId)
     .filter((item) => item?.type === "folder")
-    .map((item) => ({
-      id: item.id,
-      label: item.id === rootId ? "Vault completo" : item.name,
-      rootPath: normalizeRelativePath(getContentRelativePath(item.path || "")),
-      path: item.path || "",
-    }))
+    .map((item) => {
+      const location = resolveItemLocationFromItemsState(
+        {
+          byId,
+          rootId,
+        },
+        item.id,
+      );
+
+      return {
+        id: item.id,
+        label: item.id === rootId ? "Vault completo" : item.name,
+        rootPath: normalizeRelativePath(location?.contentRelativePath || ""),
+        path: location?.path || item.path || "",
+      };
+    })
     .filter((option) => option.rootPath)
     .sort((left, right) => left.rootPath.localeCompare(right.rootPath));
 }
 
-export function readEngineAssignments(settingsValue) {
-  const normalizedSettings = normalizeMusicaSettings(settingsValue);
-  const assignments = Array.isArray(normalizedSettings.engineAssignments)
-    ? normalizedSettings.engineAssignments
-    : [];
+export function resolveFolderOptionForAssignment(assignment, folderOptions = []) {
+  const assignmentRootItemId = normalizeItemId(assignment?.rootItemId);
+  const assignmentRootPath = normalizeRelativePath(assignment?.rootPath);
 
-  return assignments
-    .filter((assignment) => assignment?.engineId === MUSICA_ENGINE_ID)
-    .map((assignment) => ({
-      engineId: MUSICA_ENGINE_ID,
-      rootPath: normalizeRelativePath(assignment.rootPath),
-      recursive:
-        typeof assignment.recursive === "boolean" ? assignment.recursive : true,
-    }))
-    .filter((assignment) => assignment.rootPath);
+  if (assignmentRootItemId) {
+    return folderOptions.find((option) => option.id === assignmentRootItemId) || null;
+  }
+
+  if (!assignmentRootPath) {
+    return null;
+  }
+
+  return folderOptions.find((option) => option.rootPath === assignmentRootPath) || null;
 }
 
-export function writeEngineAssignments(settingsValue, assignments) {
-  const normalizedSettings = normalizeMusicaSettings(settingsValue);
-  const retainedAssignments = Array.isArray(normalizedSettings.engineAssignments)
-    ? normalizedSettings.engineAssignments.filter((assignment) => assignment?.engineId !== MUSICA_ENGINE_ID)
-    : [];
+export function hydrateAssignmentsWithFolderOptions(assignments, folderOptions = []) {
+  return (Array.isArray(assignments) ? assignments : []).map((assignment) => {
+    const folderOption = resolveFolderOptionForAssignment(assignment, folderOptions);
 
-  return {
-    ...normalizedSettings,
-    engineAssignments: [
-      ...retainedAssignments,
-      ...assignments.map((assignment) => ({
-        engineId: MUSICA_ENGINE_ID,
-        rootPath: normalizeRelativePath(assignment.rootPath),
-        recursive:
-          typeof assignment.recursive === "boolean" ? assignment.recursive : true,
-      })),
-    ],
-  };
+    if (!folderOption) {
+      return {
+        ...assignment,
+        rootItemId: normalizeItemId(assignment?.rootItemId),
+        rootPath: normalizeRelativePath(assignment?.rootPath),
+      };
+    }
+
+    return {
+      ...assignment,
+      rootItemId: folderOption.id,
+      rootPath: folderOption.rootPath,
+    };
+  });
 }
+
+export const readEngineAssignments = readMusicaEngineAssignments;
+export const writeEngineAssignments = writeMusicaEngineAssignments;
+export { MUSICA_ENGINE_ID };

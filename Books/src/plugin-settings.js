@@ -4,6 +4,11 @@ export const BOOKS_SETTINGS_DEFAULTS = Object.freeze({
   engineAssignments: [],
 });
 
+export function normalizeItemId(value) {
+  const normalized = String(value || "").trim();
+  return normalized || "";
+}
+
 export function normalizeBooksSettings(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {
@@ -26,6 +31,16 @@ export function normalizeRelativePath(value) {
     .trim();
 }
 
+function normalizeBooksAssignment(assignment) {
+  return {
+    engineId: BOOKS_ENGINE_ID,
+    rootItemId: normalizeItemId(assignment?.rootItemId),
+    rootPath: normalizeRelativePath(assignment?.rootPath),
+    recursive:
+      typeof assignment?.recursive === "boolean" ? assignment.recursive : true,
+  };
+}
+
 export function readBooksEngineAssignments(settingsValue) {
   const normalizedSettings = normalizeBooksSettings(settingsValue);
   const assignments = Array.isArray(normalizedSettings.engineAssignments)
@@ -34,13 +49,8 @@ export function readBooksEngineAssignments(settingsValue) {
 
   return assignments
     .filter((assignment) => assignment?.engineId === BOOKS_ENGINE_ID)
-    .map((assignment) => ({
-      engineId: BOOKS_ENGINE_ID,
-      rootPath: normalizeRelativePath(assignment.rootPath),
-      recursive:
-        typeof assignment.recursive === "boolean" ? assignment.recursive : true,
-    }))
-    .filter((assignment) => assignment.rootPath);
+    .map(normalizeBooksAssignment)
+    .filter((assignment) => assignment.rootItemId || assignment.rootPath);
 }
 
 export function writeBooksEngineAssignments(settingsValue, assignments) {
@@ -53,12 +63,9 @@ export function writeBooksEngineAssignments(settingsValue, assignments) {
     ...normalizedSettings,
     engineAssignments: [
       ...retainedAssignments,
-      ...assignments.map((assignment) => ({
-        engineId: BOOKS_ENGINE_ID,
-        rootPath: normalizeRelativePath(assignment.rootPath),
-        recursive:
-          typeof assignment.recursive === "boolean" ? assignment.recursive : true,
-      })),
+      ...assignments
+        .map(normalizeBooksAssignment)
+        .filter((assignment) => assignment.rootItemId || assignment.rootPath),
     ],
   };
 }

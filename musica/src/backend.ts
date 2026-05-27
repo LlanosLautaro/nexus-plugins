@@ -17,6 +17,82 @@ import type {
   NexusBackendPluginContext,
   NexusBackendPluginModule,
 } from "../../../nexus-backend/src/plugins/types.ts";
+import {
+  normalizeRelativePath,
+  readMusicaEngineAssignments,
+  writeMusicaEngineAssignments,
+} from "./plugin-settings.js";
+
+async function hydrateResolvedItem(ctx: NexusBackendPluginContext, item: any) {
+  if (!item?.id) {
+    return item;
+  }
+
+  const location = await ctx.resolveItemLocation(String(item.id));
+
+  if (!location) {
+    return item;
+  }
+
+  return {
+    ...item,
+    path: location.path,
+    relative_path: location.relativePath,
+    contentRelativePath: location.contentRelativePath,
+  };
+}
+
+async function migrateMusicaAssignmentIdsIfNeeded(
+  ctx: NexusBackendPluginContext,
+  settingsValue: Record<string, unknown>,
+) {
+  const assignments = readMusicaEngineAssignments(settingsValue);
+
+  if (!assignments.some((assignment) => !assignment.rootItemId && assignment.rootPath)) {
+    return null;
+  }
+
+  const items = await ctx.requireRepositories().items.findAll();
+  const folderEntries = await Promise.all(
+    items
+      .filter((item) => item?.type === "folder")
+      .map(async (item) => {
+        const location = await ctx.resolveItemLocation(String(item.id || ""));
+        return [
+          normalizeRelativePath(location?.contentRelativePath || ""),
+          String(item.id || ""),
+        ] as const;
+      }),
+  );
+  const folderIdByRelativePath = new Map(
+    folderEntries.filter(([relativePath, itemId]) => relativePath && itemId),
+  );
+
+  let changed = false;
+  const migratedAssignments = assignments.map((assignment) => {
+    if (assignment.rootItemId || !assignment.rootPath) {
+      return assignment;
+    }
+
+    const resolvedRootItemId = folderIdByRelativePath.get(
+      normalizeRelativePath(assignment.rootPath),
+    );
+
+    if (!resolvedRootItemId) {
+      return assignment;
+    }
+
+    changed = true;
+    return {
+      ...assignment,
+      rootItemId: resolvedRootItemId,
+    };
+  });
+
+  return changed
+    ? writeMusicaEngineAssignments(settingsValue, migratedAssignments)
+    : null;
+}
 
 async function reconcileMusicaAssignments(ctx: NexusBackendPluginContext) {
   const repositories = ctx.requireRepositories();
@@ -24,20 +100,22 @@ async function reconcileMusicaAssignments(ctx: NexusBackendPluginContext) {
   const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
 
   for (const item of items) {
-    if (!isSupportedAudioItem(item)) {
+    const resolvedItem = await hydrateResolvedItem(ctx, item);
+
+    if (!isSupportedAudioItem(resolvedItem)) {
       continue;
     }
 
-    const assignedToMusica = await isMusicaAssignedItem(ctx, item);
+    const assignedToMusica = await isMusicaAssignedItem(ctx, resolvedItem);
 
     if (!assignedToMusica) {
       await repositories.audio.deleteTrack(String(getModelValue(item, "id") ?? ""));
       continue;
     }
 
-    await syncAudioTrackRecord(repositories, item, {
+    await syncAudioTrackRecord(repositories, resolvedItem, {
       structuralChanged: true,
-      contentChanged: true,
+      contentChanged: false,
       extractEmbeddedCoverArt,
     });
   }
@@ -107,7 +185,7 @@ const musicaPlugin: NexusBackendPluginModule = {
           };
         }
 
-        const item = await repositories.items.findById(itemId);
+        const item = await hydrateResolvedItem(ctx, await repositories.items.findById(itemId));
 
         if (!item) {
           return {
@@ -178,9 +256,18 @@ const musicaPlugin: NexusBackendPluginModule = {
 
     let reconcileQueue = Promise.resolve();
     ctx.settings.subscribe(
-      () => {
+      (settingsValue) => {
         reconcileQueue = reconcileQueue
-          .then(() => reconcileMusicaAssignments(ctx))
+          .then(async () => {
+            const migratedSettings = await migrateMusicaAssignmentIdsIfNeeded(ctx, settingsValue);
+
+            if (migratedSettings) {
+              await ctx.settings.set(migratedSettings);
+              return;
+            }
+
+            await reconcileMusicaAssignments(ctx);
+          })
           .catch((error) => {
             console.error("[musica] Error reconciliando assignments live:", error);
           });
@@ -189,15 +276,16 @@ const musicaPlugin: NexusBackendPluginModule = {
     );
   },
   onItemSync: async (ctx, payload) => {
-    const assignedToMusica = await isMusicaAssignedItem(ctx, payload.item);
+    const resolvedItem = await hydrateResolvedItem(ctx, payload.item);
+    const assignedToMusica = await isMusicaAssignedItem(ctx, resolvedItem);
     const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
 
     if (!assignedToMusica) {
-      await ctx.requireRepositories().audio.deleteTrack(String(getModelValue(payload.item, "id") ?? ""));
+      await ctx.requireRepositories().audio.deleteTrack(String(getModelValue(resolvedItem, "id") ?? ""));
       return;
     }
 
-    await syncAudioTrackRecord(ctx.requireRepositories(), payload.item, {
+    await syncAudioTrackRecord(ctx.requireRepositories(), resolvedItem, {
       structuralChanged: payload.structuralChanged,
       contentChanged: payload.contentChanged,
       extractEmbeddedCoverArt,

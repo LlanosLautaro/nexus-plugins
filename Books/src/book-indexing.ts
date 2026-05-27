@@ -4,6 +4,7 @@ import { serializeVaultItem } from "../../../nexus-backend/src/backend/vault-run
 import { BOOKS_ENGINE_ID, BOOK_READING_STATUSES } from "./constants.js";
 import { readBooksEngineAssignments } from "./plugin-settings.js";
 import type { NexusBackendPluginContext } from "../../../nexus-backend/src/plugins/types.ts";
+import type { VaultRepositories } from "../../../nexus-backend/src/backend/vault-runtime/db/repositories.ts";
 
 const SUPPORTED_BOOK_EXTENSIONS = new Set(["pdf"]);
 
@@ -21,6 +22,25 @@ type BookRecord = {
   itemHash: string | null;
   item?: any;
 };
+
+async function withResolvedItemLocation(ctx: NexusBackendPluginContext, item: any) {
+  if (!item?.id) {
+    return item;
+  }
+
+  const location = await ctx.resolveItemLocation(String(item.id));
+
+  if (!location) {
+    return item;
+  }
+
+  return {
+    ...item,
+    path: location.path,
+    relative_path: location.relativePath,
+    contentRelativePath: location.contentRelativePath,
+  };
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -274,6 +294,92 @@ function normalizeRelativePath(value: string) {
     .trim();
 }
 
+async function assignmentMatchesItemById(
+  repositories: VaultRepositories,
+  item: any,
+  assignment: { rootItemId?: string; recursive?: boolean },
+) {
+  const rootItemId = String(assignment?.rootItemId || "").trim();
+  const itemId = String(item?.id || "").trim();
+
+  if (!rootItemId) {
+    return false;
+  }
+
+  if (itemId && itemId === rootItemId) {
+    return true;
+  }
+
+  let currentParentId = String(item?.parentId || "").trim();
+  let depth = 1;
+
+  while (currentParentId) {
+    if (currentParentId === rootItemId) {
+      return assignment.recursive !== false || depth === 1;
+    }
+
+    const parentItem = await repositories.items.findById(currentParentId);
+    currentParentId = String(parentItem?.parentId || "").trim();
+    depth += 1;
+  }
+
+  return false;
+}
+
+function assignmentMatchesItemByPath(
+  assignment: { rootPath?: string; recursive?: boolean },
+  itemRelativePath: string,
+) {
+  const assignmentRoot = normalizeRelativePath(String(assignment?.rootPath || ""));
+
+  if (!assignmentRoot || !itemRelativePath) {
+    return false;
+  }
+
+  if (itemRelativePath === assignmentRoot) {
+    return true;
+  }
+
+  if (!itemRelativePath.startsWith(`${assignmentRoot}/`)) {
+    return false;
+  }
+
+  if (assignment.recursive !== false) {
+    return true;
+  }
+
+  const relativeSuffix = itemRelativePath.slice(assignmentRoot.length + 1);
+  return !relativeSuffix.includes("/");
+}
+
+async function isBooksAssignedItemWithAssignments(
+  ctx: NexusBackendPluginContext,
+  item: any,
+  assignments: Array<{ rootItemId?: string; rootPath?: string; recursive?: boolean }>,
+) {
+  const itemRelativePath = normalizeRelativePath(
+    getContentRelativePath(String(item?.path || ""), ctx.vault.contentPath),
+  );
+
+  if (!itemRelativePath) {
+    return false;
+  }
+
+  const repositories = ctx.requireRepositories();
+
+  for (const assignment of assignments) {
+    if (await assignmentMatchesItemById(repositories, item, assignment)) {
+      return true;
+    }
+
+    if (!assignment?.rootItemId && assignmentMatchesItemByPath(assignment, itemRelativePath)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function isSupportedBookItem(item: any) {
   if (item?.type !== "file") {
     return false;
@@ -285,42 +391,15 @@ function isSupportedBookItem(item: any) {
 }
 
 export async function isBooksAssignedItem(ctx: NexusBackendPluginContext, item: any) {
-  if (!isSupportedBookItem(item)) {
+  const resolvedItem = await withResolvedItemLocation(ctx, item);
+
+  if (!isSupportedBookItem(resolvedItem)) {
     return false;
   }
 
   const settings = await ctx.settings.get();
   const assignments = readBooksEngineAssignments(settings);
-  const itemRelativePath = normalizeRelativePath(
-    getContentRelativePath(String(item?.path || ""), ctx.vault.contentPath),
-  );
-
-  if (!itemRelativePath) {
-    return false;
-  }
-
-  return assignments.some((assignment) => {
-    const assignmentRoot = normalizeRelativePath(String(assignment.rootPath || ""));
-
-    if (!assignmentRoot) {
-      return false;
-    }
-
-    if (itemRelativePath === assignmentRoot) {
-      return true;
-    }
-
-    if (!itemRelativePath.startsWith(`${assignmentRoot}/`)) {
-      return false;
-    }
-
-    if (assignment.recursive) {
-      return true;
-    }
-
-    const relativeSuffix = itemRelativePath.slice(assignmentRoot.length + 1);
-    return !relativeSuffix.includes("/");
-  });
+  return isBooksAssignedItemWithAssignments(ctx, resolvedItem, assignments);
 }
 
 function ensureBooksSchema(sqlite: any) {
@@ -520,9 +599,10 @@ export async function ensureBookRecord(
   } = {},
 ) {
   const repositories = ctx.requireRepositories();
-  const itemId = String(item?.id || "");
+  const resolvedItem = await withResolvedItemLocation(ctx, item);
+  const itemId = String(resolvedItem?.id || "");
 
-  if (!itemId || !isSupportedBookItem(item) || !(await isBooksAssignedItem(ctx, item))) {
+  if (!itemId || !isSupportedBookItem(resolvedItem) || !(await isBooksAssignedItem(ctx, resolvedItem))) {
     if (itemId) {
       await deleteBookArtifacts(ctx, itemId);
     }
@@ -530,12 +610,12 @@ export async function ensureBookRecord(
   }
 
   const existing = findBookByItemIdSync(repositories.sqlite, itemId);
-  const shouldRefreshMetadata = !existing || structuralChanged || contentChanged;
+  const shouldRefreshMetadata = !existing || contentChanged;
   const extractedMetadata = shouldRefreshMetadata
-    ? await parsePdfMetadata(String(item?.path || ""))
+    ? await parsePdfMetadata(String(resolvedItem?.path || ""))
     : { title: null, author: null };
   const addedAt = existing?.addedAt || nowIso();
-  const itemHash = normalizeOptionalText(item?.hash);
+  const itemHash = normalizeOptionalText(resolvedItem?.hash);
   const shouldResetCoverPreview =
     contentChanged
     || (Boolean(existing?.coverPreview) && Boolean(itemHash) && existing?.coverPreviewSourceHash !== itemHash);
@@ -544,10 +624,10 @@ export async function ensureBookRecord(
     title:
       extractedMetadata.title ||
       existing?.title ||
-      getBaseName(String(item?.path || item?.name || "")) ||
+      getBaseName(String(resolvedItem?.path || resolvedItem?.name || "")) ||
       "Documento",
     author: extractedMetadata.author ?? existing?.author ?? null,
-    fileFormat: getFileExtension(String(item?.path || "")) || existing?.fileFormat || "pdf",
+    fileFormat: getFileExtension(String(resolvedItem?.path || "")) || existing?.fileFormat || "pdf",
     addedAt,
     lastOpenedAt: markOpened ? nowIso() : existing?.lastOpenedAt ?? null,
     readingStatus: existing?.readingStatus || "pending",
@@ -561,7 +641,7 @@ export async function ensureBookRecord(
   const persisted = findBookByItemIdSync(repositories.sqlite, itemId);
 
   if (persisted) {
-    await syncBookSearchDocument(ctx, persisted, item);
+    await syncBookSearchDocument(ctx, persisted, resolvedItem);
   }
 
   return persisted;
@@ -577,7 +657,7 @@ export async function getBookByItemId(
   { markOpened = false } = {},
 ) {
   const repositories = ctx.requireRepositories();
-  const item = await repositories.items.findById(itemId);
+  const item = await withResolvedItemLocation(ctx, await repositories.items.findById(itemId));
 
   if (!item) {
     throw new Error("Item no encontrado.");
@@ -608,7 +688,7 @@ export async function updateBookState(
   },
 ) {
   const repositories = ctx.requireRepositories();
-  const item = await repositories.items.findById(itemId);
+  const item = await withResolvedItemLocation(ctx, await repositories.items.findById(itemId));
 
   if (!item) {
     throw new Error("Item no encontrado.");
@@ -657,7 +737,7 @@ export async function updateBookCoverPreview(
   },
 ) {
   const repositories = ctx.requireRepositories();
-  const item = await repositories.items.findById(itemId);
+  const item = await withResolvedItemLocation(ctx, await repositories.items.findById(itemId));
 
   if (!item) {
     throw new Error("Item no encontrado.");
@@ -701,18 +781,20 @@ export async function reconcileBooksAssignments(ctx: NexusBackendPluginContext) 
   const items = await repositories.items.findAll();
 
   for (const item of items) {
-    if (!isSupportedBookItem(item)) {
+    const resolvedItem = await withResolvedItemLocation(ctx, item);
+
+    if (!isSupportedBookItem(resolvedItem)) {
       continue;
     }
 
-    if (!(await isBooksAssignedItem(ctx, item))) {
+    if (!(await isBooksAssignedItem(ctx, resolvedItem))) {
       await deleteBookArtifacts(ctx, String(item.id));
       continue;
     }
 
-    await ensureBookRecord(ctx, item, {
+    await ensureBookRecord(ctx, resolvedItem, {
       structuralChanged: true,
-      contentChanged: true,
+      contentChanged: false,
       markOpened: false,
     });
   }

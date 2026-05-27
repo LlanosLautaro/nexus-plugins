@@ -4,10 +4,12 @@ import {
   BOOK_READING_STATUSES,
 } from "./constants.js";
 import {
+  normalizeItemId,
   normalizeRelativePath,
   readBooksEngineAssignments,
   writeBooksEngineAssignments,
 } from "./plugin-settings.js";
+import { resolveItemLocationFromItemsState } from "../../../nexus-frontend/src/store/items/location.mjs";
 
 const path = window.require("node:path");
 const fs = window.require("node:fs");
@@ -122,14 +124,59 @@ export function resolveVaultFilePath(filePath) {
 export function buildFolderOptions(byId = {}, rootId = null) {
   return Object.values(byId)
     .filter((item) => item?.type === "folder")
-    .map((item) => ({
-      id: item.id,
-      label: item.id === rootId ? "Vault completo" : item.name,
-      rootPath: normalizeRelativePath(getContentRelativePath(item.path || "")),
-      path: item.path || "",
-    }))
+    .map((item) => {
+      const location = resolveItemLocationFromItemsState(
+        {
+          byId,
+          rootId,
+        },
+        item.id,
+      );
+
+      return {
+        id: item.id,
+        label: item.id === rootId ? "Vault completo" : item.name,
+        rootPath: normalizeRelativePath(location?.contentRelativePath || ""),
+        path: location?.path || item.path || "",
+      };
+    })
     .filter((option) => option.rootPath)
     .sort((left, right) => left.rootPath.localeCompare(right.rootPath));
+}
+
+export function resolveFolderOptionForAssignment(assignment, folderOptions = []) {
+  const assignmentRootItemId = normalizeItemId(assignment?.rootItemId);
+  const assignmentRootPath = normalizeRelativePath(assignment?.rootPath);
+
+  if (assignmentRootItemId) {
+    return folderOptions.find((option) => option.id === assignmentRootItemId) || null;
+  }
+
+  if (!assignmentRootPath) {
+    return null;
+  }
+
+  return folderOptions.find((option) => option.rootPath === assignmentRootPath) || null;
+}
+
+export function hydrateAssignmentsWithFolderOptions(assignments, folderOptions = []) {
+  return (Array.isArray(assignments) ? assignments : []).map((assignment) => {
+    const folderOption = resolveFolderOptionForAssignment(assignment, folderOptions);
+
+    if (!folderOption) {
+      return {
+        ...assignment,
+        rootItemId: normalizeItemId(assignment?.rootItemId),
+        rootPath: normalizeRelativePath(assignment?.rootPath),
+      };
+    }
+
+    return {
+      ...assignment,
+      rootItemId: folderOption.id,
+      rootPath: folderOption.rootPath,
+    };
+  });
 }
 
 export function getReadingStatusLabel(status) {

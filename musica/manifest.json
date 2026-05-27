@@ -1,7 +1,7 @@
 {
   "id": "nexus.musica",
   "displayName": "Musica",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "apiVersion": 1,
   "schemaVersion": 1,
   "description": "Indexacion, metadata editable e IPC para audio dentro de Nexus.",

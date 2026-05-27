@@ -226,9 +226,18 @@ function PluginMetadataForm({ itemId, formInstance, onSubmitted }) {
 }
 
 // ../nexus-plugins/musica/src/plugin-settings.js
+var MUSICA_ENGINE_ID = "nexus.musica.audio";
 var MUSICA_SETTINGS_DEFAULTS = Object.freeze({
-  extractEmbeddedCoverArt: true
+  extractEmbeddedCoverArt: true,
+  engineAssignments: []
 });
+function normalizeItemId(value) {
+  const normalized = String(value || "").trim();
+  return normalized || "";
+}
+function normalizeRelativePath(value) {
+  return String(value || "").replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+/g, "/").replace(/\/$/, "").trim();
+}
 function normalizeMusicaSettings(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {
@@ -240,9 +249,114 @@ function normalizeMusicaSettings(value) {
     ...value
   };
 }
+function normalizeMusicaAssignment(assignment) {
+  return {
+    engineId: MUSICA_ENGINE_ID,
+    rootItemId: normalizeItemId(assignment?.rootItemId),
+    rootPath: normalizeRelativePath(assignment?.rootPath),
+    recursive: typeof assignment?.recursive === "boolean" ? assignment.recursive : true
+  };
+}
+function readMusicaEngineAssignments(settingsValue) {
+  const normalizedSettings = normalizeMusicaSettings(settingsValue);
+  const assignments = Array.isArray(normalizedSettings.engineAssignments) ? normalizedSettings.engineAssignments : [];
+  return assignments.filter((assignment) => assignment?.engineId === MUSICA_ENGINE_ID).map(normalizeMusicaAssignment).filter((assignment) => assignment.rootItemId || assignment.rootPath);
+}
+function writeMusicaEngineAssignments(settingsValue, assignments) {
+  const normalizedSettings = normalizeMusicaSettings(settingsValue);
+  const retainedAssignments = Array.isArray(normalizedSettings.engineAssignments) ? normalizedSettings.engineAssignments.filter(
+    (assignment) => assignment?.engineId !== MUSICA_ENGINE_ID
+  ) : [];
+  return {
+    ...normalizedSettings,
+    engineAssignments: [
+      ...retainedAssignments,
+      ...assignments.map(normalizeMusicaAssignment).filter((assignment) => assignment.rootItemId || assignment.rootPath)
+    ]
+  };
+}
+
+// ../nexus-frontend/src/store/items/location.mjs
+function normalizeItemId2(value) {
+  const normalizedValue = String(value || "").trim();
+  return normalizedValue || "";
+}
+function normalizeName(value) {
+  return String(value || "").trim();
+}
+function trimTrailingSeparators(value) {
+  return String(value || "").replace(/[\\/]+$/, "");
+}
+function guessSeparator(...values) {
+  return values.some((value) => String(value || "").includes("\\")) ? "\\" : "/";
+}
+function joinSegments(basePath, segments, separator) {
+  const normalizedBasePath = trimTrailingSeparators(basePath);
+  if (!segments.length) {
+    return normalizedBasePath;
+  }
+  return [normalizedBasePath, ...segments].filter(Boolean).join(separator);
+}
+function joinRelativePath(segments, separator) {
+  return segments.length ? segments.join(separator) : null;
+}
+function resolveItemLocationFromItemsState(itemsState, itemId, options = {}) {
+  const byId = itemsState?.byId || {};
+  const normalizedItemId = normalizeItemId2(itemId);
+  if (!normalizedItemId) {
+    return null;
+  }
+  const item = byId[normalizedItemId];
+  if (!item) {
+    return null;
+  }
+  const visitedIds = /* @__PURE__ */ new Set();
+  const ancestorIds = [];
+  const relativeSegments = [];
+  let currentItem = item;
+  let rootItem = null;
+  while (currentItem?.id) {
+    const currentItemId = normalizeItemId2(currentItem.id);
+    if (!currentItemId || visitedIds.has(currentItemId)) {
+      return null;
+    }
+    visitedIds.add(currentItemId);
+    const currentParentId = normalizeItemId2(currentItem.parentId);
+    if (!currentParentId) {
+      rootItem = currentItem;
+      break;
+    }
+    const currentName = normalizeName(currentItem.name);
+    if (currentName) {
+      relativeSegments.push(currentName);
+    }
+    ancestorIds.push(currentParentId);
+    const parentItem = byId[currentParentId];
+    if (!parentItem) {
+      return null;
+    }
+    currentItem = parentItem;
+  }
+  if (!rootItem) {
+    return null;
+  }
+  const rootPathCandidate = options.rootPath || options.vaultContentPath || "";
+  const separator = guessSeparator(rootPathCandidate);
+  const orderedSegments = [...relativeSegments].reverse();
+  const resolvedRelativePath = joinRelativePath(orderedSegments, separator);
+  return {
+    itemId: String(item.id),
+    parentId: item.parentId ?? null,
+    name: String(item.name || ""),
+    type: item.type === "folder" ? "folder" : "file",
+    path: joinSegments(rootPathCandidate, orderedSegments, separator),
+    relativePath: resolvedRelativePath,
+    contentRelativePath: orderedSegments.length ? orderedSegments.join("/") : null,
+    ancestorIds
+  };
+}
 
 // ../nexus-plugins/musica/src/renderer-helpers.js
-var MUSICA_ENGINE_ID = "nexus.musica.audio";
 var SUPPORTED_AUDIO_EXTENSIONS = /* @__PURE__ */ new Set([
   "aac",
   "flac",
@@ -268,56 +382,53 @@ function isSupportedAudioItem(item) {
     getFileExtension(item?.path || item?.name || "")
   );
 }
-function getContentRelativePath(filePath) {
-  const normalizedPath = String(filePath || "").replace(/\\/g, "/");
-  const vaultPath = String(window?.vault?.path || "").replace(/\\/g, "/").replace(/\/$/, "");
-  if (!normalizedPath) {
-    return "";
-  }
-  if (vaultPath) {
-    const contentPrefix = `${vaultPath}/content/`;
-    if (normalizedPath.startsWith(contentPrefix)) {
-      return normalizedPath.slice(contentPrefix.length);
-    }
-  }
-  const contentMatch = normalizedPath.match(/(?:^|\/)content\/(.+)$/);
-  return contentMatch?.[1] || "";
-}
-function normalizeRelativePath(value) {
-  return String(value || "").replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+/g, "/").replace(/\/$/, "").trim();
-}
 function buildFolderOptions(byId = {}, rootId = null) {
-  return Object.values(byId).filter((item) => item?.type === "folder").map((item) => ({
-    id: item.id,
-    label: item.id === rootId ? "Vault completo" : item.name,
-    rootPath: normalizeRelativePath(getContentRelativePath(item.path || "")),
-    path: item.path || ""
-  })).filter((option) => option.rootPath).sort((left, right) => left.rootPath.localeCompare(right.rootPath));
+  return Object.values(byId).filter((item) => item?.type === "folder").map((item) => {
+    const location = resolveItemLocationFromItemsState(
+      {
+        byId,
+        rootId
+      },
+      item.id
+    );
+    return {
+      id: item.id,
+      label: item.id === rootId ? "Vault completo" : item.name,
+      rootPath: normalizeRelativePath(location?.contentRelativePath || ""),
+      path: location?.path || item.path || ""
+    };
+  }).filter((option) => option.rootPath).sort((left, right) => left.rootPath.localeCompare(right.rootPath));
 }
-function readEngineAssignments(settingsValue) {
-  const normalizedSettings = normalizeMusicaSettings(settingsValue);
-  const assignments = Array.isArray(normalizedSettings.engineAssignments) ? normalizedSettings.engineAssignments : [];
-  return assignments.filter((assignment) => assignment?.engineId === MUSICA_ENGINE_ID).map((assignment) => ({
-    engineId: MUSICA_ENGINE_ID,
-    rootPath: normalizeRelativePath(assignment.rootPath),
-    recursive: typeof assignment.recursive === "boolean" ? assignment.recursive : true
-  })).filter((assignment) => assignment.rootPath);
+function resolveFolderOptionForAssignment(assignment, folderOptions = []) {
+  const assignmentRootItemId = normalizeItemId(assignment?.rootItemId);
+  const assignmentRootPath = normalizeRelativePath(assignment?.rootPath);
+  if (assignmentRootItemId) {
+    return folderOptions.find((option) => option.id === assignmentRootItemId) || null;
+  }
+  if (!assignmentRootPath) {
+    return null;
+  }
+  return folderOptions.find((option) => option.rootPath === assignmentRootPath) || null;
 }
-function writeEngineAssignments(settingsValue, assignments) {
-  const normalizedSettings = normalizeMusicaSettings(settingsValue);
-  const retainedAssignments = Array.isArray(normalizedSettings.engineAssignments) ? normalizedSettings.engineAssignments.filter((assignment) => assignment?.engineId !== MUSICA_ENGINE_ID) : [];
-  return {
-    ...normalizedSettings,
-    engineAssignments: [
-      ...retainedAssignments,
-      ...assignments.map((assignment) => ({
-        engineId: MUSICA_ENGINE_ID,
-        rootPath: normalizeRelativePath(assignment.rootPath),
-        recursive: typeof assignment.recursive === "boolean" ? assignment.recursive : true
-      }))
-    ]
-  };
+function hydrateAssignmentsWithFolderOptions(assignments, folderOptions = []) {
+  return (Array.isArray(assignments) ? assignments : []).map((assignment) => {
+    const folderOption = resolveFolderOptionForAssignment(assignment, folderOptions);
+    if (!folderOption) {
+      return {
+        ...assignment,
+        rootItemId: normalizeItemId(assignment?.rootItemId),
+        rootPath: normalizeRelativePath(assignment?.rootPath)
+      };
+    }
+    return {
+      ...assignment,
+      rootItemId: folderOption.id,
+      rootPath: folderOption.rootPath
+    };
+  });
 }
+var readEngineAssignments = readMusicaEngineAssignments;
+var writeEngineAssignments = writeMusicaEngineAssignments;
 
 // ../nexus-plugins/musica/src/MusicAudioEngine.jsx
 var { useEffect: useEffect2, useMemo: useMemo2, useRef, useState: useState2 } = window.React;
@@ -664,13 +775,22 @@ function MusicAudioEngine({
 var { useEffect: useEffect3, useMemo: useMemo3, useState: useState3 } = window.React;
 function createEmptyAssignment() {
   return {
+    rootItemId: "",
     rootPath: "",
     recursive: true
   };
 }
+function getAssignmentSelectValue(assignment) {
+  if (assignment?.rootItemId) {
+    return assignment.rootItemId;
+  }
+  const rootPath = String(assignment?.rootPath || "");
+  return rootPath ? `legacy:${rootPath}` : "";
+}
 function getAssignmentsSignature(assignments) {
   return JSON.stringify(
     Array.isArray(assignments) ? assignments.map((assignment) => ({
+      rootItemId: String(assignment?.rootItemId || ""),
       rootPath: String(assignment?.rootPath || ""),
       recursive: Boolean(assignment?.recursive)
     })) : []
@@ -678,33 +798,51 @@ function getAssignmentsSignature(assignments) {
 }
 function MusicaSettingsSection({ ctx }) {
   const baseSettings = ctx.settings.useValue();
+  const itemsState = ctx.getItems();
+  const folderOptions = buildFolderOptions(itemsState.byId, itemsState.rootId);
+  const folderOptionsById = useMemo3(
+    () => new Map(folderOptions.map((option) => [option.id, option])),
+    [folderOptions]
+  );
   const persistedAssignments = useMemo3(
     () => readEngineAssignments(baseSettings),
     [baseSettings]
   );
+  const hydratedPersistedAssignments = useMemo3(
+    () => hydrateAssignmentsWithFolderOptions(persistedAssignments, folderOptions),
+    [folderOptions, persistedAssignments]
+  );
   const persistedAssignmentsSignature = useMemo3(
-    () => getAssignmentsSignature(persistedAssignments),
-    [persistedAssignments]
+    () => getAssignmentsSignature(hydratedPersistedAssignments),
+    [hydratedPersistedAssignments]
+  );
+  const legacyFolderOptions = useMemo3(
+    () => hydratedPersistedAssignments.filter(
+      (assignment) => (assignment?.rootItemId || assignment?.rootPath) && !resolveFolderOptionForAssignment(assignment, folderOptions)
+    ).map((assignment, index) => ({
+      id: assignment.rootItemId || `legacy:${assignment.rootPath}`,
+      label: `${assignment.rootPath || assignment.rootItemId} (sin resolver)`,
+      key: `${assignment.rootItemId || assignment.rootPath}:${index}`
+    })),
+    [folderOptions, hydratedPersistedAssignments]
   );
   const [draftAssignments, setDraftAssignments] = useState3(
-    () => persistedAssignments
+    () => hydratedPersistedAssignments
   );
   const [saving, setSaving] = useState3(false);
   const [notice, setNotice] = useState3("");
   const [error, setError] = useState3("");
-  const itemsState = ctx.getItems();
-  const folderOptions = buildFolderOptions(itemsState.byId, itemsState.rootId);
   useEffect3(() => {
     setDraftAssignments(
-      (currentValue) => getAssignmentsSignature(currentValue) === persistedAssignmentsSignature ? currentValue : persistedAssignments
+      (currentValue) => getAssignmentsSignature(currentValue) === persistedAssignmentsSignature ? currentValue : hydratedPersistedAssignments
     );
-  }, [persistedAssignmentsSignature]);
+  }, [hydratedPersistedAssignments, persistedAssignmentsSignature]);
   const handleSave = async () => {
     setSaving(true);
     setError("");
     setNotice("");
     try {
-      const normalizedAssignments = draftAssignments.filter((assignment) => assignment.rootPath);
+      const normalizedAssignments = draftAssignments.filter((assignment) => assignment.rootItemId);
       const nextSettings = writeEngineAssignments(baseSettings, normalizedAssignments);
       await ctx.settings.set(nextSettings);
       setNotice("Carpetas guardadas. Musica ya reacciona en vivo a estas asignaciones.");
@@ -714,49 +852,78 @@ function MusicaSettingsSection({ ctx }) {
       setSaving(false);
     }
   };
-  return /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings" }, /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__copy" }, /* @__PURE__ */ React.createElement("strong", null, "Carpetas reclamadas por el engine musical"), /* @__PURE__ */ React.createElement("p", null, "Solo los audios dentro de estas carpetas se trataran como musica indexada por", /* @__PURE__ */ React.createElement("code", null, MUSICA_ENGINE_ID), ".")), /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__list" }, draftAssignments.length ? draftAssignments.map((assignment, index) => /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__row", key: `${assignment.rootPath}-${index}` }, /* @__PURE__ */ React.createElement(
-    "select",
+  return /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings" }, /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__copy" }, /* @__PURE__ */ React.createElement("strong", null, "Carpetas reclamadas por el engine musical"), /* @__PURE__ */ React.createElement("p", null, "Solo los audios dentro de estas carpetas se trataran como musica indexada por", /* @__PURE__ */ React.createElement("code", null, MUSICA_ENGINE_ID), ".")), /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__list" }, draftAssignments.length ? draftAssignments.map((assignment, index) => /* @__PURE__ */ React.createElement(
+    "div",
     {
-      value: assignment.rootPath,
-      onChange: (event) => setDraftAssignments(
-        (currentValue) => currentValue.map(
-          (entry, entryIndex) => entryIndex === index ? {
-            ...entry,
-            rootPath: event.target.value
-          } : entry
-        )
-      ),
-      disabled: saving
+      className: "musicaPluginSettings__row",
+      key: `${assignment.rootItemId || assignment.rootPath || "empty"}-${index}`
     },
-    /* @__PURE__ */ React.createElement("option", { value: "" }, "Selecciona una carpeta"),
-    folderOptions.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.rootPath || "__vault__", value: option.rootPath }, option.rootPath || "Vault completo"))
-  ), /* @__PURE__ */ React.createElement("label", { className: "musicaPluginSettings__checkbox" }, /* @__PURE__ */ React.createElement(
-    "input",
-    {
-      type: "checkbox",
-      checked: assignment.recursive,
-      onChange: (event) => setDraftAssignments(
-        (currentValue) => currentValue.map(
-          (entry, entryIndex) => entryIndex === index ? {
-            ...entry,
-            recursive: event.target.checked
-          } : entry
-        )
-      ),
-      disabled: saving
-    }
-  ), /* @__PURE__ */ React.createElement("span", null, "Recursiva")), /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      type: "button",
-      className: "musicaPluginSettings__secondaryButton",
-      onClick: () => setDraftAssignments(
-        (currentValue) => currentValue.filter((_entry, entryIndex) => entryIndex !== index)
-      ),
-      disabled: saving
-    },
-    "Quitar"
-  ))) : /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__empty" }, "Sin carpetas asignadas todavia. Fuera de estas carpetas, los audios usaran el fallback global del host.")), /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__actions" }, /* @__PURE__ */ React.createElement(
+    /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        value: getAssignmentSelectValue(assignment),
+        onChange: (event) => setDraftAssignments(
+          (currentValue) => currentValue.map(
+            (entry, entryIndex) => entryIndex !== index ? entry : (() => {
+              const nextValue = event.target.value;
+              const nextOption = folderOptionsById.get(nextValue) || null;
+              if (!nextValue) {
+                return {
+                  ...entry,
+                  rootItemId: "",
+                  rootPath: ""
+                };
+              }
+              if (nextOption) {
+                return {
+                  ...entry,
+                  rootItemId: nextOption.id,
+                  rootPath: nextOption.rootPath
+                };
+              }
+              return {
+                ...entry,
+                rootItemId: "",
+                rootPath: nextValue.replace(/^legacy:/, "")
+              };
+            })()
+          )
+        ),
+        disabled: saving
+      },
+      /* @__PURE__ */ React.createElement("option", { value: "" }, "Selecciona una carpeta"),
+      folderOptions.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.id, value: option.id }, option.rootPath || "Vault completo")),
+      legacyFolderOptions.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.key, value: option.id }, option.label))
+    ),
+    /* @__PURE__ */ React.createElement("label", { className: "musicaPluginSettings__checkbox" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "checkbox",
+        checked: assignment.recursive,
+        onChange: (event) => setDraftAssignments(
+          (currentValue) => currentValue.map(
+            (entry, entryIndex) => entryIndex === index ? {
+              ...entry,
+              recursive: event.target.checked
+            } : entry
+          )
+        ),
+        disabled: saving
+      }
+    ), /* @__PURE__ */ React.createElement("span", null, "Recursiva")),
+    /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        type: "button",
+        className: "musicaPluginSettings__secondaryButton",
+        onClick: () => setDraftAssignments(
+          (currentValue) => currentValue.filter((_entry, entryIndex) => entryIndex !== index)
+        ),
+        disabled: saving
+      },
+      "Quitar"
+    )
+  )) : /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__empty" }, "Sin carpetas asignadas todavia. Fuera de estas carpetas, los audios usaran el fallback global del host.")), /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__actions" }, /* @__PURE__ */ React.createElement(
     "button",
     {
       type: "button",
