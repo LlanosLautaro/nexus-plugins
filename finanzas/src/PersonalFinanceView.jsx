@@ -20,6 +20,30 @@ import {
   TrashIcon,
   WalletIcon,
 } from "./icons.jsx";
+import {
+  Button,
+  Field,
+  FieldGrid,
+  IconButton,
+  InlineField,
+  MetricCard,
+  Notice,
+  PanelHeader,
+  PanelStack,
+  PanelTitle,
+  ScrollRegion,
+  SectionPanel,
+  SegmentedControl,
+  SplitAside,
+  SplitLayout,
+  SplitMain,
+  ToolbarActions,
+  WorkspaceBody,
+  WorkspacePage,
+  WorkspaceTitle,
+  WorkspaceTopbar,
+  StateBlock,
+} from "../../../nexus-frontend/src/ui/index.js";
 
 const { ipcRenderer } = window.require("electron");
 
@@ -43,6 +67,12 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat("es-AR", {
   month: "short",
   year: "2-digit",
 });
+
+const FINANCE_WORKBENCH_TABS = [
+  { value: "compose", label: "Registrar" },
+  { value: "cash", label: "Efectivo" },
+  { value: "reports", label: "Reportes" },
+];
 
 function todayLocalDate() {
   const now = new Date();
@@ -548,18 +578,19 @@ function MovementRow({ movement, onEdit, onDelete, deleting }) {
       </div>
 
       <div className="financeDashboard__movementActions">
-        <button type="button" className="financeDashboard__iconButton" onClick={onEdit} title="Editar movimiento">
+        <IconButton type="button" className="financeDashboard__iconButton" onClick={onEdit} title="Editar movimiento">
           <PencilIcon size={15} />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           type="button"
           className="financeDashboard__iconButton financeDashboard__iconButton--danger"
+          tone="danger"
           onClick={onDelete}
           disabled={deleting}
           title="Borrar movimiento"
         >
           <TrashIcon size={15} />
-        </button>
+        </IconButton>
       </div>
     </div>
   );
@@ -617,6 +648,7 @@ export default function PersonalFinanceView() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [formState, setFormState] = useState(() => buildEmptyFormState());
   const [showAdvancedForm, setShowAdvancedForm] = useState(false);
+  const [workbenchTab, setWorkbenchTab] = useState("compose");
   const [cashCountForm, setCashCountForm] = useState(() =>
     buildCashCountFormState(FINANCE_CASH_DENOMINATIONS),
   );
@@ -781,6 +813,7 @@ export default function PersonalFinanceView() {
   const resetForm = () => {
     setFormState(buildEmptyFormState(activePreset?.id));
     setShowAdvancedForm(false);
+    setWorkbenchTab("compose");
   };
 
   const handleSubmit = async (event) => {
@@ -828,6 +861,7 @@ export default function PersonalFinanceView() {
   const handleEditMovement = (movement) => {
     setFormState(buildFormStateFromMovement(movement));
     setShowAdvancedForm(true);
+    setWorkbenchTab("compose");
     window.requestAnimationFrame(() => {
       titleInputRef.current?.focus();
     });
@@ -916,397 +950,431 @@ export default function PersonalFinanceView() {
   const hasAnyMovement = movements.length > 0;
   const cashVarianceIsPositive = cashCountPreview.varianceCents > 0;
   const cashVarianceIsNegative = cashCountPreview.varianceCents < 0;
+  const workbenchTitle = workbenchTab === "cash"
+    ? "Arqueo de efectivo"
+    : workbenchTab === "reports"
+      ? "Reportes compactos"
+      : editingMovement
+        ? "Editar movimiento"
+        : "Nuevo movimiento";
+  const workbenchDescription = workbenchTab === "cash"
+    ? "Compara el efectivo contado contra el saldo esperado en movimientos realizados con plataforma `Efectivo`."
+    : workbenchTab === "reports"
+      ? "Lectura rapida de balance y flujo sin salir del dashboard."
+      : "Registra ingresos y gastos con un flujo corto por defecto y detalles opcionales solo cuando hacen falta.";
 
   return (
-    <div className="financeDashboard">
-      <div className="financeDashboard__content">
-        <div className="financeDashboard__heroGrid">
-          <section className="financeDashboard__panel financeDashboard__panel--composer">
-            <div className="financeDashboard__panelHeader">
-              <div>
-                <strong>{editingMovement ? "Editar movimiento" : "Nuevo movimiento"}</strong>
-              </div>
-            </div>
+    <WorkspacePage className="financeDashboard">
+      <WorkspaceTopbar>
+        <WorkspaceTitle
+          eyebrow="Plugin finanzas"
+          title="Finanzas"
+          description="Movimientos como centro del flujo diario, con arqueo y reportes como herramientas auxiliares."
+        />
+        <ToolbarActions>
+          <Button
+            type="button"
+            tone="primary"
+            onClick={() => {
+              resetForm();
+              setWorkbenchTab("compose");
+              window.requestAnimationFrame(() => titleInputRef.current?.focus());
+            }}
+          >
+            Nuevo movimiento
+          </Button>
+          <IconButton
+            type="button"
+            onClick={() => void loadMovements()}
+            disabled={refreshing}
+            title="Recargar movimientos"
+          >
+            <RefreshIcon size={16} />
+          </IconButton>
+        </ToolbarActions>
+      </WorkspaceTopbar>
 
-            <div className="financeDashboard__presetGrid" role="tablist" aria-label="Tipo de movimiento">
-              {FINANCE_PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  className={[
-                    "financeDashboard__presetButton",
-                    formState.presetId === preset.id && "is-active",
-                    preset.kind === "income"
-                      ? "financeDashboard__presetButton--income"
-                      : "financeDashboard__presetButton--expense",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  onClick={() => applyPreset(preset.id)}
-                >
-                  {preset.kind === "income" ? <ArrowInIcon size={16} /> : <ArrowOutIcon size={16} />}
-                  <span>{preset.shortLabel}</span>
-                </button>
-              ))}
-            </div>
-
-            <form className="financeDashboard__form" onSubmit={handleSubmit}>
-              <label className="financeDashboard__field financeDashboard__field--wide">
-                <span>Titulo</span>
-                <input
-                  ref={titleInputRef}
-                  type="text"
-                  value={formState.title}
-                  onChange={(event) => updateFormState({ title: event.target.value })}
-                  placeholder={
-                    activePreset.kind === "income"
-                      ? "Ej. Sueldo, venta, transferencia"
-                      : "Ej. Supermercado, alquiler, cuota"
-                  }
-                  required
-                />
-              </label>
-
-              <label className="financeDashboard__field financeDashboard__field--amount">
-                <span>Monto</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  value={formState.amount}
-                  onChange={(event) => updateFormState({ amount: event.target.value })}
-                  placeholder="0.00"
-                  required
-                />
-              </label>
-
-              {showAdvancedForm ? (
-                <>
-                  <label className="financeDashboard__field">
-                    <span>Fecha</span>
-                    <input
-                      type="date"
-                      value={formState.movementDate}
-                      onChange={(event) => updateFormState({ movementDate: event.target.value })}
-                      required
-                    />
-                  </label>
-
-                  <label className="financeDashboard__field">
-                    <span>Categoria</span>
-                    <input
-                      type="text"
-                      list="finanzas-categories"
-                      value={formState.category}
-                      onChange={(event) => updateFormState({ category: event.target.value })}
-                      placeholder="Comida, transporte, sueldo..."
-                    />
-                  </label>
-
-                  <label className="financeDashboard__field">
-                    <span>Plataforma</span>
-                    <input
-                      type="text"
-                      list="finanzas-platforms"
-                      value={formState.platform}
-                      onChange={(event) => updateFormState({ platform: event.target.value })}
-                      placeholder="Efectivo, Mercado Pago, banco..."
-                    />
-                  </label>
-
-                  <label className="financeDashboard__field financeDashboard__field--wide">
-                    <span>Origen / lugar</span>
-                    <input
-                      type="text"
-                      value={formState.counterparty}
-                      onChange={(event) => updateFormState({ counterparty: event.target.value })}
-                      placeholder="Comercio, persona, empresa o contexto"
-                    />
-                  </label>
-
-                  <label className="financeDashboard__field financeDashboard__field--wide">
-                    <span>Notas</span>
-                    <textarea
-                      rows="3"
-                      value={formState.notes}
-                      onChange={(event) => updateFormState({ notes: event.target.value })}
-                      placeholder="Detalle opcional"
-                    />
-                  </label>
-                </>
-              ) : null}
-
-              <div className="financeDashboard__formActions">
-                <button type="submit" className="financeDashboard__primaryButton" disabled={saving}>
-                  {saving ? "Guardando..." : editingMovement ? "Guardar cambios" : "Agregar movimiento"}
-                </button>
-
-                <button
-                  type="button"
-                  className="financeDashboard__secondaryButton"
-                  onClick={() => setShowAdvancedForm((current) => !current)}
-                  disabled={saving}
-                >
-                  {showAdvancedForm ? "Ocultar formulario completo" : "Mostrar formulario completo"}
-                </button>
-
-                {editingMovement ? (
-                  <button
-                    type="button"
-                    className="financeDashboard__secondaryButton"
-                    onClick={resetForm}
-                    disabled={saving}
-                  >
-                    Cancelar edicion
-                  </button>
-                ) : null}
-              </div>
-            </form>
-
-            <datalist id="finanzas-categories">
-              {categories.map((category) => (
-                <option key={category} value={category} />
-              ))}
-            </datalist>
-
-            <datalist id="finanzas-platforms">
-              {platforms.map((platform) => (
-                <option key={platform} value={platform} />
-              ))}
-            </datalist>
-          </section>
-
-          <section className="financeDashboard__summaryStack">
-            <div className="financeDashboard__summaryCard financeDashboard__summaryCard--actual">
-              <span className="financeDashboard__panelEyebrow">Saldo actual</span>
-              <strong>{formatCurrency(summary.actualBalanceCents)}</strong>
-              <p>
-                Basado solo en movimientos realizados. Pendientes cargados:
-                {" "}
-                {formatCurrency(summary.plannedIncomeCents)}
-                {" "}
-                de ingresos y
-                {" "}
-                {formatCurrency(summary.plannedExpenseCents)}
-                {" "}
-                de gastos.
-              </p>
-            </div>
-
-            <div className="financeDashboard__summaryCard financeDashboard__summaryCard--projected">
-              <span className="financeDashboard__panelEyebrow">Saldo proyectado</span>
-              <strong>{formatCurrency(summary.projectedBalanceCents)}</strong>
-              <p>
-                Resultado esperado si se ejecutan todos los pendientes ya cargados.
-              </p>
-            </div>
-
-            <section className="financeDashboard__panel financeDashboard__panel--cash">
-              <div className="financeDashboard__panelHeader">
-                <div>
-                  <strong>Efectivo</strong>
-                </div>
-              </div>
-
-              <p className="financeDashboard__cashCopy">
-                Arqueo por monto agrupado por denominacion para contrastar el efectivo contado contra lo esperado por movimientos realizados con plataforma
-                {" "}
-                `Efectivo`.
-              </p>
-
-              <div className="financeDashboard__cashStats">
-                <div className="financeDashboard__cashStat">
-                  <span>Esperado</span>
-                  <strong>{formatCurrency(cashCountPreview.expectedCents)}</strong>
-                </div>
-
-                <div className="financeDashboard__cashStat">
-                  <span>Contado</span>
-                  <strong>{formatCurrency(cashCountPreview.totalCountedCents)}</strong>
-                </div>
-
-                <div className="financeDashboard__cashStat">
-                  <span>Diferencia</span>
-                  <strong
-                    className={[
-                      cashVarianceIsPositive && "financeDashboard__cashVariance--positive",
-                      cashVarianceIsNegative && "financeDashboard__cashVariance--negative",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    {formatSignedCurrency(cashCountPreview.varianceCents)}
-                  </strong>
-                </div>
-              </div>
-
-              <div className="financeDashboard__cashGrid">
-                {cashDenominations.map((denomination) => (
-                  <label key={denomination} className="financeDashboard__cashField">
-                    <span>{`${formatDenominationLabel(denomination)} ARS`}</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={cashCountForm[String(denomination)] ?? ""}
-                      onChange={(event) =>
-                        handleCashCountFieldChange(denomination, event.target.value)
-                      }
-                      placeholder="0"
-                    />
-                  </label>
-                ))}
-              </div>
-
-              <div className="financeDashboard__formActions">
-                <button
-                  type="button"
-                  className="financeDashboard__primaryButton"
-                  onClick={() => void handleSaveCashCount()}
-                  disabled={savingCashCount}
-                >
-                  {savingCashCount ? "Guardando arqueo..." : "Registrar arqueo"}
-                </button>
-              </div>
-
-              {cashAudit?.latestCashCount ? (
-                <div className="financeDashboard__cashHint">
-                  Ultimo arqueo:
-                  {" "}
-                  {formatDateTimeLabel(cashAudit.latestCashCount.countedAt)}
-                </div>
-              ) : (
-                <div className="financeDashboard__cashHint">
-                  Todavia no hay arqueos registrados. El primero te deja ver si el efectivo real coincide con lo cargado.
-                </div>
-              )}
-
-              {recentCashCounts.length ? (
-                <div className="financeDashboard__cashHistory">
-                  {recentCashCounts.map((cashCount) => (
-                    <CashCountHistoryRow key={cashCount.id} cashCount={cashCount} />
-                  ))}
-                </div>
-              ) : null}
-            </section>
-          </section>
+      <WorkspaceBody className="financeDashboard__content">
+        <div className="financeDashboard__summaryRow">
+          <MetricCard
+            className="financeDashboard__summaryCard"
+            tone="highlight"
+            eyebrow="Saldo actual"
+            value={formatCurrency(summary.actualBalanceCents)}
+            description={`Basado solo en movimientos realizados. Quedan ${formatCurrency(summary.plannedIncomeCents)} en ingresos pendientes y ${formatCurrency(summary.plannedExpenseCents)} en gastos pendientes.`}
+          />
+          <MetricCard
+            className="financeDashboard__summaryCard"
+            tone="soft"
+            eyebrow="Saldo proyectado"
+            value={formatCurrency(summary.projectedBalanceCents)}
+            description="Resultado esperado si se ejecutan todos los pendientes ya cargados."
+          />
+          <MetricCard
+            className="financeDashboard__summaryCard financeDashboard__summaryCard--variance"
+            eyebrow="Efectivo contado"
+            value={formatCurrency(cashCountPreview.totalCountedCents)}
+            description={`Esperado: ${formatCurrency(cashCountPreview.expectedCents)}. Diferencia: ${formatSignedCurrency(cashCountPreview.varianceCents)}.`}
+          />
         </div>
 
-        <section className="financeDashboard__filtersBar">
-          <label className="financeDashboard__inlineField financeDashboard__inlineField--search">
-            <span>Buscar</span>
-            <input
-              type="search"
-              value={searchValue}
-              onChange={(event) => setSearchValue(event.target.value)}
-              placeholder="Titulo, categoria, plataforma o nota"
-            />
-          </label>
+        {error ? <Notice tone="danger">{error}</Notice> : null}
 
-          <label className="financeDashboard__inlineField">
-            <span>Periodo</span>
-            <select value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>
-              {FINANCE_PERIOD_FILTERS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="financeDashboard__inlineField">
-            <span>Tipo</span>
-            <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}>
-              <option value="all">Todos</option>
-              <option value="expense">Gastos</option>
-              <option value="income">Ingresos</option>
-            </select>
-          </label>
-
-          <label className="financeDashboard__inlineField">
-            <span>Estado</span>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="all">Todos</option>
-              <option value="posted">Realizados</option>
-              <option value="planned">Pendientes</option>
-            </select>
-          </label>
-        </section>
-
-        <div className="financeDashboard__chartsGrid">
-          <section className="financeDashboard__panel">
-            <div className="financeDashboard__panelHeader">
-              <div>
-                <span className="financeDashboard__panelEyebrow">Grafico</span>
-                <strong>Nivel de dinero en el tiempo</strong>
-              </div>
-              <WalletIcon size={18} />
-            </div>
-            <BalanceTimelineChart points={timelineSeries.points} />
-          </section>
-
-          <section className="financeDashboard__panel">
-            <div className="financeDashboard__panelHeader">
-              <div>
-                <span className="financeDashboard__panelEyebrow">Flujo</span>
-                <strong>Ingresos y egresos por mes</strong>
-              </div>
-            </div>
-            <MonthlyFlowChart rows={monthlyFlow.rows} maxValue={monthlyFlow.maxValue} />
-          </section>
-        </div>
-
-        <section className="financeDashboard__panel financeDashboard__panel--history">
-          <div className="financeDashboard__panelHeader">
-            <div>
-              <strong>Movimientos</strong>
-            </div>
-            <div className="financeDashboard__panelHeaderActions">
-              <span className="financeDashboard__historyCount">
-                {visibleMovements.length}
-                {" "}
-                visibles
-              </span>
-              <button
-                type="button"
-                className="financeDashboard__iconButton"
-                onClick={() => void loadMovements()}
-                disabled={refreshing}
-                title="Recargar movimientos"
+        <SplitLayout className="financeDashboard__workspace">
+          <SplitMain>
+            <SectionPanel className="financeDashboard__panel financeDashboard__panel--history">
+              <PanelHeader
+                actions={(
+                  <div className="financeDashboard__panelHeaderActions">
+                    <span className="financeDashboard__historyCount">
+                      {visibleMovements.length}
+                      {" "}
+                      visibles
+                    </span>
+                  </div>
+                )}
               >
-                <RefreshIcon size={16} />
-              </button>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="financeDashboard__state">Cargando movimientos...</div>
-          ) : !hasAnyMovement ? (
-            <div className="financeDashboard__state">
-              Aun no hay movimientos. Empieza con un gasto o ingreso desde el panel superior.
-            </div>
-          ) : visibleMovements.length === 0 ? (
-            <div className="financeDashboard__state">
-              No hay movimientos que coincidan con los filtros actuales.
-            </div>
-          ) : (
-            <div className="financeDashboard__movementList">
-              {visibleMovements.map((movement) => (
-                <MovementRow
-                  key={movement.id}
-                  movement={movement}
-                  deleting={deletingId === movement.id}
-                  onEdit={() => handleEditMovement(movement)}
-                  onDelete={() => void handleDeleteMovement(movement)}
+                <PanelTitle
+                  eyebrow="Centro de trabajo"
+                  title="Movimientos"
+                  description="Consulta, filtra y edita ingresos y gastos sin perder el contexto principal."
                 />
-              ))}
-            </div>
-          )}
-        </section>
+              </PanelHeader>
 
-        {error ? <div className="financeDashboard__state financeDashboard__state--error">{error}</div> : null}
-      </div>
-    </div>
+              <div className="financeDashboard__filtersBar">
+                <InlineField className="financeDashboard__inlineField financeDashboard__inlineField--search" label="Buscar" grow>
+                  <input
+                    type="search"
+                    value={searchValue}
+                    onChange={(event) => setSearchValue(event.target.value)}
+                    placeholder="Titulo, categoria, plataforma o nota"
+                  />
+                </InlineField>
+
+                <InlineField className="financeDashboard__inlineField" label="Periodo">
+                  <select value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>
+                    {FINANCE_PERIOD_FILTERS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </InlineField>
+
+                <InlineField className="financeDashboard__inlineField" label="Tipo">
+                  <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}>
+                    <option value="all">Todos</option>
+                    <option value="expense">Gastos</option>
+                    <option value="income">Ingresos</option>
+                  </select>
+                </InlineField>
+
+                <InlineField className="financeDashboard__inlineField" label="Estado">
+                  <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                    <option value="all">Todos</option>
+                    <option value="posted">Realizados</option>
+                    <option value="planned">Pendientes</option>
+                  </select>
+                </InlineField>
+              </div>
+
+              <ScrollRegion className="financeDashboard__movementRegion">
+                {loading ? (
+                  <StateBlock
+                    eyebrow="Cargando"
+                    title="Estamos leyendo tus movimientos"
+                    description="En un momento veras el historial filtrable."
+                  />
+                ) : !hasAnyMovement ? (
+                  <StateBlock
+                    centered
+                    eyebrow="Sin actividad"
+                    title="Todavia no hay movimientos"
+                    description="Empieza con un gasto o ingreso desde el panel lateral."
+                  />
+                ) : visibleMovements.length === 0 ? (
+                  <StateBlock
+                    centered
+                    eyebrow="Sin resultados"
+                    title="No hay movimientos para esos filtros"
+                    description="Prueba con otro periodo o limpia la busqueda."
+                  />
+                ) : (
+                  <div className="financeDashboard__movementList">
+                    {visibleMovements.map((movement) => (
+                      <MovementRow
+                        key={movement.id}
+                        movement={movement}
+                        deleting={deletingId === movement.id}
+                        onEdit={() => handleEditMovement(movement)}
+                        onDelete={() => void handleDeleteMovement(movement)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </ScrollRegion>
+            </SectionPanel>
+          </SplitMain>
+
+          <SplitAside className="financeDashboard__aside">
+            <SectionPanel className="financeDashboard__panel financeDashboard__panel--workbench">
+              <PanelStack>
+                <PanelHeader
+                  actions={(
+                    <SegmentedControl
+                      ariaLabel="Zona de trabajo de finanzas"
+                      options={FINANCE_WORKBENCH_TABS}
+                      value={workbenchTab}
+                      onChange={setWorkbenchTab}
+                    />
+                  )}
+                >
+                  <PanelTitle title={workbenchTitle} description={workbenchDescription} />
+                </PanelHeader>
+
+                {workbenchTab === "compose" ? (
+                  <>
+                    <div className="financeDashboard__presetGrid" role="tablist" aria-label="Tipo de movimiento">
+                      {FINANCE_PRESETS.map((preset) => (
+                        <Button
+                          key={preset.id}
+                          type="button"
+                          className={[
+                            "financeDashboard__presetButton",
+                            formState.presetId === preset.id && "is-active",
+                            preset.kind === "income"
+                              ? "financeDashboard__presetButton--income"
+                              : "financeDashboard__presetButton--expense",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          onClick={() => applyPreset(preset.id)}
+                        >
+                          {preset.kind === "income" ? <ArrowInIcon size={16} /> : <ArrowOutIcon size={16} />}
+                          <span>{preset.shortLabel}</span>
+                        </Button>
+                      ))}
+                    </div>
+
+                    <form className="financeDashboard__form" onSubmit={handleSubmit}>
+                      <FieldGrid>
+                        <Field className="financeDashboard__field financeDashboard__field--wide" label="Titulo" wide>
+                          <input
+                            ref={titleInputRef}
+                            type="text"
+                            value={formState.title}
+                            onChange={(event) => updateFormState({ title: event.target.value })}
+                            placeholder={
+                              activePreset.kind === "income"
+                                ? "Ej. sueldo, venta, transferencia"
+                                : "Ej. supermercado, alquiler, cuota"
+                            }
+                            required
+                          />
+                        </Field>
+
+                        <Field className="financeDashboard__field financeDashboard__field--amount" label="Monto" wide>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            step="0.01"
+                            value={formState.amount}
+                            onChange={(event) => updateFormState({ amount: event.target.value })}
+                            placeholder="0.00"
+                            required
+                          />
+                        </Field>
+
+                        {showAdvancedForm ? (
+                          <>
+                            <Field className="financeDashboard__field" label="Fecha">
+                              <input
+                                type="date"
+                                value={formState.movementDate}
+                                onChange={(event) => updateFormState({ movementDate: event.target.value })}
+                                required
+                              />
+                            </Field>
+
+                            <Field className="financeDashboard__field" label="Categoria">
+                              <input
+                                type="text"
+                                list="finanzas-categories"
+                                value={formState.category}
+                                onChange={(event) => updateFormState({ category: event.target.value })}
+                                placeholder="Comida, transporte, sueldo..."
+                              />
+                            </Field>
+
+                            <Field className="financeDashboard__field" label="Plataforma">
+                              <input
+                                type="text"
+                                list="finanzas-platforms"
+                                value={formState.platform}
+                                onChange={(event) => updateFormState({ platform: event.target.value })}
+                                placeholder="Efectivo, Mercado Pago, banco..."
+                              />
+                            </Field>
+
+                            <Field className="financeDashboard__field financeDashboard__field--wide" label="Origen o lugar" wide>
+                              <input
+                                type="text"
+                                value={formState.counterparty}
+                                onChange={(event) => updateFormState({ counterparty: event.target.value })}
+                                placeholder="Comercio, persona, empresa o contexto"
+                              />
+                            </Field>
+
+                            <Field className="financeDashboard__field financeDashboard__field--wide" label="Notas" wide>
+                              <textarea
+                                rows="3"
+                                value={formState.notes}
+                                onChange={(event) => updateFormState({ notes: event.target.value })}
+                                placeholder="Detalle opcional"
+                              />
+                            </Field>
+                          </>
+                        ) : null}
+                      </FieldGrid>
+
+                      <div className="financeDashboard__formActions">
+                        <Button type="submit" tone="primary" disabled={saving}>
+                          {saving ? "Guardando..." : editingMovement ? "Guardar cambios" : "Agregar movimiento"}
+                        </Button>
+
+                        <Button
+                          type="button"
+                          onClick={() => setShowAdvancedForm((current) => !current)}
+                          disabled={saving}
+                        >
+                          {showAdvancedForm ? "Ocultar avanzado" : "Mostrar avanzado"}
+                        </Button>
+
+                        {editingMovement ? (
+                          <Button
+                            type="button"
+                            onClick={resetForm}
+                            disabled={saving}
+                          >
+                            Cancelar edicion
+                          </Button>
+                        ) : null}
+                      </div>
+                    </form>
+
+                    <datalist id="finanzas-categories">
+                      {categories.map((category) => (
+                        <option key={category} value={category} />
+                      ))}
+                    </datalist>
+
+                    <datalist id="finanzas-platforms">
+                      {platforms.map((platform) => (
+                        <option key={platform} value={platform} />
+                      ))}
+                    </datalist>
+                  </>
+                ) : null}
+
+                {workbenchTab === "cash" ? (
+                  <>
+                    <div className="financeDashboard__cashStats">
+                      <div className="financeDashboard__cashStat">
+                        <span>Esperado</span>
+                        <strong>{formatCurrency(cashCountPreview.expectedCents)}</strong>
+                      </div>
+
+                      <div className="financeDashboard__cashStat">
+                        <span>Contado</span>
+                        <strong>{formatCurrency(cashCountPreview.totalCountedCents)}</strong>
+                      </div>
+
+                      <div className="financeDashboard__cashStat">
+                        <span>Diferencia</span>
+                        <strong
+                          className={[
+                            cashVarianceIsPositive && "financeDashboard__cashVariance--positive",
+                            cashVarianceIsNegative && "financeDashboard__cashVariance--negative",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {formatSignedCurrency(cashCountPreview.varianceCents)}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="financeDashboard__cashGrid">
+                      {cashDenominations.map((denomination) => (
+                        <Field key={denomination} className="financeDashboard__cashField" label={`${formatDenominationLabel(denomination)} ARS`}>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={cashCountForm[String(denomination)] ?? ""}
+                            onChange={(event) =>
+                              handleCashCountFieldChange(denomination, event.target.value)
+                            }
+                            placeholder="0"
+                          />
+                        </Field>
+                      ))}
+                    </div>
+
+                    <div className="financeDashboard__formActions">
+                      <Button
+                        type="button"
+                        tone="primary"
+                        onClick={() => void handleSaveCashCount()}
+                        disabled={savingCashCount}
+                      >
+                        {savingCashCount ? "Guardando arqueo..." : "Registrar arqueo"}
+                      </Button>
+                    </div>
+
+                    <StateBlock
+                      className="financeDashboard__cashHint"
+                      title={cashAudit?.latestCashCount ? "Ultimo arqueo registrado" : "Todavia no hay arqueos"}
+                      description={
+                        cashAudit?.latestCashCount
+                          ? formatDateTimeLabel(cashAudit.latestCashCount.countedAt)
+                          : "Registra el primero para comparar el efectivo real con lo cargado."
+                      }
+                    />
+
+                    {recentCashCounts.length ? (
+                      <div className="financeDashboard__cashHistory">
+                        {recentCashCounts.map((cashCount) => (
+                          <CashCountHistoryRow key={cashCount.id} cashCount={cashCount} />
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {workbenchTab === "reports" ? (
+                  <div className="financeDashboard__chartsGrid">
+                    <SectionPanel className="financeDashboard__panel financeDashboard__panel--chart" tone="soft">
+                      <PanelHeader actions={<WalletIcon size={18} />}>
+                        <PanelTitle eyebrow="Grafico" title="Nivel de dinero en el tiempo" />
+                      </PanelHeader>
+                      <BalanceTimelineChart points={timelineSeries.points} />
+                    </SectionPanel>
+
+                    <SectionPanel className="financeDashboard__panel financeDashboard__panel--chart" tone="soft">
+                      <PanelHeader>
+                        <PanelTitle eyebrow="Flujo" title="Ingresos y egresos por mes" />
+                      </PanelHeader>
+                      <MonthlyFlowChart rows={monthlyFlow.rows} maxValue={monthlyFlow.maxValue} />
+                    </SectionPanel>
+                  </div>
+                ) : null}
+              </PanelStack>
+            </SectionPanel>
+          </SplitAside>
+        </SplitLayout>
+      </WorkspaceBody>
+    </WorkspacePage>
   );
 }

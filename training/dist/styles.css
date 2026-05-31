@@ -1,130 +1,22 @@
 .trainingPlugin {
-  height: 100%;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  background: var(--shell-bg);
-  container-type: inline-size;
+  background: var(--workspace-main-bg);
 }
 
-.trainingPlugin__topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--color-line);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--shell-bg-strong) 90%, transparent), color-mix(in srgb, var(--shell-bg) 96%, transparent));
-}
-
-.trainingPlugin__titleBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.trainingPlugin__titleBlock strong {
-  color: var(--color-text);
-  font-size: 1rem;
-  line-height: 1.2;
-}
-.trainingPlugin__titleBlock span {
-  color: var(--color-text-muted);
-  font-size: 0.82rem;
-  line-height: 1.35;
-}
-
-.trainingPlugin__topbarActions {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.trainingPlugin__modeButton,
-.trainingPlugin__primaryButton,
-.trainingPlugin__secondaryButton,
-.trainingPlugin__iconButton,
-.trainingPlugin__chipButton,
-.trainingPlugin__stepButton {
-  min-height: 32px;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-pill);
-  background: var(--surface-pill);
-  color: var(--color-text-soft);
-  font-weight: 700;
-}
-
-.trainingPlugin__modeButton,
-.trainingPlugin__primaryButton,
-.trainingPlugin__secondaryButton,
-.trainingPlugin__iconButton,
-.trainingPlugin__chipButton,
-.trainingPlugin__stepButton {
-  cursor: pointer;
-}
-.trainingPlugin__modeButton:hover:not(:disabled), .trainingPlugin__modeButton:focus-visible:not(:disabled),
-.trainingPlugin__primaryButton:hover:not(:disabled),
-.trainingPlugin__primaryButton:focus-visible:not(:disabled),
-.trainingPlugin__secondaryButton:hover:not(:disabled),
-.trainingPlugin__secondaryButton:focus-visible:not(:disabled),
-.trainingPlugin__iconButton:hover:not(:disabled),
-.trainingPlugin__iconButton:focus-visible:not(:disabled),
-.trainingPlugin__chipButton:hover:not(:disabled),
-.trainingPlugin__chipButton:focus-visible:not(:disabled),
-.trainingPlugin__stepButton:hover:not(:disabled),
-.trainingPlugin__stepButton:focus-visible:not(:disabled) {
-  border-color: var(--color-line-strong);
-  background: var(--surface-hover);
-  color: var(--color-text);
-}
-.trainingPlugin__modeButton:disabled,
-.trainingPlugin__primaryButton:disabled,
-.trainingPlugin__secondaryButton:disabled,
-.trainingPlugin__iconButton:disabled,
-.trainingPlugin__chipButton:disabled,
-.trainingPlugin__stepButton:disabled {
-  opacity: 0.58;
-  cursor: default;
-}
-
-.trainingPlugin__modeButton.is-active {
-  border-color: var(--explorer-item-active-border);
-  background: var(--explorer-item-active);
-  color: var(--color-text);
-}
-
-.trainingPlugin__primaryButton {
-  border-color: var(--explorer-item-active-border);
-  background: var(--gradient-active, var(--explorer-item-active));
-  color: var(--color-text);
-}
-
-.trainingPlugin__secondaryButton {
-  padding: 0 12px;
-}
-
-.trainingPlugin__iconButton {
-  width: 32px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.trainingPlugin__body {
+  gap: var(--space-4);
 }
 
 .trainingPlugin__content {
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: var(--space-4);
 }
 
 .trainingPlugin__sidebar {
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px;
-  border-right: 1px solid var(--color-line);
-  background: color-mix(in srgb, var(--shell-bg-strong) 96%, transparent);
+}
+
+.trainingPlugin__sidebarPanel {
+  height: 100%;
+  background: var(--workspace-rail-bg);
 }
 
 .trainingPlugin__searchField,
@@ -149,9 +41,10 @@
 .trainingPlugin__inlineField select {
   min-width: 0;
   min-height: 34px;
-  border: 1px solid var(--color-line);
-  background: var(--surface-field);
-  color: var(--color-text);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-m);
+  background: var(--field-bg);
+  color: var(--field-text);
   padding: 0 12px;
 }
 
@@ -163,11 +56,6 @@
 
 .trainingPlugin__searchField input {
   width: 100%;
-}
-
-.trainingPlugin__modeToggle {
-  display: flex;
-  gap: 8px;
 }
 
 .trainingPlugin__list {
@@ -204,8 +92,8 @@
 .trainingPlugin__listCard {
   padding: 11px 12px;
   border: 1px solid var(--color-line);
-  background: var(--shell-panel-bg);
-  border-radius: 8px;
+  background: var(--shell-panel-soft);
+  border-radius: var(--radius-m);
   text-align: left;
   cursor: pointer;
   display: flex;
@@ -215,13 +103,15 @@
 }
 .trainingPlugin__listCard:hover, .trainingPlugin__listCard:focus-visible {
   border-color: var(--color-line-strong);
-  background: color-mix(in srgb, var(--shell-panel-bg) 84%, var(--surface-hover));
+  background: var(--shell-panel-highlight);
   transform: translateY(-1px);
 }
 
 .trainingPlugin__listCard.is-active {
-  border-color: var(--explorer-item-active-border);
-  background: var(--explorer-item-active);
+  background: var(--gradient-active);
+  border-color: var(--color-border-accent);
+  color: var(--color-text);
+  box-shadow: inset 0 1px 0 var(--fx-sheen-strong), 0 10px 18px rgba(0, 0, 0, 0.14);
 }
 
 .trainingPlugin__listCardTitle {
@@ -238,32 +128,19 @@
 
 .trainingPlugin__detail {
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 14px;
+}
+
+.trainingPlugin__detailStack {
+  display: grid;
+  gap: var(--space-4);
 }
 
 .trainingPlugin__panel {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  border: 1px solid var(--color-line);
-  background: var(--shell-panel-bg);
-  padding: 14px;
+  gap: var(--space-4);
 }
 
-.trainingPlugin__panelCopy {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.trainingPlugin__panelCopy strong {
-  color: var(--color-text);
-  font-size: 0.98rem;
-}
-.trainingPlugin__panelCopy span {
-  color: var(--color-text-muted);
-  line-height: 1.45;
+.trainingPlugin__panel--hero {
+  background: var(--shell-panel-highlight);
 }
 
 .trainingPlugin__formGrid {
@@ -304,6 +181,16 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.trainingPlugin__buttonRow--actions {
+  justify-content: flex-start;
+}
+
+.trainingPlugin__iconButton {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
 }
 
 .trainingPlugin__chip {
@@ -348,8 +235,8 @@
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--color-line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--shell-panel-bg) 92%, transparent);
+  border-radius: var(--radius-m);
+  background: var(--shell-panel-soft);
 }
 
 .trainingPlugin__selectorItemMain {
@@ -379,8 +266,8 @@
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--shell-panel-bg) 92%, transparent);
+  border-radius: var(--radius-m);
+  background: var(--shell-panel-soft);
 }
 
 .trainingPlugin__stepHeader {
@@ -401,9 +288,11 @@
 }
 
 .trainingPlugin__state {
-  padding: 12px 14px;
-  border: 1px solid var(--color-line);
-  background: var(--color-surface-inset);
+  border-radius: var(--radius-m);
+  border: 1px solid var(--state-border);
+  background: var(--state-bg);
+  padding: var(--panel-padding-m);
+  box-shadow: inset 0 1px 0 var(--fx-sheen-soft);
   color: var(--color-text-muted);
 }
 
@@ -414,51 +303,39 @@
 }
 
 .trainingPlugin__empty {
-  padding: 14px;
-  border: 1px solid var(--color-line);
-  background: var(--color-surface-inset);
-  color: var(--color-text-muted);
+  min-height: 160px;
 }
 
-.trainingPlugin__empty strong {
-  color: var(--color-text);
+.trainingPlugin__advanced {
+  margin-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--color-line) 78%, transparent);
+  padding-top: 10px;
+}
+.trainingPlugin__advanced summary {
+  cursor: pointer;
+  color: var(--color-text-soft);
+  font-size: 0.84rem;
+  font-weight: 700;
+  list-style: none;
+}
+.trainingPlugin__advanced summary::-webkit-details-marker {
+  display: none;
 }
 
 @media (max-width: 1060px) {
-  .trainingPlugin__content {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 280px) minmax(0, 1fr);
-  }
-  .trainingPlugin__sidebar {
-    border-right: 0;
-    border-bottom: 1px solid var(--color-line);
+  .trainingPlugin__sidebarPanel {
+    min-height: 280px;
   }
 }
 @media (max-width: 760px) {
-  .trainingPlugin__topbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .trainingPlugin__topbarActions {
-    width: 100%;
-  }
-  .trainingPlugin__modeToggle,
   .trainingPlugin__buttonRow,
   .trainingPlugin__chipRow,
   .trainingPlugin__stepHeader,
   .trainingPlugin__stepActions {
     width: 100%;
   }
-  .trainingPlugin__modeButton,
-  .trainingPlugin__primaryButton,
-  .trainingPlugin__secondaryButton {
-    flex: 1 1 auto;
-  }
   .trainingPlugin__formGrid,
   .trainingPlugin__fieldRow {
     grid-template-columns: 1fr;
-  }
-  .trainingPlugin__detail {
-    padding: 12px;
   }
 }

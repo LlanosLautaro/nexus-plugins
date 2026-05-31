@@ -31084,6 +31084,29 @@ function joinSegments(basePath, segments, separator) {
 function joinRelativePath(segments, separator) {
   return segments.length ? segments.join(separator) : null;
 }
+function getFallbackRootItem(itemsState, byId) {
+  const normalizedRootId = normalizeItemId2(itemsState?.rootId);
+  if (normalizedRootId && byId[normalizedRootId]) {
+    return byId[normalizedRootId];
+  }
+  return Object.values(byId).find((candidate) => {
+    if (!candidate?.id) {
+      return false;
+    }
+    return !normalizeItemId2(candidate.parentId);
+  }) || null;
+}
+function getRootPathFromItemsState(itemsState, rootItem, options = {}) {
+  const explicitRootPath = trimTrailingSeparators(
+    options.rootPath || options.vaultContentPath || ""
+  );
+  if (explicitRootPath) {
+    return explicitRootPath;
+  }
+  const byId = itemsState?.byId || {};
+  const preferredRootItem = rootItem || getFallbackRootItem(itemsState, byId);
+  return trimTrailingSeparators(preferredRootItem?.path || "");
+}
 function resolveItemLocationFromItemsState(itemsState, itemId, options = {}) {
   const byId = itemsState?.byId || {};
   const normalizedItemId = normalizeItemId2(itemId);
@@ -31124,8 +31147,8 @@ function resolveItemLocationFromItemsState(itemsState, itemId, options = {}) {
   if (!rootItem) {
     return null;
   }
-  const rootPathCandidate = options.rootPath || options.vaultContentPath || "";
-  const separator = guessSeparator(rootPathCandidate);
+  const rootPathCandidate = getRootPathFromItemsState(itemsState, rootItem, options);
+  const separator = guessSeparator(rootPathCandidate, rootItem?.path, item?.path);
   const orderedSegments = [...relativeSegments].reverse();
   const resolvedRelativePath = joinRelativePath(orderedSegments, separator);
   return {
@@ -32066,6 +32089,132 @@ function createRendererDevLogger(scope) {
   };
 }
 
+// ../nexus-frontend/src/ui/cx.js
+function cx(...values) {
+  return values.filter(Boolean).join(" ");
+}
+
+// ../nexus-frontend/src/ui/WorkspacePage.jsx
+function WorkspacePage({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-page", className) }, children);
+}
+function WorkspaceTopbar({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-topbar", className) }, children);
+}
+function WorkspaceTitle({
+  className = "",
+  eyebrow = "",
+  title = "",
+  description = "",
+  aside = null
+}) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-title", className) }, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-title__copy" }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null), aside ? /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-title__aside" }, aside) : null);
+}
+function ToolbarActions({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-toolbar-actions", className) }, children);
+}
+function WorkspaceBody({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-body", className) }, children);
+}
+
+// ../nexus-frontend/src/ui/SectionPanel.jsx
+function SectionPanel({
+  className = "",
+  tone = "default",
+  padding = "default",
+  children
+}) {
+  return /* @__PURE__ */ React.createElement(
+    "section",
+    {
+      className: cx(
+        "nexus-ui-panel",
+        tone !== "default" && `nexus-ui-panel--${tone}`,
+        padding !== "default" && `nexus-ui-panel--padding-${padding}`,
+        className
+      )
+    },
+    children
+  );
+}
+
+// ../nexus-frontend/src/ui/Actions.jsx
+function Button({
+  className = "",
+  tone = "secondary",
+  iconOnly = false,
+  children,
+  ...props
+}) {
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      ...props,
+      className: cx(
+        "nexus-ui-button",
+        tone !== "secondary" && `nexus-ui-button--${tone}`,
+        iconOnly && "nexus-ui-button--icon",
+        className
+      )
+    },
+    children
+  );
+}
+function IconButton({ className = "", tone = "secondary", title = "", children, ...props }) {
+  return /* @__PURE__ */ React.createElement(
+    Button,
+    {
+      ...props,
+      className,
+      tone,
+      iconOnly: true,
+      title,
+      "aria-label": props["aria-label"] || title || void 0
+    },
+    children
+  );
+}
+
+// ../nexus-frontend/src/ui/Fields.jsx
+function InlineField({
+  className = "",
+  label = "",
+  children,
+  grow = false
+}) {
+  return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-inline-field", grow && "nexus-ui-inline-field--grow", className) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-inline-field__label" }, label), /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-inline-field__control" }, children));
+}
+
+// ../nexus-frontend/src/ui/States.jsx
+function Notice({ className = "", tone = "info", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-notice", `nexus-ui-notice--${tone}`, className) }, children);
+}
+function StateBlock({
+  className = "",
+  tone = "default",
+  eyebrow = "",
+  title = "",
+  description = "",
+  centered = false,
+  children = null
+}) {
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: cx(
+        "nexus-ui-state",
+        tone !== "default" && `nexus-ui-state--${tone}`,
+        centered && "nexus-ui-state--centered",
+        className
+      )
+    },
+    eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null,
+    title ? /* @__PURE__ */ React.createElement("strong", null, title) : null,
+    description ? /* @__PURE__ */ React.createElement("p", null, description) : null,
+    children
+  );
+}
+
 // ../nexus-plugins/Books/src/BooksLibraryView.jsx
 var { startTransition, useDeferredValue, useEffect: useEffect3, useMemo: useMemo3, useRef: useRef3, useState: useState3 } = window.React;
 var { ipcRenderer: ipcRenderer3 } = window.require("electron");
@@ -32518,7 +32667,14 @@ function BooksLibraryView({ ctx }) {
     });
   };
   const showEmptySearchState = !loading && books.length > 0 && visibleBooks.length === 0;
-  return /* @__PURE__ */ React.createElement("div", { className: "booksLibrary" }, /* @__PURE__ */ React.createElement("div", { className: "booksLibrary__topbar" }, /* @__PURE__ */ React.createElement("div", { className: "booksLibrary__titleBlock" }, /* @__PURE__ */ React.createElement("span", { className: "booksLibrary__eyebrow" }, "Plugin books"), /* @__PURE__ */ React.createElement("strong", null, "Biblioteca")), /* @__PURE__ */ React.createElement("div", { className: "booksLibrary__controls" }, /* @__PURE__ */ React.createElement("label", { className: "booksLibrary__searchField" }, /* @__PURE__ */ React.createElement("span", { className: "booksLibrary__controlLabel" }, "Buscar"), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement(WorkspacePage, { className: "booksLibrary" }, /* @__PURE__ */ React.createElement(WorkspaceTopbar, null, /* @__PURE__ */ React.createElement(
+    WorkspaceTitle,
+    {
+      eyebrow: "Plugin books",
+      title: "Biblioteca",
+      description: "Biblioteca PDF-first con busqueda rapida, progreso simple y apertura directa al visor."
+    }
+  ), /* @__PURE__ */ React.createElement(ToolbarActions, { className: "booksLibrary__controls" }, /* @__PURE__ */ React.createElement(InlineField, { className: "booksLibrary__searchField", label: "Buscar", grow: true }, /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "search",
@@ -32526,17 +32682,39 @@ function BooksLibraryView({ ctx }) {
       onChange: (event) => setSearchValue(event.target.value),
       placeholder: "Titulo o autor"
     }
-  )), /* @__PURE__ */ React.createElement("label", { className: "booksLibrary__sortField" }, /* @__PURE__ */ React.createElement("span", { className: "booksLibrary__controlLabel" }, "Ordenar"), /* @__PURE__ */ React.createElement("select", { value: sortBy, onChange: (event) => setSortBy(event.target.value) }, BOOK_SORT_OPTIONS.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.value, value: option.value }, option.label)))), /* @__PURE__ */ React.createElement(
-    "button",
+  )), /* @__PURE__ */ React.createElement(InlineField, { className: "booksLibrary__sortField", label: "Ordenar" }, /* @__PURE__ */ React.createElement("select", { value: sortBy, onChange: (event) => setSortBy(event.target.value) }, BOOK_SORT_OPTIONS.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.value, value: option.value }, option.label)))), /* @__PURE__ */ React.createElement(
+    IconButton,
     {
       type: "button",
-      className: "booksLibrary__iconButton",
       onClick: () => void loadBooks(),
       disabled: refreshing,
       title: "Recargar biblioteca"
     },
     /* @__PURE__ */ React.createElement(RefreshIcon, { size: 16 })
-  ))), /* @__PURE__ */ React.createElement("div", { ref: contentRef, className: "booksLibrary__content" }, loading ? /* @__PURE__ */ React.createElement("div", { className: "booksLibrary__state" }, "Cargando biblioteca...") : books.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "booksLibrary__state" }, "Sin libros indexados todavia. Asigna carpetas PDF a `Books` desde Settings.") : showEmptySearchState ? /* @__PURE__ */ React.createElement("div", { className: "booksLibrary__state" }, "No hay resultados para esa busqueda. Prueba con otro titulo, autor o criterio de orden.") : /* @__PURE__ */ React.createElement("div", { ref: gridMeasureRef, className: "booksLibrary__virtualViewport" }, /* @__PURE__ */ React.createElement("div", { className: "booksLibrary__virtualGrid", style: { height: `${totalGridHeight}px` } }, virtualizedBooks.map(({ book, style }) => /* @__PURE__ */ React.createElement(
+  ))), /* @__PURE__ */ React.createElement(WorkspaceBody, null, error ? /* @__PURE__ */ React.createElement(Notice, { tone: "danger" }, error) : null, /* @__PURE__ */ React.createElement(SectionPanel, { className: "booksLibrary__content", padding: "tight" }, loading ? /* @__PURE__ */ React.createElement(
+    StateBlock,
+    {
+      eyebrow: "Cargando",
+      title: "Estamos preparando la biblioteca",
+      description: "Leyendo libros, portadas y progreso guardado."
+    }
+  ) : books.length === 0 ? /* @__PURE__ */ React.createElement(
+    StateBlock,
+    {
+      centered: true,
+      eyebrow: "Sin libros",
+      title: "Todavia no hay PDFs reclamados por Books",
+      description: "Asigna una carpeta PDF a Books desde Settings para empezar a poblar esta biblioteca."
+    }
+  ) : showEmptySearchState ? /* @__PURE__ */ React.createElement(
+    StateBlock,
+    {
+      centered: true,
+      eyebrow: "Sin resultados",
+      title: "No encontramos libros para ese filtro",
+      description: "Prueba con otro titulo, autor o criterio de orden."
+    }
+  ) : /* @__PURE__ */ React.createElement("div", { ref: contentRef, className: "booksLibrary__virtualViewport" }, /* @__PURE__ */ React.createElement("div", { ref: gridMeasureRef, className: "booksLibrary__virtualGrid", style: { height: `${totalGridHeight}px` } }, virtualizedBooks.map(({ book, style }) => /* @__PURE__ */ React.createElement(
     "button",
     {
       type: "button",
@@ -32548,7 +32726,7 @@ function BooksLibraryView({ ctx }) {
     },
     /* @__PURE__ */ React.createElement(BookCoverPreview, { book }),
     /* @__PURE__ */ React.createElement("div", { className: "booksLibrary__cardBody" }, /* @__PURE__ */ React.createElement("strong", { className: "booksLibrary__cardTitle" }, book.title || "Documento"), /* @__PURE__ */ React.createElement("p", { className: "booksLibrary__cardAuthor" }, book.author || "Autor sin curar"), /* @__PURE__ */ React.createElement(ProgressBar, { value: book.progressPercent }))
-  )))), error ? /* @__PURE__ */ React.createElement("div", { className: "booksLibrary__state booksLibrary__state--error" }, error) : null));
+  )))))));
 }
 
 // ../nexus-plugins/Books/src/BooksSettingsSection.jsx

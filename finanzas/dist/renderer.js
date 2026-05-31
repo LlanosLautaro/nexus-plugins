@@ -79,6 +79,210 @@ function ArrowOutIcon(props) {
   return /* @__PURE__ */ React2.createElement(BaseIcon, { ...props }, /* @__PURE__ */ React2.createElement("path", { d: "M12 6v12" }), /* @__PURE__ */ React2.createElement("path", { d: "m16.5 13.5-4.5 4.5-4.5-4.5" }), /* @__PURE__ */ React2.createElement("path", { d: "M5 4.75h14" }));
 }
 
+// ../nexus-frontend/src/ui/cx.js
+function cx(...values) {
+  return values.filter(Boolean).join(" ");
+}
+
+// ../nexus-frontend/src/ui/WorkspacePage.jsx
+function WorkspacePage({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-page", className) }, children);
+}
+function WorkspaceTopbar({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-topbar", className) }, children);
+}
+function WorkspaceTitle({
+  className = "",
+  eyebrow = "",
+  title = "",
+  description = "",
+  aside = null
+}) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-title", className) }, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-title__copy" }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null), aside ? /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-title__aside" }, aside) : null);
+}
+function ToolbarActions({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-toolbar-actions", className) }, children);
+}
+function WorkspaceBody({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-body", className) }, children);
+}
+function SplitLayout({ className = "", variant = "main-aside", children }) {
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: cx(
+        "nexus-ui-split",
+        variant === "sidebar-detail" ? "nexus-ui-split--sidebar-detail" : "nexus-ui-split--main-aside",
+        className
+      )
+    },
+    children
+  );
+}
+function SplitMain({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-split__main", className) }, children);
+}
+function SplitAside({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("aside", { className: cx("nexus-ui-split__aside", className) }, children);
+}
+function ScrollRegion({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-scroll-region", className) }, children);
+}
+
+// ../nexus-frontend/src/ui/SectionPanel.jsx
+function SectionPanel({
+  className = "",
+  tone = "default",
+  padding = "default",
+  children
+}) {
+  return /* @__PURE__ */ React.createElement(
+    "section",
+    {
+      className: cx(
+        "nexus-ui-panel",
+        tone !== "default" && `nexus-ui-panel--${tone}`,
+        padding !== "default" && `nexus-ui-panel--padding-${padding}`,
+        className
+      )
+    },
+    children
+  );
+}
+function PanelHeader({ className = "", children, actions = null }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-panel-header", className) }, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-panel-header__copy" }, children), actions ? /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-panel-header__actions" }, actions) : null);
+}
+function PanelTitle({ eyebrow = "", title = "", description = "" }) {
+  return /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-panel-title" }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null);
+}
+function PanelStack({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-stack", className) }, children);
+}
+
+// ../nexus-frontend/src/ui/Actions.jsx
+function Button({
+  className = "",
+  tone = "secondary",
+  iconOnly = false,
+  children,
+  ...props
+}) {
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      ...props,
+      className: cx(
+        "nexus-ui-button",
+        tone !== "secondary" && `nexus-ui-button--${tone}`,
+        iconOnly && "nexus-ui-button--icon",
+        className
+      )
+    },
+    children
+  );
+}
+function IconButton({ className = "", tone = "secondary", title = "", children, ...props }) {
+  return /* @__PURE__ */ React.createElement(
+    Button,
+    {
+      ...props,
+      className,
+      tone,
+      iconOnly: true,
+      title,
+      "aria-label": props["aria-label"] || title || void 0
+    },
+    children
+  );
+}
+function SegmentedControl({
+  className = "",
+  options = [],
+  value,
+  onChange,
+  ariaLabel = "Selector"
+}) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-segmented", className), role: "tablist", "aria-label": ariaLabel }, options.map((option) => {
+    const optionValue = option.value;
+    const active = optionValue === value;
+    return /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: optionValue,
+        type: "button",
+        role: "tab",
+        "aria-selected": active,
+        className: cx("nexus-ui-segmented__button", active && "is-active"),
+        onClick: () => onChange?.(optionValue)
+      },
+      option.icon ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__icon" }, option.icon) : null,
+      /* @__PURE__ */ React.createElement("span", null, option.label)
+    );
+  }));
+}
+
+// ../nexus-frontend/src/ui/Fields.jsx
+function Field({
+  className = "",
+  label = "",
+  description = "",
+  wide = false,
+  children
+}) {
+  return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-field", wide && "nexus-ui-field--wide", className) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-field__label" }, label), description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-field__description" }, description) : null, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-field__control" }, children));
+}
+function InlineField({
+  className = "",
+  label = "",
+  children,
+  grow = false
+}) {
+  return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-inline-field", grow && "nexus-ui-inline-field--grow", className) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-inline-field__label" }, label), /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-inline-field__control" }, children));
+}
+function FieldGrid({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-field-grid", className) }, children);
+}
+
+// ../nexus-frontend/src/ui/States.jsx
+function Notice({ className = "", tone = "info", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-notice", `nexus-ui-notice--${tone}`, className) }, children);
+}
+function StateBlock({
+  className = "",
+  tone = "default",
+  eyebrow = "",
+  title = "",
+  description = "",
+  centered = false,
+  children = null
+}) {
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: cx(
+        "nexus-ui-state",
+        tone !== "default" && `nexus-ui-state--${tone}`,
+        centered && "nexus-ui-state--centered",
+        className
+      )
+    },
+    eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null,
+    title ? /* @__PURE__ */ React.createElement("strong", null, title) : null,
+    description ? /* @__PURE__ */ React.createElement("p", null, description) : null,
+    children
+  );
+}
+function MetricCard({
+  className = "",
+  tone = "default",
+  eyebrow = "",
+  value = "",
+  description = "",
+  children = null
+}) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-metric", tone !== "default" && `nexus-ui-metric--${tone}`, className) }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, /* @__PURE__ */ React.createElement("strong", null, value), description ? /* @__PURE__ */ React.createElement("p", null, description) : null, children);
+}
+
 // ../nexus-plugins/finanzas/src/PersonalFinanceView.jsx
 var {
   startTransition,
@@ -106,6 +310,11 @@ var MONTH_FORMATTER = new Intl.DateTimeFormat("es-AR", {
   month: "short",
   year: "2-digit"
 });
+var FINANCE_WORKBENCH_TABS = [
+  { value: "compose", label: "Registrar" },
+  { value: "cash", label: "Efectivo" },
+  { value: "reports", label: "Reportes" }
+];
 function todayLocalDate() {
   const now = /* @__PURE__ */ new Date();
   const year = now.getFullYear();
@@ -473,11 +682,12 @@ function MovementRow({ movement, onEdit, onDelete, deleting }) {
       ].join(" ")
     },
     formatSignedCurrency(signedAmountCents)
-  )), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementMeta" }, /* @__PURE__ */ React.createElement("span", null, formatDateLabel(movement?.movementDate)), /* @__PURE__ */ React.createElement("span", null, movement?.category || "Sin categoria"), /* @__PURE__ */ React.createElement("span", null, movement?.platform || "Sin plataforma"), movement?.counterparty ? /* @__PURE__ */ React.createElement("span", null, movement.counterparty) : null), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementPills" }, /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__pill" }, getMovementKindLabel(movement?.kind)), /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__pill" }, getMovementStatusLabel(movement?.status))), movement?.notes ? /* @__PURE__ */ React.createElement("p", { className: "financeDashboard__movementNotes" }, movement.notes) : null), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementActions" }, /* @__PURE__ */ React.createElement("button", { type: "button", className: "financeDashboard__iconButton", onClick: onEdit, title: "Editar movimiento" }, /* @__PURE__ */ React.createElement(PencilIcon, { size: 15 })), /* @__PURE__ */ React.createElement(
-    "button",
+  )), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementMeta" }, /* @__PURE__ */ React.createElement("span", null, formatDateLabel(movement?.movementDate)), /* @__PURE__ */ React.createElement("span", null, movement?.category || "Sin categoria"), /* @__PURE__ */ React.createElement("span", null, movement?.platform || "Sin plataforma"), movement?.counterparty ? /* @__PURE__ */ React.createElement("span", null, movement.counterparty) : null), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementPills" }, /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__pill" }, getMovementKindLabel(movement?.kind)), /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__pill" }, getMovementStatusLabel(movement?.status))), movement?.notes ? /* @__PURE__ */ React.createElement("p", { className: "financeDashboard__movementNotes" }, movement.notes) : null), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementActions" }, /* @__PURE__ */ React.createElement(IconButton, { type: "button", className: "financeDashboard__iconButton", onClick: onEdit, title: "Editar movimiento" }, /* @__PURE__ */ React.createElement(PencilIcon, { size: 15 })), /* @__PURE__ */ React.createElement(
+    IconButton,
     {
       type: "button",
       className: "financeDashboard__iconButton financeDashboard__iconButton--danger",
+      tone: "danger",
       onClick: onDelete,
       disabled: deleting,
       title: "Borrar movimiento"
@@ -523,6 +733,7 @@ function PersonalFinanceView() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [formState, setFormState] = useState(() => buildEmptyFormState());
   const [showAdvancedForm, setShowAdvancedForm] = useState(false);
+  const [workbenchTab, setWorkbenchTab] = useState("compose");
   const [cashCountForm, setCashCountForm] = useState(
     () => buildCashCountFormState(FINANCE_CASH_DENOMINATIONS)
   );
@@ -648,6 +859,7 @@ function PersonalFinanceView() {
   const resetForm = () => {
     setFormState(buildEmptyFormState(activePreset?.id));
     setShowAdvancedForm(false);
+    setWorkbenchTab("compose");
   };
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -686,6 +898,7 @@ function PersonalFinanceView() {
   const handleEditMovement = (movement) => {
     setFormState(buildFormStateFromMovement(movement));
     setShowAdvancedForm(true);
+    setWorkbenchTab("compose");
     window.requestAnimationFrame(() => {
       titleInputRef.current?.focus();
     });
@@ -754,8 +967,131 @@ function PersonalFinanceView() {
   const hasAnyMovement = movements.length > 0;
   const cashVarianceIsPositive = cashCountPreview.varianceCents > 0;
   const cashVarianceIsNegative = cashCountPreview.varianceCents < 0;
-  return /* @__PURE__ */ React.createElement("div", { className: "financeDashboard" }, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__content" }, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__heroGrid" }, /* @__PURE__ */ React.createElement("section", { className: "financeDashboard__panel financeDashboard__panel--composer" }, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__panelHeader" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("strong", null, editingMovement ? "Editar movimiento" : "Nuevo movimiento"))), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__presetGrid", role: "tablist", "aria-label": "Tipo de movimiento" }, FINANCE_PRESETS.map((preset) => /* @__PURE__ */ React.createElement(
-    "button",
+  const workbenchTitle = workbenchTab === "cash" ? "Arqueo de efectivo" : workbenchTab === "reports" ? "Reportes compactos" : editingMovement ? "Editar movimiento" : "Nuevo movimiento";
+  const workbenchDescription = workbenchTab === "cash" ? "Compara el efectivo contado contra el saldo esperado en movimientos realizados con plataforma `Efectivo`." : workbenchTab === "reports" ? "Lectura rapida de balance y flujo sin salir del dashboard." : "Registra ingresos y gastos con un flujo corto por defecto y detalles opcionales solo cuando hacen falta.";
+  return /* @__PURE__ */ React.createElement(WorkspacePage, { className: "financeDashboard" }, /* @__PURE__ */ React.createElement(WorkspaceTopbar, null, /* @__PURE__ */ React.createElement(
+    WorkspaceTitle,
+    {
+      eyebrow: "Plugin finanzas",
+      title: "Finanzas",
+      description: "Movimientos como centro del flujo diario, con arqueo y reportes como herramientas auxiliares."
+    }
+  ), /* @__PURE__ */ React.createElement(ToolbarActions, null, /* @__PURE__ */ React.createElement(
+    Button,
+    {
+      type: "button",
+      tone: "primary",
+      onClick: () => {
+        resetForm();
+        setWorkbenchTab("compose");
+        window.requestAnimationFrame(() => titleInputRef.current?.focus());
+      }
+    },
+    "Nuevo movimiento"
+  ), /* @__PURE__ */ React.createElement(
+    IconButton,
+    {
+      type: "button",
+      onClick: () => void loadMovements(),
+      disabled: refreshing,
+      title: "Recargar movimientos"
+    },
+    /* @__PURE__ */ React.createElement(RefreshIcon, { size: 16 })
+  ))), /* @__PURE__ */ React.createElement(WorkspaceBody, { className: "financeDashboard__content" }, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__summaryRow" }, /* @__PURE__ */ React.createElement(
+    MetricCard,
+    {
+      className: "financeDashboard__summaryCard",
+      tone: "highlight",
+      eyebrow: "Saldo actual",
+      value: formatCurrency(summary.actualBalanceCents),
+      description: `Basado solo en movimientos realizados. Quedan ${formatCurrency(summary.plannedIncomeCents)} en ingresos pendientes y ${formatCurrency(summary.plannedExpenseCents)} en gastos pendientes.`
+    }
+  ), /* @__PURE__ */ React.createElement(
+    MetricCard,
+    {
+      className: "financeDashboard__summaryCard",
+      tone: "soft",
+      eyebrow: "Saldo proyectado",
+      value: formatCurrency(summary.projectedBalanceCents),
+      description: "Resultado esperado si se ejecutan todos los pendientes ya cargados."
+    }
+  ), /* @__PURE__ */ React.createElement(
+    MetricCard,
+    {
+      className: "financeDashboard__summaryCard financeDashboard__summaryCard--variance",
+      eyebrow: "Efectivo contado",
+      value: formatCurrency(cashCountPreview.totalCountedCents),
+      description: `Esperado: ${formatCurrency(cashCountPreview.expectedCents)}. Diferencia: ${formatSignedCurrency(cashCountPreview.varianceCents)}.`
+    }
+  )), error ? /* @__PURE__ */ React.createElement(Notice, { tone: "danger" }, error) : null, /* @__PURE__ */ React.createElement(SplitLayout, { className: "financeDashboard__workspace" }, /* @__PURE__ */ React.createElement(SplitMain, null, /* @__PURE__ */ React.createElement(SectionPanel, { className: "financeDashboard__panel financeDashboard__panel--history" }, /* @__PURE__ */ React.createElement(
+    PanelHeader,
+    {
+      actions: /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__panelHeaderActions" }, /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__historyCount" }, visibleMovements.length, " ", "visibles"))
+    },
+    /* @__PURE__ */ React.createElement(
+      PanelTitle,
+      {
+        eyebrow: "Centro de trabajo",
+        title: "Movimientos",
+        description: "Consulta, filtra y edita ingresos y gastos sin perder el contexto principal."
+      }
+    )
+  ), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__filtersBar" }, /* @__PURE__ */ React.createElement(InlineField, { className: "financeDashboard__inlineField financeDashboard__inlineField--search", label: "Buscar", grow: true }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "search",
+      value: searchValue,
+      onChange: (event) => setSearchValue(event.target.value),
+      placeholder: "Titulo, categoria, plataforma o nota"
+    }
+  )), /* @__PURE__ */ React.createElement(InlineField, { className: "financeDashboard__inlineField", label: "Periodo" }, /* @__PURE__ */ React.createElement("select", { value: periodFilter, onChange: (event) => setPeriodFilter(event.target.value) }, FINANCE_PERIOD_FILTERS.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.value, value: option.value }, option.label)))), /* @__PURE__ */ React.createElement(InlineField, { className: "financeDashboard__inlineField", label: "Tipo" }, /* @__PURE__ */ React.createElement("select", { value: kindFilter, onChange: (event) => setKindFilter(event.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "all" }, "Todos"), /* @__PURE__ */ React.createElement("option", { value: "expense" }, "Gastos"), /* @__PURE__ */ React.createElement("option", { value: "income" }, "Ingresos"))), /* @__PURE__ */ React.createElement(InlineField, { className: "financeDashboard__inlineField", label: "Estado" }, /* @__PURE__ */ React.createElement("select", { value: statusFilter, onChange: (event) => setStatusFilter(event.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "all" }, "Todos"), /* @__PURE__ */ React.createElement("option", { value: "posted" }, "Realizados"), /* @__PURE__ */ React.createElement("option", { value: "planned" }, "Pendientes")))), /* @__PURE__ */ React.createElement(ScrollRegion, { className: "financeDashboard__movementRegion" }, loading ? /* @__PURE__ */ React.createElement(
+    StateBlock,
+    {
+      eyebrow: "Cargando",
+      title: "Estamos leyendo tus movimientos",
+      description: "En un momento veras el historial filtrable."
+    }
+  ) : !hasAnyMovement ? /* @__PURE__ */ React.createElement(
+    StateBlock,
+    {
+      centered: true,
+      eyebrow: "Sin actividad",
+      title: "Todavia no hay movimientos",
+      description: "Empieza con un gasto o ingreso desde el panel lateral."
+    }
+  ) : visibleMovements.length === 0 ? /* @__PURE__ */ React.createElement(
+    StateBlock,
+    {
+      centered: true,
+      eyebrow: "Sin resultados",
+      title: "No hay movimientos para esos filtros",
+      description: "Prueba con otro periodo o limpia la busqueda."
+    }
+  ) : /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementList" }, visibleMovements.map((movement) => /* @__PURE__ */ React.createElement(
+    MovementRow,
+    {
+      key: movement.id,
+      movement,
+      deleting: deletingId === movement.id,
+      onEdit: () => handleEditMovement(movement),
+      onDelete: () => void handleDeleteMovement(movement)
+    }
+  )))))), /* @__PURE__ */ React.createElement(SplitAside, { className: "financeDashboard__aside" }, /* @__PURE__ */ React.createElement(SectionPanel, { className: "financeDashboard__panel financeDashboard__panel--workbench" }, /* @__PURE__ */ React.createElement(PanelStack, null, /* @__PURE__ */ React.createElement(
+    PanelHeader,
+    {
+      actions: /* @__PURE__ */ React.createElement(
+        SegmentedControl,
+        {
+          ariaLabel: "Zona de trabajo de finanzas",
+          options: FINANCE_WORKBENCH_TABS,
+          value: workbenchTab,
+          onChange: setWorkbenchTab
+        }
+      )
+    },
+    /* @__PURE__ */ React.createElement(PanelTitle, { title: workbenchTitle, description: workbenchDescription })
+  ), workbenchTab === "compose" ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__presetGrid", role: "tablist", "aria-label": "Tipo de movimiento" }, FINANCE_PRESETS.map((preset) => /* @__PURE__ */ React.createElement(
+    Button,
     {
       key: preset.id,
       type: "button",
@@ -768,17 +1104,17 @@ function PersonalFinanceView() {
     },
     preset.kind === "income" ? /* @__PURE__ */ React.createElement(ArrowInIcon, { size: 16 }) : /* @__PURE__ */ React.createElement(ArrowOutIcon, { size: 16 }),
     /* @__PURE__ */ React.createElement("span", null, preset.shortLabel)
-  ))), /* @__PURE__ */ React.createElement("form", { className: "financeDashboard__form", onSubmit: handleSubmit }, /* @__PURE__ */ React.createElement("label", { className: "financeDashboard__field financeDashboard__field--wide" }, /* @__PURE__ */ React.createElement("span", null, "Titulo"), /* @__PURE__ */ React.createElement(
+  ))), /* @__PURE__ */ React.createElement("form", { className: "financeDashboard__form", onSubmit: handleSubmit }, /* @__PURE__ */ React.createElement(FieldGrid, null, /* @__PURE__ */ React.createElement(Field, { className: "financeDashboard__field financeDashboard__field--wide", label: "Titulo", wide: true }, /* @__PURE__ */ React.createElement(
     "input",
     {
       ref: titleInputRef,
       type: "text",
       value: formState.title,
       onChange: (event) => updateFormState({ title: event.target.value }),
-      placeholder: activePreset.kind === "income" ? "Ej. Sueldo, venta, transferencia" : "Ej. Supermercado, alquiler, cuota",
+      placeholder: activePreset.kind === "income" ? "Ej. sueldo, venta, transferencia" : "Ej. supermercado, alquiler, cuota",
       required: true
     }
-  )), /* @__PURE__ */ React.createElement("label", { className: "financeDashboard__field financeDashboard__field--amount" }, /* @__PURE__ */ React.createElement("span", null, "Monto"), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement(Field, { className: "financeDashboard__field financeDashboard__field--amount", label: "Monto", wide: true }, /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "number",
@@ -790,7 +1126,7 @@ function PersonalFinanceView() {
       placeholder: "0.00",
       required: true
     }
-  )), showAdvancedForm ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("label", { className: "financeDashboard__field" }, /* @__PURE__ */ React.createElement("span", null, "Fecha"), /* @__PURE__ */ React.createElement(
+  )), showAdvancedForm ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Field, { className: "financeDashboard__field", label: "Fecha" }, /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "date",
@@ -798,7 +1134,7 @@ function PersonalFinanceView() {
       onChange: (event) => updateFormState({ movementDate: event.target.value }),
       required: true
     }
-  )), /* @__PURE__ */ React.createElement("label", { className: "financeDashboard__field" }, /* @__PURE__ */ React.createElement("span", null, "Categoria"), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement(Field, { className: "financeDashboard__field", label: "Categoria" }, /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "text",
@@ -807,7 +1143,7 @@ function PersonalFinanceView() {
       onChange: (event) => updateFormState({ category: event.target.value }),
       placeholder: "Comida, transporte, sueldo..."
     }
-  )), /* @__PURE__ */ React.createElement("label", { className: "financeDashboard__field" }, /* @__PURE__ */ React.createElement("span", null, "Plataforma"), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement(Field, { className: "financeDashboard__field", label: "Plataforma" }, /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "text",
@@ -816,7 +1152,7 @@ function PersonalFinanceView() {
       onChange: (event) => updateFormState({ platform: event.target.value }),
       placeholder: "Efectivo, Mercado Pago, banco..."
     }
-  )), /* @__PURE__ */ React.createElement("label", { className: "financeDashboard__field financeDashboard__field--wide" }, /* @__PURE__ */ React.createElement("span", null, "Origen / lugar"), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement(Field, { className: "financeDashboard__field financeDashboard__field--wide", label: "Origen o lugar", wide: true }, /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "text",
@@ -824,7 +1160,7 @@ function PersonalFinanceView() {
       onChange: (event) => updateFormState({ counterparty: event.target.value }),
       placeholder: "Comercio, persona, empresa o contexto"
     }
-  )), /* @__PURE__ */ React.createElement("label", { className: "financeDashboard__field financeDashboard__field--wide" }, /* @__PURE__ */ React.createElement("span", null, "Notas"), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement(Field, { className: "financeDashboard__field financeDashboard__field--wide", label: "Notas", wide: true }, /* @__PURE__ */ React.createElement(
     "textarea",
     {
       rows: "3",
@@ -832,25 +1168,23 @@ function PersonalFinanceView() {
       onChange: (event) => updateFormState({ notes: event.target.value }),
       placeholder: "Detalle opcional"
     }
-  ))) : null, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__formActions" }, /* @__PURE__ */ React.createElement("button", { type: "submit", className: "financeDashboard__primaryButton", disabled: saving }, saving ? "Guardando..." : editingMovement ? "Guardar cambios" : "Agregar movimiento"), /* @__PURE__ */ React.createElement(
-    "button",
+  ))) : null), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__formActions" }, /* @__PURE__ */ React.createElement(Button, { type: "submit", tone: "primary", disabled: saving }, saving ? "Guardando..." : editingMovement ? "Guardar cambios" : "Agregar movimiento"), /* @__PURE__ */ React.createElement(
+    Button,
     {
       type: "button",
-      className: "financeDashboard__secondaryButton",
       onClick: () => setShowAdvancedForm((current) => !current),
       disabled: saving
     },
-    showAdvancedForm ? "Ocultar formulario completo" : "Mostrar formulario completo"
+    showAdvancedForm ? "Ocultar avanzado" : "Mostrar avanzado"
   ), editingMovement ? /* @__PURE__ */ React.createElement(
-    "button",
+    Button,
     {
       type: "button",
-      className: "financeDashboard__secondaryButton",
       onClick: resetForm,
       disabled: saving
     },
     "Cancelar edicion"
-  ) : null)), /* @__PURE__ */ React.createElement("datalist", { id: "finanzas-categories" }, categories.map((category) => /* @__PURE__ */ React.createElement("option", { key: category, value: category }))), /* @__PURE__ */ React.createElement("datalist", { id: "finanzas-platforms" }, platforms.map((platform) => /* @__PURE__ */ React.createElement("option", { key: platform, value: platform })))), /* @__PURE__ */ React.createElement("section", { className: "financeDashboard__summaryStack" }, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__summaryCard financeDashboard__summaryCard--actual" }, /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__panelEyebrow" }, "Saldo actual"), /* @__PURE__ */ React.createElement("strong", null, formatCurrency(summary.actualBalanceCents)), /* @__PURE__ */ React.createElement("p", null, "Basado solo en movimientos realizados. Pendientes cargados:", " ", formatCurrency(summary.plannedIncomeCents), " ", "de ingresos y", " ", formatCurrency(summary.plannedExpenseCents), " ", "de gastos.")), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__summaryCard financeDashboard__summaryCard--projected" }, /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__panelEyebrow" }, "Saldo proyectado"), /* @__PURE__ */ React.createElement("strong", null, formatCurrency(summary.projectedBalanceCents)), /* @__PURE__ */ React.createElement("p", null, "Resultado esperado si se ejecutan todos los pendientes ya cargados.")), /* @__PURE__ */ React.createElement("section", { className: "financeDashboard__panel financeDashboard__panel--cash" }, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__panelHeader" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("strong", null, "Efectivo"))), /* @__PURE__ */ React.createElement("p", { className: "financeDashboard__cashCopy" }, "Arqueo por monto agrupado por denominacion para contrastar el efectivo contado contra lo esperado por movimientos realizados con plataforma", " ", "`Efectivo`."), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashStats" }, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashStat" }, /* @__PURE__ */ React.createElement("span", null, "Esperado"), /* @__PURE__ */ React.createElement("strong", null, formatCurrency(cashCountPreview.expectedCents))), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashStat" }, /* @__PURE__ */ React.createElement("span", null, "Contado"), /* @__PURE__ */ React.createElement("strong", null, formatCurrency(cashCountPreview.totalCountedCents))), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashStat" }, /* @__PURE__ */ React.createElement("span", null, "Diferencia"), /* @__PURE__ */ React.createElement(
+  ) : null)), /* @__PURE__ */ React.createElement("datalist", { id: "finanzas-categories" }, categories.map((category) => /* @__PURE__ */ React.createElement("option", { key: category, value: category }))), /* @__PURE__ */ React.createElement("datalist", { id: "finanzas-platforms" }, platforms.map((platform) => /* @__PURE__ */ React.createElement("option", { key: platform, value: platform })))) : null, workbenchTab === "cash" ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashStats" }, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashStat" }, /* @__PURE__ */ React.createElement("span", null, "Esperado"), /* @__PURE__ */ React.createElement("strong", null, formatCurrency(cashCountPreview.expectedCents))), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashStat" }, /* @__PURE__ */ React.createElement("span", null, "Contado"), /* @__PURE__ */ React.createElement("strong", null, formatCurrency(cashCountPreview.totalCountedCents))), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashStat" }, /* @__PURE__ */ React.createElement("span", null, "Diferencia"), /* @__PURE__ */ React.createElement(
     "strong",
     {
       className: [
@@ -859,7 +1193,7 @@ function PersonalFinanceView() {
       ].filter(Boolean).join(" ")
     },
     formatSignedCurrency(cashCountPreview.varianceCents)
-  ))), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashGrid" }, cashDenominations.map((denomination) => /* @__PURE__ */ React.createElement("label", { key: denomination, className: "financeDashboard__cashField" }, /* @__PURE__ */ React.createElement("span", null, `${formatDenominationLabel(denomination)} ARS`), /* @__PURE__ */ React.createElement(
+  ))), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashGrid" }, cashDenominations.map((denomination) => /* @__PURE__ */ React.createElement(Field, { key: denomination, className: "financeDashboard__cashField", label: `${formatDenominationLabel(denomination)} ARS` }, /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "text",
@@ -870,42 +1204,22 @@ function PersonalFinanceView() {
       placeholder: "0"
     }
   )))), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__formActions" }, /* @__PURE__ */ React.createElement(
-    "button",
+    Button,
     {
       type: "button",
-      className: "financeDashboard__primaryButton",
+      tone: "primary",
       onClick: () => void handleSaveCashCount(),
       disabled: savingCashCount
     },
     savingCashCount ? "Guardando arqueo..." : "Registrar arqueo"
-  )), cashAudit?.latestCashCount ? /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashHint" }, "Ultimo arqueo:", " ", formatDateTimeLabel(cashAudit.latestCashCount.countedAt)) : /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashHint" }, "Todavia no hay arqueos registrados. El primero te deja ver si el efectivo real coincide con lo cargado."), recentCashCounts.length ? /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashHistory" }, recentCashCounts.map((cashCount) => /* @__PURE__ */ React.createElement(CashCountHistoryRow, { key: cashCount.id, cashCount }))) : null))), /* @__PURE__ */ React.createElement("section", { className: "financeDashboard__filtersBar" }, /* @__PURE__ */ React.createElement("label", { className: "financeDashboard__inlineField financeDashboard__inlineField--search" }, /* @__PURE__ */ React.createElement("span", null, "Buscar"), /* @__PURE__ */ React.createElement(
-    "input",
+  )), /* @__PURE__ */ React.createElement(
+    StateBlock,
     {
-      type: "search",
-      value: searchValue,
-      onChange: (event) => setSearchValue(event.target.value),
-      placeholder: "Titulo, categoria, plataforma o nota"
+      className: "financeDashboard__cashHint",
+      title: cashAudit?.latestCashCount ? "Ultimo arqueo registrado" : "Todavia no hay arqueos",
+      description: cashAudit?.latestCashCount ? formatDateTimeLabel(cashAudit.latestCashCount.countedAt) : "Registra el primero para comparar el efectivo real con lo cargado."
     }
-  )), /* @__PURE__ */ React.createElement("label", { className: "financeDashboard__inlineField" }, /* @__PURE__ */ React.createElement("span", null, "Periodo"), /* @__PURE__ */ React.createElement("select", { value: periodFilter, onChange: (event) => setPeriodFilter(event.target.value) }, FINANCE_PERIOD_FILTERS.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.value, value: option.value }, option.label)))), /* @__PURE__ */ React.createElement("label", { className: "financeDashboard__inlineField" }, /* @__PURE__ */ React.createElement("span", null, "Tipo"), /* @__PURE__ */ React.createElement("select", { value: kindFilter, onChange: (event) => setKindFilter(event.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "all" }, "Todos"), /* @__PURE__ */ React.createElement("option", { value: "expense" }, "Gastos"), /* @__PURE__ */ React.createElement("option", { value: "income" }, "Ingresos"))), /* @__PURE__ */ React.createElement("label", { className: "financeDashboard__inlineField" }, /* @__PURE__ */ React.createElement("span", null, "Estado"), /* @__PURE__ */ React.createElement("select", { value: statusFilter, onChange: (event) => setStatusFilter(event.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "all" }, "Todos"), /* @__PURE__ */ React.createElement("option", { value: "posted" }, "Realizados"), /* @__PURE__ */ React.createElement("option", { value: "planned" }, "Pendientes")))), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__chartsGrid" }, /* @__PURE__ */ React.createElement("section", { className: "financeDashboard__panel" }, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__panelHeader" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__panelEyebrow" }, "Grafico"), /* @__PURE__ */ React.createElement("strong", null, "Nivel de dinero en el tiempo")), /* @__PURE__ */ React.createElement(WalletIcon, { size: 18 })), /* @__PURE__ */ React.createElement(BalanceTimelineChart, { points: timelineSeries.points })), /* @__PURE__ */ React.createElement("section", { className: "financeDashboard__panel" }, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__panelHeader" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__panelEyebrow" }, "Flujo"), /* @__PURE__ */ React.createElement("strong", null, "Ingresos y egresos por mes"))), /* @__PURE__ */ React.createElement(MonthlyFlowChart, { rows: monthlyFlow.rows, maxValue: monthlyFlow.maxValue }))), /* @__PURE__ */ React.createElement("section", { className: "financeDashboard__panel financeDashboard__panel--history" }, /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__panelHeader" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("strong", null, "Movimientos")), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__panelHeaderActions" }, /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__historyCount" }, visibleMovements.length, " ", "visibles"), /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      type: "button",
-      className: "financeDashboard__iconButton",
-      onClick: () => void loadMovements(),
-      disabled: refreshing,
-      title: "Recargar movimientos"
-    },
-    /* @__PURE__ */ React.createElement(RefreshIcon, { size: 16 })
-  ))), loading ? /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__state" }, "Cargando movimientos...") : !hasAnyMovement ? /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__state" }, "Aun no hay movimientos. Empieza con un gasto o ingreso desde el panel superior.") : visibleMovements.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__state" }, "No hay movimientos que coincidan con los filtros actuales.") : /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementList" }, visibleMovements.map((movement) => /* @__PURE__ */ React.createElement(
-    MovementRow,
-    {
-      key: movement.id,
-      movement,
-      deleting: deletingId === movement.id,
-      onEdit: () => handleEditMovement(movement),
-      onDelete: () => void handleDeleteMovement(movement)
-    }
-  )))), error ? /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__state financeDashboard__state--error" }, error) : null));
+  ), recentCashCounts.length ? /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__cashHistory" }, recentCashCounts.map((cashCount) => /* @__PURE__ */ React.createElement(CashCountHistoryRow, { key: cashCount.id, cashCount }))) : null) : null, workbenchTab === "reports" ? /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__chartsGrid" }, /* @__PURE__ */ React.createElement(SectionPanel, { className: "financeDashboard__panel financeDashboard__panel--chart", tone: "soft" }, /* @__PURE__ */ React.createElement(PanelHeader, { actions: /* @__PURE__ */ React.createElement(WalletIcon, { size: 18 }) }, /* @__PURE__ */ React.createElement(PanelTitle, { eyebrow: "Grafico", title: "Nivel de dinero en el tiempo" })), /* @__PURE__ */ React.createElement(BalanceTimelineChart, { points: timelineSeries.points })), /* @__PURE__ */ React.createElement(SectionPanel, { className: "financeDashboard__panel financeDashboard__panel--chart", tone: "soft" }, /* @__PURE__ */ React.createElement(PanelHeader, null, /* @__PURE__ */ React.createElement(PanelTitle, { eyebrow: "Flujo", title: "Ingresos y egresos por mes" })), /* @__PURE__ */ React.createElement(MonthlyFlowChart, { rows: monthlyFlow.rows, maxValue: monthlyFlow.maxValue }))) : null))))));
 }
 
 // ../nexus-plugins/finanzas/src/renderer.js

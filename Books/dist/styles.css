@@ -68,23 +68,63 @@
 .booksPluginSettings__row select,
 .booksPluginSettings__secondaryButton,
 .booksPluginSettings__primaryButton,
-.booksLibrary__iconButton,
+.booksLibrary__secondaryButton,
+.booksLibrary__choiceButton,
+.booksEngine__toolbar button,
+.booksEngine__choiceButton,
+.booksEngine__secondaryButton {
+  min-height: var(--control-height-m);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--button-secondary-border);
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+}
+.booksPluginSettings__row select:hover:not(:disabled), .booksPluginSettings__row select:focus-visible:not(:disabled),
+.booksPluginSettings__secondaryButton:hover:not(:disabled),
+.booksPluginSettings__secondaryButton:focus-visible:not(:disabled),
+.booksPluginSettings__primaryButton:hover:not(:disabled),
+.booksPluginSettings__primaryButton:focus-visible:not(:disabled),
+.booksLibrary__secondaryButton:hover:not(:disabled),
+.booksLibrary__secondaryButton:focus-visible:not(:disabled),
+.booksLibrary__choiceButton:hover:not(:disabled),
+.booksLibrary__choiceButton:focus-visible:not(:disabled),
+.booksEngine__toolbar button:hover:not(:disabled),
+.booksEngine__toolbar button:focus-visible:not(:disabled),
+.booksEngine__choiceButton:hover:not(:disabled),
+.booksEngine__choiceButton:focus-visible:not(:disabled),
+.booksEngine__secondaryButton:hover:not(:disabled),
+.booksEngine__secondaryButton:focus-visible:not(:disabled) {
+  border-color: var(--color-line-strong);
+  background: var(--surface-hover);
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+.booksPluginSettings__row select:disabled,
+.booksPluginSettings__secondaryButton:disabled,
+.booksPluginSettings__primaryButton:disabled,
+.booksLibrary__secondaryButton:disabled,
+.booksLibrary__choiceButton:disabled,
+.booksEngine__toolbar button:disabled,
+.booksEngine__choiceButton:disabled,
+.booksEngine__secondaryButton:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+.booksPluginSettings__row select,
+.booksPluginSettings__secondaryButton,
+.booksPluginSettings__primaryButton,
 .booksLibrary__secondaryButton,
 .booksLibrary__choiceButton,
 .booksEngine__toolbar button,
 .booksEngine__choiceButton,
 .booksEngine__secondaryButton {
   min-height: 30px;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-pill);
-  background: var(--surface-pill);
-  color: var(--color-text-soft);
   font-weight: 700;
 }
 
 .booksPluginSettings__secondaryButton,
 .booksPluginSettings__primaryButton,
-.booksLibrary__iconButton,
 .booksLibrary__secondaryButton,
 .booksLibrary__choiceButton,
 .booksEngine__toolbar button,
@@ -94,7 +134,6 @@
 }
 .booksPluginSettings__secondaryButton:hover:not(:disabled),
 .booksPluginSettings__primaryButton:hover:not(:disabled),
-.booksLibrary__iconButton:hover:not(:disabled),
 .booksLibrary__secondaryButton:hover:not(:disabled),
 .booksLibrary__choiceButton:hover:not(:disabled),
 .booksEngine__toolbar button:hover:not(:disabled),
@@ -106,7 +145,6 @@
 }
 .booksPluginSettings__secondaryButton:disabled,
 .booksPluginSettings__primaryButton:disabled,
-.booksLibrary__iconButton:disabled,
 .booksLibrary__secondaryButton:disabled,
 .booksLibrary__choiceButton:disabled,
 .booksEngine__toolbar button:disabled,
@@ -119,9 +157,10 @@
 .booksPluginSettings__primaryButton,
 .booksLibrary__choiceButton.is-active,
 .booksEngine__choiceButton.is-active {
-  border-color: var(--color-line-strong);
+  background: var(--gradient-active);
+  border-color: var(--color-border-accent);
   color: var(--color-text);
-  background: var(--explorer-item-active, var(--surface-hover));
+  box-shadow: inset 0 1px 0 var(--fx-sheen-strong), 0 10px 18px rgba(0, 0, 0, 0.14);
 }
 
 .booksPluginSettings__checkbox {
@@ -141,9 +180,11 @@
 .booksPluginSettings__error,
 .booksLibrary__state,
 .booksEngine__state {
-  padding: 12px 14px;
-  border: 1px solid var(--color-line);
-  background: var(--color-surface-inset);
+  border-radius: var(--radius-m);
+  border: 1px solid var(--state-border);
+  background: var(--state-bg);
+  padding: var(--panel-padding-m);
+  box-shadow: inset 0 1px 0 var(--fx-sheen-soft);
   color: var(--color-text-muted);
 }
 
@@ -155,38 +196,7 @@
 }
 
 .booksLibrary {
-  height: 100%;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  background: var(--shell-bg);
-  container-type: inline-size;
-}
-
-.booksLibrary__topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 14px 14px;
-  border-bottom: 1px solid var(--color-line);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--shell-bg-strong) 90%, transparent), color-mix(in srgb, var(--shell-bg) 96%, transparent));
-}
-
-.booksLibrary__eyebrow {
-  font-size: 0.62rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.booksLibrary__titleBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.booksLibrary__titleBlock strong {
-  color: var(--color-text);
-  font-size: 1rem;
+  background: var(--workspace-main-bg);
 }
 
 .booksLibrary__controls {
@@ -196,29 +206,9 @@
   flex-wrap: wrap;
 }
 
-.booksLibrary__searchField,
-.booksLibrary__sortField {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.booksLibrary__controlLabel {
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
 .booksLibrary__searchField input,
 .booksLibrary__sortField select {
   min-width: 0;
-  min-height: 34px;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-pill);
-  background: var(--shell-panel-bg);
-  color: var(--color-text);
-  padding: 0 12px;
 }
 
 .booksLibrary__searchField input {
@@ -229,26 +219,21 @@
   width: 180px;
 }
 
-.booksLibrary__iconButton {
-  width: 32px;
-  padding: 0;
-}
-
 .booksLibrary__content {
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 14px;
 }
 
 .booksLibrary__virtualViewport {
   width: 100%;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .booksLibrary__virtualGrid {
@@ -262,16 +247,16 @@
   min-width: 0;
   padding: 0;
   border: 1px solid var(--color-line);
-  background: var(--shell-panel-bg);
+  background: var(--shell-panel-soft);
   text-align: left;
   cursor: pointer;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--radius-m);
   transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
 }
 .booksLibrary__card:hover, .booksLibrary__card:focus-visible {
   border-color: var(--color-line-strong);
-  background: color-mix(in srgb, var(--shell-panel-bg) 84%, var(--surface-hover));
+  background: var(--shell-panel-highlight);
   transform: translateY(-1px);
   box-shadow: 0 16px 32px color-mix(in srgb, var(--color-shadow, #000) 12%, transparent);
 }
@@ -289,7 +274,7 @@
   height: 100%;
   border: 0;
   pointer-events: none;
-  background: #fff;
+  background: var(--color-paper);
 }
 
 .booksLibrary__coverPlaceholder {
@@ -308,7 +293,7 @@
   position: absolute;
   inset: auto 0 0;
   height: 34%;
-  background: linear-gradient(180deg, transparent, color-mix(in srgb, #000 18%, transparent));
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-shadow, #000) 18%, transparent));
   pointer-events: none;
 }
 
@@ -464,7 +449,7 @@
   position: relative;
   max-width: 100%;
   border: 1px solid color-mix(in srgb, var(--color-line) 86%, transparent);
-  background: #ffffff;
+  background: var(--color-paper);
   box-shadow: 0 22px 44px color-mix(in srgb, var(--color-shadow, #000) 10%, transparent);
   overflow: hidden;
 }
@@ -486,7 +471,7 @@
   display: grid;
   place-items: center;
   padding: 18px;
-  background: linear-gradient(180deg, color-mix(in srgb, #ffffff 96%, transparent), color-mix(in srgb, var(--color-surface-inset) 94%, transparent));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-paper) 96%, transparent), color-mix(in srgb, var(--color-surface-inset) 94%, transparent));
 }
 
 .booksEngine__pageOverlayCard {

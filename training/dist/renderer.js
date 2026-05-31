@@ -202,6 +202,158 @@ function ArrowDownIcon(props) {
   return /* @__PURE__ */ React2.createElement(BaseIcon, { ...props }, /* @__PURE__ */ React2.createElement("path", { d: "m8 12 4 4 4-4" }), /* @__PURE__ */ React2.createElement("path", { d: "M12 8v8" }));
 }
 
+// ../nexus-frontend/src/ui/cx.js
+function cx(...values) {
+  return values.filter(Boolean).join(" ");
+}
+
+// ../nexus-frontend/src/ui/WorkspacePage.jsx
+function WorkspacePage({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-page", className) }, children);
+}
+function WorkspaceTopbar({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-topbar", className) }, children);
+}
+function WorkspaceTitle({
+  className = "",
+  eyebrow = "",
+  title = "",
+  description = "",
+  aside = null
+}) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-title", className) }, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-title__copy" }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null), aside ? /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-title__aside" }, aside) : null);
+}
+function ToolbarActions({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-toolbar-actions", className) }, children);
+}
+function WorkspaceBody({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-body", className) }, children);
+}
+function SplitLayout({ className = "", variant = "main-aside", children }) {
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: cx(
+        "nexus-ui-split",
+        variant === "sidebar-detail" ? "nexus-ui-split--sidebar-detail" : "nexus-ui-split--main-aside",
+        className
+      )
+    },
+    children
+  );
+}
+function SplitSidebar({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("aside", { className: cx("nexus-ui-split__sidebar", className) }, children);
+}
+function SplitDetail({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("main", { className: cx("nexus-ui-split__detail", className) }, children);
+}
+
+// ../nexus-frontend/src/ui/SectionPanel.jsx
+function SectionPanel({
+  className = "",
+  tone = "default",
+  padding = "default",
+  children
+}) {
+  return /* @__PURE__ */ React.createElement(
+    "section",
+    {
+      className: cx(
+        "nexus-ui-panel",
+        tone !== "default" && `nexus-ui-panel--${tone}`,
+        padding !== "default" && `nexus-ui-panel--padding-${padding}`,
+        className
+      )
+    },
+    children
+  );
+}
+function PanelHeader({ className = "", children, actions = null }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-panel-header", className) }, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-panel-header__copy" }, children), actions ? /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-panel-header__actions" }, actions) : null);
+}
+function PanelTitle({ eyebrow = "", title = "", description = "" }) {
+  return /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-panel-title" }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null);
+}
+
+// ../nexus-frontend/src/ui/Actions.jsx
+function Button({
+  className = "",
+  tone = "secondary",
+  iconOnly = false,
+  children,
+  ...props
+}) {
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      ...props,
+      className: cx(
+        "nexus-ui-button",
+        tone !== "secondary" && `nexus-ui-button--${tone}`,
+        iconOnly && "nexus-ui-button--icon",
+        className
+      )
+    },
+    children
+  );
+}
+function SegmentedControl({
+  className = "",
+  options = [],
+  value,
+  onChange,
+  ariaLabel = "Selector"
+}) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-segmented", className), role: "tablist", "aria-label": ariaLabel }, options.map((option) => {
+    const optionValue = option.value;
+    const active = optionValue === value;
+    return /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: optionValue,
+        type: "button",
+        role: "tab",
+        "aria-selected": active,
+        className: cx("nexus-ui-segmented__button", active && "is-active"),
+        onClick: () => onChange?.(optionValue)
+      },
+      option.icon ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__icon" }, option.icon) : null,
+      /* @__PURE__ */ React.createElement("span", null, option.label)
+    );
+  }));
+}
+
+// ../nexus-frontend/src/ui/States.jsx
+function Notice({ className = "", tone = "info", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-notice", `nexus-ui-notice--${tone}`, className) }, children);
+}
+function StateBlock({
+  className = "",
+  tone = "default",
+  eyebrow = "",
+  title = "",
+  description = "",
+  centered = false,
+  children = null
+}) {
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: cx(
+        "nexus-ui-state",
+        tone !== "default" && `nexus-ui-state--${tone}`,
+        centered && "nexus-ui-state--centered",
+        className
+      )
+    },
+    eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null,
+    title ? /* @__PURE__ */ React.createElement("strong", null, title) : null,
+    description ? /* @__PURE__ */ React.createElement("p", null, description) : null,
+    children
+  );
+}
+
 // ../nexus-plugins/training/src/TrainingView.jsx
 var { ipcRenderer } = window.require("electron");
 var React3 = window.React;
@@ -979,31 +1131,34 @@ function TrainingView() {
   const selectedExerciseMuscleIds = new Set(
     (exerciseDraft.muscles || []).map((muscle) => String(muscle.conceptId || muscle.entityRefId))
   );
-  return /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__topbar" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__titleBlock" }, /* @__PURE__ */ React3.createElement("strong", null, "Entrenamientos"), /* @__PURE__ */ React3.createElement("span", null, "Ejercicios, musculos y rutinas lineales con concepts enlazados.")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__topbarActions" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__modeToggle", role: "tablist", "aria-label": "Modo de entrenamientos" }, /* @__PURE__ */ React3.createElement(
-    "button",
+  return /* @__PURE__ */ React3.createElement(WorkspacePage, { className: "trainingPlugin" }, /* @__PURE__ */ React3.createElement(WorkspaceTopbar, null, /* @__PURE__ */ React3.createElement(
+    WorkspaceTitle,
+    {
+      eyebrow: "Plugin training",
+      title: "Entrenamientos",
+      description: "Ejercicios, rutinas y musculos enlazados con una UI mas humana y menos expuesta a detalles internos."
+    }
+  ), /* @__PURE__ */ React3.createElement(ToolbarActions, null, /* @__PURE__ */ React3.createElement(
+    SegmentedControl,
+    {
+      ariaLabel: "Modo de entrenamientos",
+      options: [
+        { value: "exercises", label: "Ejercicios" },
+        { value: "routines", label: "Rutinas" }
+      ],
+      value: mode,
+      onChange: setMode
+    }
+  ), /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: () => loadLibrary() }, /* @__PURE__ */ React3.createElement(RefreshIcon, { size: 16 }), /* @__PURE__ */ React3.createElement("span", null, "Refrescar")), /* @__PURE__ */ React3.createElement(
+    Button,
     {
       type: "button",
-      className: `trainingPlugin__modeButton ${mode === "exercises" ? "is-active" : ""}`,
-      onClick: () => setMode("exercises")
-    },
-    "Ejercicios"
-  ), /* @__PURE__ */ React3.createElement(
-    "button",
-    {
-      type: "button",
-      className: `trainingPlugin__modeButton ${mode === "routines" ? "is-active" : ""}`,
-      onClick: () => setMode("routines")
-    },
-    "Rutinas"
-  )), /* @__PURE__ */ React3.createElement("button", { type: "button", className: "trainingPlugin__secondaryButton", onClick: () => loadLibrary() }, /* @__PURE__ */ React3.createElement(RefreshIcon, { size: 16 })), /* @__PURE__ */ React3.createElement(
-    "button",
-    {
-      type: "button",
-      className: "trainingPlugin__secondaryButton",
+      tone: "primary",
       onClick: mode === "exercises" ? createExercise : createRoutine
     },
-    /* @__PURE__ */ React3.createElement(PlusIcon, { size: 16 })
-  ))), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__content" }, /* @__PURE__ */ React3.createElement("aside", { className: "trainingPlugin__sidebar" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__searchField" }, /* @__PURE__ */ React3.createElement("span", null, "Buscar"), /* @__PURE__ */ React3.createElement(
+    /* @__PURE__ */ React3.createElement(PlusIcon, { size: 16 }),
+    /* @__PURE__ */ React3.createElement("span", null, mode === "exercises" ? "Nuevo ejercicio" : "Nueva rutina")
+  ))), /* @__PURE__ */ React3.createElement(WorkspaceBody, { className: "trainingPlugin__body" }, /* @__PURE__ */ React3.createElement(SplitLayout, { className: "trainingPlugin__content", variant: "sidebar-detail" }, /* @__PURE__ */ React3.createElement(SplitSidebar, { className: "trainingPlugin__sidebar" }, /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__sidebarPanel" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__searchField" }, /* @__PURE__ */ React3.createElement("span", null, "Buscar"), /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "search",
@@ -1024,7 +1179,16 @@ function TrainingView() {
     },
     /* @__PURE__ */ React3.createElement("span", { className: "trainingPlugin__listCardTitle" }, exercise.title),
     /* @__PURE__ */ React3.createElement("span", { className: "trainingPlugin__listCardSummary" }, exercise.searchSummary || exercise.summary || "Sin unidad definida")
-  )), !filteredExercises.length ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__empty" }, /* @__PURE__ */ React3.createElement("strong", null, "No hay ejercicios."), /* @__PURE__ */ React3.createElement("div", null, "Crealo desde el boton +.")) : null) : /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__list" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__listHeader" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__listHeaderCopy" }, /* @__PURE__ */ React3.createElement("strong", null, "Rutinas"), /* @__PURE__ */ React3.createElement("span", null, filteredRoutines.length, " registros"))), filteredRoutines.map((routine) => /* @__PURE__ */ React3.createElement(
+  )), !filteredExercises.length ? /* @__PURE__ */ React3.createElement(
+    StateBlock,
+    {
+      className: "trainingPlugin__empty",
+      centered: true,
+      eyebrow: "Sin ejercicios",
+      title: "Todavia no hay ejercicios",
+      description: "Crea el primero desde el boton superior."
+    }
+  ) : null) : /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__list" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__listHeader" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__listHeaderCopy" }, /* @__PURE__ */ React3.createElement("strong", null, "Rutinas"), /* @__PURE__ */ React3.createElement("span", null, filteredRoutines.length, " registros"))), filteredRoutines.map((routine) => /* @__PURE__ */ React3.createElement(
     "button",
     {
       key: routine.id,
@@ -1037,7 +1201,30 @@ function TrainingView() {
     },
     /* @__PURE__ */ React3.createElement("span", { className: "trainingPlugin__listCardTitle" }, routine.title),
     /* @__PURE__ */ React3.createElement("span", { className: "trainingPlugin__listCardSummary" }, routine.searchSummary || routine.summary || "Sin pasos definidos")
-  )), !filteredRoutines.length ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__empty" }, /* @__PURE__ */ React3.createElement("strong", null, "No hay rutinas."), /* @__PURE__ */ React3.createElement("div", null, "Creala desde el boton +.")) : null)), /* @__PURE__ */ React3.createElement("main", { className: "trainingPlugin__detail" }, error ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__state trainingPlugin__state--error" }, error) : null, loading ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__state" }, "Cargando entrenamientos...") : null, !loading && mode === "exercises" ? /* @__PURE__ */ React3.createElement("section", { className: "trainingPlugin__panel" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__panelCopy" }, /* @__PURE__ */ React3.createElement("strong", null, selectedExercise?.title || "Nuevo ejercicio"), /* @__PURE__ */ React3.createElement("span", null, selectedExercise?.searchSummary || selectedExercise?.summary || "Defini el movimiento, la unidad y los musculos asociados.")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__formGrid" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Titulo"), /* @__PURE__ */ React3.createElement(
+  )), !filteredRoutines.length ? /* @__PURE__ */ React3.createElement(
+    StateBlock,
+    {
+      className: "trainingPlugin__empty",
+      centered: true,
+      eyebrow: "Sin rutinas",
+      title: "Todavia no hay rutinas",
+      description: "Crea la primera desde el boton superior."
+    }
+  ) : null))), /* @__PURE__ */ React3.createElement(SplitDetail, { className: "trainingPlugin__detail" }, error ? /* @__PURE__ */ React3.createElement(Notice, { tone: "danger" }, error) : null, loading ? /* @__PURE__ */ React3.createElement(
+    StateBlock,
+    {
+      eyebrow: "Cargando",
+      title: "Estamos leyendo la biblioteca de entrenamientos",
+      description: "Enseguida veras ejercicios, rutinas y relaciones disponibles."
+    }
+  ) : null, !loading && mode === "exercises" ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__detailStack" }, /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__panel trainingPlugin__panel--hero", tone: "highlight" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(
+    PanelTitle,
+    {
+      eyebrow: "Ejercicio",
+      title: selectedExercise?.title || "Nuevo ejercicio",
+      description: selectedExercise?.searchSummary || selectedExercise?.summary || "Define el movimiento, la unidad y los musculos asociados."
+    }
+  ))), /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__panel" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(PanelTitle, { title: "Resumen del ejercicio", description: "Empieza por nombre, descripcion y unidad principal." })), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__formGrid" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Titulo"), /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "text",
@@ -1069,15 +1256,7 @@ function TrainingView() {
         measurement: createExerciseMeasurementDraft(nextMeasurement)
       }))
     }
-  ), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Musculos"), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__fieldRow" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Carpeta de concepts"), /* @__PURE__ */ React3.createElement(
-    "input",
-    {
-      type: "text",
-      value: muscleConceptFolder,
-      onChange: (event) => setMuscleConceptFolder(event.target.value),
-      placeholder: "Concepts/Muscles"
-    }
-  ))), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__buttonRow" }, /* @__PURE__ */ React3.createElement(
+  ))), /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__panel" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(PanelTitle, { title: "Musculos vinculados", description: "Relaciona el ejercicio con musculos existentes o crea nuevos si no estan disponibles." })), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__buttonRow" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "text",
@@ -1091,7 +1270,7 @@ function TrainingView() {
       },
       placeholder: "Biceps braquial"
     }
-  ), /* @__PURE__ */ React3.createElement("button", { type: "button", className: "trainingPlugin__secondaryButton", onClick: () => void handleAddMuscle() }, "Agregar")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__chipRow" }, (exerciseDraft.muscles || []).map((muscle) => /* @__PURE__ */ React3.createElement("span", { key: String(muscle.conceptId || muscle.entityRefId), className: "trainingPlugin__chip" }, /* @__PURE__ */ React3.createElement("span", { className: "trainingPlugin__chipLabel" }, muscle.title), /* @__PURE__ */ React3.createElement(
+  ), /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: () => void handleAddMuscle() }, "Agregar")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__chipRow" }, (exerciseDraft.muscles || []).map((muscle) => /* @__PURE__ */ React3.createElement("span", { key: String(muscle.conceptId || muscle.entityRefId), className: "trainingPlugin__chip" }, /* @__PURE__ */ React3.createElement("span", { className: "trainingPlugin__chipLabel" }, muscle.title), /* @__PURE__ */ React3.createElement(
     "button",
     {
       type: "button",
@@ -1100,27 +1279,49 @@ function TrainingView() {
       "aria-label": `Quitar ${muscle.title}`
     },
     "x"
-  )))), /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__searchField" }, /* @__PURE__ */ React3.createElement("span", null, "Concepts sugeridos"), /* @__PURE__ */ React3.createElement(
+  )))), /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__searchField" }, /* @__PURE__ */ React3.createElement("span", null, "Conceptos sugeridos"), /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "search",
       value: muscleSearch,
       onChange: (event) => setMuscleSearch(event.target.value),
-      placeholder: "Filtrar concepts activos"
+      placeholder: "Filtrar sugerencias"
     }
   )), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__selectorList" }, filteredMuscles.slice(0, 20).map((muscle) => {
     const muscleId = String(muscle.conceptId || muscle.entityRefId || muscle.id);
-    return /* @__PURE__ */ React3.createElement("div", { key: muscleId, className: "trainingPlugin__selectorItem" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__selectorItemMain" }, /* @__PURE__ */ React3.createElement("strong", null, createOptionLabel(muscle)), /* @__PURE__ */ React3.createElement("span", null, muscle.slug || muscle.title)), /* @__PURE__ */ React3.createElement(
-      "button",
+    return /* @__PURE__ */ React3.createElement("div", { key: muscleId, className: "trainingPlugin__selectorItem" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__selectorItemMain" }, /* @__PURE__ */ React3.createElement("strong", null, muscle.title || createOptionLabel(muscle)), /* @__PURE__ */ React3.createElement("span", null, muscle.summary || muscle.slug || "Concepto relacionado con este ejercicio.")), /* @__PURE__ */ React3.createElement(
+      Button,
       {
         type: "button",
         className: "trainingPlugin__secondaryButton",
         disabled: selectedExerciseMuscleIds.has(muscleId),
         onClick: () => addMuscleFromSelector(muscle)
       },
-      selectedExerciseMuscleIds.has(muscleId) ? "Agregado" : "Agregar"
+      selectedExerciseMuscleIds.has(muscleId) ? "Agregado" : "Vincular"
     ));
-  }), !filteredMuscles.length ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__state" }, "No hay concepts que coincidan con ese filtro.") : null))), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__buttonRow" }, /* @__PURE__ */ React3.createElement("button", { type: "button", className: "trainingPlugin__primaryButton", onClick: () => void handleSaveExercise() }, "Guardar ejercicio"), /* @__PURE__ */ React3.createElement("button", { type: "button", className: "trainingPlugin__secondaryButton", onClick: createExercise }, "Nuevo"), /* @__PURE__ */ React3.createElement("button", { type: "button", className: "trainingPlugin__secondaryButton", onClick: () => void handleDeleteExercise(), disabled: !exerciseDraft.id }, /* @__PURE__ */ React3.createElement(DeleteIcon, { size: 16 })))) : null, !loading && mode === "routines" ? /* @__PURE__ */ React3.createElement("section", { className: "trainingPlugin__panel" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__panelCopy" }, /* @__PURE__ */ React3.createElement("strong", null, selectedRoutine?.title || "Nueva rutina"), /* @__PURE__ */ React3.createElement("span", null, selectedRoutine?.searchSummary || selectedRoutine?.summary || "Armada con pasos lineales, ejercicios y descansos.")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__formGrid" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Titulo"), /* @__PURE__ */ React3.createElement(
+  }), !filteredMuscles.length ? /* @__PURE__ */ React3.createElement(
+    StateBlock,
+    {
+      className: "trainingPlugin__state",
+      title: "No hay sugerencias para ese filtro",
+      description: "Prueba con otro nombre o crea un musculo nuevo."
+    }
+  ) : null), /* @__PURE__ */ React3.createElement("details", { className: "trainingPlugin__advanced" }, /* @__PURE__ */ React3.createElement("summary", null, "Opciones avanzadas"), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__fieldRow" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Carpeta para nuevos musculos"), /* @__PURE__ */ React3.createElement(
+    "input",
+    {
+      type: "text",
+      value: muscleConceptFolder,
+      onChange: (event) => setMuscleConceptFolder(event.target.value),
+      placeholder: "Concepts/Muscles"
+    }
+  )))))), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__buttonRow trainingPlugin__buttonRow--actions" }, /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "primary", onClick: () => void handleSaveExercise() }, "Guardar ejercicio"), /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: createExercise }, "Nuevo"), /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "danger", onClick: () => void handleDeleteExercise(), disabled: !exerciseDraft.id }, /* @__PURE__ */ React3.createElement(DeleteIcon, { size: 16 }), /* @__PURE__ */ React3.createElement("span", null, "Eliminar")))) : null, !loading && mode === "routines" ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__detailStack" }, /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__panel trainingPlugin__panel--hero", tone: "highlight" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(
+    PanelTitle,
+    {
+      eyebrow: "Rutina",
+      title: selectedRoutine?.title || "Nueva rutina",
+      description: selectedRoutine?.searchSummary || selectedRoutine?.summary || "Arma una secuencia lineal de ejercicios y descansos."
+    }
+  ))), /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__panel" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(PanelTitle, { title: "Resumen de la rutina", description: "Define el nombre y el objetivo antes de bajar al detalle de pasos." })), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__formGrid" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Titulo"), /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "text",
@@ -1142,12 +1343,12 @@ function TrainingView() {
       onChange: (event) => setRoutineDraft((current) => ({ ...current, notes: event.target.value })),
       placeholder: "Observaciones generales."
     }
-  )), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Pasos"), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__buttonRow" }, /* @__PURE__ */ React3.createElement("button", { type: "button", className: "trainingPlugin__secondaryButton", onClick: () => addRoutineStep("exercise") }, "Agregar ejercicio"), /* @__PURE__ */ React3.createElement("button", { type: "button", className: "trainingPlugin__secondaryButton", onClick: () => addRoutineStep("rest") }, "Agregar descanso")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__steps" }, routineDraft.steps.map((step, index) => {
+  )))), /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__panel" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(PanelTitle, { title: "Pasos", description: "Alterna ejercicios y descansos en el orden real de la rutina." })), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__buttonRow" }, /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: () => addRoutineStep("exercise") }, "Agregar ejercicio"), /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: () => addRoutineStep("rest") }, "Agregar descanso")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__steps" }, routineDraft.steps.map((step, index) => {
     const selectedExerciseForStep = step.exerciseId ? findExerciseById(catalog.exercises, step.exerciseId) : null;
     return /* @__PURE__ */ React3.createElement("div", { key: step.id, className: "trainingPlugin__step" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__stepHeader" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__stepTitle" }, /* @__PURE__ */ React3.createElement("strong", null, "Paso ", index + 1), /* @__PURE__ */ React3.createElement("span", null, buildTrainingMetricSummary(
       draftMetricToPayload(step.metric, step.kind === "rest" ? "rest" : "exercise")
     ) || "Paso sin configurar")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__stepActions" }, /* @__PURE__ */ React3.createElement(
-      "button",
+      Button,
       {
         type: "button",
         className: "trainingPlugin__iconButton",
@@ -1156,7 +1357,7 @@ function TrainingView() {
       },
       /* @__PURE__ */ React3.createElement(ArrowUpIcon, { size: 16 })
     ), /* @__PURE__ */ React3.createElement(
-      "button",
+      Button,
       {
         type: "button",
         className: "trainingPlugin__iconButton",
@@ -1164,7 +1365,7 @@ function TrainingView() {
         disabled: index === routineDraft.steps.length - 1
       },
       /* @__PURE__ */ React3.createElement(ArrowDownIcon, { size: 16 })
-    ), /* @__PURE__ */ React3.createElement("button", { type: "button", className: "trainingPlugin__iconButton", onClick: () => removeRoutineStep(step.id) }, /* @__PURE__ */ React3.createElement(DeleteIcon, { size: 16 })))), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__formGrid" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field" }, /* @__PURE__ */ React3.createElement("span", null, "Tipo"), /* @__PURE__ */ React3.createElement(
+    ), /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "danger", className: "trainingPlugin__iconButton", onClick: () => removeRoutineStep(step.id) }, /* @__PURE__ */ React3.createElement(DeleteIcon, { size: 16 })))), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__formGrid" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field" }, /* @__PURE__ */ React3.createElement("span", null, "Tipo"), /* @__PURE__ */ React3.createElement(
       "select",
       {
         value: step.kind,
@@ -1204,7 +1405,14 @@ function TrainingView() {
           metric: normalizeMetricDraftForMode(nextMetric, "exercise")
         })
       }
-    ), selectedExerciseForStep ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__state" }, "Ejercicio: ", selectedExerciseForStep.title, selectedExerciseForStep.searchSummary ? ` - ${selectedExerciseForStep.searchSummary}` : "") : null) : /* @__PURE__ */ React3.createElement(
+    ), selectedExerciseForStep ? /* @__PURE__ */ React3.createElement(
+      StateBlock,
+      {
+        className: "trainingPlugin__state",
+        title: `Ejercicio: ${selectedExerciseForStep.title}`,
+        description: selectedExerciseForStep.searchSummary || "Ejercicio enlazado correctamente."
+      }
+    ) : null) : /* @__PURE__ */ React3.createElement(
       TrainingMetricEditor,
       {
         label: "Descanso",
@@ -1215,7 +1423,34 @@ function TrainingView() {
         })
       }
     )));
-  }), !routineDraft.steps.length ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__empty" }, /* @__PURE__ */ React3.createElement("strong", null, "La rutina todavia no tiene pasos."), /* @__PURE__ */ React3.createElement("div", null, "Agrega un ejercicio o un descanso para empezar.")) : null))), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__buttonRow" }, /* @__PURE__ */ React3.createElement("button", { type: "button", className: "trainingPlugin__primaryButton", onClick: () => void handleSaveRoutine() }, "Guardar rutina"), /* @__PURE__ */ React3.createElement("button", { type: "button", className: "trainingPlugin__secondaryButton", onClick: createRoutine }, "Nueva"), /* @__PURE__ */ React3.createElement("button", { type: "button", className: "trainingPlugin__secondaryButton", onClick: () => void handleDeleteRoutine(), disabled: !routineDraft.id }, /* @__PURE__ */ React3.createElement(DeleteIcon, { size: 16 })))) : null, !loading && !catalog.exercises.length && mode === "exercises" ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__empty" }, /* @__PURE__ */ React3.createElement("strong", null, "Sin ejercicios todavia."), /* @__PURE__ */ React3.createElement("div", null, "Crealo desde el boton + y luego enlaza sus musculos.")) : null, !loading && !catalog.routines.length && mode === "routines" ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__empty" }, /* @__PURE__ */ React3.createElement("strong", null, "Sin rutinas todavia."), /* @__PURE__ */ React3.createElement("div", null, "Creala desde el boton + y arma sus pasos lineales.")) : null)));
+  }), !routineDraft.steps.length ? /* @__PURE__ */ React3.createElement(
+    StateBlock,
+    {
+      className: "trainingPlugin__empty",
+      centered: true,
+      eyebrow: "Sin pasos",
+      title: "La rutina todavia no tiene pasos",
+      description: "Agrega un ejercicio o un descanso para empezar."
+    }
+  ) : null))), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__buttonRow trainingPlugin__buttonRow--actions" }, /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "primary", onClick: () => void handleSaveRoutine() }, "Guardar rutina"), /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: createRoutine }, "Nueva"), /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "danger", onClick: () => void handleDeleteRoutine(), disabled: !routineDraft.id }, /* @__PURE__ */ React3.createElement(DeleteIcon, { size: 16 }), /* @__PURE__ */ React3.createElement("span", null, "Eliminar")))) : null, !loading && !catalog.exercises.length && mode === "exercises" ? /* @__PURE__ */ React3.createElement(
+    StateBlock,
+    {
+      className: "trainingPlugin__empty",
+      centered: true,
+      eyebrow: "Sin ejercicios",
+      title: "Aun no hay ejercicios cargados",
+      description: "Crea el primero y luego enlaza sus musculos."
+    }
+  ) : null, !loading && !catalog.routines.length && mode === "routines" ? /* @__PURE__ */ React3.createElement(
+    StateBlock,
+    {
+      className: "trainingPlugin__empty",
+      centered: true,
+      eyebrow: "Sin rutinas",
+      title: "Aun no hay rutinas cargadas",
+      description: "Crea la primera y arma sus pasos lineales."
+    }
+  ) : null))));
 }
 var TrainingView_default = TrainingView;
 

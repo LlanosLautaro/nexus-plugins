@@ -2,6 +2,7 @@ const { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState 
 import { BookIcon, RefreshIcon } from "./icons.jsx";
 import { formatPercent, resolveVaultFilePath } from "./renderer-helpers.js";
 import { createRendererDevLogger } from "../../../nexus-frontend/src/utils/devLog.js";
+import { IconButton, InlineField, Notice, SectionPanel, StateBlock, ToolbarActions, WorkspaceBody, WorkspacePage, WorkspaceTitle, WorkspaceTopbar } from "../../../nexus-frontend/src/ui/index.js";
 
 const { ipcRenderer } = window.require("electron");
 const booksLibraryLogger = createRendererDevLogger("renderer.plugins.books");
@@ -578,26 +579,25 @@ export default function BooksLibraryView({ ctx }) {
   const showEmptySearchState = !loading && books.length > 0 && visibleBooks.length === 0;
 
   return (
-    <div className="booksLibrary">
-      <div className="booksLibrary__topbar">
-        <div className="booksLibrary__titleBlock">
-          <span className="booksLibrary__eyebrow">Plugin books</span>
-          <strong>Biblioteca</strong>
-        </div>
+    <WorkspacePage className="booksLibrary">
+      <WorkspaceTopbar>
+        <WorkspaceTitle
+          eyebrow="Plugin books"
+          title="Biblioteca"
+          description="Biblioteca PDF-first con busqueda rapida, progreso simple y apertura directa al visor."
+        />
 
-        <div className="booksLibrary__controls">
-          <label className="booksLibrary__searchField">
-            <span className="booksLibrary__controlLabel">Buscar</span>
+        <ToolbarActions className="booksLibrary__controls">
+          <InlineField className="booksLibrary__searchField" label="Buscar" grow>
             <input
               type="search"
               value={searchValue}
               onChange={(event) => setSearchValue(event.target.value)}
               placeholder="Titulo o autor"
             />
-          </label>
+          </InlineField>
 
-          <label className="booksLibrary__sortField">
-            <span className="booksLibrary__controlLabel">Ordenar</span>
+          <InlineField className="booksLibrary__sortField" label="Ordenar">
             <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
               {BOOK_SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -605,60 +605,71 @@ export default function BooksLibraryView({ ctx }) {
                 </option>
               ))}
             </select>
-          </label>
+          </InlineField>
 
-          <button
+          <IconButton
             type="button"
-            className="booksLibrary__iconButton"
             onClick={() => void loadBooks()}
             disabled={refreshing}
             title="Recargar biblioteca"
           >
             <RefreshIcon size={16} />
-          </button>
-        </div>
-      </div>
+          </IconButton>
+        </ToolbarActions>
+      </WorkspaceTopbar>
 
-      <div ref={contentRef} className="booksLibrary__content">
-        {loading ? (
-          <div className="booksLibrary__state">Cargando biblioteca...</div>
-        ) : books.length === 0 ? (
-          <div className="booksLibrary__state">
-            Sin libros indexados todavia. Asigna carpetas PDF a `Books` desde Settings.
-          </div>
-        ) : showEmptySearchState ? (
-          <div className="booksLibrary__state">
-            No hay resultados para esa busqueda. Prueba con otro titulo, autor o criterio de orden.
-          </div>
-        ) : (
-          <div ref={gridMeasureRef} className="booksLibrary__virtualViewport">
-            <div className="booksLibrary__virtualGrid" style={{ height: `${totalGridHeight}px` }}>
-              {virtualizedBooks.map(({ book, style }) => (
-              <button
-                type="button"
-                key={book.itemId}
-                className="booksLibrary__card"
-                style={style}
-                onClick={() => void handleOpenBook(book)}
-                title={book.title || "Abrir PDF"}
-              >
-                <BookCoverPreview book={book} />
-
-                <div className="booksLibrary__cardBody">
-                  <strong className="booksLibrary__cardTitle">{book.title || "Documento"}</strong>
-                  <p className="booksLibrary__cardAuthor">{book.author || "Autor sin curar"}</p>
-                  <ProgressBar value={book.progressPercent} />
-                </div>
-              </button>
-              ))}
-            </div>
-          </div>
-        )}
-
+      <WorkspaceBody>
         {error ? (
-          <div className="booksLibrary__state booksLibrary__state--error">{error}</div>
+          <Notice tone="danger">{error}</Notice>
         ) : null}
-      </div>
-    </div>
+
+        <SectionPanel className="booksLibrary__content" padding="tight">
+          {loading ? (
+            <StateBlock
+              eyebrow="Cargando"
+              title="Estamos preparando la biblioteca"
+              description="Leyendo libros, portadas y progreso guardado."
+            />
+          ) : books.length === 0 ? (
+            <StateBlock
+              centered
+              eyebrow="Sin libros"
+              title="Todavia no hay PDFs reclamados por Books"
+              description="Asigna una carpeta PDF a Books desde Settings para empezar a poblar esta biblioteca."
+            />
+          ) : showEmptySearchState ? (
+            <StateBlock
+              centered
+              eyebrow="Sin resultados"
+              title="No encontramos libros para ese filtro"
+              description="Prueba con otro titulo, autor o criterio de orden."
+            />
+          ) : (
+            <div ref={contentRef} className="booksLibrary__virtualViewport">
+              <div ref={gridMeasureRef} className="booksLibrary__virtualGrid" style={{ height: `${totalGridHeight}px` }}>
+                {virtualizedBooks.map(({ book, style }) => (
+                  <button
+                    type="button"
+                    key={book.itemId}
+                    className="booksLibrary__card"
+                    style={style}
+                    onClick={() => void handleOpenBook(book)}
+                    title={book.title || "Abrir PDF"}
+                  >
+                    <BookCoverPreview book={book} />
+
+                    <div className="booksLibrary__cardBody">
+                      <strong className="booksLibrary__cardTitle">{book.title || "Documento"}</strong>
+                      <p className="booksLibrary__cardAuthor">{book.author || "Autor sin curar"}</p>
+                      <ProgressBar value={book.progressPercent} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </SectionPanel>
+      </WorkspaceBody>
+    </WorkspacePage>
   );
 }
