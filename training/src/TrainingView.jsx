@@ -6,30 +6,35 @@ import {
   normalizeTrainingMeasurement,
   normalizeTrainingPrescription,
 } from "./training-utils.js";
+import { readTrainingMuscleConceptsDirectory } from "./plugin-settings.js";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
   DeleteIcon,
   PlusIcon,
   RefreshIcon,
-  TrainingIcon,
 } from "./icons.jsx";
 import {
   Button,
+  Field,
+  FieldGrid,
+  IconButton,
+  InlineField,
   Notice,
   PanelHeader,
   PanelTitle,
+  ScrollRegion,
   SectionPanel,
   SegmentedControl,
   SplitDetail,
   SplitLayout,
   SplitSidebar,
+  StateBlock,
   ToolbarActions,
   WorkspaceBody,
   WorkspacePage,
   WorkspaceTitle,
   WorkspaceTopbar,
-  StateBlock,
 } from "../../../nexus-frontend/src/ui/index.js";
 
 const { ipcRenderer } = window.require("electron");
@@ -51,9 +56,7 @@ function createExerciseMeasurementDraft(measurement = {}) {
 }
 
 function createRoutineMetricDraft(metric = {}, context = "exercise") {
-  const normalized = context === "rest"
-    ? normalizeTrainingPrescription(metric)
-    : normalizeTrainingPrescription(metric);
+  const normalized = normalizeTrainingPrescription(metric);
 
   return {
     mode: normalized.mode || "reps",
@@ -122,18 +125,19 @@ function normalizeMetricDraftForMode(metricDraft, context = "exercise") {
 }
 
 function updateMetricDraftMode(metricDraft, nextMode, context = "exercise") {
-  return normalizeMetricDraftForMode({
-    ...metricDraft,
-    mode: nextMode,
-  }, context);
+  return normalizeMetricDraftForMode(
+    {
+      ...metricDraft,
+      mode: nextMode,
+    },
+    context,
+  );
 }
 
 function createExerciseDraft() {
   return {
     id: null,
     title: "",
-    summary: "",
-    notes: "",
     measurement: createExerciseMeasurementDraft(),
     muscles: [],
   };
@@ -153,7 +157,6 @@ function createRoutineDraft() {
     id: null,
     title: "",
     summary: "",
-    notes: "",
     steps: [],
   };
 }
@@ -168,16 +171,16 @@ function exerciseRecordToDraft(exercise) {
   return {
     id: exercise.id,
     title: exercise.title || "",
-    summary: exercise.summary || "",
-    notes: exercise.notes || "",
     measurement: createExerciseMeasurementDraft(measurement),
-    muscles: Array.isArray(exercise.muscles) ? exercise.muscles.map((muscle) => ({
-      conceptId: muscle.conceptId || muscle.concept_id || muscle.entityRefId || muscle.entity_ref_id || muscle.id,
-      entityRefId: muscle.conceptEntityRefId || muscle.concept_entity_ref_id || muscle.entityRefId || muscle.entity_ref_id || null,
-      title: muscle.title || "",
-      slug: muscle.slug || "",
-      summary: muscle.summary || "",
-    })) : [],
+    muscles: Array.isArray(exercise.muscles)
+      ? exercise.muscles.map((muscle) => ({
+          conceptId: muscle.conceptId || muscle.concept_id || muscle.entityRefId || muscle.entity_ref_id || muscle.id,
+          entityRefId: muscle.conceptEntityRefId || muscle.concept_entity_ref_id || muscle.entityRefId || muscle.entity_ref_id || null,
+          title: muscle.title || "",
+          slug: muscle.slug || "",
+          summary: muscle.summary || "",
+        }))
+      : [],
   };
 }
 
@@ -190,14 +193,16 @@ function routineRecordToDraft(routine) {
     id: routine.id,
     title: routine.title || "",
     summary: routine.summary || "",
-    notes: routine.notes || "",
     steps: Array.isArray(routine.steps)
       ? routine.steps.map((step) => ({
           id: step.id || window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
           kind: step.kind || "exercise",
           exerciseId: step.exerciseId || step.exercise_id || "",
           metric: normalizeMetricDraftForMode(
-            createRoutineMetricDraft(normalizeTrainingPrescription(step.prescription), step.kind === "rest" ? "rest" : "exercise"),
+            createRoutineMetricDraft(
+              normalizeTrainingPrescription(step.prescription),
+              step.kind === "rest" ? "rest" : "exercise",
+            ),
             step.kind === "rest" ? "rest" : "exercise",
           ),
         }))
@@ -240,12 +245,6 @@ function normalizeSearchValue(value) {
     .trim();
 }
 
-function createOptionLabel(option) {
-  const title = normalizeOptionalText(option?.title || option?.name || "");
-  const summary = normalizeOptionalText(option?.summary || "");
-  return summary ? `${title} - ${summary}` : title;
-}
-
 function normalizePathSearchValue(value) {
   return String(value ?? "")
     .replace(/\\/g, "/")
@@ -283,8 +282,15 @@ function findExerciseById(exercises, exerciseId) {
   return exercises.find((exercise) => exercise.id === exerciseId) || null;
 }
 
+function buildExerciseEditorDescription(exercise) {
+  return exercise?.searchSummary || "Define el nombre corto, la unidad base y los musculos relacionados.";
+}
+
+function buildRoutineEditorDescription(routine) {
+  return routine?.searchSummary || routine?.summary || "Arma una secuencia lineal con ejercicios y descansos.";
+}
+
 function TrainingMeasurementUnitEditor({
-  label,
   value,
   onChange,
   disabled = false,
@@ -292,11 +298,14 @@ function TrainingMeasurementUnitEditor({
   const currentMode = value?.mode || "reps";
 
   return (
-    <div className="trainingPlugin__field trainingPlugin__field--wide">
-      <span>{label}</span>
-      <div className="trainingPlugin__fieldRow">
-        <label className="trainingPlugin__inlineField">
-          <span>Unidad de medida</span>
+    <div className="trainingPlugin__measureCard">
+      <div className="trainingPlugin__sectionIntro">
+        <strong>Unidad base</strong>
+        <span>El ejercicio solo define el tipo de medida. La cantidad concreta vive en la rutina.</span>
+      </div>
+
+      <div className="trainingPlugin__measureRow">
+        <InlineField label="Medida" grow>
           <select
             value={currentMode}
             onChange={(event) => onChange({ mode: event.target.value })}
@@ -308,10 +317,12 @@ function TrainingMeasurementUnitEditor({
               </option>
             ))}
           </select>
-        </label>
-      </div>
-      <div className="trainingPlugin__state">
-        Unidad: {buildTrainingMeasurementUnitSummary(value) || "sin definir"}
+        </InlineField>
+
+        <div className="trainingPlugin__measurePreview">
+          <span>Lectura</span>
+          <strong>{buildTrainingMeasurementUnitSummary(value) || "Sin definir"}</strong>
+        </div>
       </div>
     </div>
   );
@@ -340,14 +351,20 @@ function TrainingMetricEditor({
   };
 
   return (
-    <div className="trainingPlugin__field trainingPlugin__field--wide">
-      <span>{label}</span>
+    <div className="trainingPlugin__metricEditor">
+      <div className="trainingPlugin__sectionIntro">
+        <strong>{label}</strong>
+        <span>
+          {isRest
+            ? "Tiempo de pausa y cualquier aclaracion opcional."
+            : "Esta parte si guarda la cantidad concreta de trabajo."}
+        </span>
+      </div>
 
       {isRest ? (
         <>
-          <div className="trainingPlugin__fieldRow">
-            <label className="trainingPlugin__inlineField">
-              <span>Descanso</span>
+          <FieldGrid>
+            <Field label="Descanso">
               <input
                 type="number"
                 min="0"
@@ -356,24 +373,28 @@ function TrainingMetricEditor({
                 disabled={disabled}
                 placeholder="90"
               />
-            </label>
-          </div>
+            </Field>
+          </FieldGrid>
 
-          <label className="trainingPlugin__field trainingPlugin__field--wide">
-            <span>Notas</span>
-            <textarea
-              value={currentValue.notes}
-              onChange={updateField("notes")}
-              disabled={disabled}
-              placeholder="Detalle del descanso."
-            />
-          </label>
+          <details className="trainingPlugin__detailsToggle">
+            <summary>Detalle opcional</summary>
+            <FieldGrid>
+              <Field label="Notas" wide>
+                <textarea
+                  value={currentValue.notes}
+                  onChange={updateField("notes")}
+                  disabled={disabled}
+                  placeholder="Contexto breve del descanso."
+                  rows={3}
+                />
+              </Field>
+            </FieldGrid>
+          </details>
         </>
       ) : (
         <>
-          <div className="trainingPlugin__fieldRow">
-            <label className="trainingPlugin__inlineField">
-              <span>Modo</span>
+          <FieldGrid>
+            <Field label="Modo">
               <select value={mode} onChange={updateMode} disabled={disabled}>
                 {TRAINING_METRIC_MODE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -381,11 +402,10 @@ function TrainingMetricEditor({
                   </option>
                 ))}
               </select>
-            </label>
+            </Field>
 
             {mode === "reps" ? (
-              <label className="trainingPlugin__inlineField">
-                <span>Reps</span>
+              <Field label="Reps">
                 <input
                   type="number"
                   min="0"
@@ -394,12 +414,11 @@ function TrainingMetricEditor({
                   disabled={disabled}
                   placeholder="8"
                 />
-              </label>
+              </Field>
             ) : null}
 
             {mode === "time" ? (
-              <label className="trainingPlugin__inlineField">
-                <span>Segundos</span>
+              <Field label="Segundos">
                 <input
                   type="number"
                   min="0"
@@ -408,12 +427,11 @@ function TrainingMetricEditor({
                   disabled={disabled}
                   placeholder="45"
                 />
-              </label>
+              </Field>
             ) : null}
 
             {mode === "distance" ? (
-              <label className="trainingPlugin__inlineField">
-                <span>Distancia</span>
+              <Field label="Distancia">
                 <input
                   type="number"
                   min="0"
@@ -423,12 +441,11 @@ function TrainingMetricEditor({
                   disabled={disabled}
                   placeholder="1.5"
                 />
-              </label>
+              </Field>
             ) : null}
 
             {mode === "weight" ? (
-              <label className="trainingPlugin__inlineField">
-                <span>Peso</span>
+              <Field label="Peso">
                 <input
                   type="number"
                   min="0"
@@ -438,14 +455,13 @@ function TrainingMetricEditor({
                   disabled={disabled}
                   placeholder="20"
                 />
-              </label>
+              </Field>
             ) : null}
-          </div>
+          </FieldGrid>
 
           {mode === "distance" ? (
-            <div className="trainingPlugin__fieldRow">
-              <label className="trainingPlugin__inlineField">
-                <span>Unidad distancia</span>
+            <FieldGrid>
+              <Field label="Unidad distancia">
                 <input
                   type="text"
                   value={currentValue.distanceUnit}
@@ -453,10 +469,8 @@ function TrainingMetricEditor({
                   disabled={disabled}
                   placeholder="m"
                 />
-              </label>
-
-              <label className="trainingPlugin__inlineField">
-                <span>Tempo</span>
+              </Field>
+              <Field label="Tempo">
                 <input
                   type="text"
                   value={currentValue.tempo}
@@ -464,14 +478,13 @@ function TrainingMetricEditor({
                   disabled={disabled}
                   placeholder="3-1-1"
                 />
-              </label>
-            </div>
+              </Field>
+            </FieldGrid>
           ) : null}
 
           {mode === "weight" ? (
-            <div className="trainingPlugin__fieldRow">
-              <label className="trainingPlugin__inlineField">
-                <span>Unidad peso</span>
+            <FieldGrid>
+              <Field label="Unidad peso">
                 <input
                   type="text"
                   value={currentValue.weightUnit}
@@ -479,10 +492,8 @@ function TrainingMetricEditor({
                   disabled={disabled}
                   placeholder="kg"
                 />
-              </label>
-
-              <label className="trainingPlugin__inlineField">
-                <span>Tempo</span>
+              </Field>
+              <Field label="Tempo">
                 <input
                   type="text"
                   value={currentValue.tempo}
@@ -490,14 +501,13 @@ function TrainingMetricEditor({
                   disabled={disabled}
                   placeholder="3-1-1"
                 />
-              </label>
-            </div>
+              </Field>
+            </FieldGrid>
           ) : null}
 
           {mode === "reps" ? (
-            <div className="trainingPlugin__fieldRow">
-              <label className="trainingPlugin__inlineField">
-                <span>Peso</span>
+            <FieldGrid>
+              <Field label="Peso opcional">
                 <input
                   type="number"
                   min="0"
@@ -507,10 +517,8 @@ function TrainingMetricEditor({
                   disabled={disabled}
                   placeholder="20"
                 />
-              </label>
-
-              <label className="trainingPlugin__inlineField">
-                <span>Unidad peso</span>
+              </Field>
+              <Field label="Unidad peso">
                 <input
                   type="text"
                   value={currentValue.weightUnit}
@@ -518,10 +526,8 @@ function TrainingMetricEditor({
                   disabled={disabled}
                   placeholder="kg"
                 />
-              </label>
-
-              <label className="trainingPlugin__inlineField">
-                <span>Tempo</span>
+              </Field>
+              <Field label="Tempo" wide>
                 <input
                   type="text"
                   value={currentValue.tempo}
@@ -529,14 +535,13 @@ function TrainingMetricEditor({
                   disabled={disabled}
                   placeholder="3-1-1"
                 />
-              </label>
-            </div>
+              </Field>
+            </FieldGrid>
           ) : null}
 
           {mode === "time" ? (
-            <div className="trainingPlugin__fieldRow">
-              <label className="trainingPlugin__inlineField">
-                <span>Tempo</span>
+            <FieldGrid>
+              <Field label="Tempo">
                 <input
                   type="text"
                   value={currentValue.tempo}
@@ -544,26 +549,445 @@ function TrainingMetricEditor({
                   disabled={disabled}
                   placeholder="3-1-1"
                 />
-              </label>
-            </div>
+              </Field>
+            </FieldGrid>
           ) : null}
 
-          <label className="trainingPlugin__field trainingPlugin__field--wide">
-            <span>Notas</span>
-            <textarea
-              value={currentValue.notes}
-              onChange={updateField("notes")}
-              disabled={disabled}
-              placeholder="Detalle opcional."
-            />
-          </label>
+          <details className="trainingPlugin__detailsToggle">
+            <summary>Detalle opcional</summary>
+            <FieldGrid>
+              <Field label="Notas" wide>
+                <textarea
+                  value={currentValue.notes}
+                  onChange={updateField("notes")}
+                  disabled={disabled}
+                  placeholder="Aclaracion breve si hace falta."
+                  rows={3}
+                />
+              </Field>
+            </FieldGrid>
+          </details>
         </>
       )}
     </div>
   );
 }
 
-function TrainingView() {
+function ExerciseEditor({
+  selectedExercise,
+  exerciseDraft,
+  setExerciseDraft,
+  muscleInput,
+  setMuscleInput,
+  muscleSearch,
+  setMuscleSearch,
+  filteredMuscles,
+  selectedExerciseMuscleIds,
+  muscleConceptFolder,
+  addMuscleFromSelector,
+  removeMuscleFromExercise,
+  handleAddMuscle,
+  handleSaveExercise,
+  handleDeleteExercise,
+}) {
+  return (
+    <div className="trainingPlugin__editor trainingPlugin__editor--exercise">
+      <SectionPanel className="trainingPlugin__detailHeader" tone="highlight" padding="tight">
+        <PanelHeader
+          actions={(
+            <div className="trainingPlugin__headerActions">
+              <Button type="button" tone="primary" onClick={() => void handleSaveExercise()}>
+                Guardar ejercicio
+              </Button>
+              <Button
+                type="button"
+                tone="danger"
+                onClick={() => void handleDeleteExercise()}
+                disabled={!exerciseDraft.id}
+              >
+                <DeleteIcon size={16} />
+                <span>Eliminar</span>
+              </Button>
+            </div>
+          )}
+        >
+          <PanelTitle
+            eyebrow="Ejercicio"
+            title={selectedExercise?.title || "Nuevo ejercicio"}
+            description={buildExerciseEditorDescription(selectedExercise)}
+          />
+        </PanelHeader>
+      </SectionPanel>
+
+      <div className="trainingPlugin__exerciseLayout">
+        <SectionPanel className="trainingPlugin__card trainingPlugin__card--main">
+          <PanelHeader>
+            <PanelTitle
+              title="Base del ejercicio"
+              description="Menos campos, mas claridad: nombre, unidad y listo."
+            />
+          </PanelHeader>
+
+          <FieldGrid className="trainingPlugin__singleColumnGrid">
+            <Field label="Titulo" wide>
+              <input
+                type="text"
+                value={exerciseDraft.title}
+                onChange={(event) => setExerciseDraft((current) => ({ ...current, title: event.target.value }))}
+                placeholder="Nombre del ejercicio"
+              />
+            </Field>
+          </FieldGrid>
+
+          <TrainingMeasurementUnitEditor
+            value={exerciseDraft.measurement}
+            onChange={(nextMeasurement) =>
+              setExerciseDraft((current) => ({
+                ...current,
+                measurement: createExerciseMeasurementDraft(nextMeasurement),
+              }))
+            }
+          />
+        </SectionPanel>
+
+        <SectionPanel className="trainingPlugin__card trainingPlugin__card--aside">
+          <PanelHeader>
+            <PanelTitle
+              title="Musculos relacionados"
+              description="Vincula muscles existentes o crea uno nuevo sin salir del flujo."
+            />
+          </PanelHeader>
+
+          <div className="trainingPlugin__sectionIntro trainingPlugin__sectionIntro--compact">
+            <strong>Origen activo</strong>
+            <span>
+              Los nuevos muscles se crean en <code>{muscleConceptFolder}</code>.
+            </span>
+          </div>
+
+          <div className="trainingPlugin__inputActionRow">
+            <input
+              type="text"
+              value={muscleInput}
+              onChange={(event) => setMuscleInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void handleAddMuscle();
+                }
+              }}
+              placeholder="Escribe un musculo"
+            />
+            <Button type="button" onClick={() => void handleAddMuscle()}>
+              Agregar
+            </Button>
+          </div>
+
+          <div className="trainingPlugin__chipRow">
+            {(exerciseDraft.muscles || []).length ? (
+              exerciseDraft.muscles.map((muscle) => (
+                <span key={String(muscle.conceptId || muscle.entityRefId)} className="trainingPlugin__chip">
+                  <span className="trainingPlugin__chipLabel">{muscle.title}</span>
+                  <button
+                    type="button"
+                    className="trainingPlugin__chipRemove"
+                    onClick={() => removeMuscleFromExercise(muscle.conceptId || muscle.entityRefId)}
+                    aria-label={`Quitar ${muscle.title}`}
+                  >
+                    x
+                  </button>
+                </span>
+              ))
+            ) : (
+              <div className="trainingPlugin__mutedBlock">
+                Sin muscles vinculados todavia.
+              </div>
+            )}
+          </div>
+
+          <Field label="Filtrar sugeridos" wide>
+            <input
+              type="search"
+              value={muscleSearch}
+              onChange={(event) => setMuscleSearch(event.target.value)}
+              placeholder="Buscar por nombre"
+            />
+          </Field>
+
+          <div className="trainingPlugin__selectorList">
+            {filteredMuscles.slice(0, 20).map((muscle) => {
+              const muscleId = String(muscle.conceptId || muscle.entityRefId || muscle.id);
+
+              return (
+                <div key={muscleId} className="trainingPlugin__selectorItem">
+                  <div className="trainingPlugin__selectorItemMain">
+                    <strong>{muscle.title}</strong>
+                    <span>{muscle.summary || muscle.slug || muscle.itemPath || "Concepto relacionado."}</span>
+                  </div>
+                  <Button
+                    type="button"
+                    disabled={selectedExerciseMuscleIds.has(muscleId)}
+                    onClick={() => addMuscleFromSelector(muscle)}
+                  >
+                    {selectedExerciseMuscleIds.has(muscleId) ? "Agregado" : "Vincular"}
+                  </Button>
+                </div>
+              );
+            })}
+
+            {!filteredMuscles.length ? (
+              <div className="trainingPlugin__mutedBlock">
+                No hay sugerencias para ese filtro.
+              </div>
+            ) : null}
+          </div>
+        </SectionPanel>
+      </div>
+    </div>
+  );
+}
+
+function RoutineEditor({
+  selectedRoutine,
+  routineDraft,
+  setRoutineDraft,
+  catalog,
+  addRoutineStep,
+  updateRoutineStep,
+  moveRoutineStep,
+  removeRoutineStep,
+  handleSaveRoutine,
+  handleDeleteRoutine,
+}) {
+  return (
+    <div className="trainingPlugin__editor trainingPlugin__editor--routine">
+      <SectionPanel className="trainingPlugin__detailHeader" tone="highlight" padding="tight">
+        <PanelHeader
+          actions={(
+            <div className="trainingPlugin__headerActions">
+              <Button type="button" tone="primary" onClick={() => void handleSaveRoutine()}>
+                Guardar rutina
+              </Button>
+              <Button
+                type="button"
+                tone="danger"
+                onClick={() => void handleDeleteRoutine()}
+                disabled={!routineDraft.id}
+              >
+                <DeleteIcon size={16} />
+                <span>Eliminar</span>
+              </Button>
+            </div>
+          )}
+        >
+          <PanelTitle
+            eyebrow="Rutina"
+            title={selectedRoutine?.title || "Nueva rutina"}
+            description={buildRoutineEditorDescription(selectedRoutine)}
+          />
+        </PanelHeader>
+      </SectionPanel>
+
+      <SectionPanel className="trainingPlugin__card trainingPlugin__card--summary">
+        <PanelHeader>
+          <PanelTitle
+            title="Identidad de la rutina"
+            description="Titulo corto y un resumen minimo antes de bajar al detalle."
+          />
+        </PanelHeader>
+
+        <FieldGrid className="trainingPlugin__singleColumnGrid">
+          <Field label="Titulo" wide>
+            <input
+              type="text"
+              value={routineDraft.title}
+              onChange={(event) => setRoutineDraft((current) => ({ ...current, title: event.target.value }))}
+              placeholder="Nombre de la rutina"
+            />
+          </Field>
+
+          <Field label="Resumen" wide>
+            <textarea
+              value={routineDraft.summary}
+              onChange={(event) => setRoutineDraft((current) => ({ ...current, summary: event.target.value }))}
+              placeholder="Objetivo o enfoque general."
+              rows={3}
+            />
+          </Field>
+        </FieldGrid>
+      </SectionPanel>
+
+      <SectionPanel className="trainingPlugin__card trainingPlugin__card--steps">
+        <PanelHeader
+          actions={(
+            <div className="trainingPlugin__headerActions">
+              <Button type="button" tone="primary" onClick={() => addRoutineStep("exercise")}>
+                Agregar ejercicio
+              </Button>
+              <Button type="button" onClick={() => addRoutineStep("rest")}>
+                Agregar descanso
+              </Button>
+            </div>
+          )}
+        >
+          <PanelTitle
+            title="Pasos"
+            description="Orden real del trabajo: ejercicio, pausa, ejercicio."
+          />
+        </PanelHeader>
+
+        <div className="trainingPlugin__steps">
+          {routineDraft.steps.map((step, index) => {
+            const selectedExerciseForStep = step.exerciseId
+              ? findExerciseById(catalog.exercises, step.exerciseId)
+              : null;
+            const stepSummary = buildTrainingMetricSummary(
+              draftMetricToPayload(step.metric, step.kind === "rest" ? "rest" : "routine"),
+            );
+
+            return (
+              <div key={step.id} className="trainingPlugin__stepCard">
+                <div className="trainingPlugin__stepHeader">
+                  <div className="trainingPlugin__stepTitle">
+                    <strong>Paso {index + 1}</strong>
+                    <span>{stepSummary || "Paso sin configurar"}</span>
+                  </div>
+
+                  <div className="trainingPlugin__stepActions">
+                    <IconButton
+                      type="button"
+                      title="Subir paso"
+                      onClick={() => moveRoutineStep(step.id, -1)}
+                      disabled={index === 0}
+                    >
+                      <ArrowUpIcon size={16} />
+                    </IconButton>
+                    <IconButton
+                      type="button"
+                      title="Bajar paso"
+                      onClick={() => moveRoutineStep(step.id, 1)}
+                      disabled={index === routineDraft.steps.length - 1}
+                    >
+                      <ArrowDownIcon size={16} />
+                    </IconButton>
+                    <IconButton
+                      type="button"
+                      tone="danger"
+                      title="Eliminar paso"
+                      onClick={() => removeRoutineStep(step.id)}
+                    >
+                      <DeleteIcon size={16} />
+                    </IconButton>
+                  </div>
+                </div>
+
+                <FieldGrid>
+                  <Field label="Tipo">
+                    <select
+                      value={step.kind}
+                      onChange={(event) =>
+                        updateRoutineStep(step.id, {
+                          kind: event.target.value === "rest" ? "rest" : "exercise",
+                          metric:
+                            event.target.value === "rest"
+                              ? createRoutineMetricDraft(step.metric, "rest")
+                              : normalizeMetricDraftForMode(step.metric, "exercise"),
+                        })
+                      }
+                    >
+                      <option value="exercise">Ejercicio</option>
+                      <option value="rest">Descanso</option>
+                    </select>
+                  </Field>
+
+                  {step.kind === "exercise" ? (
+                    <Field label="Ejercicio">
+                      <select
+                        value={step.exerciseId}
+                        onChange={(event) => {
+                          const nextExerciseId = event.target.value;
+                          const nextExercise = findExerciseById(catalog.exercises, nextExerciseId);
+
+                          updateRoutineStep(step.id, {
+                            exerciseId: nextExerciseId,
+                            kind: "exercise",
+                            metric: nextExercise
+                              ? normalizeMetricDraftForMode(
+                                  createRoutineMetricDraft(nextExercise.measurement || {}, "exercise"),
+                                  "exercise",
+                                )
+                              : normalizeMetricDraftForMode(step.metric, "exercise"),
+                          });
+                        }}
+                      >
+                        <option value="">Selecciona un ejercicio</option>
+                        {catalog.exercises.map((exercise) => (
+                          <option key={exercise.id} value={exercise.id}>
+                            {exercise.title}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  ) : null}
+                </FieldGrid>
+
+                {step.kind === "exercise" ? (
+                  <>
+                    <TrainingMetricEditor
+                      label="Prescripcion"
+                      context="exercise"
+                      value={step.metric}
+                      onChange={(nextMetric) =>
+                        updateRoutineStep(step.id, {
+                          metric: normalizeMetricDraftForMode(nextMetric, "exercise"),
+                        })
+                      }
+                    />
+
+                    {selectedExerciseForStep ? (
+                      <div className="trainingPlugin__linkedHint">
+                        <strong>{selectedExerciseForStep.title}</strong>
+                        <span>{selectedExerciseForStep.searchSummary || "Ejercicio vinculado."}</span>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <TrainingMetricEditor
+                    label="Descanso"
+                    context="rest"
+                    value={step.metric}
+                    onChange={(nextMetric) =>
+                      updateRoutineStep(step.id, {
+                        metric: normalizeMetricDraftForMode(nextMetric, "rest"),
+                      })
+                    }
+                  />
+                )}
+              </div>
+            );
+          })}
+
+          {!routineDraft.steps.length ? (
+            <StateBlock
+              className="trainingPlugin__empty"
+              centered
+              eyebrow="Sin pasos"
+              title="La rutina todavia no tiene pasos"
+              description="Empieza agregando un ejercicio o un descanso."
+            />
+          ) : null}
+        </div>
+      </SectionPanel>
+    </div>
+  );
+}
+
+function TrainingView({ ctx }) {
+  const trainingSettings = ctx.settings.useValue();
+  const muscleConceptFolder = useMemo(
+    () => readTrainingMuscleConceptsDirectory(trainingSettings),
+    [trainingSettings],
+  );
   const [mode, setMode] = useState("exercises");
   const [catalog, setCatalog] = useState({
     exercises: [],
@@ -574,7 +998,6 @@ function TrainingView() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [muscleSearch, setMuscleSearch] = useState("");
-  const [muscleConceptFolder, setMuscleConceptFolder] = useState("Concepts/Muscles");
   const [exerciseDraft, setExerciseDraft] = useState(createExerciseDraft);
   const [routineDraft, setRoutineDraft] = useState(createRoutineDraft);
   const [selectedExerciseId, setSelectedExerciseId] = useState(null);
@@ -589,11 +1012,11 @@ function TrainingView() {
         return true;
       }
 
-      const muscles = Array.isArray(exercise.muscles) ? exercise.muscles.map((muscle) => muscle.title).join(" ") : "";
+      const muscles = Array.isArray(exercise.muscles)
+        ? exercise.muscles.map((muscle) => muscle.title).join(" ")
+        : "";
       return [
         exercise.title,
-        exercise.summary,
-        exercise.notes,
         exercise.searchSummary,
         muscles,
       ].some((value) => isComparableTextMatch(value, normalizedSearch));
@@ -611,7 +1034,6 @@ function TrainingView() {
       return [
         routine.title,
         routine.summary,
-        routine.notes,
         routine.searchSummary,
         Array.isArray(routine.steps)
           ? routine.steps.map((step) => step.searchSummary).join(" ")
@@ -643,7 +1065,7 @@ function TrainingView() {
         muscle.searchText,
       ].some((value) => isComparableTextMatch(value, normalizedSearch));
     });
-  }, [catalog.muscles, muscleSearch, muscleConceptFolder]);
+  }, [catalog.muscles, muscleConceptFolder, muscleSearch]);
 
   const selectedExercise = useMemo(
     () => findExerciseById(catalog.exercises, selectedExerciseId),
@@ -718,7 +1140,7 @@ function TrainingView() {
 
     const selected = catalog.exercises.find((exercise) => exercise.id === selectedExerciseId);
     setExerciseDraft(selected ? exerciseRecordToDraft(selected) : createExerciseDraft());
-  }, [mode, selectedExerciseId, catalog.exercises]);
+  }, [catalog.exercises, mode, selectedExerciseId]);
 
   useEffect(() => {
     if (mode !== "routines") {
@@ -737,7 +1159,7 @@ function TrainingView() {
 
     const selected = catalog.routines.find((routine) => routine.id === selectedRoutineId);
     setRoutineDraft(selected ? routineRecordToDraft(selected) : createRoutineDraft());
-  }, [mode, selectedRoutineId, catalog.routines]);
+  }, [catalog.routines, mode, selectedRoutineId]);
 
   async function handleSaveExercise() {
     const title = normalizeOptionalText(exerciseDraft.title);
@@ -753,8 +1175,6 @@ function TrainingView() {
       const payload = {
         id: exerciseDraft.id,
         title,
-        summary: normalizeOptionalText(exerciseDraft.summary),
-        notes: normalizeOptionalText(exerciseDraft.notes),
         measurement: draftMetricToPayload(exerciseDraft.measurement, "exercise"),
         muscles: exerciseDraft.muscles.map((muscle) => ({
           conceptId: muscle.conceptId || muscle.entityRefId || null,
@@ -789,7 +1209,6 @@ function TrainingView() {
         id: routineDraft.id,
         title,
         summary: normalizeOptionalText(routineDraft.summary),
-        notes: normalizeOptionalText(routineDraft.notes),
         steps: routineDraft.steps.map((step) => {
           const exercise = step.exerciseId ? findExerciseById(catalog.exercises, step.exerciseId) : null;
 
@@ -893,7 +1312,9 @@ function TrainingView() {
       }
 
       setExerciseDraft((current) => {
-        const exists = current.muscles.some((muscle) => String(muscle.conceptId || muscle.entityRefId) === String(concept.id));
+        const exists = current.muscles.some(
+          (muscle) => String(muscle.conceptId || muscle.entityRefId) === String(concept.id),
+        );
 
         if (exists) {
           return current;
@@ -1056,11 +1477,12 @@ function TrainingView() {
         <WorkspaceTitle
           eyebrow="Plugin training"
           title="Entrenamientos"
-          description="Ejercicios, rutinas y musculos enlazados con una UI mas humana y menos expuesta a detalles internos."
+          description="Ejercicios minimos, rutinas lineales y muscles enlazados sin ruido innecesario."
         />
 
         <ToolbarActions>
           <SegmentedControl
+            className="trainingPlugin__modeTabs"
             ariaLabel="Modo de entrenamientos"
             options={[
               { value: "exercises", label: "Ejercicios" },
@@ -1088,15 +1510,14 @@ function TrainingView() {
         <SplitLayout className="trainingPlugin__content" variant="sidebar-detail">
           <SplitSidebar className="trainingPlugin__sidebar">
             <SectionPanel className="trainingPlugin__sidebarPanel">
-              <label className="trainingPlugin__searchField">
-                <span>Buscar</span>
+              <Field label="Buscar" wide>
                 <input
                   type="search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder={mode === "exercises" ? "Buscar ejercicios" : "Buscar rutinas"}
                 />
-              </label>
+              </Field>
 
               {mode === "exercises" ? (
                 <div className="trainingPlugin__list">
@@ -1119,7 +1540,7 @@ function TrainingView() {
                     >
                       <span className="trainingPlugin__listCardTitle">{exercise.title}</span>
                       <span className="trainingPlugin__listCardSummary">
-                        {exercise.searchSummary || exercise.summary || "Sin unidad definida"}
+                        {exercise.searchSummary || "Sin unidad definida"}
                       </span>
                     </button>
                   ))}
@@ -1130,7 +1551,7 @@ function TrainingView() {
                       centered
                       eyebrow="Sin ejercicios"
                       title="Todavia no hay ejercicios"
-                      description="Crea el primero desde el boton superior."
+                      description="Crea el primero desde la barra superior."
                     />
                   ) : null}
                 </div>
@@ -1166,7 +1587,7 @@ function TrainingView() {
                       centered
                       eyebrow="Sin rutinas"
                       title="Todavia no hay rutinas"
-                      description="Crea la primera desde el boton superior."
+                      description="Crea la primera desde la barra superior."
                     />
                   ) : null}
                 </div>
@@ -1175,423 +1596,52 @@ function TrainingView() {
           </SplitSidebar>
 
           <SplitDetail className="trainingPlugin__detail">
-            {error ? <Notice tone="danger">{error}</Notice> : null}
-            {loading ? (
-              <StateBlock
-                eyebrow="Cargando"
-                title="Estamos leyendo la biblioteca de entrenamientos"
-                description="Enseguida veras ejercicios, rutinas y relaciones disponibles."
-              />
-            ) : null}
+            <ScrollRegion className="trainingPlugin__detailScroll">
+              {error ? <Notice tone="danger">{error}</Notice> : null}
 
-            {!loading && mode === "exercises" ? (
-              <div className="trainingPlugin__detailStack">
-                <SectionPanel className="trainingPlugin__panel trainingPlugin__panel--hero" tone="highlight">
-                  <PanelHeader>
-                    <PanelTitle
-                      eyebrow="Ejercicio"
-                      title={selectedExercise?.title || "Nuevo ejercicio"}
-                      description={selectedExercise?.searchSummary || selectedExercise?.summary || "Define el movimiento, la unidad y los musculos asociados."}
-                    />
-                  </PanelHeader>
-                </SectionPanel>
+              {loading ? (
+                <StateBlock
+                  eyebrow="Cargando"
+                  title="Estamos leyendo la biblioteca"
+                  description="Enseguida veras ejercicios, rutinas y relationships disponibles."
+                />
+              ) : null}
 
-                <SectionPanel className="trainingPlugin__panel">
-                  <PanelHeader>
-                    <PanelTitle title="Resumen del ejercicio" description="Empieza por nombre, descripcion y unidad principal." />
-                  </PanelHeader>
+              {!loading && mode === "exercises" ? (
+                <ExerciseEditor
+                  selectedExercise={selectedExercise}
+                  exerciseDraft={exerciseDraft}
+                  setExerciseDraft={setExerciseDraft}
+                  muscleInput={muscleInput}
+                  setMuscleInput={setMuscleInput}
+                  muscleSearch={muscleSearch}
+                  setMuscleSearch={setMuscleSearch}
+                  filteredMuscles={filteredMuscles}
+                  selectedExerciseMuscleIds={selectedExerciseMuscleIds}
+                  muscleConceptFolder={muscleConceptFolder}
+                  addMuscleFromSelector={addMuscleFromSelector}
+                  removeMuscleFromExercise={removeMuscleFromExercise}
+                  handleAddMuscle={handleAddMuscle}
+                  handleSaveExercise={handleSaveExercise}
+                  handleDeleteExercise={handleDeleteExercise}
+                />
+              ) : null}
 
-                  <div className="trainingPlugin__formGrid">
-                    <label className="trainingPlugin__field trainingPlugin__field--wide">
-                      <span>Titulo</span>
-                      <input
-                        type="text"
-                        value={exerciseDraft.title}
-                        onChange={(event) => setExerciseDraft((current) => ({ ...current, title: event.target.value }))}
-                        placeholder="Sentadilla"
-                      />
-                    </label>
-
-                    <label className="trainingPlugin__field trainingPlugin__field--wide">
-                      <span>Resumen</span>
-                      <textarea
-                        value={exerciseDraft.summary}
-                        onChange={(event) => setExerciseDraft((current) => ({ ...current, summary: event.target.value }))}
-                        placeholder="Describe el ejercicio en una linea."
-                      />
-                    </label>
-
-                    <label className="trainingPlugin__field trainingPlugin__field--wide">
-                      <span>Notas</span>
-                      <textarea
-                        value={exerciseDraft.notes}
-                        onChange={(event) => setExerciseDraft((current) => ({ ...current, notes: event.target.value }))}
-                        placeholder="Indicaciones, tecnica o contexto."
-                      />
-                    </label>
-
-                    <TrainingMeasurementUnitEditor
-                      label="Unidad"
-                      value={exerciseDraft.measurement}
-                      onChange={(nextMeasurement) =>
-                        setExerciseDraft((current) => ({
-                          ...current,
-                          measurement: createExerciseMeasurementDraft(nextMeasurement),
-                        }))
-                      }
-                    />
-                  </div>
-                </SectionPanel>
-
-                <SectionPanel className="trainingPlugin__panel">
-                  <PanelHeader>
-                    <PanelTitle title="Musculos vinculados" description="Relaciona el ejercicio con musculos existentes o crea nuevos si no estan disponibles." />
-                  </PanelHeader>
-
-                  <div className="trainingPlugin__field trainingPlugin__field--wide">
-                    <div className="trainingPlugin__buttonRow">
-                      <input
-                        type="text"
-                        value={muscleInput}
-                        onChange={(event) => setMuscleInput(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            void handleAddMuscle();
-                          }
-                        }}
-                        placeholder="Biceps braquial"
-                      />
-                      <Button type="button" onClick={() => void handleAddMuscle()}>
-                        Agregar
-                      </Button>
-                    </div>
-
-                    <div className="trainingPlugin__chipRow">
-                      {(exerciseDraft.muscles || []).map((muscle) => (
-                        <span key={String(muscle.conceptId || muscle.entityRefId)} className="trainingPlugin__chip">
-                          <span className="trainingPlugin__chipLabel">{muscle.title}</span>
-                          <button
-                            type="button"
-                            className="trainingPlugin__chipRemove"
-                            onClick={() => removeMuscleFromExercise(muscle.conceptId || muscle.entityRefId)}
-                            aria-label={`Quitar ${muscle.title}`}
-                          >
-                            x
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-
-                    <label className="trainingPlugin__searchField">
-                      <span>Conceptos sugeridos</span>
-                      <input
-                        type="search"
-                        value={muscleSearch}
-                        onChange={(event) => setMuscleSearch(event.target.value)}
-                        placeholder="Filtrar sugerencias"
-                      />
-                    </label>
-
-                    <div className="trainingPlugin__selectorList">
-                      {filteredMuscles.slice(0, 20).map((muscle) => {
-                        const muscleId = String(muscle.conceptId || muscle.entityRefId || muscle.id);
-
-                        return (
-                          <div key={muscleId} className="trainingPlugin__selectorItem">
-                            <div className="trainingPlugin__selectorItemMain">
-                              <strong>{muscle.title || createOptionLabel(muscle)}</strong>
-                              <span>{muscle.summary || muscle.slug || "Concepto relacionado con este ejercicio."}</span>
-                            </div>
-                            <Button
-                              type="button"
-                              className="trainingPlugin__secondaryButton"
-                              disabled={selectedExerciseMuscleIds.has(muscleId)}
-                              onClick={() => addMuscleFromSelector(muscle)}
-                            >
-                              {selectedExerciseMuscleIds.has(muscleId) ? "Agregado" : "Vincular"}
-                            </Button>
-                          </div>
-                        );
-                      })}
-                      {!filteredMuscles.length ? (
-                        <StateBlock
-                          className="trainingPlugin__state"
-                          title="No hay sugerencias para ese filtro"
-                          description="Prueba con otro nombre o crea un musculo nuevo."
-                        />
-                      ) : null}
-                    </div>
-
-                    <details className="trainingPlugin__advanced">
-                      <summary>Opciones avanzadas</summary>
-                      <div className="trainingPlugin__fieldRow">
-                        <label className="trainingPlugin__inlineField">
-                          <span>Carpeta para nuevos musculos</span>
-                          <input
-                            type="text"
-                            value={muscleConceptFolder}
-                            onChange={(event) => setMuscleConceptFolder(event.target.value)}
-                            placeholder="Concepts/Muscles"
-                          />
-                        </label>
-                      </div>
-                    </details>
-                  </div>
-                </SectionPanel>
-
-                <div className="trainingPlugin__buttonRow trainingPlugin__buttonRow--actions">
-                  <Button type="button" tone="primary" onClick={() => void handleSaveExercise()}>
-                    Guardar ejercicio
-                  </Button>
-                  <Button type="button" onClick={createExercise}>
-                    Nuevo
-                  </Button>
-                  <Button type="button" tone="danger" onClick={() => void handleDeleteExercise()} disabled={!exerciseDraft.id}>
-                    <DeleteIcon size={16} />
-                    <span>Eliminar</span>
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-
-            {!loading && mode === "routines" ? (
-              <div className="trainingPlugin__detailStack">
-                <SectionPanel className="trainingPlugin__panel trainingPlugin__panel--hero" tone="highlight">
-                  <PanelHeader>
-                    <PanelTitle
-                      eyebrow="Rutina"
-                      title={selectedRoutine?.title || "Nueva rutina"}
-                      description={selectedRoutine?.searchSummary || selectedRoutine?.summary || "Arma una secuencia lineal de ejercicios y descansos."}
-                    />
-                  </PanelHeader>
-                </SectionPanel>
-
-                <SectionPanel className="trainingPlugin__panel">
-                  <PanelHeader>
-                    <PanelTitle title="Resumen de la rutina" description="Define el nombre y el objetivo antes de bajar al detalle de pasos." />
-                  </PanelHeader>
-
-                  <div className="trainingPlugin__formGrid">
-                    <label className="trainingPlugin__field trainingPlugin__field--wide">
-                      <span>Titulo</span>
-                      <input
-                        type="text"
-                        value={routineDraft.title}
-                        onChange={(event) => setRoutineDraft((current) => ({ ...current, title: event.target.value }))}
-                        placeholder="Push day"
-                      />
-                    </label>
-
-                    <label className="trainingPlugin__field trainingPlugin__field--wide">
-                      <span>Resumen</span>
-                      <textarea
-                        value={routineDraft.summary}
-                        onChange={(event) => setRoutineDraft((current) => ({ ...current, summary: event.target.value }))}
-                        placeholder="Que persigue esta rutina."
-                      />
-                    </label>
-
-                    <label className="trainingPlugin__field trainingPlugin__field--wide">
-                      <span>Notas</span>
-                      <textarea
-                        value={routineDraft.notes}
-                        onChange={(event) => setRoutineDraft((current) => ({ ...current, notes: event.target.value }))}
-                        placeholder="Observaciones generales."
-                      />
-                    </label>
-                  </div>
-                </SectionPanel>
-
-                <SectionPanel className="trainingPlugin__panel">
-                  <PanelHeader>
-                    <PanelTitle title="Pasos" description="Alterna ejercicios y descansos en el orden real de la rutina." />
-                  </PanelHeader>
-
-                  <div className="trainingPlugin__field trainingPlugin__field--wide">
-                    <div className="trainingPlugin__buttonRow">
-                      <Button type="button" onClick={() => addRoutineStep("exercise")}>
-                        Agregar ejercicio
-                      </Button>
-                      <Button type="button" onClick={() => addRoutineStep("rest")}>
-                        Agregar descanso
-                      </Button>
-                    </div>
-
-                    <div className="trainingPlugin__steps">
-                      {routineDraft.steps.map((step, index) => {
-                        const selectedExerciseForStep = step.exerciseId
-                          ? findExerciseById(catalog.exercises, step.exerciseId)
-                          : null;
-
-                        return (
-                          <div key={step.id} className="trainingPlugin__step">
-                            <div className="trainingPlugin__stepHeader">
-                              <div className="trainingPlugin__stepTitle">
-                                <strong>Paso {index + 1}</strong>
-                                <span>
-                                  {buildTrainingMetricSummary(
-                                    draftMetricToPayload(step.metric, step.kind === "rest" ? "rest" : "exercise"),
-                                  ) || "Paso sin configurar"}
-                                </span>
-                              </div>
-
-                              <div className="trainingPlugin__stepActions">
-                                <Button
-                                  type="button"
-                                  className="trainingPlugin__iconButton"
-                                  onClick={() => moveRoutineStep(step.id, -1)}
-                                  disabled={index === 0}
-                                >
-                                  <ArrowUpIcon size={16} />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  className="trainingPlugin__iconButton"
-                                  onClick={() => moveRoutineStep(step.id, 1)}
-                                  disabled={index === routineDraft.steps.length - 1}
-                                >
-                                  <ArrowDownIcon size={16} />
-                                </Button>
-                                <Button type="button" tone="danger" className="trainingPlugin__iconButton" onClick={() => removeRoutineStep(step.id)}>
-                                  <DeleteIcon size={16} />
-                                </Button>
-                              </div>
-                            </div>
-
-                            <div className="trainingPlugin__formGrid">
-                              <label className="trainingPlugin__field">
-                                <span>Tipo</span>
-                                <select
-                                  value={step.kind}
-                                  onChange={(event) =>
-                                    updateRoutineStep(step.id, {
-                                      kind: event.target.value === "rest" ? "rest" : "exercise",
-                                      metric: event.target.value === "rest"
-                                        ? createRoutineMetricDraft(step.metric, "rest")
-                                        : normalizeMetricDraftForMode(step.metric, "exercise"),
-                                    })
-                                  }
-                                >
-                                  <option value="exercise">Ejercicio</option>
-                                  <option value="rest">Descanso</option>
-                                </select>
-                              </label>
-
-                              {step.kind === "exercise" ? (
-                                <>
-                                  <label className="trainingPlugin__field">
-                                    <span>Ejercicio</span>
-                                    <select
-                                      value={step.exerciseId}
-                                      onChange={(event) => {
-                                        const nextExerciseId = event.target.value;
-                                        const nextExercise = findExerciseById(catalog.exercises, nextExerciseId);
-
-                                        updateRoutineStep(step.id, {
-                                          exerciseId: nextExerciseId,
-                                          kind: "exercise",
-                                          metric: nextExercise
-                                            ? normalizeMetricDraftForMode(
-                                                createRoutineMetricDraft(nextExercise.measurement || {}, "exercise"),
-                                                "exercise",
-                                              )
-                                            : normalizeMetricDraftForMode(step.metric, "exercise"),
-                                        });
-                                      }}
-                                    >
-                                      <option value="">Selecciona un ejercicio</option>
-                                      {catalog.exercises.map((exercise) => (
-                                        <option key={exercise.id} value={exercise.id}>
-                                          {exercise.title}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </label>
-
-                                  <TrainingMetricEditor
-                                    label="Prescripción"
-                                    context="exercise"
-                                    value={step.metric}
-                                    onChange={(nextMetric) =>
-                                      updateRoutineStep(step.id, {
-                                        metric: normalizeMetricDraftForMode(nextMetric, "exercise"),
-                                      })
-                                    }
-                                  />
-
-                                  {selectedExerciseForStep ? (
-                                    <StateBlock
-                                      className="trainingPlugin__state"
-                                      title={`Ejercicio: ${selectedExerciseForStep.title}`}
-                                      description={selectedExerciseForStep.searchSummary || "Ejercicio enlazado correctamente."}
-                                    />
-                                  ) : null}
-                                </>
-                              ) : (
-                                <TrainingMetricEditor
-                                  label="Descanso"
-                                  context="rest"
-                                  value={step.metric}
-                                  onChange={(nextMetric) =>
-                                    updateRoutineStep(step.id, {
-                                      metric: normalizeMetricDraftForMode(nextMetric, "rest"),
-                                    })
-                                  }
-                                />
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {!routineDraft.steps.length ? (
-                        <StateBlock
-                          className="trainingPlugin__empty"
-                          centered
-                          eyebrow="Sin pasos"
-                          title="La rutina todavia no tiene pasos"
-                          description="Agrega un ejercicio o un descanso para empezar."
-                        />
-                      ) : null}
-                    </div>
-                  </div>
-                </SectionPanel>
-
-                <div className="trainingPlugin__buttonRow trainingPlugin__buttonRow--actions">
-                  <Button type="button" tone="primary" onClick={() => void handleSaveRoutine()}>
-                    Guardar rutina
-                  </Button>
-                  <Button type="button" onClick={createRoutine}>
-                    Nueva
-                  </Button>
-                  <Button type="button" tone="danger" onClick={() => void handleDeleteRoutine()} disabled={!routineDraft.id}>
-                    <DeleteIcon size={16} />
-                    <span>Eliminar</span>
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-
-            {!loading && !catalog.exercises.length && mode === "exercises" ? (
-              <StateBlock
-                className="trainingPlugin__empty"
-                centered
-                eyebrow="Sin ejercicios"
-                title="Aun no hay ejercicios cargados"
-                description="Crea el primero y luego enlaza sus musculos."
-              />
-            ) : null}
-
-            {!loading && !catalog.routines.length && mode === "routines" ? (
-              <StateBlock
-                className="trainingPlugin__empty"
-                centered
-                eyebrow="Sin rutinas"
-                title="Aun no hay rutinas cargadas"
-                description="Crea la primera y arma sus pasos lineales."
-              />
-            ) : null}
+              {!loading && mode === "routines" ? (
+                <RoutineEditor
+                  selectedRoutine={selectedRoutine}
+                  routineDraft={routineDraft}
+                  setRoutineDraft={setRoutineDraft}
+                  catalog={catalog}
+                  addRoutineStep={addRoutineStep}
+                  updateRoutineStep={updateRoutineStep}
+                  moveRoutineStep={moveRoutineStep}
+                  removeRoutineStep={removeRoutineStep}
+                  handleSaveRoutine={handleSaveRoutine}
+                  handleDeleteRoutine={handleDeleteRoutine}
+                />
+              ) : null}
+            </ScrollRegion>
           </SplitDetail>
         </SplitLayout>
       </WorkspaceBody>

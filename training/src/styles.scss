@@ -1,63 +1,48 @@
 @use "../../../nexus-frontend/src/scss/tools" as *;
 
 .trainingPlugin {
-  background: var(--workspace-main-bg);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--workspace-main-bg) 86%, var(--shell-bg-strong)),
+      var(--workspace-main-bg)
+    );
 }
 
-.trainingPlugin__body {
+.trainingPlugin__body,
+.trainingPlugin__content,
+.trainingPlugin__detailScroll,
+.trainingPlugin__editor,
+.trainingPlugin__steps {
   gap: var(--space-4);
 }
 
-.trainingPlugin__content {
-  gap: var(--space-4);
-}
-
-.trainingPlugin__sidebar {
+.trainingPlugin__sidebar,
+.trainingPlugin__detail,
+.trainingPlugin__sidebarPanel,
+.trainingPlugin__detailScroll {
   min-height: 0;
 }
 
 .trainingPlugin__sidebarPanel {
   height: 100%;
-  background: var(--workspace-rail-bg);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--workspace-rail-bg) 92%, transparent),
+      color-mix(in srgb, var(--workspace-rail-bg) 76%, var(--shell-panel-soft))
+    );
 }
 
-.trainingPlugin__searchField,
-.trainingPlugin__field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-
-  span {
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-  }
-}
-
-.trainingPlugin__searchField input,
-.trainingPlugin__field input,
-.trainingPlugin__field textarea,
-.trainingPlugin__field select,
-.trainingPlugin__inlineField input,
-.trainingPlugin__inlineField select {
-  min-width: 0;
-  min-height: 34px;
-  border: 1px solid var(--field-border);
+.trainingPlugin__modeTabs {
   border-radius: var(--radius-m);
-  background: var(--field-bg);
-  color: var(--field-text);
-  padding: 0 12px;
-}
+  padding: 3px;
 
-.trainingPlugin__field textarea {
-  min-height: 84px;
-  padding: 10px 12px;
-  resize: vertical;
-}
-
-.trainingPlugin__searchField input {
-  width: 100%;
+  .nexus-ui-segmented__button {
+    min-height: 32px;
+    border-radius: calc(var(--radius-m) - 2px);
+    padding: 0 13px;
+  }
 }
 
 .trainingPlugin__list {
@@ -78,8 +63,7 @@
 }
 
 .trainingPlugin__listHeaderCopy {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 3px;
 
   strong {
@@ -95,13 +79,12 @@
 
 .trainingPlugin__listCard {
   padding: 11px 12px;
-  border: 1px solid var(--color-line);
-  background: var(--shell-panel-soft);
+  border: 1px solid color-mix(in srgb, var(--color-line) 90%, transparent);
+  background: color-mix(in srgb, var(--shell-panel-soft) 84%, transparent);
   border-radius: var(--radius-m);
   text-align: left;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 5px;
   transition:
     border-color 120ms ease,
@@ -111,13 +94,13 @@
   &:hover,
   &:focus-visible {
     border-color: var(--color-line-strong);
-    background: var(--shell-panel-highlight);
+    background: color-mix(in srgb, var(--shell-panel-highlight) 82%, transparent);
     transform: translateY(-1px);
   }
 }
 
 .trainingPlugin__listCard.is-active {
-  @include interactive-active($shadow: 0 10px 18px rgba(0, 0, 0, 0.14));
+  @include interactive-active();
 }
 
 .trainingPlugin__listCardTitle {
@@ -125,78 +108,137 @@
   font-weight: 700;
 }
 
-.trainingPlugin__listCardMeta,
 .trainingPlugin__listCardSummary {
   color: var(--color-text-muted);
   font-size: 0.8rem;
   line-height: 1.35;
 }
 
-.trainingPlugin__detail {
-  min-height: 0;
-}
-
-.trainingPlugin__detailStack {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.trainingPlugin__panel {
-  gap: var(--space-4);
-}
-
-.trainingPlugin__panel--hero {
-  background: var(--shell-panel-highlight);
-}
-
-.trainingPlugin__formGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.trainingPlugin__field--wide,
-.trainingPlugin__field--full {
-  grid-column: 1 / -1;
-}
-
-.trainingPlugin__fieldRow {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.trainingPlugin__inlineField {
+.trainingPlugin__detailScroll {
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
 
-.trainingPlugin__inlineField label {
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+.trainingPlugin__detailHeader {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--shell-panel-highlight) 88%, transparent),
+      color-mix(in srgb, var(--shell-panel-soft) 92%, transparent)
+    );
 }
 
-.trainingPlugin__buttonRow,
-.trainingPlugin__chipRow,
-.trainingPlugin__stepHeader,
-.trainingPlugin__stepActions {
+.trainingPlugin__headerActions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
-.trainingPlugin__buttonRow--actions {
-  justify-content: flex-start;
+.trainingPlugin__exerciseLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 640px) minmax(280px, 380px);
+  gap: var(--space-4);
+  align-items: start;
 }
 
-.trainingPlugin__iconButton {
-  width: 32px;
-  min-width: 32px;
-  padding: 0;
+.trainingPlugin__card {
+  min-height: 0;
+}
+
+.trainingPlugin__card--summary,
+.trainingPlugin__card--steps {
+  max-width: 920px;
+}
+
+.trainingPlugin__singleColumnGrid {
+  max-width: 620px;
+}
+
+.trainingPlugin__sectionIntro {
+  display: grid;
+  gap: 4px;
+
+  strong {
+    color: var(--color-text);
+    font-size: 0.84rem;
+  }
+
+  span {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+
+  code {
+    font-size: 0.78rem;
+    color: var(--color-text-soft);
+  }
+}
+
+.trainingPlugin__sectionIntro--compact {
+  gap: 2px;
+}
+
+.trainingPlugin__measureCard,
+.trainingPlugin__metricEditor {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.trainingPlugin__measureRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: end;
+  max-width: 620px;
+}
+
+.trainingPlugin__measurePreview {
+  min-height: var(--control-height-m);
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--color-surface-1) 92%, transparent);
+
+  span {
+    color: var(--color-text-subtle);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  strong {
+    color: var(--color-text);
+    font-size: 0.88rem;
+  }
+}
+
+.trainingPlugin__inputActionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+
+  input {
+    width: 100%;
+    min-width: 0;
+    min-height: var(--control-height-m);
+    border-radius: var(--radius-m);
+    border: 1px solid var(--field-border);
+    background: var(--field-bg);
+    color: var(--field-text);
+    padding: 0 12px;
+  }
+}
+
+.trainingPlugin__chipRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .trainingPlugin__chip {
@@ -205,9 +247,9 @@
   gap: 6px;
   min-height: 28px;
   padding: 0 10px;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-pill);
-  background: var(--surface-pill);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-line));
+  border-radius: calc(var(--radius-m) + 2px);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--surface-pill));
   color: var(--color-text-soft);
 }
 
@@ -229,7 +271,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 200px;
+  max-height: 340px;
   overflow: auto;
   padding-right: 2px;
 }
@@ -239,15 +281,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--color-line);
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
   border-radius: var(--radius-m);
-  background: var(--shell-panel-soft);
+  background: color-mix(in srgb, var(--shell-panel-soft) 78%, transparent);
 }
 
 .trainingPlugin__selectorItemMain {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 3px;
   min-width: 0;
 
@@ -259,68 +300,39 @@
   span {
     color: var(--color-text-muted);
     font-size: 0.76rem;
+    line-height: 1.35;
   }
 }
 
-.trainingPlugin__steps {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.trainingPlugin__step {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--color-line);
+.trainingPlugin__mutedBlock,
+.trainingPlugin__linkedHint {
+  border: 1px dashed color-mix(in srgb, var(--color-line) 90%, transparent);
   border-radius: var(--radius-m);
-  background: var(--shell-panel-soft);
+  background: color-mix(in srgb, var(--shell-panel-soft) 64%, transparent);
+  color: var(--color-text-muted);
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
-.trainingPlugin__stepHeader {
-  justify-content: space-between;
-}
-
-.trainingPlugin__stepTitle {
-  display: flex;
-  flex-direction: column;
+.trainingPlugin__linkedHint {
+  display: grid;
   gap: 3px;
 
   strong {
     color: var(--color-text);
-  }
-
-  span {
-    color: var(--color-text-muted);
-    font-size: 0.78rem;
+    font-size: 0.84rem;
   }
 }
 
-.trainingPlugin__state {
-  @include state-block();
-  color: var(--color-text-muted);
-}
-
-.trainingPlugin__state--error {
-  border-color: var(--color-border-danger, var(--color-line-strong));
-  color: var(--color-danger, var(--color-text));
-  background: var(--surface-danger-soft);
-}
-
-.trainingPlugin__empty {
-  min-height: 160px;
-}
-
-.trainingPlugin__advanced {
-  margin-top: 10px;
-  border-top: 1px solid color-mix(in srgb, var(--color-line) 78%, transparent);
-  padding-top: 10px;
+.trainingPlugin__detailsToggle {
+  border-top: 1px solid color-mix(in srgb, var(--color-line) 82%, transparent);
+  padding-top: var(--space-3);
 
   summary {
     cursor: pointer;
     color: var(--color-text-soft);
-    font-size: 0.84rem;
+    font-size: 0.82rem;
     font-weight: 700;
     list-style: none;
   }
@@ -330,22 +342,77 @@
   }
 }
 
-@media (max-width: 1060px) {
-  .trainingPlugin__sidebarPanel {
-    min-height: 280px;
+.trainingPlugin__stepCard {
+  display: grid;
+  gap: var(--space-3);
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: calc(var(--radius-m) + 2px);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--shell-panel-soft) 90%, transparent),
+      color-mix(in srgb, var(--shell-panel-soft) 72%, transparent)
+    );
+}
+
+.trainingPlugin__stepHeader,
+.trainingPlugin__stepActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trainingPlugin__stepHeader {
+  justify-content: space-between;
+}
+
+.trainingPlugin__stepTitle {
+  display: grid;
+  gap: 3px;
+
+  strong {
+    color: var(--color-text);
+  }
+
+  span {
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+}
+
+.trainingPlugin__empty {
+  min-height: 160px;
+}
+
+@media (max-width: 1180px) {
+  .trainingPlugin__exerciseLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .trainingPlugin__card--aside {
+    max-width: 640px;
+  }
+}
+
+@media (max-width: 860px) {
+  .trainingPlugin__measureRow,
+  .trainingPlugin__inputActionRow {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 760px) {
-  .trainingPlugin__buttonRow,
-  .trainingPlugin__chipRow,
+  .trainingPlugin__headerActions,
   .trainingPlugin__stepHeader,
   .trainingPlugin__stepActions {
     width: 100%;
   }
 
-  .trainingPlugin__formGrid,
-  .trainingPlugin__fieldRow {
-    grid-template-columns: 1fr;
+  .trainingPlugin__selectorItem {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

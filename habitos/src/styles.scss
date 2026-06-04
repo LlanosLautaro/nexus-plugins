@@ -1,0 +1,342 @@
+.habitosView {
+  --habitos-border: color-mix(in srgb, var(--color-border-default, rgba(255, 255, 255, 0.12)) 100%, transparent);
+  --habitos-soft: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 84%, transparent);
+  --habitos-accent: var(--color-accent-strong, #6f8cff);
+}
+
+.habitosView__panelActions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.habitosView__modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--gradient-backdrop);
+  backdrop-filter: blur(14px);
+}
+
+.habitosView__modalShell {
+  width: min(760px, 100%);
+  height: min(640px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+}
+
+.habitosView__modalPanel {
+  width: 100%;
+  min-height: 100%;
+  overflow: auto;
+}
+
+.habitosView__modalStep {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.86rem;
+  user-select: none;
+}
+
+.habitosView__modalStep strong {
+  color: var(--color-text);
+  font-size: 0.92rem;
+}
+
+.habitosView__queueList,
+.habitosView__secondaryList,
+.habitosView__editorForm,
+.habitosView__subitemsDraft,
+.habitosView__wizardStep {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.habitosView__queueList {
+  gap: 0.55rem;
+}
+
+.habitosView__queueItem {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid var(--habitos-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 92%, transparent);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+  user-select: none;
+}
+
+.habitosView__queueItem.is-overdue {
+  border-color: color-mix(in srgb, var(--habitos-accent) 32%, var(--habitos-border));
+}
+
+.habitosView__queueItem.is-selected {
+  border-color: color-mix(in srgb, var(--habitos-accent) 26%, var(--habitos-border));
+  background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.05)) 90%, transparent);
+}
+
+.habitosView__queueBadge {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--habitos-item-accent) 32%, var(--habitos-border));
+  background: color-mix(in srgb, var(--habitos-item-accent) 16%, transparent);
+  color: var(--habitos-item-accent);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.habitosView__queueCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.habitosView__queueCopy strong {
+  color: var(--color-text);
+  line-height: 1.25;
+}
+
+.habitosView__queueCopy span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.habitosView__queueCheck {
+  width: 1.35rem;
+  height: 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--color-text-muted, rgba(255, 255, 255, 0.72)) 52%, var(--habitos-border));
+  border-radius: 0.42rem;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.habitosView__queueCheck:hover {
+  border-color: color-mix(in srgb, var(--habitos-accent) 30%, var(--habitos-border));
+  background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 88%, transparent);
+}
+
+.habitosView__queueCheck[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--habitos-accent) 34%, var(--habitos-border));
+  background: color-mix(in srgb, var(--habitos-accent) 18%, transparent);
+  color: var(--habitos-accent);
+}
+
+.habitosView__queueCheck svg {
+  width: 0.82rem;
+  height: 0.82rem;
+}
+
+.habitosView__editorActions,
+.habitosView__editorNav,
+.habitosView__sectionIntro,
+.habitosView__subitemDraftRow,
+.habitosView__secondaryCard,
+.habitosView__booleanGrid,
+.habitosView__booleanField {
+  display: flex;
+}
+
+.habitosView__sectionIntro,
+.habitosView__secondaryCard,
+.habitosView__booleanGrid,
+.habitosView__booleanField {
+  flex-direction: column;
+}
+
+.habitosView__editorActions,
+.habitosView__editorNav,
+.habitosView__subitemDraftRow {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.habitosView__sectionIntro span,
+.habitosView__secondaryCard span {
+  margin-top: 0.2rem;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+}
+
+.habitosView__subitemsDraft {
+  padding-top: 0.25rem;
+}
+
+.habitosView__subitemDraftRow {
+  gap: 0.75rem;
+}
+
+.habitosView__subitemToggle span {
+  flex: 1;
+}
+
+.habitosView__subitemDraftRow input[type="text"],
+.habitosView__subitemDraftRow input:not([type]) {
+  flex: 1;
+}
+
+.habitosView__booleanGrid {
+  gap: 0.75rem;
+}
+
+.habitosView__booleanField {
+  gap: 0.45rem;
+  padding: 0.8rem;
+  border: 1px solid var(--habitos-border);
+  border-radius: 14px;
+  background: var(--habitos-soft);
+}
+
+.habitosView__booleanField input {
+  margin: 0;
+}
+
+.habitosView__editorActions {
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.habitosView__secondaryCard {
+  width: 100%;
+  text-align: left;
+  gap: 0.2rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--habitos-border);
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 88%, transparent);
+  cursor: pointer;
+  user-select: none;
+}
+
+.habitosView__createChoiceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.habitosView__createChoice {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.05rem;
+  text-align: left;
+  border-radius: 16px;
+  border: 1px solid var(--habitos-border);
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 88%, transparent);
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+}
+
+.habitosView__createChoice span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  line-height: 1.45;
+}
+
+.habitosView__weekdayGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.habitosView__weekdayButton {
+  border: 1px solid var(--habitos-border);
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+}
+
+.habitosView__weekdayButton.is-active {
+  border-color: color-mix(in srgb, var(--habitos-accent) 40%, var(--habitos-border));
+  background: color-mix(in srgb, var(--habitos-accent) 14%, transparent);
+}
+
+.habitosView__contextMenu {
+  position: relative;
+  min-width: 188px;
+  padding: 6px;
+  overflow: hidden;
+  user-select: none;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  background:
+    radial-gradient(circle at top right, var(--fx-accent-glow-soft), transparent 42%),
+    color-mix(in srgb, var(--color-surface-1) 96%, var(--color-canvas));
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-s);
+}
+
+.habitosView__contextMenu .context-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.habitosView__contextMenu .context-menu-item + .context-menu-item {
+  margin-top: 2px;
+}
+
+.habitosView__contextMenu .context-menu-item:hover {
+  background: color-mix(in srgb, var(--color-surface-2) 88%, var(--color-accent) 12%);
+}
+
+.habitosView input,
+.habitosView select,
+.habitosView textarea {
+  width: 100%;
+}
+
+@media (max-width: 980px) {
+  .habitosView__createChoiceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .habitosView__weekdayGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

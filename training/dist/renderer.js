@@ -164,6 +164,31 @@ function isComparableTextMatch(value, query) {
   return normalizedValue.includes(normalizedQuery);
 }
 
+// ../nexus-plugins/training/src/plugin-settings.js
+var TRAINING_SETTINGS_DEFAULTS = Object.freeze({
+  muscleConceptsDirectory: "Concepts/Muscles"
+});
+function normalizeTrainingSettings(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      ...TRAINING_SETTINGS_DEFAULTS
+    };
+  }
+  const nextSettings = {
+    ...TRAINING_SETTINGS_DEFAULTS,
+    ...value
+  };
+  if (typeof nextSettings.muscleConceptsDirectory !== "string" || !nextSettings.muscleConceptsDirectory.trim()) {
+    nextSettings.muscleConceptsDirectory = TRAINING_SETTINGS_DEFAULTS.muscleConceptsDirectory;
+  } else {
+    nextSettings.muscleConceptsDirectory = nextSettings.muscleConceptsDirectory.replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+/g, "/").replace(/\/$/, "").trim();
+  }
+  return nextSettings;
+}
+function readTrainingMuscleConceptsDirectory(settingsValue) {
+  return normalizeTrainingSettings(settingsValue).muscleConceptsDirectory;
+}
+
 // ../nexus-plugins/training/src/icons.jsx
 var React2 = window.React;
 function BaseIcon({ children, size = 18, strokeWidth = 1.8 }) {
@@ -248,6 +273,9 @@ function SplitSidebar({ className = "", children }) {
 function SplitDetail({ className = "", children }) {
   return /* @__PURE__ */ React.createElement("main", { className: cx("nexus-ui-split__detail", className) }, children);
 }
+function ScrollRegion({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-scroll-region", className) }, children);
+}
 
 // ../nexus-frontend/src/ui/SectionPanel.jsx
 function SectionPanel({
@@ -298,6 +326,20 @@ function Button({
     children
   );
 }
+function IconButton({ className = "", tone = "secondary", title = "", children, ...props }) {
+  return /* @__PURE__ */ React.createElement(
+    Button,
+    {
+      ...props,
+      className,
+      tone,
+      iconOnly: true,
+      title,
+      "aria-label": props["aria-label"] || title || void 0
+    },
+    children
+  );
+}
 function SegmentedControl({
   className = "",
   options = [],
@@ -322,6 +364,28 @@ function SegmentedControl({
       /* @__PURE__ */ React.createElement("span", null, option.label)
     );
   }));
+}
+
+// ../nexus-frontend/src/ui/Fields.jsx
+function Field({
+  className = "",
+  label = "",
+  description = "",
+  wide = false,
+  children
+}) {
+  return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-field", wide && "nexus-ui-field--wide", className) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-field__label" }, label), description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-field__description" }, description) : null, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-field__control" }, children));
+}
+function InlineField({
+  className = "",
+  label = "",
+  children,
+  grow = false
+}) {
+  return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-inline-field", grow && "nexus-ui-inline-field--grow", className) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-inline-field__label" }, label), /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-inline-field__control" }, children));
+}
+function FieldGrid({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-field-grid", className) }, children);
 }
 
 // ../nexus-frontend/src/ui/States.jsx
@@ -371,7 +435,7 @@ function createExerciseMeasurementDraft(measurement = {}) {
   };
 }
 function createRoutineMetricDraft(metric = {}, context = "exercise") {
-  const normalized = context === "rest" ? normalizeTrainingPrescription(metric) : normalizeTrainingPrescription(metric);
+  const normalized = normalizeTrainingPrescription(metric);
   return {
     mode: normalized.mode || "reps",
     reps: normalized.reps == null ? "" : String(normalized.reps),
@@ -433,17 +497,18 @@ function normalizeMetricDraftForMode(metricDraft, context = "exercise") {
   return nextDraft;
 }
 function updateMetricDraftMode(metricDraft, nextMode, context = "exercise") {
-  return normalizeMetricDraftForMode({
-    ...metricDraft,
-    mode: nextMode
-  }, context);
+  return normalizeMetricDraftForMode(
+    {
+      ...metricDraft,
+      mode: nextMode
+    },
+    context
+  );
 }
 function createExerciseDraft() {
   return {
     id: null,
     title: "",
-    summary: "",
-    notes: "",
     measurement: createExerciseMeasurementDraft(),
     muscles: []
   };
@@ -461,7 +526,6 @@ function createRoutineDraft() {
     id: null,
     title: "",
     summary: "",
-    notes: "",
     steps: []
   };
 }
@@ -473,8 +537,6 @@ function exerciseRecordToDraft(exercise) {
   return {
     id: exercise.id,
     title: exercise.title || "",
-    summary: exercise.summary || "",
-    notes: exercise.notes || "",
     measurement: createExerciseMeasurementDraft(measurement),
     muscles: Array.isArray(exercise.muscles) ? exercise.muscles.map((muscle) => ({
       conceptId: muscle.conceptId || muscle.concept_id || muscle.entityRefId || muscle.entity_ref_id || muscle.id,
@@ -493,13 +555,15 @@ function routineRecordToDraft(routine) {
     id: routine.id,
     title: routine.title || "",
     summary: routine.summary || "",
-    notes: routine.notes || "",
     steps: Array.isArray(routine.steps) ? routine.steps.map((step) => ({
       id: step.id || window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       kind: step.kind || "exercise",
       exerciseId: step.exerciseId || step.exercise_id || "",
       metric: normalizeMetricDraftForMode(
-        createRoutineMetricDraft(normalizeTrainingPrescription(step.prescription), step.kind === "rest" ? "rest" : "exercise"),
+        createRoutineMetricDraft(
+          normalizeTrainingPrescription(step.prescription),
+          step.kind === "rest" ? "rest" : "exercise"
+        ),
         step.kind === "rest" ? "rest" : "exercise"
       )
     })) : []
@@ -532,11 +596,6 @@ function draftMetricToPayload(metricDraft, context = "exercise") {
 function normalizeSearchValue(value) {
   return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
-function createOptionLabel(option) {
-  const title = normalizeOptionalText(option?.title || option?.name || "");
-  const summary = normalizeOptionalText(option?.summary || "");
-  return summary ? `${title} - ${summary}` : title;
-}
 function normalizePathSearchValue(value) {
   return String(value ?? "").replace(/\\/g, "/").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
@@ -562,14 +621,19 @@ async function invoke(channel, payload) {
 function findExerciseById(exercises, exerciseId) {
   return exercises.find((exercise) => exercise.id === exerciseId) || null;
 }
+function buildExerciseEditorDescription(exercise) {
+  return exercise?.searchSummary || "Define el nombre corto, la unidad base y los musculos relacionados.";
+}
+function buildRoutineEditorDescription(routine) {
+  return routine?.searchSummary || routine?.summary || "Arma una secuencia lineal con ejercicios y descansos.";
+}
 function TrainingMeasurementUnitEditor({
-  label,
   value,
   onChange,
   disabled = false
 }) {
   const currentMode = value?.mode || "reps";
-  return /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, label), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__fieldRow" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Unidad de medida"), /* @__PURE__ */ React3.createElement(
+  return /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__measureCard" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__sectionIntro" }, /* @__PURE__ */ React3.createElement("strong", null, "Unidad base"), /* @__PURE__ */ React3.createElement("span", null, "El ejercicio solo define el tipo de medida. La cantidad concreta vive en la rutina.")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__measureRow" }, /* @__PURE__ */ React3.createElement(InlineField, { label: "Medida", grow: true }, /* @__PURE__ */ React3.createElement(
     "select",
     {
       value: currentMode,
@@ -577,7 +641,7 @@ function TrainingMeasurementUnitEditor({
       disabled
     },
     TRAINING_METRIC_MODE_OPTIONS.map((option) => /* @__PURE__ */ React3.createElement("option", { key: option.value, value: option.value }, option.label))
-  ))), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__state" }, "Unidad: ", buildTrainingMeasurementUnitSummary(value) || "sin definir"));
+  )), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__measurePreview" }, /* @__PURE__ */ React3.createElement("span", null, "Lectura"), /* @__PURE__ */ React3.createElement("strong", null, buildTrainingMeasurementUnitSummary(value) || "Sin definir"))));
 }
 function TrainingMetricEditor({
   label,
@@ -598,7 +662,7 @@ function TrainingMetricEditor({
   const updateMode = (event) => {
     onChange(updateMetricDraftMode(currentValue, event.target.value, context));
   };
-  return /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, label), isRest ? /* @__PURE__ */ React3.createElement(React3.Fragment, null, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__fieldRow" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Descanso"), /* @__PURE__ */ React3.createElement(
+  return /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__metricEditor" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__sectionIntro" }, /* @__PURE__ */ React3.createElement("strong", null, label), /* @__PURE__ */ React3.createElement("span", null, isRest ? "Tiempo de pausa y cualquier aclaracion opcional." : "Esta parte si guarda la cantidad concreta de trabajo.")), isRest ? /* @__PURE__ */ React3.createElement(React3.Fragment, null, /* @__PURE__ */ React3.createElement(FieldGrid, null, /* @__PURE__ */ React3.createElement(Field, { label: "Descanso" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "number",
@@ -608,15 +672,16 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "90"
     }
-  ))), /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Notas"), /* @__PURE__ */ React3.createElement(
+  ))), /* @__PURE__ */ React3.createElement("details", { className: "trainingPlugin__detailsToggle" }, /* @__PURE__ */ React3.createElement("summary", null, "Detalle opcional"), /* @__PURE__ */ React3.createElement(FieldGrid, null, /* @__PURE__ */ React3.createElement(Field, { label: "Notas", wide: true }, /* @__PURE__ */ React3.createElement(
     "textarea",
     {
       value: currentValue.notes,
       onChange: updateField("notes"),
       disabled,
-      placeholder: "Detalle del descanso."
+      placeholder: "Contexto breve del descanso.",
+      rows: 3
     }
-  ))) : /* @__PURE__ */ React3.createElement(React3.Fragment, null, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__fieldRow" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Modo"), /* @__PURE__ */ React3.createElement("select", { value: mode, onChange: updateMode, disabled }, TRAINING_METRIC_MODE_OPTIONS.map((option) => /* @__PURE__ */ React3.createElement("option", { key: option.value, value: option.value }, option.label)))), mode === "reps" ? /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Reps"), /* @__PURE__ */ React3.createElement(
+  ))))) : /* @__PURE__ */ React3.createElement(React3.Fragment, null, /* @__PURE__ */ React3.createElement(FieldGrid, null, /* @__PURE__ */ React3.createElement(Field, { label: "Modo" }, /* @__PURE__ */ React3.createElement("select", { value: mode, onChange: updateMode, disabled }, TRAINING_METRIC_MODE_OPTIONS.map((option) => /* @__PURE__ */ React3.createElement("option", { key: option.value, value: option.value }, option.label)))), mode === "reps" ? /* @__PURE__ */ React3.createElement(Field, { label: "Reps" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "number",
@@ -626,7 +691,7 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "8"
     }
-  )) : null, mode === "time" ? /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Segundos"), /* @__PURE__ */ React3.createElement(
+  )) : null, mode === "time" ? /* @__PURE__ */ React3.createElement(Field, { label: "Segundos" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "number",
@@ -636,7 +701,7 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "45"
     }
-  )) : null, mode === "distance" ? /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Distancia"), /* @__PURE__ */ React3.createElement(
+  )) : null, mode === "distance" ? /* @__PURE__ */ React3.createElement(Field, { label: "Distancia" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "number",
@@ -647,7 +712,7 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "1.5"
     }
-  )) : null, mode === "weight" ? /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Peso"), /* @__PURE__ */ React3.createElement(
+  )) : null, mode === "weight" ? /* @__PURE__ */ React3.createElement(Field, { label: "Peso" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "number",
@@ -658,7 +723,7 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "20"
     }
-  )) : null), mode === "distance" ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__fieldRow" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Unidad distancia"), /* @__PURE__ */ React3.createElement(
+  )) : null), mode === "distance" ? /* @__PURE__ */ React3.createElement(FieldGrid, null, /* @__PURE__ */ React3.createElement(Field, { label: "Unidad distancia" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "text",
@@ -667,7 +732,7 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "m"
     }
-  )), /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Tempo"), /* @__PURE__ */ React3.createElement(
+  )), /* @__PURE__ */ React3.createElement(Field, { label: "Tempo" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "text",
@@ -676,7 +741,7 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "3-1-1"
     }
-  ))) : null, mode === "weight" ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__fieldRow" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Unidad peso"), /* @__PURE__ */ React3.createElement(
+  ))) : null, mode === "weight" ? /* @__PURE__ */ React3.createElement(FieldGrid, null, /* @__PURE__ */ React3.createElement(Field, { label: "Unidad peso" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "text",
@@ -685,7 +750,7 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "kg"
     }
-  )), /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Tempo"), /* @__PURE__ */ React3.createElement(
+  )), /* @__PURE__ */ React3.createElement(Field, { label: "Tempo" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "text",
@@ -694,7 +759,7 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "3-1-1"
     }
-  ))) : null, mode === "reps" ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__fieldRow" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Peso"), /* @__PURE__ */ React3.createElement(
+  ))) : null, mode === "reps" ? /* @__PURE__ */ React3.createElement(FieldGrid, null, /* @__PURE__ */ React3.createElement(Field, { label: "Peso opcional" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "number",
@@ -705,7 +770,7 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "20"
     }
-  )), /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Unidad peso"), /* @__PURE__ */ React3.createElement(
+  )), /* @__PURE__ */ React3.createElement(Field, { label: "Unidad peso" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "text",
@@ -714,7 +779,7 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "kg"
     }
-  )), /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Tempo"), /* @__PURE__ */ React3.createElement(
+  )), /* @__PURE__ */ React3.createElement(Field, { label: "Tempo", wide: true }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "text",
@@ -723,7 +788,7 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "3-1-1"
     }
-  ))) : null, mode === "time" ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__fieldRow" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Tempo"), /* @__PURE__ */ React3.createElement(
+  ))) : null, mode === "time" ? /* @__PURE__ */ React3.createElement(FieldGrid, null, /* @__PURE__ */ React3.createElement(Field, { label: "Tempo" }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "text",
@@ -732,17 +797,299 @@ function TrainingMetricEditor({
       disabled,
       placeholder: "3-1-1"
     }
-  ))) : null, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Notas"), /* @__PURE__ */ React3.createElement(
+  ))) : null, /* @__PURE__ */ React3.createElement("details", { className: "trainingPlugin__detailsToggle" }, /* @__PURE__ */ React3.createElement("summary", null, "Detalle opcional"), /* @__PURE__ */ React3.createElement(FieldGrid, null, /* @__PURE__ */ React3.createElement(Field, { label: "Notas", wide: true }, /* @__PURE__ */ React3.createElement(
     "textarea",
     {
       value: currentValue.notes,
       onChange: updateField("notes"),
       disabled,
-      placeholder: "Detalle opcional."
+      placeholder: "Aclaracion breve si hace falta.",
+      rows: 3
     }
-  ))));
+  ))))));
 }
-function TrainingView() {
+function ExerciseEditor({
+  selectedExercise,
+  exerciseDraft,
+  setExerciseDraft,
+  muscleInput,
+  setMuscleInput,
+  muscleSearch,
+  setMuscleSearch,
+  filteredMuscles,
+  selectedExerciseMuscleIds,
+  muscleConceptFolder,
+  addMuscleFromSelector,
+  removeMuscleFromExercise,
+  handleAddMuscle,
+  handleSaveExercise,
+  handleDeleteExercise
+}) {
+  return /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__editor trainingPlugin__editor--exercise" }, /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__detailHeader", tone: "highlight", padding: "tight" }, /* @__PURE__ */ React3.createElement(
+    PanelHeader,
+    {
+      actions: /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__headerActions" }, /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "primary", onClick: () => void handleSaveExercise() }, "Guardar ejercicio"), /* @__PURE__ */ React3.createElement(
+        Button,
+        {
+          type: "button",
+          tone: "danger",
+          onClick: () => void handleDeleteExercise(),
+          disabled: !exerciseDraft.id
+        },
+        /* @__PURE__ */ React3.createElement(DeleteIcon, { size: 16 }),
+        /* @__PURE__ */ React3.createElement("span", null, "Eliminar")
+      ))
+    },
+    /* @__PURE__ */ React3.createElement(
+      PanelTitle,
+      {
+        eyebrow: "Ejercicio",
+        title: selectedExercise?.title || "Nuevo ejercicio",
+        description: buildExerciseEditorDescription(selectedExercise)
+      }
+    )
+  )), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__exerciseLayout" }, /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__card trainingPlugin__card--main" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(
+    PanelTitle,
+    {
+      title: "Base del ejercicio",
+      description: "Menos campos, mas claridad: nombre, unidad y listo."
+    }
+  )), /* @__PURE__ */ React3.createElement(FieldGrid, { className: "trainingPlugin__singleColumnGrid" }, /* @__PURE__ */ React3.createElement(Field, { label: "Titulo", wide: true }, /* @__PURE__ */ React3.createElement(
+    "input",
+    {
+      type: "text",
+      value: exerciseDraft.title,
+      onChange: (event) => setExerciseDraft((current) => ({ ...current, title: event.target.value })),
+      placeholder: "Nombre del ejercicio"
+    }
+  ))), /* @__PURE__ */ React3.createElement(
+    TrainingMeasurementUnitEditor,
+    {
+      value: exerciseDraft.measurement,
+      onChange: (nextMeasurement) => setExerciseDraft((current) => ({
+        ...current,
+        measurement: createExerciseMeasurementDraft(nextMeasurement)
+      }))
+    }
+  )), /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__card trainingPlugin__card--aside" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(
+    PanelTitle,
+    {
+      title: "Musculos relacionados",
+      description: "Vincula muscles existentes o crea uno nuevo sin salir del flujo."
+    }
+  )), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__sectionIntro trainingPlugin__sectionIntro--compact" }, /* @__PURE__ */ React3.createElement("strong", null, "Origen activo"), /* @__PURE__ */ React3.createElement("span", null, "Los nuevos muscles se crean en ", /* @__PURE__ */ React3.createElement("code", null, muscleConceptFolder), ".")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__inputActionRow" }, /* @__PURE__ */ React3.createElement(
+    "input",
+    {
+      type: "text",
+      value: muscleInput,
+      onChange: (event) => setMuscleInput(event.target.value),
+      onKeyDown: (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          void handleAddMuscle();
+        }
+      },
+      placeholder: "Escribe un musculo"
+    }
+  ), /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: () => void handleAddMuscle() }, "Agregar")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__chipRow" }, (exerciseDraft.muscles || []).length ? exerciseDraft.muscles.map((muscle) => /* @__PURE__ */ React3.createElement("span", { key: String(muscle.conceptId || muscle.entityRefId), className: "trainingPlugin__chip" }, /* @__PURE__ */ React3.createElement("span", { className: "trainingPlugin__chipLabel" }, muscle.title), /* @__PURE__ */ React3.createElement(
+    "button",
+    {
+      type: "button",
+      className: "trainingPlugin__chipRemove",
+      onClick: () => removeMuscleFromExercise(muscle.conceptId || muscle.entityRefId),
+      "aria-label": `Quitar ${muscle.title}`
+    },
+    "x"
+  ))) : /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__mutedBlock" }, "Sin muscles vinculados todavia.")), /* @__PURE__ */ React3.createElement(Field, { label: "Filtrar sugeridos", wide: true }, /* @__PURE__ */ React3.createElement(
+    "input",
+    {
+      type: "search",
+      value: muscleSearch,
+      onChange: (event) => setMuscleSearch(event.target.value),
+      placeholder: "Buscar por nombre"
+    }
+  )), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__selectorList" }, filteredMuscles.slice(0, 20).map((muscle) => {
+    const muscleId = String(muscle.conceptId || muscle.entityRefId || muscle.id);
+    return /* @__PURE__ */ React3.createElement("div", { key: muscleId, className: "trainingPlugin__selectorItem" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__selectorItemMain" }, /* @__PURE__ */ React3.createElement("strong", null, muscle.title), /* @__PURE__ */ React3.createElement("span", null, muscle.summary || muscle.slug || muscle.itemPath || "Concepto relacionado.")), /* @__PURE__ */ React3.createElement(
+      Button,
+      {
+        type: "button",
+        disabled: selectedExerciseMuscleIds.has(muscleId),
+        onClick: () => addMuscleFromSelector(muscle)
+      },
+      selectedExerciseMuscleIds.has(muscleId) ? "Agregado" : "Vincular"
+    ));
+  }), !filteredMuscles.length ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__mutedBlock" }, "No hay sugerencias para ese filtro.") : null))));
+}
+function RoutineEditor({
+  selectedRoutine,
+  routineDraft,
+  setRoutineDraft,
+  catalog,
+  addRoutineStep,
+  updateRoutineStep,
+  moveRoutineStep,
+  removeRoutineStep,
+  handleSaveRoutine,
+  handleDeleteRoutine
+}) {
+  return /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__editor trainingPlugin__editor--routine" }, /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__detailHeader", tone: "highlight", padding: "tight" }, /* @__PURE__ */ React3.createElement(
+    PanelHeader,
+    {
+      actions: /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__headerActions" }, /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "primary", onClick: () => void handleSaveRoutine() }, "Guardar rutina"), /* @__PURE__ */ React3.createElement(
+        Button,
+        {
+          type: "button",
+          tone: "danger",
+          onClick: () => void handleDeleteRoutine(),
+          disabled: !routineDraft.id
+        },
+        /* @__PURE__ */ React3.createElement(DeleteIcon, { size: 16 }),
+        /* @__PURE__ */ React3.createElement("span", null, "Eliminar")
+      ))
+    },
+    /* @__PURE__ */ React3.createElement(
+      PanelTitle,
+      {
+        eyebrow: "Rutina",
+        title: selectedRoutine?.title || "Nueva rutina",
+        description: buildRoutineEditorDescription(selectedRoutine)
+      }
+    )
+  )), /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__card trainingPlugin__card--summary" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(
+    PanelTitle,
+    {
+      title: "Identidad de la rutina",
+      description: "Titulo corto y un resumen minimo antes de bajar al detalle."
+    }
+  )), /* @__PURE__ */ React3.createElement(FieldGrid, { className: "trainingPlugin__singleColumnGrid" }, /* @__PURE__ */ React3.createElement(Field, { label: "Titulo", wide: true }, /* @__PURE__ */ React3.createElement(
+    "input",
+    {
+      type: "text",
+      value: routineDraft.title,
+      onChange: (event) => setRoutineDraft((current) => ({ ...current, title: event.target.value })),
+      placeholder: "Nombre de la rutina"
+    }
+  )), /* @__PURE__ */ React3.createElement(Field, { label: "Resumen", wide: true }, /* @__PURE__ */ React3.createElement(
+    "textarea",
+    {
+      value: routineDraft.summary,
+      onChange: (event) => setRoutineDraft((current) => ({ ...current, summary: event.target.value })),
+      placeholder: "Objetivo o enfoque general.",
+      rows: 3
+    }
+  )))), /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__card trainingPlugin__card--steps" }, /* @__PURE__ */ React3.createElement(
+    PanelHeader,
+    {
+      actions: /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__headerActions" }, /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "primary", onClick: () => addRoutineStep("exercise") }, "Agregar ejercicio"), /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: () => addRoutineStep("rest") }, "Agregar descanso"))
+    },
+    /* @__PURE__ */ React3.createElement(
+      PanelTitle,
+      {
+        title: "Pasos",
+        description: "Orden real del trabajo: ejercicio, pausa, ejercicio."
+      }
+    )
+  ), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__steps" }, routineDraft.steps.map((step, index) => {
+    const selectedExerciseForStep = step.exerciseId ? findExerciseById(catalog.exercises, step.exerciseId) : null;
+    const stepSummary = buildTrainingMetricSummary(
+      draftMetricToPayload(step.metric, step.kind === "rest" ? "rest" : "routine")
+    );
+    return /* @__PURE__ */ React3.createElement("div", { key: step.id, className: "trainingPlugin__stepCard" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__stepHeader" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__stepTitle" }, /* @__PURE__ */ React3.createElement("strong", null, "Paso ", index + 1), /* @__PURE__ */ React3.createElement("span", null, stepSummary || "Paso sin configurar")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__stepActions" }, /* @__PURE__ */ React3.createElement(
+      IconButton,
+      {
+        type: "button",
+        title: "Subir paso",
+        onClick: () => moveRoutineStep(step.id, -1),
+        disabled: index === 0
+      },
+      /* @__PURE__ */ React3.createElement(ArrowUpIcon, { size: 16 })
+    ), /* @__PURE__ */ React3.createElement(
+      IconButton,
+      {
+        type: "button",
+        title: "Bajar paso",
+        onClick: () => moveRoutineStep(step.id, 1),
+        disabled: index === routineDraft.steps.length - 1
+      },
+      /* @__PURE__ */ React3.createElement(ArrowDownIcon, { size: 16 })
+    ), /* @__PURE__ */ React3.createElement(
+      IconButton,
+      {
+        type: "button",
+        tone: "danger",
+        title: "Eliminar paso",
+        onClick: () => removeRoutineStep(step.id)
+      },
+      /* @__PURE__ */ React3.createElement(DeleteIcon, { size: 16 })
+    ))), /* @__PURE__ */ React3.createElement(FieldGrid, null, /* @__PURE__ */ React3.createElement(Field, { label: "Tipo" }, /* @__PURE__ */ React3.createElement(
+      "select",
+      {
+        value: step.kind,
+        onChange: (event) => updateRoutineStep(step.id, {
+          kind: event.target.value === "rest" ? "rest" : "exercise",
+          metric: event.target.value === "rest" ? createRoutineMetricDraft(step.metric, "rest") : normalizeMetricDraftForMode(step.metric, "exercise")
+        })
+      },
+      /* @__PURE__ */ React3.createElement("option", { value: "exercise" }, "Ejercicio"),
+      /* @__PURE__ */ React3.createElement("option", { value: "rest" }, "Descanso")
+    )), step.kind === "exercise" ? /* @__PURE__ */ React3.createElement(Field, { label: "Ejercicio" }, /* @__PURE__ */ React3.createElement(
+      "select",
+      {
+        value: step.exerciseId,
+        onChange: (event) => {
+          const nextExerciseId = event.target.value;
+          const nextExercise = findExerciseById(catalog.exercises, nextExerciseId);
+          updateRoutineStep(step.id, {
+            exerciseId: nextExerciseId,
+            kind: "exercise",
+            metric: nextExercise ? normalizeMetricDraftForMode(
+              createRoutineMetricDraft(nextExercise.measurement || {}, "exercise"),
+              "exercise"
+            ) : normalizeMetricDraftForMode(step.metric, "exercise")
+          });
+        }
+      },
+      /* @__PURE__ */ React3.createElement("option", { value: "" }, "Selecciona un ejercicio"),
+      catalog.exercises.map((exercise) => /* @__PURE__ */ React3.createElement("option", { key: exercise.id, value: exercise.id }, exercise.title))
+    )) : null), step.kind === "exercise" ? /* @__PURE__ */ React3.createElement(React3.Fragment, null, /* @__PURE__ */ React3.createElement(
+      TrainingMetricEditor,
+      {
+        label: "Prescripcion",
+        context: "exercise",
+        value: step.metric,
+        onChange: (nextMetric) => updateRoutineStep(step.id, {
+          metric: normalizeMetricDraftForMode(nextMetric, "exercise")
+        })
+      }
+    ), selectedExerciseForStep ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__linkedHint" }, /* @__PURE__ */ React3.createElement("strong", null, selectedExerciseForStep.title), /* @__PURE__ */ React3.createElement("span", null, selectedExerciseForStep.searchSummary || "Ejercicio vinculado.")) : null) : /* @__PURE__ */ React3.createElement(
+      TrainingMetricEditor,
+      {
+        label: "Descanso",
+        context: "rest",
+        value: step.metric,
+        onChange: (nextMetric) => updateRoutineStep(step.id, {
+          metric: normalizeMetricDraftForMode(nextMetric, "rest")
+        })
+      }
+    ));
+  }), !routineDraft.steps.length ? /* @__PURE__ */ React3.createElement(
+    StateBlock,
+    {
+      className: "trainingPlugin__empty",
+      centered: true,
+      eyebrow: "Sin pasos",
+      title: "La rutina todavia no tiene pasos",
+      description: "Empieza agregando un ejercicio o un descanso."
+    }
+  ) : null)));
+}
+function TrainingView({ ctx }) {
+  const trainingSettings = ctx.settings.useValue();
+  const muscleConceptFolder = useMemo(
+    () => readTrainingMuscleConceptsDirectory(trainingSettings),
+    [trainingSettings]
+  );
   const [mode, setMode] = useState("exercises");
   const [catalog, setCatalog] = useState({
     exercises: [],
@@ -753,7 +1100,6 @@ function TrainingView() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [muscleSearch, setMuscleSearch] = useState("");
-  const [muscleConceptFolder, setMuscleConceptFolder] = useState("Concepts/Muscles");
   const [exerciseDraft, setExerciseDraft] = useState(createExerciseDraft);
   const [routineDraft, setRoutineDraft] = useState(createRoutineDraft);
   const [selectedExerciseId, setSelectedExerciseId] = useState(null);
@@ -768,8 +1114,6 @@ function TrainingView() {
       const muscles = Array.isArray(exercise.muscles) ? exercise.muscles.map((muscle) => muscle.title).join(" ") : "";
       return [
         exercise.title,
-        exercise.summary,
-        exercise.notes,
         exercise.searchSummary,
         muscles
       ].some((value) => isComparableTextMatch(value, normalizedSearch));
@@ -784,7 +1128,6 @@ function TrainingView() {
       return [
         routine.title,
         routine.summary,
-        routine.notes,
         routine.searchSummary,
         Array.isArray(routine.steps) ? routine.steps.map((step) => step.searchSummary).join(" ") : ""
       ].some((value) => isComparableTextMatch(value, normalizedSearch));
@@ -808,7 +1151,7 @@ function TrainingView() {
         muscle.searchText
       ].some((value) => isComparableTextMatch(value, normalizedSearch));
     });
-  }, [catalog.muscles, muscleSearch, muscleConceptFolder]);
+  }, [catalog.muscles, muscleConceptFolder, muscleSearch]);
   const selectedExercise = useMemo(
     () => findExerciseById(catalog.exercises, selectedExerciseId),
     [catalog.exercises, selectedExerciseId]
@@ -858,7 +1201,7 @@ function TrainingView() {
     }
     const selected = catalog.exercises.find((exercise) => exercise.id === selectedExerciseId);
     setExerciseDraft(selected ? exerciseRecordToDraft(selected) : createExerciseDraft());
-  }, [mode, selectedExerciseId, catalog.exercises]);
+  }, [catalog.exercises, mode, selectedExerciseId]);
   useEffect(() => {
     if (mode !== "routines") {
       return;
@@ -873,7 +1216,7 @@ function TrainingView() {
     }
     const selected = catalog.routines.find((routine) => routine.id === selectedRoutineId);
     setRoutineDraft(selected ? routineRecordToDraft(selected) : createRoutineDraft());
-  }, [mode, selectedRoutineId, catalog.routines]);
+  }, [catalog.routines, mode, selectedRoutineId]);
   async function handleSaveExercise() {
     const title = normalizeOptionalText(exerciseDraft.title);
     if (!title) {
@@ -885,8 +1228,6 @@ function TrainingView() {
       const payload = {
         id: exerciseDraft.id,
         title,
-        summary: normalizeOptionalText(exerciseDraft.summary),
-        notes: normalizeOptionalText(exerciseDraft.notes),
         measurement: draftMetricToPayload(exerciseDraft.measurement, "exercise"),
         muscles: exerciseDraft.muscles.map((muscle) => ({
           conceptId: muscle.conceptId || muscle.entityRefId || null,
@@ -916,7 +1257,6 @@ function TrainingView() {
         id: routineDraft.id,
         title,
         summary: normalizeOptionalText(routineDraft.summary),
-        notes: normalizeOptionalText(routineDraft.notes),
         steps: routineDraft.steps.map((step) => {
           const exercise = step.exerciseId ? findExerciseById(catalog.exercises, step.exerciseId) : null;
           return {
@@ -999,7 +1339,9 @@ function TrainingView() {
         throw new Error("No se pudo resolver el musculo.");
       }
       setExerciseDraft((current) => {
-        const exists = current.muscles.some((muscle) => String(muscle.conceptId || muscle.entityRefId) === String(concept.id));
+        const exists = current.muscles.some(
+          (muscle) => String(muscle.conceptId || muscle.entityRefId) === String(concept.id)
+        );
         if (exists) {
           return current;
         }
@@ -1136,11 +1478,12 @@ function TrainingView() {
     {
       eyebrow: "Plugin training",
       title: "Entrenamientos",
-      description: "Ejercicios, rutinas y musculos enlazados con una UI mas humana y menos expuesta a detalles internos."
+      description: "Ejercicios minimos, rutinas lineales y muscles enlazados sin ruido innecesario."
     }
   ), /* @__PURE__ */ React3.createElement(ToolbarActions, null, /* @__PURE__ */ React3.createElement(
     SegmentedControl,
     {
+      className: "trainingPlugin__modeTabs",
       ariaLabel: "Modo de entrenamientos",
       options: [
         { value: "exercises", label: "Ejercicios" },
@@ -1158,7 +1501,7 @@ function TrainingView() {
     },
     /* @__PURE__ */ React3.createElement(PlusIcon, { size: 16 }),
     /* @__PURE__ */ React3.createElement("span", null, mode === "exercises" ? "Nuevo ejercicio" : "Nueva rutina")
-  ))), /* @__PURE__ */ React3.createElement(WorkspaceBody, { className: "trainingPlugin__body" }, /* @__PURE__ */ React3.createElement(SplitLayout, { className: "trainingPlugin__content", variant: "sidebar-detail" }, /* @__PURE__ */ React3.createElement(SplitSidebar, { className: "trainingPlugin__sidebar" }, /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__sidebarPanel" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__searchField" }, /* @__PURE__ */ React3.createElement("span", null, "Buscar"), /* @__PURE__ */ React3.createElement(
+  ))), /* @__PURE__ */ React3.createElement(WorkspaceBody, { className: "trainingPlugin__body" }, /* @__PURE__ */ React3.createElement(SplitLayout, { className: "trainingPlugin__content", variant: "sidebar-detail" }, /* @__PURE__ */ React3.createElement(SplitSidebar, { className: "trainingPlugin__sidebar" }, /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__sidebarPanel" }, /* @__PURE__ */ React3.createElement(Field, { label: "Buscar", wide: true }, /* @__PURE__ */ React3.createElement(
     "input",
     {
       type: "search",
@@ -1178,7 +1521,7 @@ function TrainingView() {
       }
     },
     /* @__PURE__ */ React3.createElement("span", { className: "trainingPlugin__listCardTitle" }, exercise.title),
-    /* @__PURE__ */ React3.createElement("span", { className: "trainingPlugin__listCardSummary" }, exercise.searchSummary || exercise.summary || "Sin unidad definida")
+    /* @__PURE__ */ React3.createElement("span", { className: "trainingPlugin__listCardSummary" }, exercise.searchSummary || "Sin unidad definida")
   )), !filteredExercises.length ? /* @__PURE__ */ React3.createElement(
     StateBlock,
     {
@@ -1186,7 +1529,7 @@ function TrainingView() {
       centered: true,
       eyebrow: "Sin ejercicios",
       title: "Todavia no hay ejercicios",
-      description: "Crea el primero desde el boton superior."
+      description: "Crea el primero desde la barra superior."
     }
   ) : null) : /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__list" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__listHeader" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__listHeaderCopy" }, /* @__PURE__ */ React3.createElement("strong", null, "Rutinas"), /* @__PURE__ */ React3.createElement("span", null, filteredRoutines.length, " registros"))), filteredRoutines.map((routine) => /* @__PURE__ */ React3.createElement(
     "button",
@@ -1208,249 +1551,49 @@ function TrainingView() {
       centered: true,
       eyebrow: "Sin rutinas",
       title: "Todavia no hay rutinas",
-      description: "Crea la primera desde el boton superior."
+      description: "Crea la primera desde la barra superior."
     }
-  ) : null))), /* @__PURE__ */ React3.createElement(SplitDetail, { className: "trainingPlugin__detail" }, error ? /* @__PURE__ */ React3.createElement(Notice, { tone: "danger" }, error) : null, loading ? /* @__PURE__ */ React3.createElement(
+  ) : null))), /* @__PURE__ */ React3.createElement(SplitDetail, { className: "trainingPlugin__detail" }, /* @__PURE__ */ React3.createElement(ScrollRegion, { className: "trainingPlugin__detailScroll" }, error ? /* @__PURE__ */ React3.createElement(Notice, { tone: "danger" }, error) : null, loading ? /* @__PURE__ */ React3.createElement(
     StateBlock,
     {
       eyebrow: "Cargando",
-      title: "Estamos leyendo la biblioteca de entrenamientos",
-      description: "Enseguida veras ejercicios, rutinas y relaciones disponibles."
+      title: "Estamos leyendo la biblioteca",
+      description: "Enseguida veras ejercicios, rutinas y relationships disponibles."
     }
-  ) : null, !loading && mode === "exercises" ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__detailStack" }, /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__panel trainingPlugin__panel--hero", tone: "highlight" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(
-    PanelTitle,
+  ) : null, !loading && mode === "exercises" ? /* @__PURE__ */ React3.createElement(
+    ExerciseEditor,
     {
-      eyebrow: "Ejercicio",
-      title: selectedExercise?.title || "Nuevo ejercicio",
-      description: selectedExercise?.searchSummary || selectedExercise?.summary || "Define el movimiento, la unidad y los musculos asociados."
+      selectedExercise,
+      exerciseDraft,
+      setExerciseDraft,
+      muscleInput,
+      setMuscleInput,
+      muscleSearch,
+      setMuscleSearch,
+      filteredMuscles,
+      selectedExerciseMuscleIds,
+      muscleConceptFolder,
+      addMuscleFromSelector,
+      removeMuscleFromExercise,
+      handleAddMuscle,
+      handleSaveExercise,
+      handleDeleteExercise
     }
-  ))), /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__panel" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(PanelTitle, { title: "Resumen del ejercicio", description: "Empieza por nombre, descripcion y unidad principal." })), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__formGrid" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Titulo"), /* @__PURE__ */ React3.createElement(
-    "input",
+  ) : null, !loading && mode === "routines" ? /* @__PURE__ */ React3.createElement(
+    RoutineEditor,
     {
-      type: "text",
-      value: exerciseDraft.title,
-      onChange: (event) => setExerciseDraft((current) => ({ ...current, title: event.target.value })),
-      placeholder: "Sentadilla"
+      selectedRoutine,
+      routineDraft,
+      setRoutineDraft,
+      catalog,
+      addRoutineStep,
+      updateRoutineStep,
+      moveRoutineStep,
+      removeRoutineStep,
+      handleSaveRoutine,
+      handleDeleteRoutine
     }
-  )), /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Resumen"), /* @__PURE__ */ React3.createElement(
-    "textarea",
-    {
-      value: exerciseDraft.summary,
-      onChange: (event) => setExerciseDraft((current) => ({ ...current, summary: event.target.value })),
-      placeholder: "Describe el ejercicio en una linea."
-    }
-  )), /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Notas"), /* @__PURE__ */ React3.createElement(
-    "textarea",
-    {
-      value: exerciseDraft.notes,
-      onChange: (event) => setExerciseDraft((current) => ({ ...current, notes: event.target.value })),
-      placeholder: "Indicaciones, tecnica o contexto."
-    }
-  )), /* @__PURE__ */ React3.createElement(
-    TrainingMeasurementUnitEditor,
-    {
-      label: "Unidad",
-      value: exerciseDraft.measurement,
-      onChange: (nextMeasurement) => setExerciseDraft((current) => ({
-        ...current,
-        measurement: createExerciseMeasurementDraft(nextMeasurement)
-      }))
-    }
-  ))), /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__panel" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(PanelTitle, { title: "Musculos vinculados", description: "Relaciona el ejercicio con musculos existentes o crea nuevos si no estan disponibles." })), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__buttonRow" }, /* @__PURE__ */ React3.createElement(
-    "input",
-    {
-      type: "text",
-      value: muscleInput,
-      onChange: (event) => setMuscleInput(event.target.value),
-      onKeyDown: (event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          void handleAddMuscle();
-        }
-      },
-      placeholder: "Biceps braquial"
-    }
-  ), /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: () => void handleAddMuscle() }, "Agregar")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__chipRow" }, (exerciseDraft.muscles || []).map((muscle) => /* @__PURE__ */ React3.createElement("span", { key: String(muscle.conceptId || muscle.entityRefId), className: "trainingPlugin__chip" }, /* @__PURE__ */ React3.createElement("span", { className: "trainingPlugin__chipLabel" }, muscle.title), /* @__PURE__ */ React3.createElement(
-    "button",
-    {
-      type: "button",
-      className: "trainingPlugin__chipRemove",
-      onClick: () => removeMuscleFromExercise(muscle.conceptId || muscle.entityRefId),
-      "aria-label": `Quitar ${muscle.title}`
-    },
-    "x"
-  )))), /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__searchField" }, /* @__PURE__ */ React3.createElement("span", null, "Conceptos sugeridos"), /* @__PURE__ */ React3.createElement(
-    "input",
-    {
-      type: "search",
-      value: muscleSearch,
-      onChange: (event) => setMuscleSearch(event.target.value),
-      placeholder: "Filtrar sugerencias"
-    }
-  )), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__selectorList" }, filteredMuscles.slice(0, 20).map((muscle) => {
-    const muscleId = String(muscle.conceptId || muscle.entityRefId || muscle.id);
-    return /* @__PURE__ */ React3.createElement("div", { key: muscleId, className: "trainingPlugin__selectorItem" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__selectorItemMain" }, /* @__PURE__ */ React3.createElement("strong", null, muscle.title || createOptionLabel(muscle)), /* @__PURE__ */ React3.createElement("span", null, muscle.summary || muscle.slug || "Concepto relacionado con este ejercicio.")), /* @__PURE__ */ React3.createElement(
-      Button,
-      {
-        type: "button",
-        className: "trainingPlugin__secondaryButton",
-        disabled: selectedExerciseMuscleIds.has(muscleId),
-        onClick: () => addMuscleFromSelector(muscle)
-      },
-      selectedExerciseMuscleIds.has(muscleId) ? "Agregado" : "Vincular"
-    ));
-  }), !filteredMuscles.length ? /* @__PURE__ */ React3.createElement(
-    StateBlock,
-    {
-      className: "trainingPlugin__state",
-      title: "No hay sugerencias para ese filtro",
-      description: "Prueba con otro nombre o crea un musculo nuevo."
-    }
-  ) : null), /* @__PURE__ */ React3.createElement("details", { className: "trainingPlugin__advanced" }, /* @__PURE__ */ React3.createElement("summary", null, "Opciones avanzadas"), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__fieldRow" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__inlineField" }, /* @__PURE__ */ React3.createElement("span", null, "Carpeta para nuevos musculos"), /* @__PURE__ */ React3.createElement(
-    "input",
-    {
-      type: "text",
-      value: muscleConceptFolder,
-      onChange: (event) => setMuscleConceptFolder(event.target.value),
-      placeholder: "Concepts/Muscles"
-    }
-  )))))), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__buttonRow trainingPlugin__buttonRow--actions" }, /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "primary", onClick: () => void handleSaveExercise() }, "Guardar ejercicio"), /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: createExercise }, "Nuevo"), /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "danger", onClick: () => void handleDeleteExercise(), disabled: !exerciseDraft.id }, /* @__PURE__ */ React3.createElement(DeleteIcon, { size: 16 }), /* @__PURE__ */ React3.createElement("span", null, "Eliminar")))) : null, !loading && mode === "routines" ? /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__detailStack" }, /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__panel trainingPlugin__panel--hero", tone: "highlight" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(
-    PanelTitle,
-    {
-      eyebrow: "Rutina",
-      title: selectedRoutine?.title || "Nueva rutina",
-      description: selectedRoutine?.searchSummary || selectedRoutine?.summary || "Arma una secuencia lineal de ejercicios y descansos."
-    }
-  ))), /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__panel" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(PanelTitle, { title: "Resumen de la rutina", description: "Define el nombre y el objetivo antes de bajar al detalle de pasos." })), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__formGrid" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Titulo"), /* @__PURE__ */ React3.createElement(
-    "input",
-    {
-      type: "text",
-      value: routineDraft.title,
-      onChange: (event) => setRoutineDraft((current) => ({ ...current, title: event.target.value })),
-      placeholder: "Push day"
-    }
-  )), /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Resumen"), /* @__PURE__ */ React3.createElement(
-    "textarea",
-    {
-      value: routineDraft.summary,
-      onChange: (event) => setRoutineDraft((current) => ({ ...current, summary: event.target.value })),
-      placeholder: "Que persigue esta rutina."
-    }
-  )), /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("span", null, "Notas"), /* @__PURE__ */ React3.createElement(
-    "textarea",
-    {
-      value: routineDraft.notes,
-      onChange: (event) => setRoutineDraft((current) => ({ ...current, notes: event.target.value })),
-      placeholder: "Observaciones generales."
-    }
-  )))), /* @__PURE__ */ React3.createElement(SectionPanel, { className: "trainingPlugin__panel" }, /* @__PURE__ */ React3.createElement(PanelHeader, null, /* @__PURE__ */ React3.createElement(PanelTitle, { title: "Pasos", description: "Alterna ejercicios y descansos en el orden real de la rutina." })), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__field trainingPlugin__field--wide" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__buttonRow" }, /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: () => addRoutineStep("exercise") }, "Agregar ejercicio"), /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: () => addRoutineStep("rest") }, "Agregar descanso")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__steps" }, routineDraft.steps.map((step, index) => {
-    const selectedExerciseForStep = step.exerciseId ? findExerciseById(catalog.exercises, step.exerciseId) : null;
-    return /* @__PURE__ */ React3.createElement("div", { key: step.id, className: "trainingPlugin__step" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__stepHeader" }, /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__stepTitle" }, /* @__PURE__ */ React3.createElement("strong", null, "Paso ", index + 1), /* @__PURE__ */ React3.createElement("span", null, buildTrainingMetricSummary(
-      draftMetricToPayload(step.metric, step.kind === "rest" ? "rest" : "exercise")
-    ) || "Paso sin configurar")), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__stepActions" }, /* @__PURE__ */ React3.createElement(
-      Button,
-      {
-        type: "button",
-        className: "trainingPlugin__iconButton",
-        onClick: () => moveRoutineStep(step.id, -1),
-        disabled: index === 0
-      },
-      /* @__PURE__ */ React3.createElement(ArrowUpIcon, { size: 16 })
-    ), /* @__PURE__ */ React3.createElement(
-      Button,
-      {
-        type: "button",
-        className: "trainingPlugin__iconButton",
-        onClick: () => moveRoutineStep(step.id, 1),
-        disabled: index === routineDraft.steps.length - 1
-      },
-      /* @__PURE__ */ React3.createElement(ArrowDownIcon, { size: 16 })
-    ), /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "danger", className: "trainingPlugin__iconButton", onClick: () => removeRoutineStep(step.id) }, /* @__PURE__ */ React3.createElement(DeleteIcon, { size: 16 })))), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__formGrid" }, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field" }, /* @__PURE__ */ React3.createElement("span", null, "Tipo"), /* @__PURE__ */ React3.createElement(
-      "select",
-      {
-        value: step.kind,
-        onChange: (event) => updateRoutineStep(step.id, {
-          kind: event.target.value === "rest" ? "rest" : "exercise",
-          metric: event.target.value === "rest" ? createRoutineMetricDraft(step.metric, "rest") : normalizeMetricDraftForMode(step.metric, "exercise")
-        })
-      },
-      /* @__PURE__ */ React3.createElement("option", { value: "exercise" }, "Ejercicio"),
-      /* @__PURE__ */ React3.createElement("option", { value: "rest" }, "Descanso")
-    )), step.kind === "exercise" ? /* @__PURE__ */ React3.createElement(React3.Fragment, null, /* @__PURE__ */ React3.createElement("label", { className: "trainingPlugin__field" }, /* @__PURE__ */ React3.createElement("span", null, "Ejercicio"), /* @__PURE__ */ React3.createElement(
-      "select",
-      {
-        value: step.exerciseId,
-        onChange: (event) => {
-          const nextExerciseId = event.target.value;
-          const nextExercise = findExerciseById(catalog.exercises, nextExerciseId);
-          updateRoutineStep(step.id, {
-            exerciseId: nextExerciseId,
-            kind: "exercise",
-            metric: nextExercise ? normalizeMetricDraftForMode(
-              createRoutineMetricDraft(nextExercise.measurement || {}, "exercise"),
-              "exercise"
-            ) : normalizeMetricDraftForMode(step.metric, "exercise")
-          });
-        }
-      },
-      /* @__PURE__ */ React3.createElement("option", { value: "" }, "Selecciona un ejercicio"),
-      catalog.exercises.map((exercise) => /* @__PURE__ */ React3.createElement("option", { key: exercise.id, value: exercise.id }, exercise.title))
-    )), /* @__PURE__ */ React3.createElement(
-      TrainingMetricEditor,
-      {
-        label: "Prescripci\xF3n",
-        context: "exercise",
-        value: step.metric,
-        onChange: (nextMetric) => updateRoutineStep(step.id, {
-          metric: normalizeMetricDraftForMode(nextMetric, "exercise")
-        })
-      }
-    ), selectedExerciseForStep ? /* @__PURE__ */ React3.createElement(
-      StateBlock,
-      {
-        className: "trainingPlugin__state",
-        title: `Ejercicio: ${selectedExerciseForStep.title}`,
-        description: selectedExerciseForStep.searchSummary || "Ejercicio enlazado correctamente."
-      }
-    ) : null) : /* @__PURE__ */ React3.createElement(
-      TrainingMetricEditor,
-      {
-        label: "Descanso",
-        context: "rest",
-        value: step.metric,
-        onChange: (nextMetric) => updateRoutineStep(step.id, {
-          metric: normalizeMetricDraftForMode(nextMetric, "rest")
-        })
-      }
-    )));
-  }), !routineDraft.steps.length ? /* @__PURE__ */ React3.createElement(
-    StateBlock,
-    {
-      className: "trainingPlugin__empty",
-      centered: true,
-      eyebrow: "Sin pasos",
-      title: "La rutina todavia no tiene pasos",
-      description: "Agrega un ejercicio o un descanso para empezar."
-    }
-  ) : null))), /* @__PURE__ */ React3.createElement("div", { className: "trainingPlugin__buttonRow trainingPlugin__buttonRow--actions" }, /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "primary", onClick: () => void handleSaveRoutine() }, "Guardar rutina"), /* @__PURE__ */ React3.createElement(Button, { type: "button", onClick: createRoutine }, "Nueva"), /* @__PURE__ */ React3.createElement(Button, { type: "button", tone: "danger", onClick: () => void handleDeleteRoutine(), disabled: !routineDraft.id }, /* @__PURE__ */ React3.createElement(DeleteIcon, { size: 16 }), /* @__PURE__ */ React3.createElement("span", null, "Eliminar")))) : null, !loading && !catalog.exercises.length && mode === "exercises" ? /* @__PURE__ */ React3.createElement(
-    StateBlock,
-    {
-      className: "trainingPlugin__empty",
-      centered: true,
-      eyebrow: "Sin ejercicios",
-      title: "Aun no hay ejercicios cargados",
-      description: "Crea el primero y luego enlaza sus musculos."
-    }
-  ) : null, !loading && !catalog.routines.length && mode === "routines" ? /* @__PURE__ */ React3.createElement(
-    StateBlock,
-    {
-      className: "trainingPlugin__empty",
-      centered: true,
-      eyebrow: "Sin rutinas",
-      title: "Aun no hay rutinas cargadas",
-      description: "Crea la primera y arma sus pasos lineales."
-    }
-  ) : null))));
+  ) : null)))));
 }
 var TrainingView_default = TrainingView;
 
