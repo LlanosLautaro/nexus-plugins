@@ -302,7 +302,11 @@ export default function MusicAudioEngine({
         <section className="musicaEngine__hero">
           <div className="musicaEngine__cover">
             {audioState.audioFile?.cover ? (
-              <img src={audioState.audioFile.cover} alt={audioState.audioFile.title || getFileName(filePath)} />
+              <img
+                src={audioState.audioFile.cover}
+                alt={audioState.audioFile.title || getFileName(filePath)}
+                draggable="false"
+              />
             ) : (
               <div className="musicaEngine__coverPlaceholder">
                 <strong>{getFileName(filePath).slice(0, 1).toUpperCase()}</strong>

@@ -17,6 +17,7 @@
 }
 
 .chatbotView__topbar {
+  @include chrome-static();
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -47,6 +48,7 @@
 }
 
 .chatbotView__controls {
+  @include chrome-static();
   display: flex;
   align-items: flex-end;
   gap: 10px;
@@ -139,6 +141,7 @@
 }
 
 .chatbotView__statusBar {
+  @include chrome-static();
   display: flex;
   align-items: center;
   gap: 10px;

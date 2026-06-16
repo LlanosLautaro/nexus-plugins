@@ -1,7 +1,7 @@
 {
   "id": "nexus.habitos",
   "displayName": "Habitos y tareas",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "apiVersion": 1,
   "schemaVersion": 1,
   "description": "Cola diaria manual con tareas simples, habitos basicos e historial breve.",

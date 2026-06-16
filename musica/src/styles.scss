@@ -102,6 +102,7 @@
 }
 
 .musicaEngine__meta {
+  @include chrome-static();
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
@@ -119,6 +120,7 @@
 .musicaEngine__actions,
 .musicaPluginSettings__actions,
 .musicaMetadata__actions {
+  @include chrome-static();
   display: flex;
   flex-wrap: wrap;
   gap: 10px;

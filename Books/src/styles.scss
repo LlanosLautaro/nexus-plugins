@@ -340,6 +340,7 @@
 }
 
 .booksEngine__toolbar {
+  @include chrome-static();
   display: flex;
   align-items: center;
   justify-content: space-between;

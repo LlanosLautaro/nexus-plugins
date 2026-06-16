@@ -7,10 +7,14 @@ import {
   deleteHabitSync,
   deleteTaskSync,
   ensureHabitosSchema,
+  normalizeLocalDate,
   nowIso,
+  saveHabitCategorySync,
   saveHabitSync,
   saveTaskSync,
+  setOccurrenceQuantitySync,
   toggleOccurrenceSync,
+  toggleOccurrenceChecklistItemSync,
   toggleTaskSync,
   todayLocalDate,
 } from "./habitos-core.js";
@@ -33,9 +37,15 @@ function getSqlite(ctx: NexusBackendPluginContext) {
   return ctx.requireRepositories().sqlite;
 }
 
-function buildHome(sqlite: any) {
+function resolveViewDate(dateValue: unknown) {
+  return normalizeLocalDate(dateValue, todayLocalDate());
+}
+
+function buildHome(sqlite: any, dateValue?: unknown) {
+  const actualToday = todayLocalDate();
   return buildHabitosHomeSnapshot(sqlite, {
-    today: todayLocalDate(),
+    today: resolveViewDate(dateValue),
+    actualToday,
     now: nowIso(),
   });
 }
@@ -46,9 +56,9 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
   },
 
   activate(ctx) {
-    ctx.registerIpc("habitos:get-home", async () => {
+    ctx.registerIpc("habitos:get-home", async (_event, payload: any) => {
       try {
-        return createSuccess(buildHome(getSqlite(ctx)));
+        return createSuccess(buildHome(getSqlite(ctx), payload?.date));
       } catch (error) {
         return createError(error, "No se pudo cargar Habitos y tareas.");
       }
@@ -61,7 +71,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
           today: todayLocalDate(),
           now: nowIso(),
         });
-        return createSuccess(buildHome(sqlite));
+        return createSuccess(buildHome(sqlite, payload?.date));
       } catch (error) {
         return createError(error, "No se pudo guardar la tarea.");
       }
@@ -73,7 +83,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
         toggleTaskSync(sqlite, String(payload?.taskId || ""), {
           now: nowIso(),
         });
-        return createSuccess(buildHome(sqlite));
+        return createSuccess(buildHome(sqlite, payload?.date));
       } catch (error) {
         return createError(error, "No se pudo actualizar la tarea.");
       }
@@ -83,7 +93,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       try {
         const sqlite = getSqlite(ctx);
         deleteTaskSync(sqlite, String(payload?.taskId || ""));
-        return createSuccess(buildHome(sqlite));
+        return createSuccess(buildHome(sqlite, payload?.date));
       } catch (error) {
         return createError(error, "No se pudo borrar la tarea.");
       }
@@ -96,7 +106,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
           today: todayLocalDate(),
           now: nowIso(),
         });
-        return createSuccess(buildHome(sqlite));
+        return createSuccess(buildHome(sqlite, payload?.date));
       } catch (error) {
         return createError(error, "No se pudo guardar el habito.");
       }
@@ -107,10 +117,42 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
         const sqlite = getSqlite(ctx);
         toggleOccurrenceSync(sqlite, String(payload?.occurrenceId || ""), {
           now: nowIso(),
+          today: todayLocalDate(),
         });
-        return createSuccess(buildHome(sqlite));
+        return createSuccess(buildHome(sqlite, payload?.date));
       } catch (error) {
         return createError(error, "No se pudo actualizar la ocurrencia.");
+      }
+    });
+
+    ctx.registerIpc("habitos:set-occurrence-quantity", async (_event, payload: any) => {
+      try {
+        const sqlite = getSqlite(ctx);
+        setOccurrenceQuantitySync(sqlite, String(payload?.occurrenceId || ""), payload?.value, {
+          now: nowIso(),
+          today: todayLocalDate(),
+        });
+        return createSuccess(buildHome(sqlite, payload?.date));
+      } catch (error) {
+        return createError(error, "No se pudo guardar la cantidad diaria.");
+      }
+    });
+
+    ctx.registerIpc("habitos:toggle-occurrence-checklist-item", async (_event, payload: any) => {
+      try {
+        const sqlite = getSqlite(ctx);
+        toggleOccurrenceChecklistItemSync(
+          sqlite,
+          String(payload?.occurrenceId || ""),
+          String(payload?.itemId || ""),
+          {
+            now: nowIso(),
+            today: todayLocalDate(),
+          },
+        );
+        return createSuccess(buildHome(sqlite, payload?.date));
+      } catch (error) {
+        return createError(error, "No se pudo actualizar el checklist diario.");
       }
     });
 
@@ -118,9 +160,21 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       try {
         const sqlite = getSqlite(ctx);
         deleteHabitSync(sqlite, String(payload?.habitId || ""));
-        return createSuccess(buildHome(sqlite));
+        return createSuccess(buildHome(sqlite, payload?.date));
       } catch (error) {
         return createError(error, "No se pudo borrar el habito.");
+      }
+    });
+
+    ctx.registerIpc("habitos:save-category", async (_event, payload: any) => {
+      try {
+        const sqlite = getSqlite(ctx);
+        saveHabitCategorySync(sqlite, payload, {
+          now: nowIso(),
+        });
+        return createSuccess(buildHome(sqlite, payload?.date));
+      } catch (error) {
+        return createError(error, "No se pudo guardar la categoria.");
       }
     });
   },
