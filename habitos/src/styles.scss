@@ -4,6 +4,301 @@
   --habitos-accent: var(--color-accent-strong, #6f8cff);
 }
 
+.habitosDashboard__grid {
+  position: relative;
+  overflow: visible;
+  min-height: 100%;
+  align-content: start;
+}
+
+.habitosDashboard__grid.react-grid-layout {
+  transition: height 200ms ease;
+  overflow: visible;
+  min-height: 100%;
+}
+
+.habitosDashboard__grid .react-grid-item {
+  z-index: 0;
+  overflow: visible;
+  transition: all 200ms ease;
+  transition-property: left, top, width, height, transform;
+}
+
+.habitosDashboard__grid .react-grid-item.cssTransforms {
+  transition-property: transform, width, height;
+}
+
+.habitosDashboard__grid .react-grid-item.dragging,
+.habitosDashboard__grid .react-grid-item.react-draggable-dragging {
+  z-index: 4;
+  transition: none;
+  will-change: transform;
+}
+
+.habitosDashboard__grid .react-grid-item.resizing {
+  z-index: 3;
+  transition: none;
+  will-change: transform, width, height;
+}
+
+.habitosDashboard__grid .react-grid-item.react-grid-placeholder {
+  z-index: 1;
+  overflow: hidden;
+  border: 1px dashed color-mix(in srgb, var(--habitos-accent) 52%, var(--habitos-border));
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--habitos-accent) 12%, transparent), transparent 72%),
+    color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 92%, transparent);
+  opacity: 1;
+  user-select: none;
+  pointer-events: none;
+}
+
+.habitosDashboard__grid .react-resizable-hide > .react-resizable-handle {
+  display: none;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle {
+  position: absolute;
+  opacity: 0;
+  z-index: 4;
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    filter var(--duration-fast) var(--ease-standard);
+}
+
+.habitosDashboard__grid .react-grid-item.habitosDashboard__item.is-editing > .react-resizable-handle,
+.habitosDashboard__grid .react-grid-item.resizing > .react-resizable-handle {
+  opacity: 0.92;
+}
+
+.habitosDashboard__grid .react-grid-item:hover > .react-resizable-handle,
+.habitosDashboard__grid .react-grid-item.resizing > .react-resizable-handle {
+  opacity: 1;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-3, rgba(255, 255, 255, 0.08)) 54%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--habitos-accent) 16%, var(--habitos-border)),
+    0 0 0 1px color-mix(in srgb, black 18%, transparent);
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-n,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-s {
+  left: 50%;
+  width: 1.55rem;
+  height: 0.44rem;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-n {
+  top: -0.08rem;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-s {
+  bottom: -0.08rem;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-w,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-e {
+  top: 50%;
+  width: 0.44rem;
+  height: 1.55rem;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-w {
+  left: -0.08rem;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-e {
+  right: -0.08rem;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-nw,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-ne,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-sw,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-se {
+  width: 1rem;
+  height: 1rem;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-nw {
+  top: -0.08rem;
+  left: -0.08rem;
+  cursor: nwse-resize;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-ne {
+  top: -0.08rem;
+  right: -0.08rem;
+  cursor: nesw-resize;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-sw {
+  bottom: -0.08rem;
+  left: -0.08rem;
+  cursor: nesw-resize;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-se {
+  right: -0.08rem;
+  bottom: -0.08rem;
+  cursor: nwse-resize;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-n::after,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-s::after {
+  inset: 0.12rem 0.32rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--habitos-accent) 38%, var(--habitos-border)) 0 1px,
+      transparent 1px calc(100% - 1px),
+      color-mix(in srgb, var(--habitos-accent) 38%, var(--habitos-border)) calc(100% - 1px) 100%
+    );
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-w::after,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-e::after {
+  inset: 0.32rem 0.12rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--habitos-accent) 38%, var(--habitos-border)) 0 1px,
+      transparent 1px calc(100% - 1px),
+      color-mix(in srgb, var(--habitos-accent) 38%, var(--habitos-border)) calc(100% - 1px) 100%
+    );
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-nw::before,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-ne::before,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-sw::before,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-se::before {
+  background: transparent;
+  box-shadow: none;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-nw::after,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-ne::after,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-sw::after,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-se::after {
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--habitos-accent) 64%, var(--habitos-border));
+  background: transparent;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-nw::after {
+  top: 0.08rem;
+  left: 0.08rem;
+  border-right: none;
+  border-bottom: none;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-ne::after {
+  top: 0.08rem;
+  right: 0.08rem;
+  border-left: none;
+  border-bottom: none;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-sw::after {
+  bottom: 0.08rem;
+  left: 0.08rem;
+  border-right: none;
+  border-top: none;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-se::after {
+  right: 0.08rem;
+  bottom: 0.08rem;
+  border-left: none;
+  border-top: none;
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle:hover,
+.habitosDashboard__grid .react-grid-item.resizing > .react-resizable-handle {
+  filter: brightness(1.04);
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-n:hover,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-s:hover {
+  transform: translateX(-50%) scale(1.02);
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-w:hover,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-e:hover {
+  transform: translateY(-50%) scale(1.02);
+}
+
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-nw:hover,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-ne:hover,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-sw:hover,
+.habitosDashboard__grid .react-grid-item > .react-resizable-handle.react-resizable-handle-se:hover {
+  transform: scale(1.04);
+}
+
+.habitosDashboard__item {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.habitosDashboard__item.is-editing {
+  user-select: none;
+}
+
+.habitosDashboard__item.is-editing .habitosDashboard__widget {
+  pointer-events: none;
+}
+
+.habitosDashboard__editOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 16px;
+  background: transparent;
+  cursor: grab;
+}
+
+.habitosDashboard__widget {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.habitosDashboard__widgetBody {
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.habitosDashboard__item.react-draggable-dragging .habitosDashboard__editOverlay,
+.habitosDashboard__item.dragging .habitosDashboard__editOverlay,
+.habitosDashboard__editOverlay:active {
+  cursor: grabbing;
+}
+
 .habitosView__panelActions {
   display: flex;
   align-items: center;
@@ -141,14 +436,30 @@
 .habitosView__wizardStep {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.62rem;
 }
 
 .habitosView__queueList {
-  gap: 0.42rem;
+  gap: 0;
 }
 
 .habitosView__trendPanel {
+  overflow: hidden;
+}
+
+.habitosView__queuePanel,
+.habitosView__trendPanel,
+.habitosView__secondaryPanel {
+  height: 100%;
+}
+
+.habitosView__queuePanelBody,
+.habitosView__secondaryPanelBody {
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.habitosView__trendPanelBody {
   overflow: hidden;
 }
 
@@ -164,6 +475,8 @@
 .habitosView__trendChartShell {
   flex-direction: column;
   gap: 0.7rem;
+  min-height: 0;
+  height: 100%;
 }
 
 .habitosView__trendLegend {
@@ -171,6 +484,7 @@
   gap: 0.9rem;
   flex-wrap: wrap;
   user-select: none;
+  flex: 0 0 auto;
 }
 
 .habitosView__trendLegend span {
@@ -213,7 +527,8 @@
 
 .habitosView__trendCanvasWrap {
   position: relative;
-  height: 188px;
+  min-height: 0;
+  flex: 1 1 auto;
   border-radius: 14px;
   border: 1px solid var(--habitos-border);
   background:
@@ -232,6 +547,9 @@
 }
 
 .habitosView__drawerBody,
+.habitosView__settingsSplit,
+.habitosView__settingsSidebar,
+.habitosView__settingsDetail,
 .habitosView__habitSplit,
 .habitosView__habitSidebar,
 .habitosView__habitDetail,
@@ -244,10 +562,22 @@
   flex: 1 1 auto;
 }
 
+.habitosView__settingsSplit,
 .habitosView__habitSplit,
+.habitosView__settingsSidebar,
+.habitosView__settingsDetail,
 .habitosView__habitSidebar,
 .habitosView__habitDetail {
   height: 100%;
+}
+
+.habitosView__settingsSidebar {
+  padding-right: 0.5rem;
+  border-right: 1px solid var(--habitos-border);
+}
+
+.habitosView__settingsDetail {
+  padding-left: 0.2rem;
 }
 
 .habitosView__habitSidebar {
@@ -261,6 +591,72 @@
 
 .habitosView__habitSidebarStack {
   gap: 0.85rem;
+}
+
+.habitosView__settingsTabs,
+.habitosView__categorySettingsList,
+.habitosView__settingsSectionCopy,
+.habitosView__categorySettingRowCopy {
+  display: flex;
+  flex-direction: column;
+}
+
+.habitosView__settingsTabs {
+  gap: 0.38rem;
+}
+
+.habitosView__settingsTab {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 40px;
+  padding: 0.62rem 0.78rem;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.habitosView__settingsTab:hover {
+  border-color: color-mix(in srgb, var(--habitos-accent) 16%, var(--habitos-border));
+  background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 90%, transparent);
+  color: var(--color-text);
+}
+
+.habitosView__settingsTab.is-active {
+  border-color: color-mix(in srgb, var(--habitos-accent) 26%, var(--habitos-border));
+  background: color-mix(in srgb, var(--habitos-accent) 10%, transparent);
+  color: var(--color-text);
+}
+
+.habitosView__settingsSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.2rem 0.7rem;
+}
+
+.habitosView__settingsSectionCopy {
+  min-width: 0;
+  gap: 0.16rem;
+}
+
+.habitosView__settingsSectionCopy strong {
+  color: var(--color-text);
+  line-height: 1.14;
+}
+
+.habitosView__settingsSectionCopy span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.78rem;
 }
 
 .habitosView__habitGroup,
@@ -348,6 +744,11 @@
   letter-spacing: 0.04em;
 }
 
+.habitosView__habitRowBadge .habitosView__remoteCategoryIcon {
+  width: 1rem;
+  height: 1rem;
+}
+
 .habitosView__habitRowCopy {
   min-width: 0;
   gap: 0.18rem;
@@ -385,41 +786,232 @@
   color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
 }
 
-.habitosView__queueItem {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  grid-auto-rows: minmax(0, auto);
-  align-items: flex-start;
-  gap: 0.44rem 0.7rem;
-  padding: 0.56rem 0.66rem;
+.habitosView__categorySettingsList {
+  gap: 0.55rem;
+}
+
+.habitosView__categorySettingRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  padding: 0.72rem 0.82rem;
   border: 1px solid var(--habitos-border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 92%, transparent);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 90%, transparent);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
   transition:
     border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.habitosView__categorySettingRow:hover {
+  border-color: color-mix(in srgb, var(--habitos-accent) 20%, var(--habitos-border));
+  background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 88%, transparent);
+}
+
+.habitosView__categorySettingRow.is-selected {
+  border-color: color-mix(in srgb, var(--habitos-accent) 28%, var(--habitos-border));
+  background: color-mix(in srgb, var(--habitos-accent) 10%, transparent);
+}
+
+.habitosView__categorySettingRowCopy {
+  min-width: 0;
+}
+
+.habitosView__categorySettingRowCopy strong {
+  color: var(--color-text);
+  line-height: 1.18;
+}
+
+.habitosView__categorySettingRowBadge,
+.habitosView__categoryDetailHeroIcon {
+  display: grid;
+  place-items: center;
+  color: #161616;
+}
+
+.habitosView__categorySettingRowBadge {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 2.5rem;
+  border-radius: 0.82rem;
+  border: 1px solid color-mix(in srgb, black 12%, var(--habitos-border));
+}
+
+.habitosView__categoryDetailHero {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.habitosView__habitDetailHero {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.habitosView__categoryDetailHeroIcon {
+  width: 78px;
+  height: 78px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, black 12%, var(--habitos-border));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
+}
+
+.habitosView__habitDetailHeroBadge {
+  width: 82px;
+  height: 82px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--habitos-item-accent) 30%, var(--habitos-border));
+  background: color-mix(in srgb, var(--habitos-item-accent) 14%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
+}
+
+.habitosView__categoryMetaList {
+  display: grid;
+  gap: 0.18rem;
+  align-content: start;
+}
+
+.habitosView__categoryMetaRow {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.7rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--habitos-border) 82%, transparent);
+}
+
+.habitosView__categoryMetaRow:last-child {
+  border-bottom: none;
+}
+
+.habitosView__categoryMetaRow span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.73rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.habitosView__categoryMetaRow strong {
+  color: var(--color-text);
+  line-height: 1.28;
+  word-break: break-word;
+}
+
+.habitosView__detailMetaList {
+  display: grid;
+  gap: 0.18rem;
+  align-content: start;
+}
+
+.habitosView__detailMetaList--section {
+  gap: 0.08rem;
+}
+
+.habitosView__detailMetaRow {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.7rem;
+  padding: 0.34rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--habitos-border) 82%, transparent);
+}
+
+.habitosView__detailMetaRow.is-stack {
+  align-items: start;
+}
+
+.habitosView__detailMetaRow:last-child {
+  border-bottom: none;
+}
+
+.habitosView__detailMetaRow span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.73rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.habitosView__detailMetaRow strong {
+  color: var(--color-text);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.habitosView__detailMetaContent {
+  min-width: 0;
+  display: grid;
+  gap: 0.18rem;
+}
+
+.habitosView__detailMetaContent small {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.habitosView__detailCompactList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.2rem;
+  color: var(--color-text);
+}
+
+.habitosView__detailCompactList li {
+  padding: 0.08rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--habitos-border) 70%, transparent);
+  line-height: 1.32;
+}
+
+.habitosView__detailCompactList li:last-child {
+  border-bottom: none;
+}
+
+.habitosView__queueItem {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-auto-rows: minmax(0, auto);
+  align-items: flex-start;
+  gap: 0.28rem 0.62rem;
+  padding: 0.42rem 0.1rem 0.42rem 0;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--habitos-border) 92%, transparent);
+  border-radius: 0;
+  background: transparent;
+  transition:
     background-color var(--duration-fast) var(--ease-standard);
   user-select: none;
 }
 
 .habitosView__queueItem.is-overdue {
-  border-color: color-mix(in srgb, var(--habitos-accent) 32%, var(--habitos-border));
+  border-bottom-color: color-mix(in srgb, var(--habitos-accent) 26%, var(--habitos-border));
 }
 
 .habitosView__queueItem.is-selected {
-  border-color: color-mix(in srgb, var(--habitos-accent) 26%, var(--habitos-border));
-  background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.05)) 90%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.05)) 58%, transparent);
 }
 
 .habitosView__queueItem.is-status-completed {
-  border-color: color-mix(in srgb, var(--color-success) 20%, var(--habitos-border));
+  border-bottom-color: color-mix(in srgb, var(--color-success) 18%, var(--habitos-border));
 }
 
 .habitosView__queueItem.is-status-failed {
-  border-color: color-mix(in srgb, var(--color-danger) 24%, var(--habitos-border));
+  border-bottom-color: color-mix(in srgb, var(--color-danger) 18%, var(--habitos-border));
 }
 
 .habitosView__queueItem.is-status-recorded {
-  border-color: color-mix(in srgb, var(--color-warning) 24%, var(--habitos-border));
+  border-bottom-color: color-mix(in srgb, var(--color-warning) 18%, var(--habitos-border));
 }
 
 .habitosView__queueItem.is-settled .habitosView__queueBadge {
@@ -431,17 +1023,22 @@
 }
 
 .habitosView__queueBadge {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--habitos-item-accent) 32%, var(--habitos-border));
   background: color-mix(in srgb, var(--habitos-item-accent) 14%, transparent);
   color: var(--habitos-item-accent);
-  font-size: 0.74rem;
+  font-size: 0.71rem;
   font-weight: 700;
   letter-spacing: 0.05em;
+}
+
+.habitosView__queueBadge .habitosView__remoteCategoryIcon {
+  width: 0.92rem;
+  height: 0.92rem;
 }
 
 .habitosView__queueCopy {
@@ -450,12 +1047,12 @@
   align-items: center;
   align-self: center;
   justify-content: flex-start;
-  min-height: 34px;
+  min-height: 30px;
 }
 
 .habitosView__queueCopy strong {
   color: var(--color-text);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   line-height: 1.18;
   text-align: left;
 }
@@ -593,7 +1190,22 @@
 }
 
 .habitosView__mainScroll {
+  overflow-x: hidden;
+  overflow-y: auto;
   scrollbar-gutter: stable;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0 0 0 10px !important;
+  gap: 0;
+}
+
+.habitosView__dashboardStack {
+  flex: 1 1 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .habitosView__queueQuantityControl {
@@ -729,14 +1341,16 @@
 .habitosView__subitemDraftRow,
 .habitosView__secondaryCard,
 .habitosView__booleanGrid,
-.habitosView__booleanField {
+.habitosView__booleanField,
+.habitosView__toggleCard,
+.habitosView__numberStepper,
+.habitosView__dateField {
   display: flex;
 }
 
 .habitosView__sectionIntro,
 .habitosView__secondaryCard,
-.habitosView__booleanGrid,
-.habitosView__booleanField {
+.habitosView__booleanGrid {
   flex-direction: column;
 }
 
@@ -766,11 +1380,11 @@
 
 .habitosView__detailCard {
   min-height: 100%;
-  gap: 0.4rem;
-  padding: 0.82rem 0.9rem;
-  border: 1px solid var(--habitos-border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 88%, transparent);
+  gap: 0.28rem;
+  padding: 0.68rem 0.74rem;
+  border: 1px solid color-mix(in srgb, var(--habitos-border) 88%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 78%, transparent);
 }
 
 .habitosView__detailCard span,
@@ -812,20 +1426,84 @@
 }
 
 .habitosView__subitemsDraft {
-  padding-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-top: 0.12rem;
 }
 
 .habitosView__subitemDraftRow {
-  gap: 0.75rem;
+  gap: 0.55rem;
+  min-height: 44px;
+  padding: 0.34rem 0.42rem;
+  border: 1px solid var(--habitos-border);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 90%, transparent);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.habitosView__subitemDraftRow.is-drop-target {
+  border-color: color-mix(in srgb, var(--habitos-accent) 34%, var(--habitos-border));
+  background: color-mix(in srgb, var(--habitos-accent) 10%, var(--color-surface-1, rgba(255, 255, 255, 0.03)));
+}
+
+.habitosView__subitemDraftRow.is-dragging {
+  opacity: 0.74;
+}
+
+.habitosView__subitemDraftRow:focus-within {
+  border-color: color-mix(in srgb, var(--habitos-accent) 26%, var(--habitos-border));
 }
 
 .habitosView__subitemToggle span {
   flex: 1;
 }
 
+.habitosView__subitemDragHandle {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.24rem;
+  flex: 0 0 28px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--habitos-accent) 14%, var(--habitos-border));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 90%, transparent);
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  cursor: grab;
+}
+
+.habitosView__subitemDragHandle:active {
+  cursor: grabbing;
+}
+
+.habitosView__subitemDragHandle:hover {
+  border-color: color-mix(in srgb, var(--habitos-accent) 28%, var(--habitos-border));
+  color: var(--color-text);
+}
+
+.habitosView__subitemDragHandle span {
+  width: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
 .habitosView__subitemDraftRow input[type="text"],
 .habitosView__subitemDraftRow input:not([type]) {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.22rem 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .habitosView__booleanGrid {
@@ -833,6 +1511,8 @@
 }
 
 .habitosView__booleanField {
+  flex-direction: row;
+  align-items: center;
   gap: 0.45rem;
   padding: 0.8rem;
   border: 1px solid var(--habitos-border);
@@ -840,8 +1520,21 @@
   background: var(--habitos-soft);
 }
 
+.habitosView__booleanField--inline {
+  width: 100%;
+  min-height: 100%;
+}
+
 .habitosView__booleanField input {
   margin: 0;
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 1rem;
+  accent-color: var(--habitos-accent);
+}
+
+.habitosView__booleanField span {
+  flex: 1;
 }
 
 .habitosView__editorActions {
@@ -931,8 +1624,8 @@
 }
 
 .habitosView__categoryOptionGrid {
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-  gap: 0.55rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
 }
 
 .habitosView__wizardOptionGrid--stacked {
@@ -948,12 +1641,12 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.35rem;
-  padding: 0.95rem 1rem;
+  gap: 0.28rem;
+  padding: 0.82rem 0.9rem;
   text-align: left;
-  border-radius: 15px;
-  border: 1px solid var(--habitos-border);
-  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 88%, transparent);
+  border-radius: 13px;
+  border: 1px solid color-mix(in srgb, var(--habitos-border) 88%, transparent);
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 72%, transparent);
   color: inherit;
   cursor: pointer;
   user-select: none;
@@ -978,11 +1671,12 @@
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 0.58rem;
-  min-height: 50px;
-  padding: 0.52rem 0.6rem;
+  justify-content: space-between;
+  gap: 0.9rem;
+  min-height: 72px;
+  padding: 0.82rem 0.9rem;
   text-align: left;
-  border-radius: 13px;
+  border-radius: 18px;
   color: inherit;
   cursor: pointer;
   user-select: none;
@@ -990,8 +1684,11 @@
 
 .habitosView__categoryOptionCard strong {
   color: var(--color-text);
-  font-size: 0.82rem;
-  line-height: 1.14;
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.01em;
 }
 
 .habitosView__categoryOptionCard.is-selected,
@@ -1001,23 +1698,29 @@
 }
 
 .habitosView__categoryOptionCard.is-create {
-  border-style: dashed;
+  border-color: color-mix(in srgb, var(--habitos-border) 86%, white 8%);
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 94%, transparent);
 }
 
 .habitosView__categoryOptionIcon,
 .habitosView__categoryBuilderPreviewIcon {
-  width: 2.08rem;
-  height: 2.08rem;
+  width: 3rem;
+  height: 3rem;
   display: grid;
   place-items: center;
-  flex: 0 0 2.08rem;
-  border-radius: 0.62rem;
+  flex: 0 0 3rem;
+  margin-left: auto;
+  border-radius: 0.96rem;
   border: 1px solid color-mix(in srgb, black 10%, var(--habitos-border));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, white 16%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
+    0 8px 20px color-mix(in srgb, black 16%, transparent);
 }
 
 .habitosView__categoryOptionCard.is-create .habitosView__categoryOptionIcon {
   background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.05)) 92%, transparent);
+  border-color: color-mix(in srgb, var(--habitos-border) 82%, white 10%);
+  box-shadow: none;
 }
 
 .habitosView__remoteCategoryIcon {
@@ -1037,6 +1740,11 @@
 .habitosView__remoteCategoryIcon.is-xl {
   width: 1.34rem;
   height: 1.34rem;
+}
+
+.habitosView__remoteCategoryIcon.is-xxl {
+  width: 2.35rem;
+  height: 2.35rem;
 }
 
 .habitosView__remoteCategoryIcon .app-icon__svg,
@@ -1080,19 +1788,19 @@
 }
 
 .habitosView__categoryBuilderPanel {
-  gap: 0.7rem;
-  padding: 0.78rem 0.84rem;
-  border: 1px solid var(--habitos-border);
-  border-radius: 15px;
-  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 86%, transparent);
+  gap: 0.62rem;
+  padding: 0.08rem 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .habitosView__categoryBuilderPreview {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  padding: 0.58rem 0.62rem;
-  border-radius: 13px;
+  padding: 0.2rem 0;
+  border-radius: 0;
 }
 
 .habitosView__categoryBuilderPreviewIcon {
@@ -1223,7 +1931,8 @@
 
 .habitosView__quantitySentence,
 .habitosView__centeredAction,
-.habitosView__durationField {
+.habitosView__durationField,
+.habitosView__inlineHint {
   display: flex;
 }
 
@@ -1255,6 +1964,93 @@
 .habitosView__centeredAction {
   justify-content: center;
   padding-top: 0.15rem;
+}
+
+.habitosView__toggleCard {
+  align-items: stretch;
+}
+
+.habitosView__numberStepper {
+  align-items: center;
+  gap: 0.12rem;
+  width: 100%;
+  padding: 0.18rem;
+  border: 1px solid var(--habitos-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 88%, transparent);
+}
+
+.habitosView__numberStepper input {
+  min-width: 0;
+  min-height: 0;
+  padding: 0.32rem 0.2rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+
+.habitosView__numberStepperButton {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--habitos-accent) 16%, var(--habitos-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 92%, transparent);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.habitosView__numberStepperButton:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.habitosView__numberStepper:focus-within {
+  border-color: color-mix(in srgb, var(--habitos-accent) 28%, var(--habitos-border));
+}
+
+.habitosView__dateField {
+  position: relative;
+  align-items: center;
+}
+
+.habitosView__dateFieldInput {
+  position: relative;
+  z-index: 1;
+}
+
+.habitosView__dateFieldGhost {
+  position: absolute;
+  left: 0.95rem;
+  top: 50%;
+  z-index: 2;
+  transform: translateY(-50%);
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  pointer-events: none;
+}
+
+.habitosView__dateField.is-default-today:not(:focus-within) .habitosView__dateFieldInput {
+  color: transparent;
+}
+
+.habitosView__dateField.is-default-today:not(:focus-within) .habitosView__dateFieldInput::-webkit-datetime-edit {
+  color: transparent;
+}
+
+.habitosView__inlineHint {
+  align-items: center;
+  min-height: 38px;
+  padding: 0.68rem 0.82rem;
+  border: 1px solid color-mix(in srgb, var(--habitos-accent) 14%, var(--habitos-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--habitos-accent) 8%, transparent);
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.74));
 }
 
 .habitosView__durationField {
@@ -1347,6 +2143,18 @@
     max-height: calc(100vh - 24px);
   }
 
+  .habitosView__settingsSidebar {
+    padding-right: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--habitos-border);
+    padding-bottom: 0.6rem;
+  }
+
+  .habitosView__settingsDetail {
+    padding-left: 0;
+    padding-top: 0.2rem;
+  }
+
   .habitosView__habitSidebar {
     padding-right: 0;
     border-right: none;
@@ -1364,6 +2172,14 @@
   }
 
   .habitosView__workingSummary {
+    grid-template-columns: 1fr;
+  }
+
+  .habitosView__categoryOptionGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .habitosView__categoryDetailHero {
     grid-template-columns: 1fr;
   }
 

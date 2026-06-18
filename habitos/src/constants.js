@@ -22,20 +22,20 @@ export const DEFAULT_CUSTOM_HABIT_CATEGORY_COLOR = "#8fb3ff";
 export const HABIT_CATEGORY_CREATE_VALUE = "__create_category__";
 
 export const HABIT_CATEGORY_PRESETS = [
-  { value: "Dejar un mal habito", label: "Dejar un mal habito", iconId: "mui:Block", color: "#ff9f96" },
-  { value: "Arte", label: "Arte", iconId: "mui:Brush", color: "#ffcf8b" },
-  { value: "Meditacion", label: "Meditacion", iconId: "mui:SelfImprovement", color: "#b8dfc5" },
-  { value: "Estudio", label: "Estudio", iconId: "mui:School", color: "#9dc9ff" },
-  { value: "Deportes", label: "Deportes", iconId: "mui:DirectionsBike", color: "#8fded2" },
-  { value: "Entretenimiento", label: "Entretenimiento", iconId: "mui:SportsEsports", color: "#ffd88d" },
-  { value: "Social", label: "Social", iconId: "mui:Textsms", color: "#ffc3d4" },
-  { value: "Finanzas", label: "Finanzas", iconId: "mui:AttachMoney", color: "#a9da83" },
-  { value: "Salud", label: "Salud", iconId: "mui:LocalHospital", color: "#8fd8d1" },
-  { value: "Trabajo", label: "Trabajo", iconId: "mui:Work", color: "#c5d0dc" },
-  { value: "Nutricion", label: "Nutricion", iconId: "mui:Restaurant", color: "#ffcf9c" },
-  { value: "Hogar", label: "Hogar", iconId: "mui:Home", color: "#f3c39f" },
-  { value: "Aire libre", label: "Aire libre", iconId: "mui:Landscape", color: "#9fd6a1" },
-  { value: "Otros", label: "Otros", iconId: "mui:Extension", color: "#c1cad8" },
+  { value: "Dejar un mal habito", label: "Dejar un mal habito", iconId: "mui:Block", color: "#ea4335" },
+  { value: "Arte", label: "Arte", iconId: "mui:Brush", color: "#ef4f66" },
+  { value: "Meditacion", label: "Meditacion", iconId: "mui:SelfImprovement", color: "#cf34b8" },
+  { value: "Estudio", label: "Estudio", iconId: "mui:School", color: "#9b5cf6" },
+  { value: "Deportes", label: "Deportes", iconId: "mui:DirectionsBike", color: "#4d71f2" },
+  { value: "Entretenimiento", label: "Entretenimiento", iconId: "mui:ConfirmationNumber", color: "#42b7c8" },
+  { value: "Social", label: "Social", iconId: "mui:Textsms", color: "#34b893" },
+  { value: "Finanzas", label: "Finanzas", iconId: "mui:AttachMoney", color: "#4bb86c" },
+  { value: "Salud", label: "Salud", iconId: "mui:LocalHospital", color: "#85c93c" },
+  { value: "Trabajo", label: "Trabajo", iconId: "mui:Work", color: "#a6bf3f" },
+  { value: "Nutricion", label: "Nutricion", iconId: "mui:Restaurant", color: "#ffa20f" },
+  { value: "Hogar", label: "Hogar", iconId: "mui:Home", color: "#ff960f" },
+  { value: "Aire libre", label: "Aire libre", iconId: "mui:Landscape", color: "#df7a38" },
+  { value: "Otros", label: "Otros", iconId: "mui:Widgets", color: "#df6746" },
 ];
 
 export const HABIT_PROGRESS_OPTIONS = [

@@ -864,41 +864,154 @@ function saveHabitCategorySync(sqlite, payload, options = {}) {
     throw new Error("Ya existe una categoria con ese nombre.");
   }
   const timestamp = options.now || nowIso();
-  if (existingCategory) {
-    sqlite.prepare(`
-      UPDATE habits_categories
-      SET name = ?,
-          icon_id = ?,
-          color = ?,
-          updated_at = ?
-      WHERE id = ?
-    `).run(
-      normalized.name,
-      normalized.iconId,
-      normalized.color,
-      timestamp,
-      normalized.id
-    );
-  } else {
-    sqlite.prepare(`
-      INSERT INTO habits_categories (
-        id,
-        name,
-        icon_id,
-        color,
-        created_at,
-        updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
-      normalized.id,
-      normalized.name,
-      normalized.iconId,
-      normalized.color,
-      timestamp,
-      timestamp
-    );
-  }
+  sqlite.transaction(() => {
+    if (existingCategory) {
+      sqlite.prepare(`
+        UPDATE habits_categories
+        SET name = ?,
+            icon_id = ?,
+            color = ?,
+            updated_at = ?
+        WHERE id = ?
+      `).run(
+        normalized.name,
+        normalized.iconId,
+        normalized.color,
+        timestamp,
+        normalized.id
+      );
+      if (existingCategory.name !== normalized.name) {
+        sqlite.prepare(`
+          UPDATE habits_habits
+          SET category = ?,
+              updated_at = ?
+          WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+        `).run(
+          normalized.name,
+          timestamp,
+          existingCategory.name
+        );
+        sqlite.prepare(`
+          UPDATE habits_tasks
+          SET category = ?,
+              updated_at = ?
+          WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+        `).run(
+          normalized.name,
+          timestamp,
+          existingCategory.name
+        );
+      }
+    } else {
+      sqlite.prepare(`
+        INSERT INTO habits_categories (
+          id,
+          name,
+          icon_id,
+          color,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `).run(
+        normalized.id,
+        normalized.name,
+        normalized.iconId,
+        normalized.color,
+        timestamp,
+        timestamp
+      );
+    }
+  })();
   return findHabitCategoryByIdSync(sqlite, normalized.id);
+}
+function deleteHabitCategorySync(sqlite, categoryId, options = {}) {
+  const existingCategory = findHabitCategoryByIdSync(sqlite, String(categoryId || ""));
+  if (!existingCategory) {
+    throw new Error("La categoria no existe.");
+  }
+  const timestamp = options.now || nowIso();
+  sqlite.transaction(() => {
+    sqlite.prepare(`
+      DELETE FROM habits_categories
+      WHERE id = ?
+    `).run(existingCategory.id);
+    sqlite.prepare(`
+      UPDATE habits_habits
+      SET category = '',
+          updated_at = ?
+      WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+    `).run(
+      timestamp,
+      existingCategory.name
+    );
+    sqlite.prepare(`
+      UPDATE habits_tasks
+      SET category = '',
+          updated_at = ?
+      WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+    `).run(
+      timestamp,
+      existingCategory.name
+    );
+  })();
+  return existingCategory;
+}
+function renameCategoryReferencesSync(sqlite, previousName, nextName, options = {}) {
+  const fromName = String(previousName || "").trim();
+  const toName = String(nextName || "").trim();
+  if (!fromName || !toName || fromName === toName) {
+    return;
+  }
+  const timestamp = options.now || nowIso();
+  sqlite.transaction(() => {
+    sqlite.prepare(`
+      UPDATE habits_habits
+      SET category = ?,
+          updated_at = ?
+      WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+    `).run(
+      toName,
+      timestamp,
+      fromName
+    );
+    sqlite.prepare(`
+      UPDATE habits_tasks
+      SET category = ?,
+          updated_at = ?
+      WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+    `).run(
+      toName,
+      timestamp,
+      fromName
+    );
+  })();
+}
+function clearCategoryReferencesSync(sqlite, categoryName, options = {}) {
+  const normalizedName = String(categoryName || "").trim();
+  if (!normalizedName) {
+    return;
+  }
+  const timestamp = options.now || nowIso();
+  sqlite.transaction(() => {
+    sqlite.prepare(`
+      UPDATE habits_habits
+      SET category = '',
+          updated_at = ?
+      WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+    `).run(
+      timestamp,
+      normalizedName
+    );
+    sqlite.prepare(`
+      UPDATE habits_tasks
+      SET category = '',
+          updated_at = ?
+      WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+    `).run(
+      timestamp,
+      normalizedName
+    );
+  })();
 }
 function saveTaskSync(sqlite, payload, options = {}) {
   const existingTask = payload?.id ? findTaskByIdSync(sqlite, String(payload.id)) : null;
@@ -1731,6 +1844,44 @@ var habitosBackendPlugin = {
         return createSuccess(buildHome(sqlite, payload?.date));
       } catch (error) {
         return createError(error, "No se pudo guardar la categoria.");
+      }
+    });
+    ctx.registerIpc("habitos:delete-category", async (_event, payload) => {
+      try {
+        const sqlite = getSqlite(ctx);
+        deleteHabitCategorySync(sqlite, String(payload?.categoryId || ""), {
+          now: nowIso()
+        });
+        return createSuccess(buildHome(sqlite, payload?.date));
+      } catch (error) {
+        return createError(error, "No se pudo borrar la categoria.");
+      }
+    });
+    ctx.registerIpc("habitos:rename-category-references", async (_event, payload) => {
+      try {
+        const sqlite = getSqlite(ctx);
+        renameCategoryReferencesSync(
+          sqlite,
+          String(payload?.previousName || ""),
+          String(payload?.nextName || ""),
+          {
+            now: nowIso()
+          }
+        );
+        return createSuccess(buildHome(sqlite, payload?.date));
+      } catch (error) {
+        return createError(error, "No se pudieron actualizar las referencias de categoria.");
+      }
+    });
+    ctx.registerIpc("habitos:clear-category-references", async (_event, payload) => {
+      try {
+        const sqlite = getSqlite(ctx);
+        clearCategoryReferencesSync(sqlite, String(payload?.categoryName || ""), {
+          now: nowIso()
+        });
+        return createSuccess(buildHome(sqlite, payload?.date));
+      } catch (error) {
+        return createError(error, "No se pudieron limpiar las referencias de categoria.");
       }
     });
   }

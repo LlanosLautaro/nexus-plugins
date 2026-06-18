@@ -2,6 +2,7 @@ const React = window.React;
 const {
   startTransition,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } = React;
@@ -13,6 +14,7 @@ import {
   LinearScale,
   PointElement,
 } from "chart.js";
+import { Responsive, WidthProvider } from "react-grid-layout/legacy";
 
 import {
   Button,
@@ -54,6 +56,7 @@ import {
   ChevronRightIcon,
   PencilIcon,
   PlusIcon,
+  SettingsIcon,
   TrashIcon,
 } from "./icons.jsx";
 
@@ -67,11 +70,242 @@ ChartJS.register(
   LineController,
 );
 
+const ResponsiveGridLayout = WidthProvider(Responsive);
+
 const HABIT_OUTCOME_RANGE_TICK_LIMITS = {
   "7d": 7,
   "1m": 8,
   "1y": 12,
 };
+const HABITOS_DASHBOARD_LAYOUTS_KEY = "dashboardLayouts";
+const HABITOS_CATEGORY_PRESET_OVERRIDES_KEY = "categoryPresetOverrides";
+const HABITOS_DASHBOARD_BREAKPOINTS = {
+  lg: 1200,
+  md: 996,
+  sm: 768,
+  xs: 480,
+  xxs: 0,
+};
+const HABITOS_DASHBOARD_COLS = {
+  lg: 12,
+  md: 10,
+  sm: 6,
+  xs: 4,
+  xxs: 2,
+};
+const HABITOS_DASHBOARD_DEFAULT_LAYOUTS = {
+  lg: [
+    { i: "daily-queue", x: 0, y: 0, w: 8, h: 13, minW: 4, minH: 7 },
+    { i: "habit-outcome", x: 8, y: 0, w: 4, h: 7, minW: 3, minH: 6 },
+    { i: "upcoming-tasks", x: 8, y: 7, w: 4, h: 6, minW: 3, minH: 5 },
+  ],
+  md: [
+    { i: "daily-queue", x: 0, y: 0, w: 6, h: 13, minW: 4, minH: 7 },
+    { i: "habit-outcome", x: 6, y: 0, w: 4, h: 7, minW: 3, minH: 6 },
+    { i: "upcoming-tasks", x: 6, y: 7, w: 4, h: 6, minW: 3, minH: 5 },
+  ],
+  sm: [
+    { i: "daily-queue", x: 0, y: 0, w: 6, h: 12, minW: 4, minH: 7 },
+    { i: "habit-outcome", x: 0, y: 12, w: 3, h: 6, minW: 2, minH: 5 },
+    { i: "upcoming-tasks", x: 3, y: 12, w: 3, h: 6, minW: 2, minH: 5 },
+  ],
+  xs: [
+    { i: "daily-queue", x: 0, y: 0, w: 4, h: 11, minW: 2, minH: 7 },
+    { i: "habit-outcome", x: 0, y: 11, w: 4, h: 6, minW: 2, minH: 5 },
+    { i: "upcoming-tasks", x: 0, y: 17, w: 4, h: 6, minW: 2, minH: 5 },
+  ],
+  xxs: [
+    { i: "daily-queue", x: 0, y: 0, w: 2, h: 10, minW: 2, minH: 6 },
+    { i: "habit-outcome", x: 0, y: 10, w: 2, h: 6, minW: 2, minH: 5 },
+    { i: "upcoming-tasks", x: 0, y: 16, w: 2, h: 6, minW: 2, minH: 5 },
+  ],
+};
+const HABITOS_DASHBOARD_MARGIN = [12, 12];
+const HABITOS_DASHBOARD_ROW_HEIGHT = 30;
+const HABITOS_DASHBOARD_RESIZE_HANDLES = ["s", "w", "e", "n", "sw", "nw", "se", "ne"];
+
+function normalizeDashboardGridInteger(value, fallbackValue, {
+  min = 0,
+  max = Number.MAX_SAFE_INTEGER,
+} = {}) {
+  const numericValue = Math.round(Number(value));
+  if (!Number.isInteger(numericValue)) {
+    return fallbackValue;
+  }
+
+  return Math.min(max, Math.max(min, numericValue));
+}
+
+function normalizeHabitosDashboardLayoutItem(item, fallbackItem, cols) {
+  const minW = normalizeDashboardGridInteger(item?.minW, fallbackItem.minW, {
+    min: 1,
+    max: cols,
+  });
+  const minH = normalizeDashboardGridInteger(item?.minH, fallbackItem.minH, {
+    min: 1,
+  });
+  const w = normalizeDashboardGridInteger(item?.w, fallbackItem.w, {
+    min: minW,
+    max: cols,
+  });
+  const h = normalizeDashboardGridInteger(item?.h, fallbackItem.h, {
+    min: minH,
+  });
+
+  return {
+    i: fallbackItem.i,
+    x: normalizeDashboardGridInteger(item?.x, fallbackItem.x, {
+      min: 0,
+      max: Math.max(0, cols - w),
+    }),
+    y: normalizeDashboardGridInteger(item?.y, fallbackItem.y, {
+      min: 0,
+    }),
+    w,
+    h,
+    minW,
+    minH,
+    resizeHandles: HABITOS_DASHBOARD_RESIZE_HANDLES,
+  };
+}
+
+function normalizeHabitosDashboardLayouts(source) {
+  const rawLayouts = source && typeof source === "object" ? source : {};
+  const normalizedLayouts = {};
+
+  for (const breakpoint of Object.keys(HABITOS_DASHBOARD_DEFAULT_LAYOUTS)) {
+    const fallbackItems = HABITOS_DASHBOARD_DEFAULT_LAYOUTS[breakpoint];
+    const rawItems = Array.isArray(rawLayouts?.[breakpoint]) ? rawLayouts[breakpoint] : [];
+    const rawItemsById = new Map(
+      rawItems.map((entry) => [String(entry?.i || ""), entry]),
+    );
+
+    normalizedLayouts[breakpoint] = fallbackItems.map((fallbackItem) =>
+      normalizeHabitosDashboardLayoutItem(
+        rawItemsById.get(fallbackItem.i),
+        fallbackItem,
+        HABITOS_DASHBOARD_COLS[breakpoint],
+      ));
+  }
+
+  return normalizedLayouts;
+}
+
+function getHabitosDashboardLayoutsSignature(layouts) {
+  return JSON.stringify(normalizeHabitosDashboardLayouts(layouts));
+}
+
+function readHabitosDashboardLayouts(settingsValue) {
+  const baseSettings = settingsValue && typeof settingsValue === "object" ? settingsValue : {};
+  return normalizeHabitosDashboardLayouts(baseSettings[HABITOS_DASHBOARD_LAYOUTS_KEY]);
+}
+
+function writeHabitosDashboardLayouts(settingsValue, layouts) {
+  const baseSettings = settingsValue && typeof settingsValue === "object" ? settingsValue : {};
+  return {
+    ...baseSettings,
+    [HABITOS_DASHBOARD_LAYOUTS_KEY]: normalizeHabitosDashboardLayouts(layouts),
+  };
+}
+
+function getHabitCategoryPresetId(value) {
+  return `preset:${normalizeCategoryNameValue(value)}`;
+}
+
+function normalizeHabitCategoryPresetOverrideValue(value, preset) {
+  const normalizedValue = value && typeof value === "object" ? value : {};
+
+  return {
+    id: getHabitCategoryPresetId(preset.value),
+    presetId: getHabitCategoryPresetId(preset.value),
+    kind: "preset",
+    originalName: preset.value,
+    name: String(normalizedValue.name || preset.value).trim() || preset.value,
+    iconId: normalizedValue.iconId || preset.iconId || DEFAULT_CUSTOM_HABIT_CATEGORY_ICON_ID,
+    color: normalizeHexColorDraftValue(
+      normalizedValue.color,
+      preset.color || DEFAULT_CUSTOM_HABIT_CATEGORY_COLOR,
+    ),
+    deleted: Boolean(normalizedValue.deleted),
+  };
+}
+
+function readHabitCategoryPresetOverrides(settingsValue) {
+  const baseSettings = settingsValue && typeof settingsValue === "object" ? settingsValue : {};
+  const rawOverrides = baseSettings[HABITOS_CATEGORY_PRESET_OVERRIDES_KEY];
+  const normalizedOverrides = {};
+
+  for (const preset of HABIT_CATEGORY_PRESETS) {
+    const presetId = getHabitCategoryPresetId(preset.value);
+    normalizedOverrides[presetId] = normalizeHabitCategoryPresetOverrideValue(
+      rawOverrides?.[presetId],
+      preset,
+    );
+  }
+
+  return normalizedOverrides;
+}
+
+function writeHabitCategoryPresetOverrides(settingsValue, overrides) {
+  const baseSettings = settingsValue && typeof settingsValue === "object" ? settingsValue : {};
+  const nextOverrides = {};
+
+  for (const preset of HABIT_CATEGORY_PRESETS) {
+    const presetId = getHabitCategoryPresetId(preset.value);
+    const normalizedOverride = normalizeHabitCategoryPresetOverrideValue(overrides?.[presetId], preset);
+
+    if (
+      normalizedOverride.name !== preset.value
+      || normalizedOverride.iconId !== preset.iconId
+      || normalizedOverride.color !== preset.color
+      || normalizedOverride.deleted
+    ) {
+      nextOverrides[presetId] = {
+        name: normalizedOverride.name,
+        iconId: normalizedOverride.iconId,
+        color: normalizedOverride.color,
+        deleted: normalizedOverride.deleted,
+      };
+    }
+  }
+
+  return {
+    ...baseSettings,
+    [HABITOS_CATEGORY_PRESET_OVERRIDES_KEY]: nextOverrides,
+  };
+}
+
+function buildEffectivePresetCategories(presetOverrides = {}) {
+  return HABIT_CATEGORY_PRESETS
+    .map((preset) => normalizeHabitCategoryPresetOverrideValue(
+      presetOverrides[getHabitCategoryPresetId(preset.value)],
+      preset,
+    ))
+    .filter((entry) => !entry.deleted)
+    .map((entry) => ({
+      id: entry.id,
+      presetId: entry.presetId,
+      kind: "preset",
+      originalName: entry.originalName,
+      name: entry.name,
+      value: entry.name,
+      label: entry.name,
+      iconId: entry.iconId,
+      color: entry.color,
+    }));
+}
+
+function buildManagedHabitCategories(customCategories = [], presetOverrides = {}) {
+  return [
+    ...buildEffectivePresetCategories(presetOverrides),
+    ...customCategories.map((entry) => ({
+      ...entry,
+      kind: "custom",
+      value: entry.name,
+      label: entry.name,
+    })),
+  ];
+}
 
 function todayLocalDate(baseDate = new Date()) {
   const now = baseDate;
@@ -113,6 +347,9 @@ function createDraftChecklistItem(source = null) {
 function createHabitCategoryDraft(source = null) {
   return {
     id: source?.id || "",
+    kind: source?.kind || "custom",
+    presetId: source?.presetId || "",
+    originalName: source?.originalName || source?.name || "",
     name: source?.name || "",
     iconId: source?.iconId || DEFAULT_CUSTOM_HABIT_CATEGORY_ICON_ID,
     color: source?.color || DEFAULT_CUSTOM_HABIT_CATEGORY_COLOR,
@@ -320,24 +557,36 @@ function formatVisibleDateLabel(value) {
     }).format(parsed);
 }
 
-function hashValue(input = "") {
-  let hash = 0;
+function resolveQueueCategoryPresentation(item, categoryCatalog = [], presetOverrides = {}) {
+  const normalizedCategory = normalizeCategoryNameValue(item?.category);
 
-  for (let index = 0; index < input.length; index += 1) {
-    hash = ((hash << 5) - hash) + input.charCodeAt(index);
-    hash |= 0;
+  if (normalizedCategory) {
+    const customCategory = categoryCatalog.find(
+      (entry) => normalizeCategoryNameValue(entry?.name) === normalizedCategory,
+    );
+
+    if (customCategory) {
+      return {
+        color: customCategory.color || DEFAULT_CUSTOM_HABIT_CATEGORY_COLOR,
+        iconId: customCategory.iconId || DEFAULT_CUSTOM_HABIT_CATEGORY_ICON_ID,
+      };
+    }
+
+    const presetCategory = buildEffectivePresetCategories(presetOverrides).find(
+      (entry) => normalizeCategoryNameValue(entry.value) === normalizedCategory,
+    );
+
+    if (presetCategory) {
+      return {
+        color: presetCategory.color || DEFAULT_CUSTOM_HABIT_CATEGORY_COLOR,
+        iconId: presetCategory.iconId || DEFAULT_CUSTOM_HABIT_CATEGORY_ICON_ID,
+      };
+    }
   }
 
-  return Math.abs(hash);
-}
-
-function getQueueAccent(item) {
-  const base = `${item.category || item.type || "item"}:${item.title || ""}`;
-  const hue = hashValue(base) % 360;
-
   return {
-    color: `hsl(${hue} 68% 58%)`,
-    label: (item.category || (item.type === "habit" ? "Habito" : "Tarea")).slice(0, 1).toUpperCase(),
+    color: DEFAULT_CUSTOM_HABIT_CATEGORY_COLOR,
+    iconId: DEFAULT_CUSTOM_HABIT_CATEGORY_ICON_ID,
   };
 }
 
@@ -422,6 +671,14 @@ function resolveChartThemeValue(name, fallbackValue) {
   const computedStyle = getComputedStyle(document.documentElement);
   const resolvedValue = computedStyle.getPropertyValue(name).trim();
   return resolvedValue || fallbackValue;
+}
+
+function DashboardEditOverlay() {
+  return <div className="habitosDashboard__editOverlay" aria-hidden="true" />;
+}
+
+function DashboardPanelTitle({ title = "", description = "", editMode = false }) {
+  return <PanelTitle title={title} description={description} />;
 }
 
 function HabitOutcomeLineChart({
@@ -562,7 +819,7 @@ function HabitOutcomeLineChart({
   );
 }
 
-function HabitOutcomePanel({ chart }) {
+function HabitOutcomePanel({ chart, className = "", dashboardEditMode = false }) {
   const defaultRange = chart?.defaultRange || "7d";
   const [rangeValue, setRangeValue] = useState(defaultRange);
   const rangeOptions = Array.isArray(chart?.options) && chart.options.length
@@ -579,7 +836,13 @@ function HabitOutcomePanel({ chart }) {
   }, [defaultRange, rangeOptions, rangeValue]);
 
   return (
-    <SectionPanel className="habitosView__trendPanel">
+    <SectionPanel
+      className={[
+        "habitosDashboard__widget",
+        "habitosView__trendPanel",
+        className,
+      ].filter(Boolean).join(" ")}
+    >
       <PanelHeader
         actions={(
           <SegmentedControl
@@ -591,9 +854,11 @@ function HabitOutcomePanel({ chart }) {
           />
         )}
       >
-        <PanelTitle title="Evolucion de habitos" />
+        <DashboardPanelTitle title="Evolucion de habitos" editMode={dashboardEditMode} />
       </PanelHeader>
-      <HabitOutcomeLineChart chartData={selectedChart} rangeValue={rangeValue} />
+      <div className="habitosDashboard__widgetBody habitosView__trendPanelBody">
+        <HabitOutcomeLineChart chartData={selectedChart} rangeValue={rangeValue} />
+      </div>
     </SectionPanel>
   );
 }
@@ -999,6 +1264,8 @@ function QuantityQueueInput({
 
 function QueueItemCard({
   item,
+  categoryCatalog = [],
+  presetOverrides = {},
   isSelected = false,
   saving = false,
   resultEditable = true,
@@ -1009,7 +1276,7 @@ function QueueItemCard({
   onToggleChecklistExpanded,
   isChecklistExpanded = false,
 }) {
-  const accent = getQueueAccent(item);
+  const accent = resolveQueueCategoryPresentation(item, categoryCatalog, presetOverrides);
   const toggleMeta = getQueueToggleMeta(item);
   const isSettled = isQueueItemSettled(item);
   const checklistItems = item.type === "habit" && item.progressMode === "checklist"
@@ -1038,7 +1305,7 @@ function QueueItemCard({
         style={{ "--habitos-item-accent": accent.color }}
         aria-hidden="true"
       >
-        <span>{accent.label}</span>
+        <RemoteCategoryIcon iconId={accent.iconId} color={accent.color} />
       </div>
 
       <div className="habitosView__queueCopy">
@@ -1145,6 +1412,127 @@ function DraftNumberInput({
   );
 }
 
+function StepperNumberInput({
+  value,
+  onChange,
+  onCommit,
+  min,
+  max,
+  step = 1,
+  disabled = false,
+  ...inputProps
+}) {
+  const minValue = Number.isFinite(Number(min)) ? Number(min) : null;
+  const maxValue = Number.isFinite(Number(max)) ? Number(max) : null;
+  const stepValue = Number.isFinite(Number(step)) && Number(step) > 0 ? Number(step) : 1;
+  const currentValue = Number(String(value ?? "").trim());
+  const hasNumericValue = Number.isFinite(currentValue);
+
+  const clampValue = (nextValue) => {
+    let normalizedValue = nextValue;
+
+    if (minValue !== null) {
+      normalizedValue = Math.max(minValue, normalizedValue);
+    }
+
+    if (maxValue !== null) {
+      normalizedValue = Math.min(maxValue, normalizedValue);
+    }
+
+    return Math.round(normalizedValue);
+  };
+
+  const commitValue = (rawValue) => {
+    onCommit?.(rawValue);
+  };
+
+  const adjustValue = (direction) => {
+    if (disabled) {
+      return;
+    }
+
+    const baseValue = hasNumericValue
+      ? currentValue
+      : minValue ?? 0;
+    const nextValue = String(clampValue(baseValue + (direction * stepValue)));
+
+    onChange(nextValue);
+    commitValue(nextValue);
+  };
+
+  const isDecrementDisabled = disabled || (hasNumericValue && minValue !== null && currentValue <= minValue);
+  const isIncrementDisabled = disabled || (hasNumericValue && maxValue !== null && currentValue >= maxValue);
+
+  return (
+    <div className={["habitosView__numberStepper", disabled ? "is-disabled" : ""].filter(Boolean).join(" ")}>
+      <button
+        type="button"
+        className="habitosView__numberStepperButton"
+        onClick={() => adjustValue(-1)}
+        disabled={isDecrementDisabled}
+        aria-label="Bajar valor"
+      >
+        <ChevronLeftIcon />
+      </button>
+
+      <input
+        {...inputProps}
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={(event) => commitValue(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commitValue(event.currentTarget.value);
+          }
+        }}
+      />
+
+      <button
+        type="button"
+        className="habitosView__numberStepperButton"
+        onClick={() => adjustValue(1)}
+        disabled={isIncrementDisabled}
+        aria-label="Subir valor"
+      >
+        <ChevronRightIcon />
+      </button>
+    </div>
+  );
+}
+
+function DateDraftInput({
+  value,
+  onChange,
+  showTodayLabel = false,
+  ...inputProps
+}) {
+  const isTodayDefault = showTodayLabel && value === todayLocalDate();
+
+  return (
+    <div className={["habitosView__dateField", isTodayDefault ? "is-default-today" : ""].filter(Boolean).join(" ")}>
+      <input
+        {...inputProps}
+        className="habitosView__dateFieldInput"
+        type="date"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {isTodayDefault ? (
+        <span className="habitosView__dateFieldGhost" aria-hidden="true">
+          Hoy
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function FloatingWorkbenchModal({
   isVisible,
   saving = false,
@@ -1207,11 +1595,8 @@ function CreateChooserModal({
   );
 }
 
-function buildHabitCategoryOptions(customCategories = [], selectedCategory = "") {
-  const nextOptions = HABIT_CATEGORY_PRESETS.map((entry) => ({
-    ...entry,
-    kind: "preset",
-  }));
+function buildHabitCategoryOptions(customCategories = [], selectedCategory = "", presetOverrides = {}) {
+  const nextOptions = buildEffectivePresetCategories(presetOverrides);
   const knownNames = new Set(nextOptions.map((entry) => normalizeCategoryNameValue(entry.value)));
 
   for (const entry of customCategories) {
@@ -1336,6 +1721,7 @@ function CategoryOptionCard({
   color,
   isSelected = false,
   isCreate = false,
+  onContextMenu,
   onClick,
 }) {
   return (
@@ -1347,7 +1733,9 @@ function CategoryOptionCard({
         isCreate ? "is-create" : "",
       ].filter(Boolean).join(" ")}
       onClick={onClick}
+      onContextMenu={onContextMenu}
     >
+      <strong>{title}</strong>
       <span
         className="habitosView__categoryOptionIcon"
         style={isCreate ? undefined : { background: color || DEFAULT_CUSTOM_HABIT_CATEGORY_COLOR }}
@@ -1355,7 +1743,6 @@ function CategoryOptionCard({
       >
         <RemoteCategoryIcon iconId={iconId} size="xl" />
       </span>
-      <strong>{title}</strong>
     </button>
   );
 }
@@ -1544,6 +1931,7 @@ function CustomHabitCategoryBuilder({
 
 function HabitCategoryPicker({
   categories = [],
+  presetOverrides = {},
   selectedCategory = "",
   saving = false,
   builderOpen = false,
@@ -1554,8 +1942,9 @@ function HabitCategoryPicker({
   onCloseBuilder,
   onChangeCategoryBuilder,
   onSaveBuilder,
+  onOpenCategoryMenu,
 }) {
-  const categoryOptions = buildHabitCategoryOptions(categories, selectedCategory);
+  const categoryOptions = buildHabitCategoryOptions(categories, selectedCategory, presetOverrides);
 
   return (
     <div className="habitosView__wizardStep">
@@ -1573,6 +1962,9 @@ function HabitCategoryPicker({
             color={option.color}
             isSelected={selectedCategory === option.value}
             onClick={() => onSelectCategory(option.value)}
+            onContextMenu={option.kind === "custom"
+              ? (event) => onOpenCategoryMenu?.(event, option)
+              : undefined}
           />
         ))}
 
@@ -1625,34 +2017,51 @@ function WizardOptionCard({
   );
 }
 
-function SecondaryListCard({ title, items, renderItem, emptyTitle = "Sin elementos." }) {
+function SecondaryListCard({
+  className = "",
+  title,
+  items,
+  renderItem,
+  emptyTitle = "Sin elementos.",
+  dashboardEditMode = false,
+}) {
   return (
-    <SectionPanel>
+    <SectionPanel
+      className={[
+        "habitosDashboard__widget",
+        "habitosView__secondaryPanel",
+        className,
+      ].filter(Boolean).join(" ")}
+    >
       <PanelHeader>
-        <PanelTitle title={title} />
+        <DashboardPanelTitle title={title} editMode={dashboardEditMode} />
       </PanelHeader>
 
-      {items.length ? (
-        <div className="habitosView__secondaryList">
-          {items.map(renderItem)}
-        </div>
-      ) : (
-        <StateBlock title={emptyTitle} />
-      )}
+      <div className="habitosDashboard__widgetBody habitosView__secondaryPanelBody">
+        {items.length ? (
+          <div className="habitosView__secondaryList">
+            {items.map(renderItem)}
+          </div>
+        ) : (
+          <StateBlock title={emptyTitle} />
+        )}
+      </div>
     </SectionPanel>
   );
 }
 
 function HabitListItem({
   habit,
+  categoryCatalog = [],
+  presetOverrides = {},
   isSelected = false,
   onSelect,
 }) {
-  const accent = getQueueAccent({
+  const accent = resolveQueueCategoryPresentation({
     type: "habit",
     title: habit.title,
     category: habit.category,
-  });
+  }, categoryCatalog, presetOverrides);
   const summaryParts = [];
 
   if (habit.category) {
@@ -1675,7 +2084,7 @@ function HabitListItem({
         style={{ "--habitos-item-accent": accent.color }}
         aria-hidden="true"
       >
-        <span>{accent.label}</span>
+        <RemoteCategoryIcon iconId={accent.iconId} color={accent.color} />
       </div>
 
       <div className="habitosView__habitRowCopy">
@@ -1693,6 +2102,8 @@ function HabitListItem({
 function HabitsGroup({
   title,
   habits,
+  categoryCatalog = [],
+  presetOverrides = {},
   selectedHabitId,
   onSelectHabit,
   emptyTitle,
@@ -1710,6 +2121,8 @@ function HabitsGroup({
             <HabitListItem
               key={habit.id}
               habit={habit}
+              categoryCatalog={categoryCatalog}
+              presetOverrides={presetOverrides}
               isSelected={habit.id === selectedHabitId}
               onSelect={() => onSelectHabit(habit.id)}
             />
@@ -1725,6 +2138,7 @@ function HabitsGroup({
 function HabitDetailsPanel({
   habit,
   home,
+  presetOverrides = {},
   saving,
   onEdit,
   onToggleStatus,
@@ -1733,6 +2147,11 @@ function HabitDetailsPanel({
   const todaySummary = getHabitTodaySummary(home, habit);
   const progressOption = getHabitProgressOption(habit.progressMode);
   const checklistItems = getHabitChecklistItemsValue(habit);
+  const accent = resolveQueueCategoryPresentation({
+    type: "habit",
+    title: habit.title,
+    category: habit.category,
+  }, home?.categoryCatalog || [], presetOverrides);
   const detailItems = [
     { label: "Estado", value: getHabitStatusLabel(habit.status) },
     { label: "Frecuencia", value: formatHabitSchedule(habit) },
@@ -1778,14 +2197,24 @@ function HabitDetailsPanel({
             />
           </PanelHeader>
 
-          <FieldGrid className="habitosView__habitMetaGrid">
-            {detailItems.map((item) => (
-              <div key={item.label} className="habitosView__detailCard">
-                <span>{item.label}</span>
-                <strong>{item.value}</strong>
-              </div>
-            ))}
-          </FieldGrid>
+          <div className="habitosView__habitDetailHero">
+            <div
+              className="habitosView__habitDetailHeroBadge"
+              style={{ "--habitos-item-accent": accent.color }}
+              aria-hidden="true"
+            >
+              <RemoteCategoryIcon iconId={accent.iconId} color={accent.color} size="xxl" />
+            </div>
+
+            <div className="habitosView__detailMetaList">
+              {detailItems.map((item) => (
+                <div key={item.label} className="habitosView__detailMetaRow">
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
         </SectionPanel>
 
         <SectionPanel tone="soft">
@@ -1793,37 +2222,41 @@ function HabitDetailsPanel({
             <PanelTitle title="Evaluacion" />
           </PanelHeader>
 
-          <FieldGrid className="habitosView__habitMetaGrid">
-            <div className="habitosView__detailCard">
+          <div className="habitosView__detailMetaList habitosView__detailMetaList--section">
+            <div className="habitosView__detailMetaRow">
               <span>Tipo</span>
-              <strong>{getHabitProgressLabel(habit)}</strong>
-              {progressOption?.description ? (
-                <small>{progressOption.description}</small>
-              ) : null}
+              <div className="habitosView__detailMetaContent">
+                <strong>{getHabitProgressLabel(habit)}</strong>
+                {progressOption?.description ? (
+                  <small>{progressOption.description}</small>
+                ) : null}
+              </div>
             </div>
 
             {habit.progressMode === "quantity" ? (
-              <div className="habitosView__detailCard">
+              <div className="habitosView__detailMetaRow">
                 <span>Objetivo</span>
                 <strong>{getHabitQuantitySummary(habit)}</strong>
               </div>
             ) : null}
 
             {habit.progressMode === "checklist" ? (
-              <div className="habitosView__detailCard">
+              <div className="habitosView__detailMetaRow is-stack">
                 <span>Sub-items</span>
-                {checklistItems.length ? (
-                  <ul className="habitosView__detailList">
-                    {checklistItems.map((item) => (
-                      <li key={item.id}>{item.title}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <small>Sin sub-items definidos.</small>
-                )}
+                <div className="habitosView__detailMetaContent">
+                  {checklistItems.length ? (
+                    <ul className="habitosView__detailCompactList">
+                      {checklistItems.map((item) => (
+                        <li key={item.id}>{item.title}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <small>Sin sub-items definidos.</small>
+                  )}
+                </div>
               </div>
             ) : null}
-          </FieldGrid>
+          </div>
         </SectionPanel>
 
         <SectionPanel tone="soft">
@@ -1831,24 +2264,26 @@ function HabitDetailsPanel({
             <PanelTitle title="Actividad" />
           </PanelHeader>
 
-          <FieldGrid className="habitosView__habitMetaGrid">
-            <div className="habitosView__detailCard">
+          <div className="habitosView__detailMetaList habitosView__detailMetaList--section">
+            <div className="habitosView__detailMetaRow">
               <span>Dia visible</span>
               <strong>{todaySummary}</strong>
             </div>
 
-            <div className="habitosView__detailCard">
+            <div className="habitosView__detailMetaRow">
               <span>Ultimo registro</span>
-              <strong>{latestHistoryEntry ? latestHistoryEntry.statusLabel : "Sin actividad reciente"}</strong>
-              {latestHistoryEntry ? (
-                <small>
-                  {formatLocalDateTime(latestHistoryEntry.timestamp)}
-                  {" - "}
-                  {latestHistoryEntry.summary}
-                </small>
-              ) : null}
+              <div className="habitosView__detailMetaContent">
+                <strong>{latestHistoryEntry ? latestHistoryEntry.statusLabel : "Sin actividad reciente"}</strong>
+                {latestHistoryEntry ? (
+                  <small>
+                    {formatLocalDateTime(latestHistoryEntry.timestamp)}
+                    {" - "}
+                    {latestHistoryEntry.summary}
+                  </small>
+                ) : null}
+              </div>
             </div>
-          </FieldGrid>
+          </div>
         </SectionPanel>
 
         {habit.notes ? (
@@ -1865,12 +2300,12 @@ function HabitDetailsPanel({
   );
 }
 
-function HabitsDrawer({
+function HabitsSettingsSection({
   habits,
   selectedHabitId,
   home,
+  presetOverrides = {},
   saving,
-  onClose,
   onCreateHabit,
   onSelectHabit,
   onEditHabit,
@@ -1881,73 +2316,326 @@ function HabitsDrawer({
   const selectedHabit = habits.find((habit) => habit.id === selectedHabitId) || null;
 
   return (
+    <SplitLayout variant="sidebar-detail" className="habitosView__habitSplit">
+      <SplitSidebar className="habitosView__habitSidebar">
+        <div className="habitosView__settingsSectionHeader">
+          <div className="habitosView__settingsSectionCopy">
+            <strong>Habitos</strong>
+            <span>Activos y en pausa</span>
+          </div>
+          <Button type="button" tone="primary" onClick={onCreateHabit} disabled={saving}>
+            Nuevo habito
+          </Button>
+        </div>
+
+        <ScrollRegion className="habitosView__habitSidebarScroll">
+          {habits.length ? (
+            <PanelStack className="habitosView__habitSidebarStack">
+              <HabitsGroup
+                title="Activos"
+                habits={activeHabits}
+                categoryCatalog={home.categoryCatalog}
+                presetOverrides={presetOverrides}
+                selectedHabitId={selectedHabitId}
+                onSelectHabit={onSelectHabit}
+                emptyTitle="Sin habitos activos."
+              />
+
+              <HabitsGroup
+                title="En pausa"
+                habits={pausedHabits}
+                categoryCatalog={home.categoryCatalog}
+                presetOverrides={presetOverrides}
+                selectedHabitId={selectedHabitId}
+                onSelectHabit={onSelectHabit}
+                emptyTitle="Sin habitos en pausa."
+              />
+            </PanelStack>
+          ) : (
+            <StateBlock
+              title="Todavia no hay habitos."
+              description="Crea uno nuevo para administrarlo desde aqui."
+            >
+              <Button type="button" tone="primary" onClick={onCreateHabit} disabled={saving}>
+                Crear habito
+              </Button>
+            </StateBlock>
+          )}
+        </ScrollRegion>
+      </SplitSidebar>
+
+      <SplitDetail className="habitosView__habitDetail">
+        {selectedHabit ? (
+          <HabitDetailsPanel
+            habit={selectedHabit}
+            home={home}
+            presetOverrides={presetOverrides}
+            saving={saving}
+            onEdit={() => onEditHabit(selectedHabit)}
+            onToggleStatus={() => onToggleHabitStatus(selectedHabit)}
+          />
+        ) : (
+          <StateBlock
+            title={habits.length ? "Selecciona un habito." : "Sin detalles por mostrar."}
+            description={habits.length ? "Elige un habito de la lista para ver su operativa." : ""}
+          />
+        )}
+      </SplitDetail>
+    </SplitLayout>
+  );
+}
+
+function CategorySettingsListItem({
+  category,
+  isSelected = false,
+  onSelect,
+}) {
+  return (
+    <button
+      type="button"
+      className={["habitosView__categorySettingRow", isSelected ? "is-selected" : ""].filter(Boolean).join(" ")}
+      onClick={onSelect}
+    >
+      <div className="habitosView__categorySettingRowCopy">
+        <strong>{category.name}</strong>
+      </div>
+      <span
+        className="habitosView__categorySettingRowBadge"
+        style={{ background: category.color }}
+        aria-hidden="true"
+      >
+        <RemoteCategoryIcon iconId={category.iconId} size="l" />
+      </span>
+    </button>
+  );
+}
+
+function CategorySettingsSection({
+  categories,
+  selectedCategoryId,
+  selectedCategory,
+  builderOpen,
+  builderDraft,
+  builderError,
+  saving,
+  onSelectCategory,
+  onCreateCategory,
+  onEditCategory,
+  onDeleteCategory,
+  onChangeCategoryBuilder,
+  onSaveCategoryBuilder,
+  onCloseCategoryBuilder,
+}) {
+  return (
+    <SplitLayout variant="sidebar-detail" className="habitosView__habitSplit">
+      <SplitSidebar className="habitosView__habitSidebar">
+        <div className="habitosView__settingsSectionHeader">
+          <div className="habitosView__settingsSectionCopy">
+            <strong>Categorias</strong>
+            <span>Color e icono</span>
+          </div>
+          <Button type="button" tone="primary" onClick={onCreateCategory} disabled={saving}>
+            Nueva categoria
+          </Button>
+        </div>
+
+        <ScrollRegion className="habitosView__habitSidebarScroll">
+          {categories.length ? (
+            <div className="habitosView__categorySettingsList">
+              {categories.map((category) => (
+                <CategorySettingsListItem
+                  key={category.id}
+                  category={category}
+                  isSelected={selectedCategoryId === category.id}
+                  onSelect={() => onSelectCategory(category.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <StateBlock
+              title="Sin categorias."
+              description="Crea una categoria para reutilizarla en tus habitos."
+            >
+              <Button type="button" tone="primary" onClick={onCreateCategory} disabled={saving}>
+                Crear categoria
+              </Button>
+            </StateBlock>
+          )}
+        </ScrollRegion>
+      </SplitSidebar>
+
+      <SplitDetail className="habitosView__habitDetail">
+        {builderOpen ? (
+          <PanelStack>
+            <SectionPanel tone="highlight">
+              <PanelHeader>
+                <PanelTitle
+                  title={builderDraft?.id ? "Editar categoria" : "Nueva categoria"}
+                />
+              </PanelHeader>
+
+              <CustomHabitCategoryBuilder
+                draft={builderDraft}
+                saving={saving}
+                error={builderError}
+                onChange={onChangeCategoryBuilder}
+                onCancel={onCloseCategoryBuilder}
+                onSave={onSaveCategoryBuilder}
+              />
+            </SectionPanel>
+          </PanelStack>
+        ) : selectedCategory ? (
+          <PanelStack>
+            <SectionPanel tone="highlight">
+              <PanelHeader
+                actions={(
+                  <div className="habitosView__habitDetailActions">
+                    <Button type="button" onClick={() => onEditCategory(selectedCategory)} disabled={saving}>
+                      <PencilIcon />
+                      <span>Editar</span>
+                    </Button>
+                    <Button type="button" tone="danger" onClick={() => onDeleteCategory(selectedCategory)} disabled={saving}>
+                      <TrashIcon />
+                      <span>Eliminar</span>
+                    </Button>
+                  </div>
+                )}
+              >
+                <PanelTitle
+                  title={selectedCategory.name}
+                  description={selectedCategory.kind === "preset" ? "Categoria base" : "Categoria personalizada"}
+                />
+              </PanelHeader>
+
+              <div className="habitosView__categoryDetailHero">
+                <span
+                  className="habitosView__categoryDetailHeroIcon"
+                  style={{ background: selectedCategory.color }}
+                  aria-hidden="true"
+                >
+                  <RemoteCategoryIcon iconId={selectedCategory.iconId} size="xxl" />
+                </span>
+
+                <div className="habitosView__categoryMetaList">
+                  <div className="habitosView__categoryMetaRow">
+                    <span>Nombre</span>
+                    <strong>{selectedCategory.name}</strong>
+                  </div>
+                  <div className="habitosView__categoryMetaRow">
+                    <span>Color</span>
+                    <strong>{selectedCategory.color.toUpperCase()}</strong>
+                  </div>
+                  <div className="habitosView__categoryMetaRow">
+                    <span>Icono</span>
+                    <strong>{selectedCategory.iconId.replace(/^[^:]+:/, "")}</strong>
+                  </div>
+                </div>
+              </div>
+            </SectionPanel>
+          </PanelStack>
+        ) : (
+          <StateBlock
+            title={categories.length ? "Selecciona una categoria." : "Sin detalles por mostrar."}
+            description={categories.length ? "Elige una categoria para editarla o eliminarla." : ""}
+          />
+        )}
+      </SplitDetail>
+    </SplitLayout>
+  );
+}
+
+function SettingsDrawer({
+  activeTab,
+  habits,
+  selectedHabitId,
+  home,
+  presetOverrides = {},
+  saving,
+  onClose,
+  onChangeTab,
+  onCreateHabit,
+  onSelectHabit,
+  onEditHabit,
+  onToggleHabitStatus,
+  categories,
+  selectedCategoryId,
+  selectedCategory,
+  onSelectCategory,
+  onCreateCategory,
+  onEditCategory,
+  onDeleteCategory,
+  categoryBuilderOpen,
+  categoryBuilderDraft,
+  categoryBuilderError,
+  onChangeCategoryBuilder,
+  onSaveCategoryBuilder,
+  onCloseCategoryBuilder,
+}) {
+  const tabOptions = [
+    { id: "habits", label: "Habitos" },
+    { id: "categories", label: "Categorias" },
+  ];
+
+  return (
     <SectionPanel tone="highlight" className="habitosView__modalPanel habitosView__drawerPanel">
       <PanelHeader
         actions={(
           <div className="habitosView__drawerHeaderActions">
-            <Button type="button" tone="primary" onClick={onCreateHabit} disabled={saving}>
-              Nuevo habito
-            </Button>
             <Button type="button" onClick={onClose} disabled={saving}>
               Cerrar
             </Button>
           </div>
         )}
       >
-        <PanelTitle
-          title="Habitos"
-          description="Gestion lateral de rutinas activas y pausadas."
-        />
+        <PanelTitle title="Configuraciones" />
       </PanelHeader>
 
       <div className="habitosView__drawerBody">
-        <SplitLayout variant="sidebar-detail" className="habitosView__habitSplit">
-          <SplitSidebar className="habitosView__habitSidebar">
-            <ScrollRegion className="habitosView__habitSidebarScroll">
-              {habits.length ? (
-                <PanelStack className="habitosView__habitSidebarStack">
-                  <HabitsGroup
-                    title="Activos"
-                    habits={activeHabits}
-                    selectedHabitId={selectedHabitId}
-                    onSelectHabit={onSelectHabit}
-                    emptyTitle="Sin habitos activos."
-                  />
-
-                  <HabitsGroup
-                    title="En pausa"
-                    habits={pausedHabits}
-                    selectedHabitId={selectedHabitId}
-                    onSelectHabit={onSelectHabit}
-                    emptyTitle="Sin habitos en pausa."
-                  />
-                </PanelStack>
-              ) : (
-                <StateBlock
-                  title="Todavia no hay habitos."
-                  description="Puedes crear uno nuevo y luego gestionarlo desde aqui."
+        <SplitLayout variant="sidebar-detail" className="habitosView__settingsSplit">
+          <SplitSidebar className="habitosView__settingsSidebar">
+            <div className="habitosView__settingsTabs">
+              {tabOptions.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={["habitosView__settingsTab", activeTab === tab.id ? "is-active" : ""].filter(Boolean).join(" ")}
+                  onClick={() => onChangeTab(tab.id)}
                 >
-                  <Button type="button" tone="primary" onClick={onCreateHabit} disabled={saving}>
-                    Crear habito
-                  </Button>
-                </StateBlock>
-              )}
-            </ScrollRegion>
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
           </SplitSidebar>
 
-          <SplitDetail className="habitosView__habitDetail">
-            {selectedHabit ? (
-              <HabitDetailsPanel
-                habit={selectedHabit}
+          <SplitDetail className="habitosView__settingsDetail">
+            {activeTab === "habits" ? (
+              <HabitsSettingsSection
+                habits={habits}
+                selectedHabitId={selectedHabitId}
                 home={home}
+                presetOverrides={presetOverrides}
                 saving={saving}
-                onEdit={() => onEditHabit(selectedHabit)}
-                onToggleStatus={() => onToggleHabitStatus(selectedHabit)}
+                onCreateHabit={onCreateHabit}
+                onSelectHabit={onSelectHabit}
+                onEditHabit={onEditHabit}
+                onToggleHabitStatus={onToggleHabitStatus}
               />
             ) : (
-              <StateBlock
-                title={habits.length ? "Selecciona un habito." : "Sin detalles por mostrar."}
-                description={habits.length ? "Elige un habito de la lista para ver su operativa." : ""}
+              <CategorySettingsSection
+                categories={categories}
+                selectedCategoryId={selectedCategoryId}
+                selectedCategory={selectedCategory}
+                builderOpen={categoryBuilderOpen}
+                builderDraft={categoryBuilderDraft}
+                builderError={categoryBuilderError}
+                saving={saving}
+                onSelectCategory={onSelectCategory}
+                onCreateCategory={onCreateCategory}
+                onEditCategory={onEditCategory}
+                onDeleteCategory={onDeleteCategory}
+                onChangeCategoryBuilder={onChangeCategoryBuilder}
+                onSaveCategoryBuilder={onSaveCategoryBuilder}
+                onCloseCategoryBuilder={onCloseCategoryBuilder}
               />
             )}
           </SplitDetail>
@@ -2011,7 +2699,7 @@ function TaskEditor({
           </Field>
 
           <Field label="Prioridad">
-            <DraftNumberInput
+            <StepperNumberInput
               min="1"
               max="100"
               step="1"
@@ -2128,6 +2816,7 @@ function TaskEditor({
 function HabitEditor({
   draft,
   categories,
+  presetOverrides = {},
   step,
   saving,
   wizardError,
@@ -2140,6 +2829,7 @@ function HabitEditor({
   onCloseCategoryBuilder,
   onChangeCategoryBuilder,
   onSaveCategoryBuilder,
+  onOpenCategoryMenu,
   onSelectCategory,
   onSelectProgressMode,
   onToggleWeekday,
@@ -2149,6 +2839,35 @@ function HabitEditor({
   onSubmit,
   onCancel,
 }) {
+  const [draggedChecklistIndex, setDraggedChecklistIndex] = useState(null);
+  const [dropChecklistIndex, setDropChecklistIndex] = useState(null);
+  const checklistDragIntentRef = useRef(null);
+
+  useEffect(() => {
+    checklistDragIntentRef.current = null;
+    setDraggedChecklistIndex(null);
+    setDropChecklistIndex(null);
+  }, [draft.id, draft.progressMode, step]);
+
+  const resetChecklistDragState = () => {
+    checklistDragIntentRef.current = null;
+    setDraggedChecklistIndex(null);
+    setDropChecklistIndex(null);
+  };
+
+  const handleChecklistDrop = (targetIndex) => {
+    if (draggedChecklistIndex === null || draggedChecklistIndex === targetIndex) {
+      resetChecklistDragState();
+      return;
+    }
+
+    onChange("moveChecklistItem", {
+      fromIndex: draggedChecklistIndex,
+      toIndex: targetIndex,
+    });
+    resetChecklistDragState();
+  };
+
   if (draft.id) {
     const isLastStep = step === HABIT_EDIT_WIZARD_STEPS.length - 1;
 
@@ -2179,6 +2898,7 @@ function HabitEditor({
 
               <HabitCategoryPicker
                 categories={categories}
+                presetOverrides={presetOverrides}
                 selectedCategory={draft.category}
                 saving={saving}
                 builderOpen={categoryBuilderOpen}
@@ -2189,6 +2909,7 @@ function HabitEditor({
                 onCloseBuilder={onCloseCategoryBuilder}
                 onChangeCategoryBuilder={onChangeCategoryBuilder}
                 onSaveCategoryBuilder={onSaveCategoryBuilder}
+                onOpenCategoryMenu={onOpenCategoryMenu}
               />
             </div>
           ) : null}
@@ -2257,7 +2978,7 @@ function HabitEditor({
               </Field>
 
               <Field label="Prioridad">
-                <DraftNumberInput
+                <StepperNumberInput
                   min="1"
                   max="100"
                   step="1"
@@ -2312,10 +3033,7 @@ function HabitEditor({
   return (
     <SectionPanel tone="highlight" className="habitosView__modalPanel">
       <PanelHeader>
-        <PanelTitle
-          title="Nuevo habito"
-          description="Configura el habito, define como evaluarlo y guardalo en tu cola diaria."
-        />
+        <PanelTitle title="Nuevo habito" />
       </PanelHeader>
 
       <form className="habitosView__editorForm" onSubmit={onSubmit}>
@@ -2333,6 +3051,7 @@ function HabitEditor({
         {step === 0 ? (
           <HabitCategoryPicker
             categories={categories}
+            presetOverrides={presetOverrides}
             selectedCategory={draft.category}
             saving={saving}
             builderOpen={categoryBuilderOpen}
@@ -2343,14 +3062,14 @@ function HabitEditor({
             onCloseBuilder={onCloseCategoryBuilder}
             onChangeCategoryBuilder={onChangeCategoryBuilder}
             onSaveCategoryBuilder={onSaveCategoryBuilder}
+            onOpenCategoryMenu={onOpenCategoryMenu}
           />
         ) : null}
 
         {step === 1 ? (
           <div className="habitosView__wizardStep">
             <div className="habitosView__sectionIntro">
-              <strong>Como quieres evaluar tu progreso?</strong>
-              <span>Este paso define el camino que seguira el wizard para tu habito.</span>
+              <strong>Como quieres evaluarlo?</strong>
             </div>
 
             <div className="habitosView__wizardOptionGrid habitosView__wizardOptionGrid--stacked">
@@ -2466,7 +3185,62 @@ function HabitEditor({
 
                   <div className="habitosView__subitemsDraft">
                     {draft.checklistItems.map((item, index) => (
-                      <div key={item.id || index} className="habitosView__subitemDraftRow">
+                      <div
+                        key={item.id || index}
+                        className={[
+                          "habitosView__subitemDraftRow",
+                          draggedChecklistIndex === index ? "is-dragging" : "",
+                          dropChecklistIndex === index && draggedChecklistIndex !== index ? "is-drop-target" : "",
+                        ].filter(Boolean).join(" ")}
+                        draggable={draft.checklistItems.length > 1}
+                        onDragStart={(event) => {
+                          if (checklistDragIntentRef.current !== index) {
+                            event.preventDefault();
+                            return;
+                          }
+
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", String(index));
+                          setDraggedChecklistIndex(index);
+                          setDropChecklistIndex(index);
+                        }}
+                        onDragEnd={() => {
+                          resetChecklistDragState();
+                        }}
+                        onDragOver={(event) => {
+                          if (draggedChecklistIndex === null) {
+                            return;
+                          }
+
+                          event.preventDefault();
+                          if (dropChecklistIndex !== index) {
+                            setDropChecklistIndex(index);
+                          }
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          handleChecklistDrop(index);
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="habitosView__subitemDragHandle"
+                          aria-label="Reordenar item"
+                          draggable={false}
+                          onPointerDown={() => {
+                            checklistDragIntentRef.current = index;
+                          }}
+                          onPointerUp={() => {
+                            checklistDragIntentRef.current = null;
+                          }}
+                          onPointerCancel={() => {
+                            checklistDragIntentRef.current = null;
+                          }}
+                        >
+                          <span />
+                          <span />
+                        </button>
+
                         <input
                           value={item.title}
                           onChange={(event) => onChange("checklistItem", {
@@ -2489,7 +3263,7 @@ function HabitEditor({
 
                   <div className="habitosView__centeredAction">
                     <Button type="button" onClick={() => onChange("addChecklistItem")}>
-                      Nuevo item
+                      Agregar item
                     </Button>
                   </div>
                 </div>
@@ -2501,8 +3275,7 @@ function HabitEditor({
         {step === 3 ? (
           <div className="habitosView__wizardStep">
             <div className="habitosView__sectionIntro">
-              <strong>Con que frecuencia quieres realizarlo?</strong>
-              <span>Define si el habito corre todos los dias o solo en dias elegidos.</span>
+              <strong>Frecuencia</strong>
             </div>
 
             <Field label="Frecuencia">
@@ -2531,11 +3304,7 @@ function HabitEditor({
                   );
                 })}
               </div>
-            ) : (
-              <Notice tone="info">
-                Se genera una ocurrencia por dia.
-              </Notice>
-            )}
+            ) : null}
           </div>
         ) : null}
 
@@ -2543,23 +3312,19 @@ function HabitEditor({
           <div className="habitosView__wizardStep">
             <div className="habitosView__sectionIntro">
               <strong>Cuando quieres hacerlo?</strong>
-              <span>Define fechas, prioridad y la capa operativa que todavia queda pendiente.</span>
             </div>
 
             <FieldGrid>
-              <Field
-                label="Fecha de inicio"
-                description={draft.startDate === todayLocalDate() ? "Hoy" : ""}
-              >
-                <input
-                  type="date"
+              <Field label="Fecha de inicio">
+                <DateDraftInput
                   value={draft.startDate}
-                  onChange={(event) => onChange("startDate", event.target.value)}
+                  onChange={(value) => onChange("startDate", value)}
+                  showTodayLabel
                 />
               </Field>
 
-              <div className="habitosView__booleanGrid">
-                <label className="habitosView__booleanField">
+              <div className="habitosView__toggleCard">
+                <label className="habitosView__booleanField habitosView__booleanField--inline">
                   <input
                     type="checkbox"
                     checked={Boolean(draft.hasEndDate)}
@@ -2595,16 +3360,13 @@ function HabitEditor({
               </FieldGrid>
             ) : null}
 
-            <Notice tone="info">
-              Hora y recordatorios aun sin soporte.
-            </Notice>
+            <div className="habitosView__inlineHint">
+              Hora y recordatorios: pronto.
+            </div>
 
             <FieldGrid>
-              <Field
-                label="Prioridad"
-                description="Del 1 al 100. A mayor valor, mas importante es."
-              >
-                <DraftNumberInput
+              <Field label="Prioridad">
+                <StepperNumberInput
                   min="1"
                   max="100"
                   step="1"
@@ -2613,11 +3375,6 @@ function HabitEditor({
                   onCommit={(value) => onCommitNumber("priority", value)}
                 />
               </Field>
-
-              <div className="habitosView__detailCard">
-                <span>Frecuencia actual</span>
-                <strong>{getCreationFrequencySummary(draft)}</strong>
-              </div>
             </FieldGrid>
           </div>
         ) : null}
@@ -2652,15 +3409,31 @@ function HabitEditor({
   );
 }
 
-export default function HabitosView({ ctx }) {
+export default function HabitosView({ ctx, input = null }) {
   const systemToday = todayLocalDate();
+  const pluginSettings = ctx.settings.useValue();
+  const dashboardEditMode = Boolean(input?.dashboardEditMode);
+  const presetCategoryOverrides = useMemo(
+    () => readHabitCategoryPresetOverrides(pluginSettings),
+    [pluginSettings],
+  );
+  const persistedDashboardLayouts = useMemo(
+    () => readHabitosDashboardLayouts(pluginSettings),
+    [pluginSettings],
+  );
+  const persistedDashboardLayoutsSignature = useMemo(
+    () => getHabitosDashboardLayoutsSignature(persistedDashboardLayouts),
+    [persistedDashboardLayouts],
+  );
   const [home, setHome] = useState(createEmptyHome);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [modalMode, setModalMode] = useState("overview");
   const [isHabitsDrawerOpen, setIsHabitsDrawerOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("habits");
   const [selectedHabitId, setSelectedHabitId] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [taskDraft, setTaskDraft] = useState(createTaskDraft());
   const [habitDraft, setHabitDraft] = useState(createHabitDraft());
   const [habitWizardError, setHabitWizardError] = useState("");
@@ -2670,23 +3443,83 @@ export default function HabitosView({ ctx }) {
   const [taskAdvancedOpen, setTaskAdvancedOpen] = useState(false);
   const [habitStep, setHabitStep] = useState(0);
   const [queueMenu, setQueueMenu] = useState(null);
+  const [categoryMenu, setCategoryMenu] = useState(null);
   const [expandedChecklistIds, setExpandedChecklistIds] = useState([]);
   const [manualEditableOccurrenceIds, setManualEditableOccurrenceIds] = useState([]);
+  const [renderedDashboardLayouts, setRenderedDashboardLayouts] = useState(
+    () => persistedDashboardLayouts,
+  );
+  const dashboardDraftLayoutsRef = useRef(persistedDashboardLayouts);
+  const dashboardDraftLayoutsSignatureRef = useRef(
+    persistedDashboardLayoutsSignature,
+  );
+  const dashboardPersistTimerRef = useRef(null);
+  const [dashboardMounted, setDashboardMounted] = useState(false);
   const [viewDate, setViewDate] = useState(systemToday);
   const viewDatePickerRef = useRef(null);
+  const lastAppliedPersistedDashboardLayoutsSignatureRef = useRef(
+    persistedDashboardLayoutsSignature,
+  );
+  const isEditingHabitDraft = Boolean(habitDraft.id);
+  const activeHabitWizardSteps = isEditingHabitDraft
+    ? HABIT_EDIT_WIZARD_STEPS
+    : HABIT_WIZARD_STEPS;
+  const lastHabitStepIndex = activeHabitWizardSteps.length - 1;
+  const managedCategories = useMemo(
+    () => buildManagedHabitCategories(home.categoryCatalog, presetCategoryOverrides),
+    [home.categoryCatalog, presetCategoryOverrides],
+  );
 
   useEffect(() => {
-    if (!queueMenu) {
+    setDashboardMounted(true);
+  }, []);
+
+  useEffect(() => {
+    setHabitStep((currentValue) => Math.min(Math.max(currentValue, 0), lastHabitStepIndex));
+  }, [lastHabitStepIndex]);
+
+  useEffect(() => {
+    if (
+      lastAppliedPersistedDashboardLayoutsSignatureRef.current
+      === persistedDashboardLayoutsSignature
+    ) {
+      return;
+    }
+
+    lastAppliedPersistedDashboardLayoutsSignatureRef.current
+      = persistedDashboardLayoutsSignature;
+
+    dashboardDraftLayoutsRef.current = persistedDashboardLayouts;
+    dashboardDraftLayoutsSignatureRef.current = persistedDashboardLayoutsSignature;
+    setRenderedDashboardLayouts((currentValue) => (
+      getHabitosDashboardLayoutsSignature(currentValue) === persistedDashboardLayoutsSignature
+        ? currentValue
+        : persistedDashboardLayouts
+    ));
+  }, [persistedDashboardLayouts, persistedDashboardLayoutsSignature]);
+
+  useEffect(() => {
+    return () => {
+      if (dashboardPersistTimerRef.current !== null) {
+        window.clearTimeout(dashboardPersistTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!queueMenu && !categoryMenu) {
       return undefined;
     }
 
     const handlePointerDown = () => {
       setQueueMenu(null);
+      setCategoryMenu(null);
     };
 
     const handleEscape = (event) => {
       if (event.key === "Escape") {
         setQueueMenu(null);
+        setCategoryMenu(null);
       }
     };
 
@@ -2701,7 +3534,7 @@ export default function HabitosView({ ctx }) {
       window.removeEventListener("resize", handlePointerDown);
       window.removeEventListener("scroll", handlePointerDown, true);
     };
-  }, [queueMenu]);
+  }, [categoryMenu, queueMenu]);
 
   useEffect(() => {
     if (!isHabitsDrawerOpen) {
@@ -2720,6 +3553,24 @@ export default function HabitosView({ ctx }) {
       setSelectedHabitId(getDefaultHabitId(home.habits));
     }
   }, [home.habits, isHabitsDrawerOpen, selectedHabitId]);
+
+  useEffect(() => {
+    if (!isHabitsDrawerOpen) {
+      return;
+    }
+
+    if (!managedCategories.length) {
+      if (selectedCategoryId) {
+        setSelectedCategoryId("");
+      }
+      return;
+    }
+
+    const selectionExists = managedCategories.some((category) => category.id === selectedCategoryId);
+    if (!selectionExists) {
+      setSelectedCategoryId(managedCategories[0]?.id || "");
+    }
+  }, [isHabitsDrawerOpen, managedCategories, selectedCategoryId]);
 
   useEffect(() => {
     const visibleChecklistIds = new Set(
@@ -2788,16 +3639,26 @@ export default function HabitosView({ ctx }) {
 
   const openHabitsDrawer = () => {
     setQueueMenu(null);
+    setCategoryMenu(null);
     setSelectedHabitId((currentValue) => (
       home.habits.some((habit) => habit.id === currentValue)
         ? currentValue
         : getDefaultHabitId(home.habits)
     ));
+    setSelectedCategoryId((currentValue) => (
+      managedCategories.some((category) => category.id === currentValue)
+        ? currentValue
+        : (managedCategories[0]?.id || "")
+    ));
+    setSettingsTab("habits");
     setIsHabitsDrawerOpen(true);
   };
 
   const closeHabitsDrawer = () => {
     setIsHabitsDrawerOpen(false);
+    setCategoryBuilderOpen(false);
+    setCategoryBuilderDraft(createHabitCategoryDraft());
+    setCategoryBuilderError("");
   };
 
   const closeWorkbench = () => {
@@ -2836,10 +3697,15 @@ export default function HabitosView({ ctx }) {
     }
   };
 
-  const handleOpenCategoryBuilder = () => {
+  const persistPresetCategoryOverrides = async (nextOverrides) => {
+    await ctx.settings.set(writeHabitCategoryPresetOverrides(pluginSettings, nextOverrides));
+  };
+
+  const handleOpenCategoryBuilder = (source = null) => {
     setCategoryBuilderError("");
-    setCategoryBuilderDraft(createHabitCategoryDraft());
+    setCategoryBuilderDraft(createHabitCategoryDraft(source));
     setCategoryBuilderOpen(true);
+    setCategoryMenu(null);
   };
 
   const handleCloseCategoryBuilder = () => {
@@ -2861,6 +3727,7 @@ export default function HabitosView({ ctx }) {
   const handleSelectExistingHabitCategory = (value) => {
     setCategoryBuilderError("");
     setCategoryBuilderOpen(false);
+    setCategoryMenu(null);
     setHabitDraft((currentValue) => ({
       ...currentValue,
       category: value,
@@ -2869,10 +3736,14 @@ export default function HabitosView({ ctx }) {
 
   const handleSaveCategoryBuilder = async () => {
     const normalizedName = normalizeCategoryNameValue(categoryBuilderDraft.name);
-    const knownCategoryNames = new Set([
-      ...HABIT_CATEGORY_PRESETS.map((entry) => normalizeCategoryNameValue(entry.value)),
-      ...home.categoryCatalog.map((entry) => normalizeCategoryNameValue(entry.name)),
-    ]);
+    const editingCategoryId = String(categoryBuilderDraft.id || "").trim();
+    const editingPresetId = String(categoryBuilderDraft.presetId || "").trim();
+    const previousCategoryName = String(categoryBuilderDraft.originalName || "").trim();
+    const knownCategoryNames = new Set(
+      managedCategories
+        .filter((entry) => entry.id !== editingCategoryId && entry.id !== editingPresetId)
+        .map((entry) => normalizeCategoryNameValue(entry.name || entry.label || entry.value)),
+    );
 
     if (!normalizedName) {
       setCategoryBuilderError("El nombre de la categoria es obligatorio.");
@@ -2886,9 +3757,61 @@ export default function HabitosView({ ctx }) {
 
     setCategoryBuilderError("");
 
+    if (categoryBuilderDraft.kind === "preset" && editingPresetId) {
+      const nextCategoryName = String(categoryBuilderDraft.name || "").trim();
+      const nextOverrides = {
+        ...presetCategoryOverrides,
+        [editingPresetId]: {
+          ...presetCategoryOverrides[editingPresetId],
+          name: nextCategoryName,
+          iconId: categoryBuilderDraft.iconId || DEFAULT_CUSTOM_HABIT_CATEGORY_ICON_ID,
+          color: normalizeHexColorDraftValue(
+            categoryBuilderDraft.color,
+            DEFAULT_CUSTOM_HABIT_CATEGORY_COLOR,
+          ),
+          deleted: false,
+        },
+      };
+
+      const finalizePresetSave = async () => {
+        await persistPresetCategoryOverrides(nextOverrides);
+        setHabitDraft((currentValue) => ({
+          ...currentValue,
+          category: currentValue.category === previousCategoryName || !currentValue.category
+            ? nextCategoryName
+            : currentValue.category,
+        }));
+        setCategoryBuilderOpen(false);
+        setCategoryBuilderDraft(createHabitCategoryDraft());
+        setCategoryBuilderError("");
+
+        if (!habitDraft.id) {
+          setHabitStep(1);
+        }
+      };
+
+      if (previousCategoryName && previousCategoryName !== nextCategoryName) {
+        await runMutation(
+          "habitos:rename-category-references",
+          {
+            previousName: previousCategoryName,
+            nextName: nextCategoryName,
+          },
+          {
+            onSuccess: finalizePresetSave,
+          },
+        );
+        return;
+      }
+
+      await finalizePresetSave();
+      return;
+    }
+
     await runMutation(
       "habitos:save-category",
       {
+        id: editingCategoryId || undefined,
         name: String(categoryBuilderDraft.name || "").trim(),
         iconId: categoryBuilderDraft.iconId || DEFAULT_CUSTOM_HABIT_CATEGORY_ICON_ID,
         color: normalizeHexColorDraftValue(
@@ -2899,13 +3822,19 @@ export default function HabitosView({ ctx }) {
       {
         onSuccess: (nextHome) => {
           const savedCategory = (nextHome?.categoryCatalog || []).find(
-            (entry) => normalizeCategoryNameValue(entry.name) === normalizedName,
+            (entry) => (
+              editingCategoryId
+                ? String(entry.id || "") === editingCategoryId
+                : normalizeCategoryNameValue(entry.name) === normalizedName
+            ),
           );
           const nextCategoryName = savedCategory?.name || String(categoryBuilderDraft.name || "").trim();
 
           setHabitDraft((currentValue) => ({
             ...currentValue,
-            category: nextCategoryName,
+            category: currentValue.category === previousCategoryName || !currentValue.category
+              ? nextCategoryName
+              : currentValue.category,
           }));
           setCategoryBuilderOpen(false);
           setCategoryBuilderDraft(createHabitCategoryDraft());
@@ -2917,6 +3846,92 @@ export default function HabitosView({ ctx }) {
         },
       },
     );
+  };
+
+  const handleOpenCategoryMenu = (event, option) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setQueueMenu(null);
+    setCategoryMenu({
+      x: event.clientX,
+      y: event.clientY,
+      option,
+    });
+  };
+
+  const handleDeleteCategory = async (option) => {
+    if (option.kind === "preset" && option.presetId) {
+      const nextOverrides = {
+        ...presetCategoryOverrides,
+        [option.presetId]: {
+          ...presetCategoryOverrides[option.presetId],
+          deleted: true,
+        },
+      };
+
+      await runMutation(
+        "habitos:clear-category-references",
+        {
+          categoryName: option.value,
+        },
+        {
+          onSuccess: async () => {
+            await persistPresetCategoryOverrides(nextOverrides);
+            setHabitDraft((currentValue) => (
+              currentValue.category === option.value
+                ? {
+                    ...currentValue,
+                    category: "",
+                  }
+                : currentValue
+            ));
+            setCategoryMenu(null);
+            setCategoryBuilderOpen(false);
+            setCategoryBuilderDraft(createHabitCategoryDraft());
+            setCategoryBuilderError("");
+          },
+        },
+      );
+      return;
+    }
+
+    await runMutation(
+      "habitos:delete-category",
+      {
+        categoryId: option.id,
+      },
+      {
+        onSuccess: () => {
+          setHabitDraft((currentValue) => (
+            currentValue.category === option.value
+              ? {
+                  ...currentValue,
+                  category: "",
+                }
+              : currentValue
+          ));
+          setCategoryMenu(null);
+          setCategoryBuilderOpen(false);
+          setCategoryBuilderDraft(createHabitCategoryDraft());
+          setCategoryBuilderError("");
+        },
+      },
+    );
+  };
+
+  const handleCreateCategoryFromSettings = () => {
+    setSettingsTab("categories");
+    handleOpenCategoryBuilder();
+  };
+
+  const handleEditCategoryFromSettings = (category) => {
+    setSettingsTab("categories");
+    setSelectedCategoryId(String(category?.id || ""));
+    handleOpenCategoryBuilder(category);
+  };
+
+  const handleDeleteCategoryFromSettings = (category) => {
+    void handleDeleteCategory(category);
   };
 
   const handleTaskDraftChange = (field, value) => {
@@ -2974,6 +3989,40 @@ export default function HabitosView({ ctx }) {
         ...currentValue,
         checklistItems: currentValue.checklistItems.filter((_, index) => index !== value),
       }));
+      return;
+    }
+
+    if (field === "moveChecklistItem") {
+      setHabitDraft((currentValue) => {
+        const fromIndex = Number(value?.fromIndex);
+        const toIndex = Number(value?.toIndex);
+
+        if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex)) {
+          return currentValue;
+        }
+
+        if (
+          fromIndex < 0
+          || toIndex < 0
+          || fromIndex >= currentValue.checklistItems.length
+          || toIndex >= currentValue.checklistItems.length
+          || fromIndex === toIndex
+        ) {
+          return currentValue;
+        }
+
+        const nextChecklistItems = [...currentValue.checklistItems];
+        const [movedItem] = nextChecklistItems.splice(fromIndex, 1);
+        nextChecklistItems.splice(toIndex, 0, movedItem);
+
+        return {
+          ...currentValue,
+          checklistItems: nextChecklistItems.map((entry, index) => ({
+            ...entry,
+            sortOrder: index,
+          })),
+        };
+      });
       return;
     }
 
@@ -3177,22 +4226,30 @@ export default function HabitosView({ ctx }) {
   const handleHabitSubmit = async (event) => {
     event.preventDefault();
 
-    if (habitStep < HABIT_WIZARD_STEPS.length - 1) {
-      if (!habitDraft.id && habitStep === 0 && !habitDraft.category) {
+    if (habitStep < lastHabitStepIndex) {
+      if (!isEditingHabitDraft && habitStep === 0 && !habitDraft.category) {
         setHabitWizardError("Elige una categoria para seguir.");
         return;
       }
 
-      if (!habitDraft.id && habitStep === 1 && !habitDraft.progressMode) {
+      if (!isEditingHabitDraft && habitStep === 1 && !habitDraft.progressMode) {
         setHabitWizardError("Elige como quieres evaluar tu progreso.");
         return;
       }
 
-      if (!habitDraft.id && habitStep === 2) {
+      if (
+        (isEditingHabitDraft && habitStep === 0)
+        || (!isEditingHabitDraft && habitStep === 2)
+      ) {
         const title = String(habitDraft.title || "").trim();
 
         if (!title) {
           setHabitWizardError("El nombre del habito es obligatorio.");
+          return;
+        }
+
+        if (!String(habitDraft.category || "").trim()) {
+          setHabitWizardError("Elige una categoria para continuar.");
           return;
         }
 
@@ -3218,7 +4275,10 @@ export default function HabitosView({ ctx }) {
         }
       }
 
-      if (!habitDraft.id && habitStep === 3) {
+      if (
+        (isEditingHabitDraft && habitStep === 1)
+        || (!isEditingHabitDraft && habitStep === 3)
+      ) {
         if (habitDraft.scheduleType === "weekdays" && !habitDraft.weekdays.length) {
           setHabitWizardError("Elige al menos un dia de la semana.");
           return;
@@ -3226,9 +4286,50 @@ export default function HabitosView({ ctx }) {
       }
 
       setHabitWizardError("");
-      setHabitStep((currentValue) => currentValue + 1);
+      setHabitStep((currentValue) => Math.min(currentValue + 1, lastHabitStepIndex));
       return;
     }
+
+    const normalizedTitle = String(habitDraft.title || "").trim();
+    if (!normalizedTitle) {
+      setHabitWizardError("El nombre del habito es obligatorio.");
+      return;
+    }
+
+    if (!String(habitDraft.category || "").trim()) {
+      setHabitWizardError("Elige una categoria para continuar.");
+      return;
+    }
+
+    if (habitDraft.scheduleType === "weekdays" && !habitDraft.weekdays.length) {
+      setHabitWizardError("Elige al menos un dia de la semana.");
+      return;
+    }
+
+    if (
+      habitDraft.progressMode === "quantity"
+      && habitDraft.quantityMode !== "no-target"
+      && String(habitDraft.quantityTarget || "").trim() === ""
+    ) {
+      setHabitWizardError("Define el objetivo numerico para guardar.");
+      return;
+    }
+
+    if (habitDraft.progressMode === "checklist") {
+      const items = habitDraft.checklistItems.map((entry) => String(entry.title || "").trim());
+
+      if (!items.some(Boolean)) {
+        setHabitWizardError("Agrega al menos un sub-item.");
+        return;
+      }
+
+      if (items.some((entry) => !entry)) {
+        setHabitWizardError("Completa o elimina los sub-items vacios.");
+        return;
+      }
+    }
+
+    setHabitWizardError("");
 
     const nextHabitId = habitDraft.id || createDraftId("habit");
     const payload = buildHabitPayload(habitDraft, {
@@ -3350,6 +4451,48 @@ export default function HabitosView({ ctx }) {
     input.click();
   };
 
+  const handleDashboardLayoutChange = (_currentLayout, allLayouts) => {
+    const nextLayouts = normalizeHabitosDashboardLayouts(allLayouts);
+    const nextSignature = getHabitosDashboardLayoutsSignature(nextLayouts);
+
+    if (nextSignature === dashboardDraftLayoutsSignatureRef.current) {
+      return;
+    }
+
+    dashboardDraftLayoutsRef.current = nextLayouts;
+    dashboardDraftLayoutsSignatureRef.current = nextSignature;
+  };
+
+  const handleDashboardLayoutCommit = (_currentLayout, allLayouts) => {
+    const nextLayouts = normalizeHabitosDashboardLayouts(allLayouts);
+    const nextSignature = getHabitosDashboardLayoutsSignature(nextLayouts);
+
+    dashboardDraftLayoutsRef.current = nextLayouts;
+    dashboardDraftLayoutsSignatureRef.current = nextSignature;
+    setRenderedDashboardLayouts(nextLayouts);
+
+    if (nextSignature === persistedDashboardLayoutsSignature) {
+      return;
+    }
+
+    if (dashboardPersistTimerRef.current !== null) {
+      window.clearTimeout(dashboardPersistTimerRef.current);
+    }
+
+    dashboardPersistTimerRef.current = window.setTimeout(() => {
+      dashboardPersistTimerRef.current = null;
+      void ctx.settings
+        .set(writeHabitosDashboardLayouts(pluginSettings, nextLayouts))
+        .catch((settingsError) => {
+          setError(
+            settingsError instanceof Error
+              ? settingsError.message
+              : "No se pudo guardar la distribucion del dashboard.",
+          );
+        });
+    }, 120);
+  };
+
   const handleDeleteQueueItem = async (item) => {
     if (item.type === "task") {
       await runMutation("habitos:delete-task", {
@@ -3390,6 +4533,7 @@ export default function HabitosView({ ctx }) {
   const handleOpenQueueMenu = (event, item) => {
     event.preventDefault();
     event.stopPropagation();
+    setCategoryMenu(null);
     setQueueMenu({
       x: event.clientX,
       y: event.clientY,
@@ -3398,129 +4542,194 @@ export default function HabitosView({ ctx }) {
   };
 
   const selectedHabit = home.habits.find((habit) => habit.id === selectedHabitId) || null;
+  const selectedCategory = managedCategories.find((category) => category.id === selectedCategoryId) || null;
+  const dailyPanelTitle = isPastView
+    ? "Historial del dia"
+    : isFutureView
+      ? "Plan del dia"
+      : "Panel del dia";
+  const dailyPanelDescription = isPastView
+    ? "Resultados cerrados por fecha. Usa click derecho para habilitar edicion manual del resultado."
+    : isFutureView
+      ? "Vista previa de tareas y ocurrencias previstas para esa fecha."
+      : "";
 
   return (
     <WorkspacePage className="habitosView">
       <WorkspaceBody>
         <ScrollRegion className="habitosView__mainScroll">
-          <PanelStack>
+          <PanelStack className="habitosView__dashboardStack">
             {error ? (
               <Notice tone="danger">
                 {error}
               </Notice>
             ) : null}
 
-            <SectionPanel>
-              <PanelHeader
-                actions={(
-                  <div className="habitosView__panelActions">
-                    <div className="habitosView__dayNavigator">
-                      <button
-                        type="button"
-                        className="habitosView__dayNavButton"
-                        onClick={() => handleShiftViewDate(-1)}
-                        disabled={loading || saving}
-                        aria-label="Dia anterior"
-                      >
-                        <ChevronLeftIcon />
-                      </button>
-
-                      <button
-                        type="button"
-                        className="habitosView__dayNavCurrent"
-                        onClick={handleOpenViewDatePicker}
-                        disabled={loading || saving}
-                        aria-label="Elegir fecha"
-                      >
-                        <span>{formatVisibleDateLabel(viewDate)}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        className="habitosView__dayNavButton"
-                        onClick={() => handleShiftViewDate(1)}
-                        disabled={loading || saving}
-                        aria-label="Dia siguiente"
-                      >
-                        <ChevronRightIcon />
-                      </button>
-
-                      {viewDate !== actualToday ? (
-                        <Button
-                          type="button"
-                          tone="secondary"
-                          onClick={() => handleSelectViewDate(actualToday)}
-                          disabled={loading || saving}
-                        >
-                          Volver a hoy
-                        </Button>
-                      ) : null}
-
-                      <input
-                        ref={viewDatePickerRef}
-                        className="habitosView__datePickerInput"
-                        type="date"
-                        value={viewDate}
-                        onChange={(event) => handleSelectViewDate(event.target.value)}
-                        tabIndex="-1"
-                        aria-hidden="true"
-                      />
-                    </div>
-
-                    <Button type="button" onClick={openHabitsDrawer}>
-                      Habitos
-                    </Button>
-                    <IconButton type="button" tone="primary" aria-label="Crear nuevo" onClick={openCreateChooser}>
-                      <PlusIcon />
-                    </IconButton>
-                  </div>
-                )}
+            <ResponsiveGridLayout
+              className="habitosDashboard__grid"
+              layouts={renderedDashboardLayouts}
+              breakpoints={HABITOS_DASHBOARD_BREAKPOINTS}
+              cols={HABITOS_DASHBOARD_COLS}
+              rowHeight={HABITOS_DASHBOARD_ROW_HEIGHT}
+              margin={HABITOS_DASHBOARD_MARGIN}
+              containerPadding={[0, 0]}
+              measureBeforeMount={false}
+              autoSize
+              resizeHandles={HABITOS_DASHBOARD_RESIZE_HANDLES}
+              compactType={null}
+              preventCollision={true}
+              useCSSTransforms={dashboardMounted}
+              isDraggable={dashboardEditMode}
+              isResizable={dashboardEditMode}
+              draggableHandle=".habitosDashboard__editOverlay"
+              draggableCancel=".nexus-ui-panel-header__actions, .habitosDashboard__widgetBody, button, input, select, textarea, label, canvas"
+              onLayoutChange={handleDashboardLayoutChange}
+              onDragStop={handleDashboardLayoutCommit}
+              onResizeStop={handleDashboardLayoutCommit}
+            >
+              <div
+                key="daily-queue"
+                className={["habitosDashboard__item", dashboardEditMode ? "is-editing" : ""].filter(Boolean).join(" ")}
               >
-                <PanelTitle
-                  title={isPastView ? "Historial del dia" : isFutureView ? "Plan del dia" : "Panel del dia"}
-                  description={isPastView
-                    ? "Resultados cerrados por fecha. Usa click derecho para habilitar edicion manual del resultado."
-                    : isFutureView
-                      ? "Vista previa de tareas y ocurrencias previstas para esa fecha."
-                      : undefined}
-                />
-              </PanelHeader>
+                <SectionPanel className="habitosDashboard__widget habitosView__queuePanel">
+                  <PanelHeader
+                    actions={(
+                      <div className="habitosView__panelActions">
+                        <div className="habitosView__dayNavigator">
+                          <button
+                            type="button"
+                            className="habitosView__dayNavButton"
+                            onClick={() => handleShiftViewDate(-1)}
+                            disabled={loading || saving}
+                            aria-label="Dia anterior"
+                          >
+                            <ChevronLeftIcon />
+                          </button>
 
-              {loading ? (
-                <StateBlock title="Cargando..." />
-              ) : home.dailyQueue.length ? (
-                <div className="habitosView__queueList">
-                  {home.dailyQueue.map((item) => (
-                    <QueueItemCard
-                      key={item.id}
-                      item={item}
-                      isSelected={queueMenu?.item?.id === item.id}
-                      saving={saving}
-                      resultEditable={item.type === "task" ? viewDate === actualToday : canEditOccurrenceResult(item)}
-                      onToggle={() => void handleToggleQueueItem(item)}
-                      onContextMenu={handleOpenQueueMenu}
-                      onCommitQuantity={(queueItem, value) => handleCommitOccurrenceQuantity(queueItem, value)}
-                      onToggleChecklistItem={(queueItem, itemId) => handleToggleOccurrenceChecklistItem(queueItem, itemId)}
-                      onToggleChecklistExpanded={handleToggleChecklistExpanded}
-                      isChecklistExpanded={expandedChecklistIds.includes(item.recordId)}
+                          <button
+                            type="button"
+                            className="habitosView__dayNavCurrent"
+                            onClick={handleOpenViewDatePicker}
+                            disabled={loading || saving}
+                            aria-label="Elegir fecha"
+                          >
+                            <span>{formatVisibleDateLabel(viewDate)}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className="habitosView__dayNavButton"
+                            onClick={() => handleShiftViewDate(1)}
+                            disabled={loading || saving}
+                            aria-label="Dia siguiente"
+                          >
+                            <ChevronRightIcon />
+                          </button>
+
+                          {viewDate !== actualToday ? (
+                            <Button
+                              type="button"
+                              tone="secondary"
+                              onClick={() => handleSelectViewDate(actualToday)}
+                              disabled={loading || saving}
+                            >
+                              Volver a hoy
+                            </Button>
+                          ) : null}
+
+                          <input
+                            ref={viewDatePickerRef}
+                            className="habitosView__datePickerInput"
+                            type="date"
+                            value={viewDate}
+                            onChange={(event) => handleSelectViewDate(event.target.value)}
+                            tabIndex="-1"
+                            aria-hidden="true"
+                          />
+                        </div>
+
+                        <IconButton
+                          type="button"
+                          aria-label="Configuraciones"
+                          title="Configuraciones"
+                          onClick={openHabitsDrawer}
+                        >
+                          <SettingsIcon />
+                        </IconButton>
+                        <IconButton type="button" tone="primary" aria-label="Crear nuevo" onClick={openCreateChooser}>
+                          <PlusIcon />
+                        </IconButton>
+                      </div>
+                    )}
+                  >
+                    <DashboardPanelTitle
+                      title={dailyPanelTitle}
+                      description={dailyPanelDescription}
+                      editMode={dashboardEditMode}
                     />
-                  ))}
-                </div>
-              ) : (
-                <StateBlock title={isPastView ? "No hay historial para esta fecha." : isFutureView ? "No hay actividad prevista para esta fecha." : "No hay actividad para hoy."} />
-              )}
-            </SectionPanel>
+                  </PanelHeader>
 
-            <HabitOutcomePanel chart={home.habitOutcomeChart} />
+                  <div className="habitosDashboard__widgetBody habitosView__queuePanelBody">
+                    {loading ? (
+                      <StateBlock title="Cargando..." />
+                    ) : home.dailyQueue.length ? (
+                      <div className="habitosView__queueList">
+                        {home.dailyQueue.map((item) => (
+                          <QueueItemCard
+                            key={item.id}
+                            item={item}
+                            categoryCatalog={home.categoryCatalog}
+                            presetOverrides={presetCategoryOverrides}
+                            isSelected={queueMenu?.item?.id === item.id}
+                            saving={saving}
+                            resultEditable={item.type === "task" ? viewDate === actualToday : canEditOccurrenceResult(item)}
+                            onToggle={() => void handleToggleQueueItem(item)}
+                            onContextMenu={handleOpenQueueMenu}
+                            onCommitQuantity={(queueItem, value) => handleCommitOccurrenceQuantity(queueItem, value)}
+                            onToggleChecklistItem={(queueItem, itemId) => handleToggleOccurrenceChecklistItem(queueItem, itemId)}
+                            onToggleChecklistExpanded={handleToggleChecklistExpanded}
+                            isChecklistExpanded={expandedChecklistIds.includes(item.recordId)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <StateBlock
+                        title={isPastView
+                          ? "No hay historial para esta fecha."
+                          : isFutureView
+                            ? "No hay actividad prevista para esta fecha."
+                            : "No hay actividad para hoy."}
+                      />
+                    )}
+                  </div>
+                </SectionPanel>
+                {dashboardEditMode ? <DashboardEditOverlay /> : null}
+              </div>
 
-            {viewDate === actualToday ? (
-              <SecondaryListCard
-                title="Tareas proximas"
-                items={home.upcomingTasks}
-                emptyTitle="Sin tareas proximas."
-                renderItem={renderSecondaryTask}
-              />
-            ) : null}
+              <div
+                key="habit-outcome"
+                className={["habitosDashboard__item", dashboardEditMode ? "is-editing" : ""].filter(Boolean).join(" ")}
+              >
+                <HabitOutcomePanel chart={home.habitOutcomeChart} dashboardEditMode={dashboardEditMode} />
+                {dashboardEditMode ? <DashboardEditOverlay /> : null}
+              </div>
+
+              <div
+                key="upcoming-tasks"
+                className={["habitosDashboard__item", dashboardEditMode ? "is-editing" : ""].filter(Boolean).join(" ")}
+              >
+                <SecondaryListCard
+                  title="Tareas proximas"
+                  items={viewDate === actualToday ? home.upcomingTasks : []}
+                  emptyTitle={viewDate === actualToday
+                    ? "Sin tareas proximas."
+                    : "Disponible solo para hoy."}
+                  renderItem={renderSecondaryTask}
+                  dashboardEditMode={dashboardEditMode}
+                />
+                {dashboardEditMode ? <DashboardEditOverlay /> : null}
+              </div>
+            </ResponsiveGridLayout>
           </PanelStack>
         </ScrollRegion>
       </WorkspaceBody>
@@ -3583,22 +4792,76 @@ export default function HabitosView({ ctx }) {
         </div>
       ) : null}
 
+      {categoryMenu?.option ? (
+        <div
+          className="habitosView__contextMenu"
+          style={{
+            position: "fixed",
+            top: `${categoryMenu.y}px`,
+            left: `${categoryMenu.x}px`,
+            zIndex: 1400,
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => {
+              handleOpenCategoryBuilder({
+                id: categoryMenu.option.id,
+                name: categoryMenu.option.label,
+                iconId: categoryMenu.option.iconId,
+                color: categoryMenu.option.color,
+              });
+            }}
+          >
+            Editar categoria
+          </button>
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => {
+              void handleDeleteCategory(categoryMenu.option);
+            }}
+          >
+            Eliminar categoria
+          </button>
+        </div>
+      ) : null}
+
       <FloatingWorkbenchModal
         isVisible={isHabitsDrawerOpen}
         saving={saving}
         layout="drawer"
         onClose={closeHabitsDrawer}
       >
-        <HabitsDrawer
+        <SettingsDrawer
+          activeTab={settingsTab}
           habits={home.habits}
           selectedHabitId={selectedHabit?.id || ""}
           home={home}
+          presetOverrides={presetCategoryOverrides}
           saving={saving}
           onClose={closeHabitsDrawer}
+          onChangeTab={setSettingsTab}
           onCreateHabit={() => openHabitEditor()}
           onSelectHabit={setSelectedHabitId}
           onEditHabit={openHabitEditor}
           onToggleHabitStatus={(habit) => void handleToggleHabitStatus(habit)}
+          categories={managedCategories}
+          selectedCategoryId={selectedCategory?.id || ""}
+          selectedCategory={selectedCategory}
+          onSelectCategory={setSelectedCategoryId}
+          onCreateCategory={handleCreateCategoryFromSettings}
+          onEditCategory={handleEditCategoryFromSettings}
+          onDeleteCategory={handleDeleteCategoryFromSettings}
+          categoryBuilderOpen={categoryBuilderOpen}
+          categoryBuilderDraft={categoryBuilderDraft}
+          categoryBuilderError={categoryBuilderError}
+          onChangeCategoryBuilder={handleChangeCategoryBuilder}
+          onSaveCategoryBuilder={() => void handleSaveCategoryBuilder()}
+          onCloseCategoryBuilder={handleCloseCategoryBuilder}
         />
       </FloatingWorkbenchModal>
 
@@ -3670,6 +4933,7 @@ export default function HabitosView({ ctx }) {
         <HabitEditor
           draft={habitDraft}
           categories={home.categoryCatalog}
+          presetOverrides={presetCategoryOverrides}
           step={habitStep}
           saving={saving}
           wizardError={habitWizardError}
@@ -3682,6 +4946,7 @@ export default function HabitosView({ ctx }) {
           onCloseCategoryBuilder={handleCloseCategoryBuilder}
           onChangeCategoryBuilder={handleChangeCategoryBuilder}
           onSaveCategoryBuilder={() => void handleSaveCategoryBuilder()}
+          onOpenCategoryMenu={handleOpenCategoryMenu}
           onCommitNumber={handleHabitDraftNumberCommit}
           onSelectCategory={handleSelectHabitCategory}
           onSelectProgressMode={handleSelectHabitProgressMode}

@@ -4,11 +4,14 @@ import type {
 } from "../../../nexus-backend/src/plugins/types.ts";
 import {
   buildHabitosHomeSnapshot,
+  clearCategoryReferencesSync,
   deleteHabitSync,
+  deleteHabitCategorySync,
   deleteTaskSync,
   ensureHabitosSchema,
   normalizeLocalDate,
   nowIso,
+  renameCategoryReferencesSync,
   saveHabitCategorySync,
   saveHabitSync,
   saveTaskSync,
@@ -175,6 +178,47 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
         return createSuccess(buildHome(sqlite, payload?.date));
       } catch (error) {
         return createError(error, "No se pudo guardar la categoria.");
+      }
+    });
+
+    ctx.registerIpc("habitos:delete-category", async (_event, payload: any) => {
+      try {
+        const sqlite = getSqlite(ctx);
+        deleteHabitCategorySync(sqlite, String(payload?.categoryId || ""), {
+          now: nowIso(),
+        });
+        return createSuccess(buildHome(sqlite, payload?.date));
+      } catch (error) {
+        return createError(error, "No se pudo borrar la categoria.");
+      }
+    });
+
+    ctx.registerIpc("habitos:rename-category-references", async (_event, payload: any) => {
+      try {
+        const sqlite = getSqlite(ctx);
+        renameCategoryReferencesSync(
+          sqlite,
+          String(payload?.previousName || ""),
+          String(payload?.nextName || ""),
+          {
+            now: nowIso(),
+          },
+        );
+        return createSuccess(buildHome(sqlite, payload?.date));
+      } catch (error) {
+        return createError(error, "No se pudieron actualizar las referencias de categoria.");
+      }
+    });
+
+    ctx.registerIpc("habitos:clear-category-references", async (_event, payload: any) => {
+      try {
+        const sqlite = getSqlite(ctx);
+        clearCategoryReferencesSync(sqlite, String(payload?.categoryName || ""), {
+          now: nowIso(),
+        });
+        return createSuccess(buildHome(sqlite, payload?.date));
+      } catch (error) {
+        return createError(error, "No se pudieron limpiar las referencias de categoria.");
       }
     });
   },

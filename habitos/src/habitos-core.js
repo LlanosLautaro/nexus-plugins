@@ -1105,42 +1105,173 @@ export function saveHabitCategorySync(sqlite, payload, options = {}) {
 
   const timestamp = options.now || nowIso();
 
-  if (existingCategory) {
-    sqlite.prepare(`
-      UPDATE habits_categories
-      SET name = ?,
-          icon_id = ?,
-          color = ?,
-          updated_at = ?
-      WHERE id = ?
-    `).run(
-      normalized.name,
-      normalized.iconId,
-      normalized.color,
-      timestamp,
-      normalized.id,
-    );
-  } else {
-    sqlite.prepare(`
-      INSERT INTO habits_categories (
-        id,
-        name,
-        icon_id,
-        color,
-        created_at,
-        updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
-      normalized.id,
-      normalized.name,
-      normalized.iconId,
-      normalized.color,
-      timestamp,
-      timestamp,
-    );
-  }
+  sqlite.transaction(() => {
+    if (existingCategory) {
+      sqlite.prepare(`
+        UPDATE habits_categories
+        SET name = ?,
+            icon_id = ?,
+            color = ?,
+            updated_at = ?
+        WHERE id = ?
+      `).run(
+        normalized.name,
+        normalized.iconId,
+        normalized.color,
+        timestamp,
+        normalized.id,
+      );
+
+      if (existingCategory.name !== normalized.name) {
+        sqlite.prepare(`
+          UPDATE habits_habits
+          SET category = ?,
+              updated_at = ?
+          WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+        `).run(
+          normalized.name,
+          timestamp,
+          existingCategory.name,
+        );
+
+        sqlite.prepare(`
+          UPDATE habits_tasks
+          SET category = ?,
+              updated_at = ?
+          WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+        `).run(
+          normalized.name,
+          timestamp,
+          existingCategory.name,
+        );
+      }
+    } else {
+      sqlite.prepare(`
+        INSERT INTO habits_categories (
+          id,
+          name,
+          icon_id,
+          color,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `).run(
+        normalized.id,
+        normalized.name,
+        normalized.iconId,
+        normalized.color,
+        timestamp,
+        timestamp,
+      );
+    }
+  })();
 
   return findHabitCategoryByIdSync(sqlite, normalized.id);
+}
+
+export function deleteHabitCategorySync(sqlite, categoryId, options = {}) {
+  const existingCategory = findHabitCategoryByIdSync(sqlite, String(categoryId || ""));
+
+  if (!existingCategory) {
+    throw new Error("La categoria no existe.");
+  }
+
+  const timestamp = options.now || nowIso();
+
+  sqlite.transaction(() => {
+    sqlite.prepare(`
+      DELETE FROM habits_categories
+      WHERE id = ?
+    `).run(existingCategory.id);
+
+    sqlite.prepare(`
+      UPDATE habits_habits
+      SET category = '',
+          updated_at = ?
+      WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+    `).run(
+      timestamp,
+      existingCategory.name,
+    );
+
+    sqlite.prepare(`
+      UPDATE habits_tasks
+      SET category = '',
+          updated_at = ?
+      WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+    `).run(
+      timestamp,
+      existingCategory.name,
+    );
+  })();
+
+  return existingCategory;
+}
+
+export function renameCategoryReferencesSync(sqlite, previousName, nextName, options = {}) {
+  const fromName = String(previousName || "").trim();
+  const toName = String(nextName || "").trim();
+
+  if (!fromName || !toName || fromName === toName) {
+    return;
+  }
+
+  const timestamp = options.now || nowIso();
+
+  sqlite.transaction(() => {
+    sqlite.prepare(`
+      UPDATE habits_habits
+      SET category = ?,
+          updated_at = ?
+      WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+    `).run(
+      toName,
+      timestamp,
+      fromName,
+    );
+
+    sqlite.prepare(`
+      UPDATE habits_tasks
+      SET category = ?,
+          updated_at = ?
+      WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+    `).run(
+      toName,
+      timestamp,
+      fromName,
+    );
+  })();
+}
+
+export function clearCategoryReferencesSync(sqlite, categoryName, options = {}) {
+  const normalizedName = String(categoryName || "").trim();
+  if (!normalizedName) {
+    return;
+  }
+
+  const timestamp = options.now || nowIso();
+
+  sqlite.transaction(() => {
+    sqlite.prepare(`
+      UPDATE habits_habits
+      SET category = '',
+          updated_at = ?
+      WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+    `).run(
+      timestamp,
+      normalizedName,
+    );
+
+    sqlite.prepare(`
+      UPDATE habits_tasks
+      SET category = '',
+          updated_at = ?
+      WHERE LOWER(TRIM(category)) = LOWER(TRIM(?))
+    `).run(
+      timestamp,
+      normalizedName,
+    );
+  })();
 }
 
 export function saveTaskSync(sqlite, payload, options = {}) {
