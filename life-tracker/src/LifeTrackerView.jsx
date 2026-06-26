@@ -14,7 +14,6 @@ import {
   LinearScale,
   PointElement,
 } from "chart.js";
-import { Responsive, WidthProvider } from "react-grid-layout/legacy";
 
 import {
   Button,
@@ -41,6 +40,21 @@ import {
   loadUnifiedIconCatalog,
 } from "../../../nexus-frontend/src/components/icons/iconCatalogClient.js";
 import {
+  CanvasWorkspace,
+  createCanvasStateFromLegacyLayouts,
+} from "../../../nexus-frontend/src/internalModules/runtime/CanvasWorkspace.jsx";
+import PersonalFinanceView from "./finance/PersonalFinanceView.jsx";
+import TrainingView from "./training/TrainingView.jsx";
+import {
+  createRoutineAssignmentDraft,
+  createRoutineCaptureDraft,
+  normalizeRoutineAssignmentPayload,
+  RoutineAssignmentModal,
+  RoutineCaptureModal,
+  serializeRoutineCaptureDraft,
+} from "./training/home-modals.jsx";
+import { TRAINING_SETTINGS_DEFAULTS } from "./training/plugin-settings.js";
+import {
   DEFAULT_CUSTOM_HABIT_CATEGORY_COLOR,
   DEFAULT_CUSTOM_HABIT_CATEGORY_ICON_ID,
   HABIT_CATEGORY_PRESETS,
@@ -48,6 +62,15 @@ import {
   HABIT_PROGRESS_OPTIONS,
   HABIT_QUANTITY_MODE_OPTIONS,
   HABIT_WIZARD_STEPS,
+  LIFE_TRACKER_CANVAS_STATE_KEY,
+  LIFE_TRACKER_DEFAULT_SECTION,
+  LIFE_TRACKER_HABIT_CATEGORY_PRESET_OVERRIDES_KEY,
+  LIFE_TRACKER_HOME_CANVAS_ID,
+  LIFE_TRACKER_LEGACY_DASHBOARD_LAYOUTS_KEY,
+  LIFE_TRACKER_LEGACY_HABIT_CATEGORY_PRESET_OVERRIDES_KEY,
+  LIFE_TRACKER_PLUGIN_ID,
+  LIFE_TRACKER_SECTION_OPTIONS,
+  LIFE_TRACKER_WORKSPACE_VIEW_ID,
   WEEKDAY_OPTIONS,
 } from "./constants.js";
 import {
@@ -70,15 +93,40 @@ ChartJS.register(
   LineController,
 );
 
-const ResponsiveGridLayout = WidthProvider(Responsive);
-
 const HABIT_OUTCOME_RANGE_TICK_LIMITS = {
   "7d": 7,
   "1m": 8,
   "1y": 12,
 };
-const HABITOS_DASHBOARD_LAYOUTS_KEY = "dashboardLayouts";
-const HABITOS_CATEGORY_PRESET_OVERRIDES_KEY = "categoryPresetOverrides";
+const LIFE_TRACKER_HABITS_CHANNEL_PREFIX = "life-tracker:habits";
+const LIFE_TRACKER_FINANCE_CHANNEL_PREFIX = "life-tracker:finance";
+const LIFE_TRACKER_TRAINING_CHANNEL_PREFIX = "life-tracker:training";
+const LIFE_TRACKER_HABITS_CHANNELS = {
+  getHome: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:get-home`,
+  saveTask: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:save-task`,
+  toggleTask: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:toggle-task`,
+  deleteTask: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:delete-task`,
+  saveHabit: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:save-habit`,
+  toggleOccurrence: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:toggle-occurrence`,
+  setOccurrenceQuantity: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:set-occurrence-quantity`,
+  toggleOccurrenceChecklistItem: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:toggle-occurrence-checklist-item`,
+  deleteHabit: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:delete-habit`,
+  saveCategory: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:save-category`,
+  deleteCategory: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:delete-category`,
+  renameCategoryReferences: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:rename-category-references`,
+  clearCategoryReferences: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:clear-category-references`,
+};
+const LIFE_TRACKER_FINANCE_CHANNELS = {
+  list: `${LIFE_TRACKER_FINANCE_CHANNEL_PREFIX}:list`,
+};
+const LIFE_TRACKER_TRAINING_CHANNELS = {
+  list: `${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:list`,
+  listAssignments: `${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:list-assignments`,
+  getAssignment: `${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:get-assignment`,
+  saveAssignment: `${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:save-assignment`,
+  deleteAssignment: `${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:delete-assignment`,
+  saveOccurrenceResult: `${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:save-occurrence-result`,
+};
 const HABITOS_DASHBOARD_BREAKPOINTS = {
   lg: 1200,
   md: 996,
@@ -123,6 +171,14 @@ const HABITOS_DASHBOARD_DEFAULT_LAYOUTS = {
 const HABITOS_DASHBOARD_MARGIN = [12, 12];
 const HABITOS_DASHBOARD_ROW_HEIGHT = 30;
 const HABITOS_DASHBOARD_RESIZE_HANDLES = ["s", "w", "e", "n", "sw", "nw", "se", "ne"];
+const EMPTY_TRAINING_LIBRARY = {
+  exercises: [],
+  routines: [],
+  assignments: [],
+  muscles: [],
+  regions: [],
+  groups: [],
+};
 
 function normalizeDashboardGridInteger(value, fallbackValue, {
   min = 0,
@@ -197,14 +253,14 @@ function getHabitosDashboardLayoutsSignature(layouts) {
 
 function readHabitosDashboardLayouts(settingsValue) {
   const baseSettings = settingsValue && typeof settingsValue === "object" ? settingsValue : {};
-  return normalizeHabitosDashboardLayouts(baseSettings[HABITOS_DASHBOARD_LAYOUTS_KEY]);
+  return normalizeHabitosDashboardLayouts(baseSettings[LIFE_TRACKER_LEGACY_DASHBOARD_LAYOUTS_KEY]);
 }
 
 function writeHabitosDashboardLayouts(settingsValue, layouts) {
   const baseSettings = settingsValue && typeof settingsValue === "object" ? settingsValue : {};
   return {
     ...baseSettings,
-    [HABITOS_DASHBOARD_LAYOUTS_KEY]: normalizeHabitosDashboardLayouts(layouts),
+    [LIFE_TRACKER_LEGACY_DASHBOARD_LAYOUTS_KEY]: normalizeHabitosDashboardLayouts(layouts),
   };
 }
 
@@ -232,7 +288,9 @@ function normalizeHabitCategoryPresetOverrideValue(value, preset) {
 
 function readHabitCategoryPresetOverrides(settingsValue) {
   const baseSettings = settingsValue && typeof settingsValue === "object" ? settingsValue : {};
-  const rawOverrides = baseSettings[HABITOS_CATEGORY_PRESET_OVERRIDES_KEY];
+  const rawOverrides =
+    baseSettings[LIFE_TRACKER_HABIT_CATEGORY_PRESET_OVERRIDES_KEY]
+    || baseSettings[LIFE_TRACKER_LEGACY_HABIT_CATEGORY_PRESET_OVERRIDES_KEY];
   const normalizedOverrides = {};
 
   for (const preset of HABIT_CATEGORY_PRESETS) {
@@ -271,7 +329,81 @@ function writeHabitCategoryPresetOverrides(settingsValue, overrides) {
 
   return {
     ...baseSettings,
-    [HABITOS_CATEGORY_PRESET_OVERRIDES_KEY]: nextOverrides,
+    [LIFE_TRACKER_HABIT_CATEGORY_PRESET_OVERRIDES_KEY]: nextOverrides,
+  };
+}
+
+function readLifeTrackerCanvasState(settingsValue) {
+  const baseSettings = settingsValue && typeof settingsValue === "object" ? settingsValue : {};
+  return baseSettings[LIFE_TRACKER_CANVAS_STATE_KEY] || null;
+}
+
+function writeLifeTrackerCanvasState(settingsValue, canvasState) {
+  const baseSettings = settingsValue && typeof settingsValue === "object" ? settingsValue : {};
+  return {
+    ...baseSettings,
+    [LIFE_TRACKER_CANVAS_STATE_KEY]: canvasState,
+  };
+}
+
+function hasPluginSettingsOverrides(value, defaults = {}) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const relevantKeys = new Set([
+    ...Object.keys(defaults || {}),
+    ...Object.keys(value || {}),
+  ]);
+
+  for (const key of relevantKeys) {
+    if (JSON.stringify(value?.[key]) !== JSON.stringify(defaults?.[key])) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function createMigratedPluginSettingsApi(ctx, pluginId, {
+  defaults = {},
+  legacyPluginId = null,
+} = {}) {
+  const currentApi = ctx.createPluginSettingsApi(pluginId, defaults);
+  const legacyApi = legacyPluginId ? ctx.createPluginSettingsApi(legacyPluginId, defaults) : null;
+
+  const resolveValue = (currentValue, legacyValue) => {
+    if (hasPluginSettingsOverrides(currentValue, defaults)) {
+      return currentValue;
+    }
+
+    if (legacyApi && hasPluginSettingsOverrides(legacyValue, defaults)) {
+      return legacyValue;
+    }
+
+    return currentValue;
+  };
+
+  return {
+    stateKey: currentApi.stateKey,
+    async get() {
+      const [currentValue, legacyValue] = await Promise.all([
+        currentApi.get(),
+        legacyApi ? legacyApi.get() : Promise.resolve(null),
+      ]);
+      return resolveValue(currentValue, legacyValue);
+    },
+    async set(value) {
+      return currentApi.set(value);
+    },
+    subscribe(listener, options) {
+      return currentApi.subscribe(listener, options);
+    },
+    useValue() {
+      const currentValue = currentApi.useValue();
+      const legacyValue = legacyApi ? legacyApi.useValue() : null;
+      return resolveValue(currentValue, legacyValue);
+    },
   };
 }
 
@@ -558,6 +690,13 @@ function formatVisibleDateLabel(value) {
 }
 
 function resolveQueueCategoryPresentation(item, categoryCatalog = [], presetOverrides = {}) {
+  if (item?.type === "routine") {
+    return {
+      color: "var(--habitos-accent)",
+      iconId: DEFAULT_CUSTOM_HABIT_CATEGORY_ICON_ID,
+    };
+  }
+
   const normalizedCategory = normalizeCategoryNameValue(item?.category);
 
   if (normalizedCategory) {
@@ -680,6 +819,327 @@ function DashboardEditOverlay() {
 function DashboardPanelTitle({ title = "", description = "", editMode = false }) {
   return <PanelTitle title={title} description={description} />;
 }
+
+const FINANCE_WIDGET_CURRENCY_FORMATTER = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+function formatFinanceWidgetCurrency(cents) {
+  return FINANCE_WIDGET_CURRENCY_FORMATTER.format((Number(cents) || 0) / 100);
+}
+
+function getFinanceWidgetSignedAmountCents(movement) {
+  const amountCents = Math.max(0, Math.round(Number(movement?.amountCents || 0)));
+  return movement?.kind === "expense" ? -amountCents : amountCents;
+}
+
+function buildFinanceWidgetSummary(snapshot) {
+  const movements = Array.isArray(snapshot?.movements) ? snapshot.movements : [];
+  const actualBalanceCents = movements.reduce((total, movement) => {
+    return movement?.status === "posted"
+      ? total + getFinanceWidgetSignedAmountCents(movement)
+      : total;
+  }, 0);
+  const projectedBalanceCents = movements.reduce((total, movement) => {
+    return total + getFinanceWidgetSignedAmountCents(movement);
+  }, 0);
+
+  return {
+    actualBalanceCents,
+    projectedBalanceCents,
+    movementCount: movements.length,
+    cashAudit: snapshot?.cashAudit || null,
+    latestMovement: movements[0] || null,
+  };
+}
+
+function buildTrainingWidgetSummary(snapshot) {
+  const exercises = Array.isArray(snapshot?.exercises) ? snapshot.exercises : [];
+  const routines = Array.isArray(snapshot?.routines) ? snapshot.routines : [];
+  const assignments = Array.isArray(snapshot?.assignments) ? snapshot.assignments : [];
+  const activeAssignments = assignments.filter((entry) => entry?.status === "active");
+
+  return {
+    exerciseCount: exercises.length,
+    routineCount: routines.length,
+    activeAssignmentCount: activeAssignments.length,
+    latestExercise: exercises[0] || null,
+    latestRoutine: routines[0] || null,
+    latestAssignment: activeAssignments[0] || assignments[0] || null,
+  };
+}
+
+function LifeTrackerWidgetValue({ eyebrow = "", value = "", tone = "default" }) {
+  return (
+    <div className={["lifeTrackerWidget__value", tone !== "default" ? `is-${tone}` : ""].filter(Boolean).join(" ")}>
+      <span>{eyebrow}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+export function LifeTrackerDailyQueueWidget({ widgetContext }) {
+  return widgetContext?.renderDailyQueue?.() || null;
+}
+
+export function LifeTrackerHabitOutcomeWidget({ widgetContext }) {
+  return widgetContext?.renderHabitOutcome?.() || null;
+}
+
+export function LifeTrackerUpcomingTasksWidget({ widgetContext }) {
+  return widgetContext?.renderUpcomingTasks?.() || null;
+}
+
+export function LifeTrackerFinanceSummaryWidget({ widgetContext }) {
+  const [snapshot, setSnapshot] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadFinanceSummary() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await ipcRenderer.invoke(LIFE_TRACKER_FINANCE_CHANNELS.list);
+        if (!response?.ok) {
+          throw new Error(response?.error || "No se pudieron cargar los datos de dinero.");
+        }
+
+        if (!isCancelled) {
+          setSnapshot(response.data || null);
+        }
+      } catch (loadError) {
+        if (!isCancelled) {
+          setError(loadError instanceof Error ? loadError.message : "No se pudieron cargar los datos de dinero.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadFinanceSummary();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  const summary = useMemo(() => buildFinanceWidgetSummary(snapshot), [snapshot]);
+
+  return (
+    <SectionPanel className="habitosDashboard__widget lifeTrackerWidget lifeTrackerWidget--finance">
+      <PanelHeader
+        actions={(
+          <Button type="button" tone="secondary" onClick={() => widgetContext?.openSection?.("finance")}>
+            Abrir dinero
+          </Button>
+        )}
+      >
+        <DashboardPanelTitle
+          title="Dinero"
+          description="Saldo rapido y pulso reciente del modulo financiero."
+        />
+      </PanelHeader>
+
+      <div className="habitosDashboard__widgetBody lifeTrackerWidget__summaryBody">
+        {loading ? (
+          <StateBlock title="Cargando dinero..." />
+        ) : error ? (
+          <Notice tone="danger">{error}</Notice>
+        ) : (
+          <>
+            <div className="lifeTrackerWidget__valueGrid">
+              <LifeTrackerWidgetValue eyebrow="Saldo actual" value={formatFinanceWidgetCurrency(summary.actualBalanceCents)} tone="accent" />
+              <LifeTrackerWidgetValue eyebrow="Proyectado" value={formatFinanceWidgetCurrency(summary.projectedBalanceCents)} />
+              <LifeTrackerWidgetValue
+                eyebrow="Efectivo esperado"
+                value={formatFinanceWidgetCurrency(summary.cashAudit?.currentExpectedCents || 0)}
+              />
+            </div>
+            <div className="lifeTrackerWidget__metaList">
+              <span>{summary.movementCount} movimientos visibles en el tablero financiero.</span>
+              <span>
+                {summary.latestMovement?.title
+                  ? `Ultimo: ${summary.latestMovement.title}`
+                  : "Todavia no hay movimientos cargados."}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+    </SectionPanel>
+  );
+}
+
+export function LifeTrackerTrainingSummaryWidget({ widgetContext }) {
+  const [snapshot, setSnapshot] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadTrainingSummary() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await ipcRenderer.invoke(LIFE_TRACKER_TRAINING_CHANNELS.list);
+        if (!response?.ok) {
+          throw new Error(response?.error || "No se pudieron cargar los datos de entrenamiento.");
+        }
+
+        if (!isCancelled) {
+          setSnapshot(response.data || null);
+        }
+      } catch (loadError) {
+        if (!isCancelled) {
+          setError(loadError instanceof Error ? loadError.message : "No se pudieron cargar los datos de entrenamiento.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadTrainingSummary();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [widgetContext?.trainingRefreshToken]);
+
+  const summary = useMemo(() => buildTrainingWidgetSummary(snapshot), [snapshot]);
+
+  return (
+    <SectionPanel className="habitosDashboard__widget lifeTrackerWidget lifeTrackerWidget--training">
+      <PanelHeader
+        actions={(
+          <Button type="button" tone="secondary" onClick={() => widgetContext?.openSection?.("training")}>
+            Abrir entrenamiento
+          </Button>
+        )}
+      >
+        <DashboardPanelTitle
+          title="Entrenamiento"
+          description="Ejercicios, rutinas y programadas activas dentro de Life Tracker."
+        />
+      </PanelHeader>
+
+      <div className="habitosDashboard__widgetBody lifeTrackerWidget__summaryBody">
+        {loading ? (
+          <StateBlock title="Cargando entrenamiento..." />
+        ) : error ? (
+          <Notice tone="danger">{error}</Notice>
+        ) : (
+          <>
+            <div className="lifeTrackerWidget__valueGrid">
+              <LifeTrackerWidgetValue eyebrow="Ejercicios" value={String(summary.exerciseCount)} tone="accent" />
+              <LifeTrackerWidgetValue eyebrow="Rutinas" value={String(summary.routineCount)} />
+              <LifeTrackerWidgetValue eyebrow="Programadas activas" value={String(summary.activeAssignmentCount)} />
+            </div>
+            <div className="lifeTrackerWidget__metaList">
+              <span>
+                {summary.latestRoutine?.title
+                  ? `Rutina destacada: ${summary.latestRoutine.title}`
+                  : "Todavia no hay rutinas guardadas."}
+              </span>
+              <span>
+                {summary.latestAssignment?.routine?.title
+                  ? `Activa: ${summary.latestAssignment.routine.title}`
+                  : summary.latestExercise?.title
+                    ? `Ejercicio reciente: ${summary.latestExercise.title}`
+                    : "Todavia no hay ejercicios cargados."}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+    </SectionPanel>
+  );
+}
+
+export const LIFE_TRACKER_HOME_WIDGET_PROVIDERS = [
+  {
+    id: "daily-queue",
+    title: "Panel del dia",
+    order: 100,
+    defaultSize: { w: 7, h: 14, minW: 4, minH: 7 },
+    defaultPlacement: {
+      lg: { x: 0, y: 0, w: 7, h: 14, minW: 4, minH: 7 },
+      md: { x: 0, y: 0, w: 6, h: 14, minW: 4, minH: 7 },
+      sm: { x: 0, y: 0, w: 6, h: 12, minW: 4, minH: 7 },
+      xs: { x: 0, y: 0, w: 4, h: 11, minW: 2, minH: 7 },
+      xxs: { x: 0, y: 0, w: 2, h: 10, minW: 2, minH: 6 },
+    },
+    component: LifeTrackerDailyQueueWidget,
+  },
+  {
+    id: "habit-outcome",
+    title: "Evolucion de habitos",
+    order: 200,
+    defaultSize: { w: 5, h: 7, minW: 3, minH: 5 },
+    defaultPlacement: {
+      lg: { x: 7, y: 0, w: 5, h: 7, minW: 3, minH: 6 },
+      md: { x: 6, y: 0, w: 4, h: 7, minW: 3, minH: 6 },
+      sm: { x: 0, y: 12, w: 3, h: 6, minW: 2, minH: 5 },
+      xs: { x: 0, y: 11, w: 4, h: 6, minW: 2, minH: 5 },
+      xxs: { x: 0, y: 10, w: 2, h: 6, minW: 2, minH: 5 },
+    },
+    component: LifeTrackerHabitOutcomeWidget,
+  },
+  {
+    id: "upcoming-tasks",
+    title: "Tareas proximas",
+    order: 300,
+    defaultSize: { w: 5, h: 7, minW: 3, minH: 5 },
+    defaultPlacement: {
+      lg: { x: 7, y: 7, w: 5, h: 7, minW: 3, minH: 5 },
+      md: { x: 6, y: 7, w: 4, h: 7, minW: 3, minH: 5 },
+      sm: { x: 3, y: 12, w: 3, h: 6, minW: 2, minH: 5 },
+      xs: { x: 0, y: 17, w: 4, h: 6, minW: 2, minH: 5 },
+      xxs: { x: 0, y: 16, w: 2, h: 6, minW: 2, minH: 5 },
+    },
+    component: LifeTrackerUpcomingTasksWidget,
+  },
+  {
+    id: "finance-summary",
+    title: "Dinero",
+    order: 400,
+    defaultSize: { w: 6, h: 6, minW: 3, minH: 5 },
+    defaultPlacement: {
+      lg: { x: 0, y: 14, w: 6, h: 6, minW: 3, minH: 5 },
+      md: { x: 0, y: 14, w: 5, h: 6, minW: 3, minH: 5 },
+      sm: { x: 0, y: 18, w: 3, h: 6, minW: 2, minH: 5 },
+      xs: { x: 0, y: 23, w: 4, h: 6, minW: 2, minH: 5 },
+      xxs: { x: 0, y: 22, w: 2, h: 6, minW: 2, minH: 5 },
+    },
+    component: LifeTrackerFinanceSummaryWidget,
+  },
+  {
+    id: "training-summary",
+    title: "Entrenamiento",
+    order: 500,
+    defaultSize: { w: 6, h: 6, minW: 3, minH: 5 },
+    defaultPlacement: {
+      lg: { x: 6, y: 14, w: 6, h: 6, minW: 3, minH: 5 },
+      md: { x: 5, y: 14, w: 5, h: 6, minW: 3, minH: 5 },
+      sm: { x: 3, y: 18, w: 3, h: 6, minW: 2, minH: 5 },
+      xs: { x: 0, y: 29, w: 4, h: 6, minW: 2, minH: 5 },
+      xxs: { x: 0, y: 28, w: 2, h: 6, minW: 2, minH: 5 },
+    },
+    component: LifeTrackerTrainingSummaryWidget,
+  },
+];
 
 function HabitOutcomeLineChart({
   chartData,
@@ -1072,6 +1532,10 @@ function buildUpcomingTaskMenuItem(task) {
 }
 
 function shouldShowQueueStatusPill(item) {
+  if (item?.type === "routine") {
+    return item.completionMode === "detailed" || item.status === "failed";
+  }
+
   return item?.type === "habit"
     && item.progressMode !== "yes-no"
     && item.status
@@ -1090,6 +1554,30 @@ function getQueueToggleMeta(item) {
       isPressed: item.status === "completed",
       className: item.status === "completed" ? "is-completed" : "",
       content: item.status === "completed" ? <CheckIcon /> : null,
+    };
+  }
+
+  if (item.type === "routine") {
+    if (item.completionMode === "detailed") {
+      return null;
+    }
+
+    if (item.status === "completed") {
+      return {
+        title: "Quitar resultado",
+        ariaLabel: "Quitar resultado de rutina",
+        isPressed: true,
+        className: "is-completed",
+        content: <CheckIcon />,
+      };
+    }
+
+    return {
+      title: "Marcar hecha",
+      ariaLabel: "Marcar rutina como completada",
+      isPressed: false,
+      className: "",
+      content: null,
     };
   }
 
@@ -1124,6 +1612,10 @@ function getQueueToggleMeta(item) {
     className: "",
     content: null,
   };
+}
+
+function getRoutineDetailedActionLabel(item) {
+  return item?.status === "completed" ? "Editar detalle" : "Registrar detalle";
 }
 
 function getOccurrenceQuantityDraftValue(item) {
@@ -1288,6 +1780,12 @@ function QueueItemCard({
       : [],
   );
   const controlsDisabled = saving || !resultEditable;
+  const routineDetailActionLabel = item.type === "routine" && item.completionMode === "detailed"
+    ? getRoutineDetailedActionLabel(item)
+    : "";
+  const secondaryCopy = item.type === "routine"
+    ? [item.meta, item.summary].filter(Boolean).join(" - ")
+    : "";
 
   return (
     <article
@@ -1309,10 +1807,17 @@ function QueueItemCard({
       </div>
 
       <div className="habitosView__queueCopy">
-        <strong>{item.title}</strong>
+        <div className="habitosView__queueCopyText">
+          <strong>{item.title}</strong>
+          {secondaryCopy ? <span>{secondaryCopy}</span> : null}
+        </div>
       </div>
 
       <div className="habitosView__queueActions">
+        {item.type === "routine" && shouldShowQueueStatusPill(item) ? (
+          <QueueStatusPill status={item.status} label={item.statusLabel} />
+        ) : null}
+
         {item.type === "habit" && item.progressMode === "quantity" ? (
           <>
             {shouldShowQueueStatusPill(item) ? (
@@ -1344,6 +1849,17 @@ function QueueItemCard({
               <span>Sub-items {getChecklistProgressSummary(item)}</span>
             </button>
           </>
+        ) : null}
+
+        {item.type === "routine" && item.completionMode === "detailed" ? (
+          <button
+            type="button"
+            className="habitosView__queueInlineAction"
+            onClick={onToggle}
+            disabled={controlsDisabled}
+          >
+            {routineDetailActionLabel}
+          </button>
         ) : null}
 
         {toggleMeta ? (
@@ -1566,6 +2082,7 @@ function FloatingWorkbenchModal({
 function CreateChooserModal({
   onTask,
   onHabit,
+  onRoutine,
   onCancel,
 }) {
   return (
@@ -1583,6 +2100,11 @@ function CreateChooserModal({
         <button type="button" className="habitosView__createChoice" onClick={onHabit}>
           <strong>Habito</strong>
           <span>Actividad que se repite en el tiempo. Posee un seguimiento detallado y estadisticas.</span>
+        </button>
+
+        <button type="button" className="habitosView__createChoice" onClick={onRoutine}>
+          <strong>Rutina de ejercicios</strong>
+          <span>Asigna una rutina existente con recurrencia propia y seguimiento simple o detallado.</span>
         </button>
       </div>
 
@@ -3409,22 +3931,72 @@ function HabitEditor({
   );
 }
 
-export default function HabitosView({ ctx, input = null }) {
+export default function LifeTrackerView({ ctx, input = null }) {
   const systemToday = todayLocalDate();
   const pluginSettings = ctx.settings.useValue();
+  const pluginSettingsRef = useRef(pluginSettings);
+  const legacyHabitsSettingsApi = useMemo(
+    () => ctx.createPluginSettingsApi("nexus.habitos"),
+    [ctx],
+  );
+  const legacyHabitsSettings = legacyHabitsSettingsApi.useValue();
+  const trainingSettingsApi = useMemo(
+    () => createMigratedPluginSettingsApi(ctx, `${LIFE_TRACKER_PLUGIN_ID}.training`, {
+      defaults: TRAINING_SETTINGS_DEFAULTS,
+      legacyPluginId: "nexus.training",
+    }),
+    [ctx],
+  );
+  const financeSettingsApi = useMemo(
+    () => createMigratedPluginSettingsApi(ctx, `${LIFE_TRACKER_PLUGIN_ID}.finance`, {
+      legacyPluginId: "nexus.finanzas",
+    }),
+    [ctx],
+  );
+  const activeSection = typeof input?.section === "string" && input.section.trim()
+    ? input.section
+    : LIFE_TRACKER_DEFAULT_SECTION;
   const dashboardEditMode = Boolean(input?.dashboardEditMode);
+  const widgetProviders = ctx.useWidgetProviders();
+  const lifeTrackerWidgetProviders = useMemo(
+    () => widgetProviders
+      .filter((provider) => provider?.pluginId === LIFE_TRACKER_PLUGIN_ID)
+      .sort((left, right) => Number(left?.order || 0) - Number(right?.order || 0)),
+    [widgetProviders],
+  );
+  const canvasWidgetProviders = useMemo(() => {
+    if (lifeTrackerWidgetProviders.length) {
+      return lifeTrackerWidgetProviders;
+    }
+
+    return LIFE_TRACKER_HOME_WIDGET_PROVIDERS.map((provider) => ({
+      ...provider,
+      pluginId: LIFE_TRACKER_PLUGIN_ID,
+    }));
+  }, [lifeTrackerWidgetProviders]);
   const presetCategoryOverrides = useMemo(
     () => readHabitCategoryPresetOverrides(pluginSettings),
     [pluginSettings],
   );
-  const persistedDashboardLayouts = useMemo(
-    () => readHabitosDashboardLayouts(pluginSettings),
+  const canvasStateValue = useMemo(
+    () => readLifeTrackerCanvasState(pluginSettings),
     [pluginSettings],
   );
-  const persistedDashboardLayoutsSignature = useMemo(
-    () => getHabitosDashboardLayoutsSignature(persistedDashboardLayouts),
-    [persistedDashboardLayouts],
-  );
+  const migratedCanvasState = useMemo(() => {
+    if (canvasStateValue) {
+      return canvasStateValue;
+    }
+
+    const legacyLayouts = readHabitosDashboardLayouts(legacyHabitsSettings);
+    return createCanvasStateFromLegacyLayouts(
+      legacyLayouts,
+      canvasWidgetProviders,
+      {
+        breakpoints: HABITOS_DASHBOARD_BREAKPOINTS,
+        colsByBreakpoint: HABITOS_DASHBOARD_COLS,
+      },
+    );
+  }, [canvasStateValue, canvasWidgetProviders, legacyHabitsSettings]);
   const [home, setHome] = useState(createEmptyHome);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -3442,24 +4014,20 @@ export default function HabitosView({ ctx, input = null }) {
   const [categoryBuilderError, setCategoryBuilderError] = useState("");
   const [taskAdvancedOpen, setTaskAdvancedOpen] = useState(false);
   const [habitStep, setHabitStep] = useState(0);
+  const [trainingLibrary, setTrainingLibrary] = useState(EMPTY_TRAINING_LIBRARY);
+  const [trainingLibraryLoading, setTrainingLibraryLoading] = useState(false);
+  const [trainingLibraryError, setTrainingLibraryError] = useState("");
+  const [trainingAssignmentDraft, setTrainingAssignmentDraft] = useState(createRoutineAssignmentDraft());
+  const [trainingAssignmentError, setTrainingAssignmentError] = useState("");
+  const [routineCaptureDraft, setRoutineCaptureDraft] = useState(null);
+  const [routineCaptureError, setRoutineCaptureError] = useState("");
+  const [trainingRefreshToken, setTrainingRefreshToken] = useState(0);
   const [queueMenu, setQueueMenu] = useState(null);
   const [categoryMenu, setCategoryMenu] = useState(null);
   const [expandedChecklistIds, setExpandedChecklistIds] = useState([]);
   const [manualEditableOccurrenceIds, setManualEditableOccurrenceIds] = useState([]);
-  const [renderedDashboardLayouts, setRenderedDashboardLayouts] = useState(
-    () => persistedDashboardLayouts,
-  );
-  const dashboardDraftLayoutsRef = useRef(persistedDashboardLayouts);
-  const dashboardDraftLayoutsSignatureRef = useRef(
-    persistedDashboardLayoutsSignature,
-  );
-  const dashboardPersistTimerRef = useRef(null);
-  const [dashboardMounted, setDashboardMounted] = useState(false);
   const [viewDate, setViewDate] = useState(systemToday);
   const viewDatePickerRef = useRef(null);
-  const lastAppliedPersistedDashboardLayoutsSignatureRef = useRef(
-    persistedDashboardLayoutsSignature,
-  );
   const isEditingHabitDraft = Boolean(habitDraft.id);
   const activeHabitWizardSteps = isEditingHabitDraft
     ? HABIT_EDIT_WIZARD_STEPS
@@ -3471,40 +4039,12 @@ export default function HabitosView({ ctx, input = null }) {
   );
 
   useEffect(() => {
-    setDashboardMounted(true);
-  }, []);
+    pluginSettingsRef.current = pluginSettings;
+  }, [pluginSettings]);
 
   useEffect(() => {
     setHabitStep((currentValue) => Math.min(Math.max(currentValue, 0), lastHabitStepIndex));
   }, [lastHabitStepIndex]);
-
-  useEffect(() => {
-    if (
-      lastAppliedPersistedDashboardLayoutsSignatureRef.current
-      === persistedDashboardLayoutsSignature
-    ) {
-      return;
-    }
-
-    lastAppliedPersistedDashboardLayoutsSignatureRef.current
-      = persistedDashboardLayoutsSignature;
-
-    dashboardDraftLayoutsRef.current = persistedDashboardLayouts;
-    dashboardDraftLayoutsSignatureRef.current = persistedDashboardLayoutsSignature;
-    setRenderedDashboardLayouts((currentValue) => (
-      getHabitosDashboardLayoutsSignature(currentValue) === persistedDashboardLayoutsSignature
-        ? currentValue
-        : persistedDashboardLayouts
-    ));
-  }, [persistedDashboardLayouts, persistedDashboardLayoutsSignature]);
-
-  useEffect(() => {
-    return () => {
-      if (dashboardPersistTimerRef.current !== null) {
-        window.clearTimeout(dashboardPersistTimerRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (!queueMenu && !categoryMenu) {
@@ -3535,6 +4075,33 @@ export default function HabitosView({ ctx, input = null }) {
       window.removeEventListener("scroll", handlePointerDown, true);
     };
   }, [categoryMenu, queueMenu]);
+
+  useEffect(() => {
+    const hasCurrentCanvasState = Boolean(readLifeTrackerCanvasState(pluginSettings));
+    if (hasCurrentCanvasState || !migratedCanvasState) {
+      return;
+    }
+
+    void ctx.settings.set(writeLifeTrackerCanvasState(pluginSettings, migratedCanvasState));
+  }, [ctx.settings, migratedCanvasState, pluginSettings]);
+
+  useEffect(() => {
+    const baseSettings = pluginSettings && typeof pluginSettings === "object" ? pluginSettings : {};
+    if (baseSettings[LIFE_TRACKER_HABIT_CATEGORY_PRESET_OVERRIDES_KEY]) {
+      return;
+    }
+
+    const legacySettings = legacyHabitsSettings && typeof legacyHabitsSettings === "object"
+      ? legacyHabitsSettings
+      : {};
+    if (!legacySettings[LIFE_TRACKER_LEGACY_HABIT_CATEGORY_PRESET_OVERRIDES_KEY]) {
+      return;
+    }
+
+    void ctx.settings.set(
+      writeHabitCategoryPresetOverrides(pluginSettings, readHabitCategoryPresetOverrides(legacySettings)),
+    );
+  }, [ctx.settings, legacyHabitsSettings, pluginSettings]);
 
   useEffect(() => {
     if (!isHabitsDrawerOpen) {
@@ -3597,25 +4164,83 @@ export default function HabitosView({ ctx, input = null }) {
     setError("");
 
     try {
-      const nextHome = await invoke("habitos:get-home", {
+      const nextHome = await invoke(LIFE_TRACKER_HABITS_CHANNELS.getHome, {
         date: requestedDate,
       });
       startTransition(() => {
         setHome(nextHome || createEmptyHome());
       });
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "No se pudo cargar Habitos y tareas.");
+      setError(loadError instanceof Error ? loadError.message : "No se pudo cargar Life Tracker.");
     } finally {
       setLoading(false);
     }
   };
 
+  const loadTrainingLibrary = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setTrainingLibraryLoading(true);
+    }
+    setTrainingLibraryError("");
+
+    try {
+      const nextLibrary = await invoke(LIFE_TRACKER_TRAINING_CHANNELS.list);
+      setTrainingLibrary(nextLibrary || EMPTY_TRAINING_LIBRARY);
+      return nextLibrary || EMPTY_TRAINING_LIBRARY;
+    } catch (loadError) {
+      const message = loadError instanceof Error
+        ? loadError.message
+        : "No se pudo cargar la biblioteca de entrenamiento.";
+      setTrainingLibraryError(message);
+      return null;
+    } finally {
+      if (!silent) {
+        setTrainingLibraryLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
+    if (activeSection !== "home") {
+      return;
+    }
+
     void loadHome(viewDate);
-  }, [viewDate]);
+  }, [activeSection, viewDate]);
+
+  const openLifeTrackerSection = (section) => {
+    void ctx.openView({
+      viewId: LIFE_TRACKER_WORKSPACE_VIEW_ID,
+      reuse: true,
+      sourceId: "nexus.life-tracker.section",
+      input: {
+        ...(input && typeof input === "object" ? input : {}),
+        section,
+        dashboardEditMode: section === "home" ? dashboardEditMode : false,
+      },
+    });
+  };
+
+  const financeCtx = useMemo(
+    () => ({
+      ...ctx,
+      pluginId: `${LIFE_TRACKER_PLUGIN_ID}.finance`,
+      settings: financeSettingsApi,
+    }),
+    [ctx, financeSettingsApi],
+  );
+  const trainingCtx = useMemo(
+    () => ({
+      ...ctx,
+      pluginId: `${LIFE_TRACKER_PLUGIN_ID}.training`,
+      settings: trainingSettingsApi,
+    }),
+    [ctx, trainingSettingsApi],
+  );
 
   const openTaskEditor = (source = null) => {
     setQueueMenu(null);
+    setError("");
     setTaskDraft(createTaskDraft(source));
     setTaskAdvancedOpen(Boolean(source?.notes || source?.time || source?.reminderAt || source?.subitems?.length));
     setModalMode("task");
@@ -3623,6 +4248,7 @@ export default function HabitosView({ ctx, input = null }) {
 
   const openHabitEditor = (source = null) => {
     setQueueMenu(null);
+    setError("");
     setHabitDraft(createHabitDraft(source));
     setHabitWizardError("");
     setCategoryBuilderOpen(false);
@@ -3634,7 +4260,27 @@ export default function HabitosView({ ctx, input = null }) {
 
   const openCreateChooser = () => {
     setQueueMenu(null);
+    setError("");
     setModalMode("create");
+  };
+
+  const openRoutineAssignmentEditor = (source = null) => {
+    setQueueMenu(null);
+    setCategoryMenu(null);
+    setError("");
+    setTrainingAssignmentError("");
+    setTrainingAssignmentDraft(createRoutineAssignmentDraft(source));
+    setModalMode("routine-assignment");
+    void loadTrainingLibrary();
+  };
+
+  const openRoutineCaptureEditor = (item) => {
+    setQueueMenu(null);
+    setCategoryMenu(null);
+    setError("");
+    setRoutineCaptureError("");
+    setRoutineCaptureDraft(createRoutineCaptureDraft(item));
+    setModalMode("routine-capture");
   };
 
   const openHabitsDrawer = () => {
@@ -3671,6 +4317,10 @@ export default function HabitosView({ ctx, input = null }) {
     setCategoryBuilderError("");
     setTaskAdvancedOpen(false);
     setHabitStep(0);
+    setTrainingAssignmentDraft(createRoutineAssignmentDraft());
+    setTrainingAssignmentError("");
+    setRoutineCaptureDraft(null);
+    setRoutineCaptureError("");
   };
 
   const applyHomeUpdate = (nextHome) => {
@@ -3695,6 +4345,174 @@ export default function HabitosView({ ctx, input = null }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const runTrainingMutation = async (
+    channel,
+    payload,
+    {
+      onSuccess,
+      refreshHome = true,
+      refreshTraining = true,
+    } = {},
+  ) => {
+    setSaving(true);
+    setError("");
+
+    try {
+      const result = await invoke(channel, payload || {});
+
+      if (refreshHome && activeSection === "home") {
+        await loadHome(viewDate);
+      }
+
+      if (refreshTraining) {
+        await loadTrainingLibrary({ silent: true });
+        setTrainingRefreshToken((currentValue) => currentValue + 1);
+      }
+
+      await onSuccess?.(result);
+      return result;
+    } catch (mutationError) {
+      setError(mutationError instanceof Error ? mutationError.message : "No se pudo completar la operacion.");
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTrainingAssignmentDraftChange = (field, value) => {
+    setTrainingAssignmentError("");
+    setTrainingAssignmentDraft((currentValue) => ({
+      ...currentValue,
+      [field]: value,
+    }));
+  };
+
+  const handleToggleTrainingWeekday = (weekday) => {
+    setTrainingAssignmentError("");
+    setTrainingAssignmentDraft((currentValue) => {
+      const isActive = currentValue.weekdays.includes(weekday);
+      return {
+        ...currentValue,
+        weekdays: isActive
+          ? currentValue.weekdays.filter((entry) => entry !== weekday)
+          : [...currentValue.weekdays, weekday].sort((left, right) => left - right),
+      };
+    });
+  };
+
+  const handleSaveRoutineAssignment = async () => {
+    try {
+      const payload = normalizeRoutineAssignmentPayload(trainingAssignmentDraft);
+      setTrainingAssignmentError("");
+      await runTrainingMutation(
+        LIFE_TRACKER_TRAINING_CHANNELS.saveAssignment,
+        {
+          id: trainingAssignmentDraft.id || undefined,
+          ...payload,
+        },
+        {
+          onSuccess: () => {
+            closeWorkbench();
+          },
+        },
+      );
+    } catch (validationError) {
+      setTrainingAssignmentError(
+        validationError instanceof Error
+          ? validationError.message
+          : "No se pudo validar la programacion.",
+      );
+    }
+  };
+
+  const handleDeleteRoutineAssignment = async (assignmentId = trainingAssignmentDraft.id) => {
+    if (!assignmentId) {
+      closeWorkbench();
+      return;
+    }
+
+    await runTrainingMutation(
+      LIFE_TRACKER_TRAINING_CHANNELS.deleteAssignment,
+      {
+        assignmentId,
+      },
+      {
+        onSuccess: () => {
+          closeWorkbench();
+        },
+      },
+    );
+  };
+
+  const handleRoutineCaptureStepChange = (stepId, nextActual) => {
+    setRoutineCaptureError("");
+    setRoutineCaptureDraft((currentValue) => {
+      if (!currentValue) {
+        return currentValue;
+      }
+
+      return {
+        ...currentValue,
+        steps: currentValue.steps.map((step) => (
+          step.id === stepId
+            ? {
+                ...step,
+                actual: nextActual,
+              }
+            : step
+        )),
+      };
+    });
+  };
+
+  const handleSaveRoutineCapture = async () => {
+    if (!routineCaptureDraft?.assignmentId) {
+      setRoutineCaptureError("No encontramos la rutina programada.");
+      return;
+    }
+
+    const serializedResult = serializeRoutineCaptureDraft(routineCaptureDraft);
+    if (!serializedResult.entries.length) {
+      setRoutineCaptureError("Carga al menos un resultado antes de guardar.");
+      return;
+    }
+
+    await runTrainingMutation(
+      LIFE_TRACKER_TRAINING_CHANNELS.saveOccurrenceResult,
+      {
+        assignmentId: routineCaptureDraft.assignmentId,
+        occurrenceDate: routineCaptureDraft.occurrenceDate,
+        result: serializedResult,
+      },
+      {
+        onSuccess: () => {
+          closeWorkbench();
+        },
+      },
+    );
+  };
+
+  const handleClearRoutineCapture = async () => {
+    if (!routineCaptureDraft?.assignmentId) {
+      setRoutineCaptureError("No encontramos la rutina programada.");
+      return;
+    }
+
+    await runTrainingMutation(
+      LIFE_TRACKER_TRAINING_CHANNELS.saveOccurrenceResult,
+      {
+        assignmentId: routineCaptureDraft.assignmentId,
+        occurrenceDate: routineCaptureDraft.occurrenceDate,
+        clear: true,
+      },
+      {
+        onSuccess: () => {
+          closeWorkbench();
+        },
+      },
+    );
   };
 
   const persistPresetCategoryOverrides = async (nextOverrides) => {
@@ -3792,7 +4610,7 @@ export default function HabitosView({ ctx, input = null }) {
 
       if (previousCategoryName && previousCategoryName !== nextCategoryName) {
         await runMutation(
-          "habitos:rename-category-references",
+          LIFE_TRACKER_HABITS_CHANNELS.renameCategoryReferences,
           {
             previousName: previousCategoryName,
             nextName: nextCategoryName,
@@ -3809,7 +4627,7 @@ export default function HabitosView({ ctx, input = null }) {
     }
 
     await runMutation(
-      "habitos:save-category",
+      LIFE_TRACKER_HABITS_CHANNELS.saveCategory,
       {
         id: editingCategoryId || undefined,
         name: String(categoryBuilderDraft.name || "").trim(),
@@ -3870,7 +4688,7 @@ export default function HabitosView({ ctx, input = null }) {
       };
 
       await runMutation(
-        "habitos:clear-category-references",
+        LIFE_TRACKER_HABITS_CHANNELS.clearCategoryReferences,
         {
           categoryName: option.value,
         },
@@ -3896,7 +4714,7 @@ export default function HabitosView({ ctx, input = null }) {
     }
 
     await runMutation(
-      "habitos:delete-category",
+      LIFE_TRACKER_HABITS_CHANNELS.deleteCategory,
       {
         categoryId: option.id,
       },
@@ -4205,7 +5023,7 @@ export default function HabitosView({ ctx, input = null }) {
     event.preventDefault();
 
     await runMutation(
-      "habitos:save-task",
+      LIFE_TRACKER_HABITS_CHANNELS.saveTask,
       {
         ...taskDraft,
         priority: normalizeIntegerDraftValue(taskDraft.priority, {
@@ -4337,7 +5155,7 @@ export default function HabitosView({ ctx, input = null }) {
     });
 
     await runMutation(
-      "habitos:save-habit",
+      LIFE_TRACKER_HABITS_CHANNELS.saveHabit,
       payload,
       {
         onSuccess: () => {
@@ -4358,38 +5176,56 @@ export default function HabitosView({ ctx, input = null }) {
         return;
       }
 
-      await runMutation("habitos:toggle-task", {
+      await runMutation(LIFE_TRACKER_HABITS_CHANNELS.toggleTask, {
         taskId: item.recordId,
       });
       return;
     }
 
-    if (!canEditOccurrenceResult(item)) {
+    if (item.type === "routine") {
+      if (!canEditQueueItemResult(item)) {
+        return;
+      }
+
+      if (item.completionMode === "detailed") {
+        openRoutineCaptureEditor(item);
+        return;
+      }
+
+      await runTrainingMutation(LIFE_TRACKER_TRAINING_CHANNELS.saveOccurrenceResult, {
+        assignmentId: item.assignmentId,
+        occurrenceDate: item.raw?.occurrenceDate || viewDate,
+        clear: item.status === "completed",
+      });
       return;
     }
 
-    await runMutation("habitos:toggle-occurrence", {
+    if (!canEditQueueItemResult(item)) {
+      return;
+    }
+
+    await runMutation(LIFE_TRACKER_HABITS_CHANNELS.toggleOccurrence, {
       occurrenceId: item.recordId,
     });
   };
 
   const handleCommitOccurrenceQuantity = async (item, value) => {
-    if (!canEditOccurrenceResult(item)) {
+    if (!canEditQueueItemResult(item)) {
       return;
     }
 
-    await runMutation("habitos:set-occurrence-quantity", {
+    await runMutation(LIFE_TRACKER_HABITS_CHANNELS.setOccurrenceQuantity, {
       occurrenceId: item.recordId,
       value,
     });
   };
 
   const handleToggleOccurrenceChecklistItem = async (item, itemId) => {
-    if (!canEditOccurrenceResult(item)) {
+    if (!canEditQueueItemResult(item)) {
       return;
     }
 
-    await runMutation("habitos:toggle-occurrence-checklist-item", {
+    await runMutation(LIFE_TRACKER_HABITS_CHANNELS.toggleOccurrenceChecklistItem, {
       occurrenceId: item.recordId,
       itemId,
     });
@@ -4413,8 +5249,16 @@ export default function HabitosView({ ctx, input = null }) {
     setManualEditableOccurrenceIds((currentValue) => currentValue.filter((entry) => entry !== occurrenceId));
   };
 
-  const canEditOccurrenceResult = (item) => {
-    if (!item || item.type !== "habit" || item.isProjected) {
+  const canEditQueueItemResult = (item) => {
+    if (!item) {
+      return false;
+    }
+
+    if (item.type === "routine") {
+      return !isFutureView;
+    }
+
+    if (item.type !== "habit" || item.isProjected) {
       return false;
     }
 
@@ -4451,57 +5295,20 @@ export default function HabitosView({ ctx, input = null }) {
     input.click();
   };
 
-  const handleDashboardLayoutChange = (_currentLayout, allLayouts) => {
-    const nextLayouts = normalizeHabitosDashboardLayouts(allLayouts);
-    const nextSignature = getHabitosDashboardLayoutsSignature(nextLayouts);
-
-    if (nextSignature === dashboardDraftLayoutsSignatureRef.current) {
-      return;
-    }
-
-    dashboardDraftLayoutsRef.current = nextLayouts;
-    dashboardDraftLayoutsSignatureRef.current = nextSignature;
-  };
-
-  const handleDashboardLayoutCommit = (_currentLayout, allLayouts) => {
-    const nextLayouts = normalizeHabitosDashboardLayouts(allLayouts);
-    const nextSignature = getHabitosDashboardLayoutsSignature(nextLayouts);
-
-    dashboardDraftLayoutsRef.current = nextLayouts;
-    dashboardDraftLayoutsSignatureRef.current = nextSignature;
-    setRenderedDashboardLayouts(nextLayouts);
-
-    if (nextSignature === persistedDashboardLayoutsSignature) {
-      return;
-    }
-
-    if (dashboardPersistTimerRef.current !== null) {
-      window.clearTimeout(dashboardPersistTimerRef.current);
-    }
-
-    dashboardPersistTimerRef.current = window.setTimeout(() => {
-      dashboardPersistTimerRef.current = null;
-      void ctx.settings
-        .set(writeHabitosDashboardLayouts(pluginSettings, nextLayouts))
-        .catch((settingsError) => {
-          setError(
-            settingsError instanceof Error
-              ? settingsError.message
-              : "No se pudo guardar la distribucion del dashboard.",
-          );
-        });
-    }, 120);
-  };
-
   const handleDeleteQueueItem = async (item) => {
     if (item.type === "task") {
-      await runMutation("habitos:delete-task", {
+      await runMutation(LIFE_TRACKER_HABITS_CHANNELS.deleteTask, {
         taskId: item.raw?.id || item.recordId,
       });
       return;
     }
 
-    await runMutation("habitos:delete-habit", {
+    if (item.type === "routine") {
+      await handleDeleteRoutineAssignment(item.assignmentId);
+      return;
+    }
+
+    await runMutation(LIFE_TRACKER_HABITS_CHANNELS.deleteHabit, {
       habitId: item.habit?.id,
     });
   };
@@ -4509,7 +5316,7 @@ export default function HabitosView({ ctx, input = null }) {
   const handleToggleHabitStatus = async (habit) => {
     setSelectedHabitId(habit.id);
     await runMutation(
-      "habitos:save-habit",
+      LIFE_TRACKER_HABITS_CHANNELS.saveHabit,
       buildHabitPayload(habit, {
         status: habit.status === "active" ? "archived" : "active",
       }),
@@ -4553,188 +5360,200 @@ export default function HabitosView({ ctx, input = null }) {
     : isFutureView
       ? "Vista previa de tareas y ocurrencias previstas para esa fecha."
       : "";
+  const renderDailyQueueWidget = () => (
+    <SectionPanel className="habitosDashboard__widget habitosView__queuePanel">
+      <PanelHeader
+        actions={(
+          <div className="habitosView__panelActions">
+            <div className="habitosView__dayNavigator">
+              <button
+                type="button"
+                className="habitosView__dayNavButton"
+                onClick={() => handleShiftViewDate(-1)}
+                disabled={loading || saving}
+                aria-label="Dia anterior"
+              >
+                <ChevronLeftIcon />
+              </button>
+
+              <button
+                type="button"
+                className="habitosView__dayNavCurrent"
+                onClick={handleOpenViewDatePicker}
+                disabled={loading || saving}
+                aria-label="Elegir fecha"
+              >
+                <span>{formatVisibleDateLabel(viewDate)}</span>
+              </button>
+
+              <button
+                type="button"
+                className="habitosView__dayNavButton"
+                onClick={() => handleShiftViewDate(1)}
+                disabled={loading || saving}
+                aria-label="Dia siguiente"
+              >
+                <ChevronRightIcon />
+              </button>
+
+              {viewDate !== actualToday ? (
+                <Button
+                  type="button"
+                  tone="secondary"
+                  onClick={() => handleSelectViewDate(actualToday)}
+                  disabled={loading || saving}
+                >
+                  Volver a hoy
+                </Button>
+              ) : null}
+
+              <input
+                ref={viewDatePickerRef}
+                className="habitosView__datePickerInput"
+                type="date"
+                value={viewDate}
+                onChange={(event) => handleSelectViewDate(event.target.value)}
+                tabIndex="-1"
+                aria-hidden="true"
+              />
+            </div>
+
+            <IconButton
+              type="button"
+              aria-label="Configuraciones"
+              title="Configuraciones"
+              onClick={openHabitsDrawer}
+            >
+              <SettingsIcon />
+            </IconButton>
+            <IconButton type="button" tone="primary" aria-label="Crear nuevo" onClick={openCreateChooser}>
+              <PlusIcon />
+            </IconButton>
+          </div>
+        )}
+      >
+        <DashboardPanelTitle
+          title={dailyPanelTitle}
+          description={dailyPanelDescription}
+          editMode={dashboardEditMode}
+        />
+      </PanelHeader>
+
+      <div className="habitosDashboard__widgetBody habitosView__queuePanelBody">
+        {loading ? (
+          <StateBlock title="Cargando..." />
+        ) : home.dailyQueue.length ? (
+          <div className="habitosView__queueList">
+            {home.dailyQueue.map((item) => (
+              <QueueItemCard
+                key={item.id}
+                item={item}
+                categoryCatalog={home.categoryCatalog}
+                presetOverrides={presetCategoryOverrides}
+                isSelected={queueMenu?.item?.id === item.id}
+                saving={saving}
+                resultEditable={item.type === "task" ? viewDate === actualToday : canEditQueueItemResult(item)}
+                onToggle={() => void handleToggleQueueItem(item)}
+                onContextMenu={handleOpenQueueMenu}
+                onCommitQuantity={(queueItem, value) => handleCommitOccurrenceQuantity(queueItem, value)}
+                onToggleChecklistItem={(queueItem, itemId) => handleToggleOccurrenceChecklistItem(queueItem, itemId)}
+                onToggleChecklistExpanded={handleToggleChecklistExpanded}
+                isChecklistExpanded={expandedChecklistIds.includes(item.recordId)}
+              />
+            ))}
+          </div>
+        ) : (
+          <StateBlock
+            title={isPastView
+              ? "No hay historial para esta fecha."
+              : isFutureView
+                ? "No hay actividad prevista para esta fecha."
+                : "No hay actividad para hoy."}
+          />
+        )}
+      </div>
+    </SectionPanel>
+  );
+
+  const renderHabitOutcomeWidget = () => (
+    <HabitOutcomePanel chart={home.habitOutcomeChart} dashboardEditMode={dashboardEditMode} />
+  );
+
+  const renderUpcomingTasksWidget = () => (
+    <SecondaryListCard
+      title="Tareas proximas"
+      items={viewDate === actualToday ? home.upcomingTasks : []}
+      emptyTitle={viewDate === actualToday
+        ? "Sin tareas proximas."
+        : "Disponible solo para hoy."}
+      renderItem={renderSecondaryTask}
+      dashboardEditMode={dashboardEditMode}
+    />
+  );
+
+  const persistHomeCanvasState = async (nextCanvasState) => {
+    await ctx.settings.set(
+      writeLifeTrackerCanvasState(pluginSettingsRef.current, nextCanvasState),
+    );
+  };
+
+  const lifeTrackerWidgetContext = {
+    openSection: openLifeTrackerSection,
+    renderDailyQueue: renderDailyQueueWidget,
+    renderHabitOutcome: renderHabitOutcomeWidget,
+    renderUpcomingTasks: renderUpcomingTasksWidget,
+    trainingRefreshToken,
+  };
 
   return (
-    <WorkspacePage className="habitosView">
-      <WorkspaceBody>
-        <ScrollRegion className="habitosView__mainScroll">
-          <PanelStack className="habitosView__dashboardStack">
-            {error ? (
-              <Notice tone="danger">
-                {error}
-              </Notice>
-            ) : null}
+    <WorkspacePage className="habitosView lifeTrackerView">
+      {activeSection === "home" ? (
+        <WorkspaceBody>
+          <ScrollRegion className="habitosView__mainScroll">
+            <PanelStack className="habitosView__dashboardStack">
+              {error ? (
+                <Notice tone="danger">
+                  {error}
+                </Notice>
+              ) : null}
 
-            <ResponsiveGridLayout
-              className="habitosDashboard__grid"
-              layouts={renderedDashboardLayouts}
-              breakpoints={HABITOS_DASHBOARD_BREAKPOINTS}
-              cols={HABITOS_DASHBOARD_COLS}
-              rowHeight={HABITOS_DASHBOARD_ROW_HEIGHT}
-              margin={HABITOS_DASHBOARD_MARGIN}
-              containerPadding={[0, 0]}
-              measureBeforeMount={false}
-              autoSize
-              resizeHandles={HABITOS_DASHBOARD_RESIZE_HANDLES}
-              compactType={null}
-              preventCollision={true}
-              useCSSTransforms={dashboardMounted}
-              isDraggable={dashboardEditMode}
-              isResizable={dashboardEditMode}
-              draggableHandle=".habitosDashboard__editOverlay"
-              draggableCancel=".nexus-ui-panel-header__actions, .habitosDashboard__widgetBody, button, input, select, textarea, label, canvas"
-              onLayoutChange={handleDashboardLayoutChange}
-              onDragStop={handleDashboardLayoutCommit}
-              onResizeStop={handleDashboardLayoutCommit}
-            >
-              <div
-                key="daily-queue"
-                className={["habitosDashboard__item", dashboardEditMode ? "is-editing" : ""].filter(Boolean).join(" ")}
-              >
-                <SectionPanel className="habitosDashboard__widget habitosView__queuePanel">
-                  <PanelHeader
-                    actions={(
-                      <div className="habitosView__panelActions">
-                        <div className="habitosView__dayNavigator">
-                          <button
-                            type="button"
-                            className="habitosView__dayNavButton"
-                            onClick={() => handleShiftViewDate(-1)}
-                            disabled={loading || saving}
-                            aria-label="Dia anterior"
-                          >
-                            <ChevronLeftIcon />
-                          </button>
+              <CanvasWorkspace
+                providers={canvasWidgetProviders}
+                canvasState={migratedCanvasState}
+                onPersistCanvasState={persistHomeCanvasState}
+                onPersistError={(settingsError) => {
+                  setError(
+                    settingsError instanceof Error
+                      ? settingsError.message
+                      : "No se pudo guardar el lienzo de Life Tracker.",
+                  );
+                }}
+                editMode={dashboardEditMode}
+                widgetContext={lifeTrackerWidgetContext}
+                gridClassName="habitosDashboard__grid"
+                itemClassName="habitosDashboard__item"
+                editOverlayClassName="habitosDashboard__editOverlay"
+                draggableCancel=".nexus-ui-panel-header__actions, .habitosDashboard__widgetBody, button, input, select, textarea, label, canvas"
+                breakpoints={HABITOS_DASHBOARD_BREAKPOINTS}
+                cols={HABITOS_DASHBOARD_COLS}
+                rowHeight={HABITOS_DASHBOARD_ROW_HEIGHT}
+                margin={HABITOS_DASHBOARD_MARGIN}
+                containerPadding={[0, 0]}
+              />
+            </PanelStack>
+          </ScrollRegion>
+        </WorkspaceBody>
+      ) : null}
 
-                          <button
-                            type="button"
-                            className="habitosView__dayNavCurrent"
-                            onClick={handleOpenViewDatePicker}
-                            disabled={loading || saving}
-                            aria-label="Elegir fecha"
-                          >
-                            <span>{formatVisibleDateLabel(viewDate)}</span>
-                          </button>
+      {activeSection === "finance" ? (
+        <PersonalFinanceView shellMode="embedded" showTopbar={false} />
+      ) : null}
 
-                          <button
-                            type="button"
-                            className="habitosView__dayNavButton"
-                            onClick={() => handleShiftViewDate(1)}
-                            disabled={loading || saving}
-                            aria-label="Dia siguiente"
-                          >
-                            <ChevronRightIcon />
-                          </button>
+      {activeSection === "training" ? (
+        <TrainingView ctx={trainingCtx} shellMode="embedded" showTopbar={false} />
+      ) : null}
 
-                          {viewDate !== actualToday ? (
-                            <Button
-                              type="button"
-                              tone="secondary"
-                              onClick={() => handleSelectViewDate(actualToday)}
-                              disabled={loading || saving}
-                            >
-                              Volver a hoy
-                            </Button>
-                          ) : null}
-
-                          <input
-                            ref={viewDatePickerRef}
-                            className="habitosView__datePickerInput"
-                            type="date"
-                            value={viewDate}
-                            onChange={(event) => handleSelectViewDate(event.target.value)}
-                            tabIndex="-1"
-                            aria-hidden="true"
-                          />
-                        </div>
-
-                        <IconButton
-                          type="button"
-                          aria-label="Configuraciones"
-                          title="Configuraciones"
-                          onClick={openHabitsDrawer}
-                        >
-                          <SettingsIcon />
-                        </IconButton>
-                        <IconButton type="button" tone="primary" aria-label="Crear nuevo" onClick={openCreateChooser}>
-                          <PlusIcon />
-                        </IconButton>
-                      </div>
-                    )}
-                  >
-                    <DashboardPanelTitle
-                      title={dailyPanelTitle}
-                      description={dailyPanelDescription}
-                      editMode={dashboardEditMode}
-                    />
-                  </PanelHeader>
-
-                  <div className="habitosDashboard__widgetBody habitosView__queuePanelBody">
-                    {loading ? (
-                      <StateBlock title="Cargando..." />
-                    ) : home.dailyQueue.length ? (
-                      <div className="habitosView__queueList">
-                        {home.dailyQueue.map((item) => (
-                          <QueueItemCard
-                            key={item.id}
-                            item={item}
-                            categoryCatalog={home.categoryCatalog}
-                            presetOverrides={presetCategoryOverrides}
-                            isSelected={queueMenu?.item?.id === item.id}
-                            saving={saving}
-                            resultEditable={item.type === "task" ? viewDate === actualToday : canEditOccurrenceResult(item)}
-                            onToggle={() => void handleToggleQueueItem(item)}
-                            onContextMenu={handleOpenQueueMenu}
-                            onCommitQuantity={(queueItem, value) => handleCommitOccurrenceQuantity(queueItem, value)}
-                            onToggleChecklistItem={(queueItem, itemId) => handleToggleOccurrenceChecklistItem(queueItem, itemId)}
-                            onToggleChecklistExpanded={handleToggleChecklistExpanded}
-                            isChecklistExpanded={expandedChecklistIds.includes(item.recordId)}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <StateBlock
-                        title={isPastView
-                          ? "No hay historial para esta fecha."
-                          : isFutureView
-                            ? "No hay actividad prevista para esta fecha."
-                            : "No hay actividad para hoy."}
-                      />
-                    )}
-                  </div>
-                </SectionPanel>
-                {dashboardEditMode ? <DashboardEditOverlay /> : null}
-              </div>
-
-              <div
-                key="habit-outcome"
-                className={["habitosDashboard__item", dashboardEditMode ? "is-editing" : ""].filter(Boolean).join(" ")}
-              >
-                <HabitOutcomePanel chart={home.habitOutcomeChart} dashboardEditMode={dashboardEditMode} />
-                {dashboardEditMode ? <DashboardEditOverlay /> : null}
-              </div>
-
-              <div
-                key="upcoming-tasks"
-                className={["habitosDashboard__item", dashboardEditMode ? "is-editing" : ""].filter(Boolean).join(" ")}
-              >
-                <SecondaryListCard
-                  title="Tareas proximas"
-                  items={viewDate === actualToday ? home.upcomingTasks : []}
-                  emptyTitle={viewDate === actualToday
-                    ? "Sin tareas proximas."
-                    : "Disponible solo para hoy."}
-                  renderItem={renderSecondaryTask}
-                  dashboardEditMode={dashboardEditMode}
-                />
-                {dashboardEditMode ? <DashboardEditOverlay /> : null}
-              </div>
-            </ResponsiveGridLayout>
-          </PanelStack>
-        </ScrollRegion>
-      </WorkspaceBody>
-
-      {queueMenu?.item ? (
+      {activeSection === "home" && queueMenu?.item ? (
         <div
           className="habitosView__contextMenu"
           style={{
@@ -4774,6 +5593,11 @@ export default function HabitosView({ ctx, input = null }) {
                 return;
               }
 
+              if (queueMenu.item.type === "routine") {
+                openRoutineAssignmentEditor(queueMenu.item.assignment);
+                return;
+              }
+
               openHabitEditor(queueMenu.item.habit);
             }}
           >
@@ -4792,7 +5616,7 @@ export default function HabitosView({ ctx, input = null }) {
         </div>
       ) : null}
 
-      {categoryMenu?.option ? (
+      {activeSection === "home" && categoryMenu?.option ? (
         <div
           className="habitosView__contextMenu"
           style={{
@@ -4878,9 +5702,55 @@ export default function HabitosView({ ctx, input = null }) {
           onHabit={() => {
             openHabitEditor();
           }}
+          onRoutine={() => {
+            openRoutineAssignmentEditor();
+          }}
           onCancel={() => {
             closeWorkbench();
           }}
+        />
+      </FloatingWorkbenchModal>
+
+      <FloatingWorkbenchModal
+        isVisible={modalMode === "routine-assignment"}
+        saving={saving}
+        onClose={() => {
+          closeWorkbench();
+        }}
+      >
+        <RoutineAssignmentModal
+          draft={trainingAssignmentDraft}
+          routines={trainingLibrary.routines}
+          loading={trainingLibraryLoading}
+          error={trainingAssignmentError || trainingLibraryError || error}
+          saving={saving}
+          onChange={handleTrainingAssignmentDraftChange}
+          onToggleWeekday={handleToggleTrainingWeekday}
+          onSave={() => void handleSaveRoutineAssignment()}
+          onDelete={() => void handleDeleteRoutineAssignment()}
+          onCancel={() => closeWorkbench()}
+          onOpenTrainingSection={() => {
+            closeWorkbench();
+            openLifeTrackerSection("training");
+          }}
+        />
+      </FloatingWorkbenchModal>
+
+      <FloatingWorkbenchModal
+        isVisible={modalMode === "routine-capture"}
+        saving={saving}
+        onClose={() => {
+          closeWorkbench();
+        }}
+      >
+        <RoutineCaptureModal
+          draft={routineCaptureDraft}
+          error={routineCaptureError || error}
+          saving={saving}
+          onChangeStep={handleRoutineCaptureStepChange}
+          onSave={() => void handleSaveRoutineCapture()}
+          onClear={() => void handleClearRoutineCapture()}
+          onCancel={() => closeWorkbench()}
         />
       </FloatingWorkbenchModal>
 

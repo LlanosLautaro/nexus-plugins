@@ -982,7 +982,7 @@ function RoutineEditor({
   );
 }
 
-function TrainingView({ ctx }) {
+function TrainingView({ ctx, shellMode = "workspace", showTopbar = true }) {
   const trainingSettings = ctx.settings.useValue();
   const muscleConceptFolder = useMemo(
     () => readTrainingMuscleConceptsDirectory(trainingSettings),
@@ -1471,40 +1471,42 @@ function TrainingView({ ctx }) {
     (exerciseDraft.muscles || []).map((muscle) => String(muscle.conceptId || muscle.entityRefId)),
   );
 
-  return (
-    <WorkspacePage className="trainingPlugin">
-      <WorkspaceTopbar>
-        <WorkspaceTitle
-          eyebrow="Plugin training"
-          title="Entrenamientos"
-          description="Ejercicios minimos, rutinas lineales y muscles enlazados sin ruido innecesario."
-        />
-
-        <ToolbarActions>
-          <SegmentedControl
-            className="trainingPlugin__modeTabs"
-            ariaLabel="Modo de entrenamientos"
-            options={[
-              { value: "exercises", label: "Ejercicios" },
-              { value: "routines", label: "Rutinas" },
-            ]}
-            value={mode}
-            onChange={setMode}
+  const pageContent = (
+    <>
+      {showTopbar ? (
+        <WorkspaceTopbar>
+          <WorkspaceTitle
+            eyebrow="Plugin training"
+            title="Entrenamientos"
+            description="Ejercicios minimos, rutinas lineales y muscles enlazados sin ruido innecesario."
           />
-          <Button type="button" onClick={() => loadLibrary()}>
-            <RefreshIcon size={16} />
-            <span>Refrescar</span>
-          </Button>
-          <Button
-            type="button"
-            tone="primary"
-            onClick={mode === "exercises" ? createExercise : createRoutine}
-          >
-            <PlusIcon size={16} />
-            <span>{mode === "exercises" ? "Nuevo ejercicio" : "Nueva rutina"}</span>
-          </Button>
-        </ToolbarActions>
-      </WorkspaceTopbar>
+
+          <ToolbarActions>
+            <SegmentedControl
+              className="trainingPlugin__modeTabs"
+              ariaLabel="Modo de entrenamientos"
+              options={[
+                { value: "exercises", label: "Ejercicios" },
+                { value: "routines", label: "Rutinas" },
+              ]}
+              value={mode}
+              onChange={setMode}
+            />
+            <Button type="button" onClick={() => loadLibrary()}>
+              <RefreshIcon size={16} />
+              <span>Refrescar</span>
+            </Button>
+            <Button
+              type="button"
+              tone="primary"
+              onClick={mode === "exercises" ? createExercise : createRoutine}
+            >
+              <PlusIcon size={16} />
+              <span>{mode === "exercises" ? "Nuevo ejercicio" : "Nueva rutina"}</span>
+            </Button>
+          </ToolbarActions>
+        </WorkspaceTopbar>
+      ) : null}
 
       <WorkspaceBody className="trainingPlugin__body">
         <SplitLayout className="trainingPlugin__content" variant="sidebar-detail">
@@ -1645,6 +1647,16 @@ function TrainingView({ ctx }) {
           </SplitDetail>
         </SplitLayout>
       </WorkspaceBody>
+    </>
+  );
+
+  if (shellMode === "embedded") {
+    return <div className="trainingPlugin trainingPlugin--embedded">{pageContent}</div>;
+  }
+
+  return (
+    <WorkspacePage className="trainingPlugin">
+      {pageContent}
     </WorkspacePage>
   );
 }

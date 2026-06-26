@@ -4,6 +4,13 @@
   background: var(--workspace-main-bg);
 }
 
+.financeDashboard--embedded {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
 .financeDashboard__content {
   gap: var(--space-4);
 }

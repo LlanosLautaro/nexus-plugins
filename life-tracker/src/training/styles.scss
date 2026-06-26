@@ -1,4 +1,4 @@
-@use "../../../nexus-frontend/src/scss/tools" as *;
+@use "../../../../nexus-frontend/src/scss/tools" as *;
 
 .trainingPlugin {
   background:
@@ -41,6 +41,97 @@
     );
 }
 
+.trainingPlugin__sidebarFolders {
+  display: grid;
+  gap: 8px;
+}
+
+.trainingPlugin__folderCard,
+.trainingPlugin__folderLink,
+.trainingPlugin__listAction,
+.trainingPlugin__folderGhostButton {
+  border: 1px solid color-mix(in srgb, var(--color-line) 90%, transparent);
+  background: color-mix(in srgb, var(--shell-panel-soft) 82%, transparent);
+  color: var(--color-text);
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--color-line-strong);
+    background: color-mix(in srgb, var(--shell-panel-highlight) 82%, transparent);
+    transform: translateY(-1px);
+  }
+}
+
+.trainingPlugin__folderCard {
+  width: 100%;
+  padding: 12px;
+  border-radius: calc(var(--radius-m) + 2px);
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+
+  strong {
+    font-size: 0.88rem;
+  }
+
+  span:last-child {
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+  }
+}
+
+.trainingPlugin__folderCard.is-active,
+.trainingPlugin__folderLink.is-active {
+  @include interactive-active();
+}
+
+.trainingPlugin__folderEyebrow {
+  color: var(--color-text-subtle);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trainingPlugin__folderAux {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.trainingPlugin__folderLink,
+.trainingPlugin__folderGhostButton,
+.trainingPlugin__listAction {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: var(--radius-m);
+  cursor: pointer;
+}
+
+.trainingPlugin__folderLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  span {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+  }
+
+  strong {
+    font-size: 0.86rem;
+  }
+}
+
+.trainingPlugin__folderGhostButton {
+  white-space: nowrap;
+}
+
 .trainingPlugin__modeTabs {
   border-radius: var(--radius-m);
   padding: 3px;
@@ -67,6 +158,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .trainingPlugin__listHeaderCopy {
@@ -82,6 +174,13 @@
     color: var(--color-text-muted);
     font-size: 0.78rem;
   }
+}
+
+.trainingPlugin__listAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .trainingPlugin__listCard {
@@ -147,6 +246,12 @@
   grid-template-columns: minmax(0, 640px) minmax(280px, 380px);
   gap: var(--space-4);
   align-items: start;
+}
+
+.trainingPlugin__exerciseMain {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-4);
 }
 
 .trainingPlugin__card {
@@ -260,6 +365,43 @@
   color: var(--color-text-soft);
 }
 
+.trainingPlugin__weekdayRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trainingPlugin__weekdayButton {
+  min-width: 44px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--shell-panel-soft) 82%, transparent);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: color-mix(in srgb, var(--color-accent) 28%, var(--color-line));
+    background: color-mix(in srgb, var(--shell-panel-highlight) 78%, transparent);
+    color: var(--color-text);
+    transform: translateY(-1px);
+  }
+}
+
+.trainingPlugin__weekdayButton.is-active {
+  border-color: color-mix(in srgb, var(--color-accent) 34%, var(--color-line));
+  background: color-mix(in srgb, var(--color-accent) 16%, var(--shell-panel-soft));
+  color: var(--color-text);
+}
+
 .trainingPlugin__chipLabel {
   white-space: nowrap;
 }
@@ -272,6 +414,13 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
+  font-size: 0;
+
+  &::before {
+    content: "x";
+    font-size: 0.82rem;
+    line-height: 1;
+  }
 }
 
 .trainingPlugin__selectorList {
@@ -299,6 +448,10 @@
   gap: 3px;
   min-width: 0;
 
+  > span {
+    display: none;
+  }
+
   strong {
     color: var(--color-text);
     font-size: 0.84rem;
@@ -309,6 +462,65 @@
     font-size: 0.76rem;
     line-height: 1.35;
   }
+}
+
+.trainingPlugin__selectorItemMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  span {
+    color: var(--color-text-muted);
+    font-size: 0.76rem;
+    line-height: 1.35;
+  }
+}
+
+.trainingPlugin__selectorItemStatus {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 88%, transparent);
+  background: color-mix(in srgb, var(--shell-panel-highlight) 72%, transparent);
+  color: var(--color-text-subtle);
+
+  &.is-documented {
+    border-color: color-mix(in srgb, var(--color-accent) 26%, var(--color-line));
+    background: color-mix(in srgb, var(--color-accent) 12%, var(--shell-panel-soft));
+    color: var(--color-text);
+  }
+}
+
+.trainingPlugin__selectorItemActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.trainingPlugin__documentCard {
+  min-width: 0;
+}
+
+.trainingPlugin__documentActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trainingPlugin__documentPreview {
+  min-width: 0;
+  max-height: 340px;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--color-line) 88%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--color-surface-1) 88%, transparent);
+}
+
+.trainingPlugin__documentPreview .markdown-engine-read {
+  background: transparent;
 }
 
 .trainingPlugin__mutedBlock,
@@ -412,6 +624,10 @@
 }
 
 @media (max-width: 760px) {
+  .trainingPlugin__folderAux {
+    grid-template-columns: 1fr;
+  }
+
   .trainingPlugin__headerActions,
   .trainingPlugin__stepHeader,
   .trainingPlugin__stepActions {
@@ -421,5 +637,10 @@
   .trainingPlugin__selectorItem {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .trainingPlugin__selectorItemActions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }

@@ -4,6 +4,7 @@ import type {
 } from "../../../nexus-backend/src/plugins/types.ts";
 import {
   buildHabitosHomeSnapshot,
+  compareDailyQueueItems,
   clearCategoryReferencesSync,
   deleteHabitSync,
   deleteHabitCategorySync,
@@ -21,6 +22,10 @@ import {
   toggleTaskSync,
   todayLocalDate,
 } from "./habitos-core.js";
+import financeBackendPlugin from "./finance/backend.ts";
+import trainingBackendPlugin, { buildTrainingHomeContribution } from "./training/backend.ts";
+
+const LIFE_TRACKER_HABITS_CHANNEL_PREFIX = "life-tracker:habits";
 
 function createSuccess(data: unknown) {
   return {
@@ -44,30 +49,59 @@ function resolveViewDate(dateValue: unknown) {
   return normalizeLocalDate(dateValue, todayLocalDate());
 }
 
+function compareHistoryEntries(left: any, right: any) {
+  return String(right?.timestamp || "").localeCompare(String(left?.timestamp || ""));
+}
+
 function buildHome(sqlite: any, dateValue?: unknown) {
   const actualToday = todayLocalDate();
-  return buildHabitosHomeSnapshot(sqlite, {
-    today: resolveViewDate(dateValue),
+  const today = resolveViewDate(dateValue);
+  const baseHome = buildHabitosHomeSnapshot(sqlite, {
+    today,
     actualToday,
     now: nowIso(),
   });
+  const trainingHome = buildTrainingHomeContribution(({
+    requireRepositories() {
+      return {
+        sqlite,
+      };
+    },
+  }) as NexusBackendPluginContext, {
+    today,
+    actualToday,
+    historyLimit: Math.max(8, Array.isArray(baseHome.recentHistory) ? baseHome.recentHistory.length : 0),
+  });
+
+  return {
+    ...baseHome,
+    dailyQueue: [...baseHome.dailyQueue, ...trainingHome.dailyQueue].sort(compareDailyQueueItems),
+    recentHistory: [...baseHome.recentHistory, ...trainingHome.recentHistory]
+      .sort(compareHistoryEntries)
+      .slice(0, Math.max(8, Array.isArray(baseHome.recentHistory) ? baseHome.recentHistory.length : 0)),
+  };
 }
 
-const habitosBackendPlugin: NexusBackendPluginModule = {
+const lifeTrackerBackendPlugin: NexusBackendPluginModule = {
   ensureSchema(ctx) {
     ensureHabitosSchema(getSqlite(ctx));
+    financeBackendPlugin.ensureSchema?.(ctx);
+    trainingBackendPlugin.ensureSchema?.(ctx);
   },
 
   activate(ctx) {
-    ctx.registerIpc("habitos:get-home", async (_event, payload: any) => {
+    financeBackendPlugin.activate?.(ctx);
+    trainingBackendPlugin.activate?.(ctx);
+
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:get-home`, async (_event, payload: any) => {
       try {
         return createSuccess(buildHome(getSqlite(ctx), payload?.date));
       } catch (error) {
-        return createError(error, "No se pudo cargar Habitos y tareas.");
+        return createError(error, "No se pudo cargar Life Tracker.");
       }
     });
 
-    ctx.registerIpc("habitos:save-task", async (_event, payload: any) => {
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:save-task`, async (_event, payload: any) => {
       try {
         const sqlite = getSqlite(ctx);
         saveTaskSync(sqlite, payload, {
@@ -80,7 +114,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("habitos:toggle-task", async (_event, payload: any) => {
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:toggle-task`, async (_event, payload: any) => {
       try {
         const sqlite = getSqlite(ctx);
         toggleTaskSync(sqlite, String(payload?.taskId || ""), {
@@ -92,7 +126,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("habitos:delete-task", async (_event, payload: any) => {
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:delete-task`, async (_event, payload: any) => {
       try {
         const sqlite = getSqlite(ctx);
         deleteTaskSync(sqlite, String(payload?.taskId || ""));
@@ -102,7 +136,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("habitos:save-habit", async (_event, payload: any) => {
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:save-habit`, async (_event, payload: any) => {
       try {
         const sqlite = getSqlite(ctx);
         saveHabitSync(sqlite, payload, {
@@ -115,7 +149,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("habitos:toggle-occurrence", async (_event, payload: any) => {
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:toggle-occurrence`, async (_event, payload: any) => {
       try {
         const sqlite = getSqlite(ctx);
         toggleOccurrenceSync(sqlite, String(payload?.occurrenceId || ""), {
@@ -128,7 +162,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("habitos:set-occurrence-quantity", async (_event, payload: any) => {
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:set-occurrence-quantity`, async (_event, payload: any) => {
       try {
         const sqlite = getSqlite(ctx);
         setOccurrenceQuantitySync(sqlite, String(payload?.occurrenceId || ""), payload?.value, {
@@ -141,7 +175,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("habitos:toggle-occurrence-checklist-item", async (_event, payload: any) => {
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:toggle-occurrence-checklist-item`, async (_event, payload: any) => {
       try {
         const sqlite = getSqlite(ctx);
         toggleOccurrenceChecklistItemSync(
@@ -159,7 +193,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("habitos:delete-habit", async (_event, payload: any) => {
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:delete-habit`, async (_event, payload: any) => {
       try {
         const sqlite = getSqlite(ctx);
         deleteHabitSync(sqlite, String(payload?.habitId || ""));
@@ -169,7 +203,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("habitos:save-category", async (_event, payload: any) => {
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:save-category`, async (_event, payload: any) => {
       try {
         const sqlite = getSqlite(ctx);
         saveHabitCategorySync(sqlite, payload, {
@@ -181,7 +215,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("habitos:delete-category", async (_event, payload: any) => {
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:delete-category`, async (_event, payload: any) => {
       try {
         const sqlite = getSqlite(ctx);
         deleteHabitCategorySync(sqlite, String(payload?.categoryId || ""), {
@@ -193,7 +227,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("habitos:rename-category-references", async (_event, payload: any) => {
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:rename-category-references`, async (_event, payload: any) => {
       try {
         const sqlite = getSqlite(ctx);
         renameCategoryReferencesSync(
@@ -210,7 +244,7 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("habitos:clear-category-references", async (_event, payload: any) => {
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:clear-category-references`, async (_event, payload: any) => {
       try {
         const sqlite = getSqlite(ctx);
         clearCategoryReferencesSync(sqlite, String(payload?.categoryName || ""), {
@@ -224,4 +258,4 @@ const habitosBackendPlugin: NexusBackendPluginModule = {
   },
 };
 
-export default habitosBackendPlugin;
+export default lifeTrackerBackendPlugin;

@@ -1,0 +1,52 @@
+{
+  "id": "nexus.life-tracker",
+  "displayName": "Life Tracker",
+  "version": "0.2.0",
+  "apiVersion": 1,
+  "schemaVersion": 1,
+  "description": "Canvas personal con seguimiento diario, dinero y entrenamiento dentro de Nexus.",
+  "author": "NEW-NEXUS",
+  "entrypoints": {
+    "backend": "./dist/backend.cjs",
+    "renderer": "./dist/renderer.js"
+  },
+  "contributes": {
+    "views": [],
+    "sideToolbar": [],
+    "frameMenu": [],
+    "fileExplorerHeader": [],
+    "engines": [],
+    "widgets": [
+      {
+        "id": "daily-queue",
+        "title": "Panel del dia",
+        "description": "Cola diaria con tareas y ocurrencias de habitos.",
+        "defaultSize": { "w": 7, "h": 14, "minW": 4, "minH": 7 }
+      },
+      {
+        "id": "habit-outcome",
+        "title": "Evolucion de habitos",
+        "description": "Chart resumido de cumplimiento y fallos.",
+        "defaultSize": { "w": 5, "h": 7, "minW": 3, "minH": 5 }
+      },
+      {
+        "id": "upcoming-tasks",
+        "title": "Tareas proximas",
+        "description": "Lista compacta de tareas pendientes cercanas.",
+        "defaultSize": { "w": 5, "h": 7, "minW": 3, "minH": 5 }
+      },
+      {
+        "id": "finance-summary",
+        "title": "Dinero",
+        "description": "Resumen financiero rapido dentro de Life Tracker.",
+        "defaultSize": { "w": 6, "h": 6, "minW": 3, "minH": 5 }
+      },
+      {
+        "id": "training-summary",
+        "title": "Entrenamiento",
+        "description": "Resumen de ejercicios, rutinas y musculos.",
+        "defaultSize": { "w": 6, "h": 6, "minW": 3, "minH": 5 }
+      }
+    ]
+  }
+}

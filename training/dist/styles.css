@@ -2,6 +2,13 @@
   background: linear-gradient(180deg, color-mix(in srgb, var(--workspace-main-bg) 86%, var(--shell-bg-strong)), var(--workspace-main-bg));
 }
 
+.trainingPlugin--embedded {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
 .trainingPlugin__body,
 .trainingPlugin__content,
 .trainingPlugin__detailScroll,

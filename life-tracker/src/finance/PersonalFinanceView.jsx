@@ -43,9 +43,10 @@ import {
   WorkspaceTitle,
   WorkspaceTopbar,
   StateBlock,
-} from "../../../nexus-frontend/src/ui/index.js";
+} from "../../../../nexus-frontend/src/ui/index.js";
 
 const { ipcRenderer } = window.require("electron");
+const LIFE_TRACKER_FINANCE_CHANNEL_PREFIX = "life-tracker:finance";
 
 const CURRENCY_FORMATTER = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -662,7 +663,7 @@ export default function PersonalFinanceView({
     setRefreshing(true);
 
     try {
-      const response = await ipcRenderer.invoke("finanzas:list");
+      const response = await ipcRenderer.invoke(`${LIFE_TRACKER_FINANCE_CHANNEL_PREFIX}:list`);
 
       if (!response?.ok) {
         throw new Error(response?.error || "No se pudieron cargar los movimientos.");
@@ -831,7 +832,7 @@ export default function PersonalFinanceView({
         throw new Error("Ingresa un monto valido mayor a cero.");
       }
 
-      const response = await ipcRenderer.invoke("finanzas:save-movement", {
+      const response = await ipcRenderer.invoke(`${LIFE_TRACKER_FINANCE_CHANNEL_PREFIX}:save-movement`, {
         id: formState.id || undefined,
         kind: formState.kind,
         status: formState.status,
@@ -887,7 +888,7 @@ export default function PersonalFinanceView({
     setError("");
 
     try {
-      const response = await ipcRenderer.invoke("finanzas:delete-movement", {
+      const response = await ipcRenderer.invoke(`${LIFE_TRACKER_FINANCE_CHANNEL_PREFIX}:delete-movement`, {
         id: movementId,
       });
 
@@ -930,7 +931,7 @@ export default function PersonalFinanceView({
         ]),
       );
 
-      const response = await ipcRenderer.invoke("finanzas:save-cash-count", {
+      const response = await ipcRenderer.invoke(`${LIFE_TRACKER_FINANCE_CHANNEL_PREFIX}:save-cash-count`, {
         counts: countsPayload,
       });
 
@@ -971,7 +972,7 @@ export default function PersonalFinanceView({
       {showTopbar ? (
         <WorkspaceTopbar>
           <WorkspaceTitle
-            eyebrow="Plugin finanzas"
+            eyebrow="Life Tracker"
             title="Finanzas"
             description="Movimientos como centro del flujo diario, con arqueo y reportes como herramientas auxiliares."
           />

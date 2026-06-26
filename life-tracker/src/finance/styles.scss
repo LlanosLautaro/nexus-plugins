@@ -1,3 +1,5 @@
+@use "../../../../nexus-frontend/src/scss/tools" as *;
+
 .financeDashboard {
   background: var(--workspace-main-bg);
 }
@@ -36,7 +38,9 @@
 }
 
 .financeDashboard__summaryCard--variance {
-  background: radial-gradient(circle at top right, color-mix(in srgb, var(--color-warning) 10%, transparent), transparent 38%), var(--shell-panel-soft);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--color-warning) 10%, transparent), transparent 38%),
+    var(--shell-panel-soft);
 }
 
 .financeDashboard__historyCount {
@@ -89,10 +93,7 @@
 }
 
 .financeDashboard__presetButton.is-active {
-  background: var(--gradient-active);
-  border-color: var(--color-border-accent);
-  color: var(--color-text);
-  box-shadow: inset 0 1px 0 var(--fx-sheen-strong), 0 10px 18px rgba(0, 0, 0, 0.14);
+  @include interactive-active($shadow: 0 10px 18px rgba(0, 0, 0, 0.14));
 }
 
 .financeDashboard__presetButton--income svg,
@@ -117,11 +118,11 @@
 }
 
 .financeDashboard__field--wide {
-  grid-column: 1/-1;
+  grid-column: 1 / -1;
 }
 
 .financeDashboard__field--amount {
-  grid-column: 1/-1;
+  grid-column: 1 / -1;
 }
 
 .financeDashboard__formActions {
@@ -150,16 +151,18 @@
   padding: 10px 12px;
   border: 1px solid var(--color-line);
   background: color-mix(in srgb, var(--shell-panel-bg) 92%, transparent);
-}
-.financeDashboard__cashStat span {
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-.financeDashboard__cashStat strong {
-  color: var(--color-text);
-  font-size: 0.96rem;
+
+  span {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  strong {
+    color: var(--color-text);
+    font-size: 0.96rem;
+  }
 }
 
 .financeDashboard__cashGrid {
@@ -204,14 +207,16 @@
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-}
-.financeDashboard__cashHistoryMain strong {
-  color: var(--color-text);
-  font-size: 0.84rem;
-}
-.financeDashboard__cashHistoryMain span {
-  color: var(--color-text-muted);
-  font-size: 0.78rem;
+
+  strong {
+    color: var(--color-text);
+    font-size: 0.84rem;
+  }
+
+  span {
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+  }
 }
 
 .financeDashboard__cashVariance {
@@ -238,7 +243,9 @@
   width: 100%;
   height: 220px;
   border: 1px solid var(--color-line);
-  background: linear-gradient(180deg, color-mix(in srgb, white 2%, transparent), transparent 18%), color-mix(in srgb, var(--color-surface-inset) 96%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, white 2%, transparent), transparent 18%),
+    color-mix(in srgb, var(--color-surface-inset) 96%, transparent);
 }
 
 .financeDashboard__timelineAxis {
@@ -355,7 +362,11 @@
 .financeDashboard__flowFill--incomePlanned,
 .financeDashboard__flowFill--expensePlanned {
   opacity: 0.45;
-  background-image: repeating-linear-gradient(135deg, currentColor 0 6px, transparent 6px 11px);
+  background-image: repeating-linear-gradient(
+    135deg,
+    currentColor 0 6px,
+    transparent 6px 11px
+  );
 }
 
 .financeDashboard__flowValue {
@@ -392,10 +403,11 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-}
-.financeDashboard__movementTitleRow strong {
-  color: var(--color-text);
-  min-width: 0;
+
+  strong {
+    color: var(--color-text);
+    min-width: 0;
+  }
 }
 
 .financeDashboard__movementAmount {
@@ -429,11 +441,7 @@
 
 .financeDashboard__state,
 .financeDashboard__emptyChart {
-  border-radius: var(--radius-m);
-  border: 1px solid var(--state-border);
-  background: var(--state-bg);
-  padding: var(--panel-padding-m);
-  box-shadow: inset 0 1px 0 var(--fx-sheen-soft);
+  @include state-block();
   color: var(--color-text-muted);
 }
 
@@ -448,10 +456,12 @@
   .financeDashboard__chartsGrid {
     grid-template-columns: 1fr;
   }
+
   .financeDashboard__filtersBar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
 @media (max-width: 760px) {
   .financeDashboard__presetGrid,
   .financeDashboard__filtersBar,
@@ -459,15 +469,19 @@
   .financeDashboard__flowRow {
     grid-template-columns: 1fr;
   }
+
   .financeDashboard__flowMetric {
     grid-template-columns: 1fr;
   }
+
   .financeDashboard__movementRow {
     grid-template-columns: 1fr;
   }
+
   .financeDashboard__movementActions {
     justify-content: flex-end;
   }
+
   .financeDashboard__movementTitleRow {
     align-items: flex-start;
     flex-direction: column;

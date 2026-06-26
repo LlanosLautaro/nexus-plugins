@@ -1,7 +1,86 @@
+@use "./finance/styles.scss" as finance;
+@use "./training/styles.scss" as training;
+
 .habitosView {
   --habitos-border: color-mix(in srgb, var(--color-border-default, rgba(255, 255, 255, 0.12)) 100%, transparent);
   --habitos-soft: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 84%, transparent);
   --habitos-accent: var(--color-accent-strong, #6f8cff);
+}
+
+.lifeTrackerView {
+  background: var(--workspace-main-bg);
+}
+
+.lifeTrackerView__toolbarActions .nexus-ui-segmented {
+  min-width: min(100%, 340px);
+}
+
+.lifeTrackerView .financeDashboard--embedded,
+.lifeTrackerView .trainingPlugin--embedded {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.lifeTrackerView .financeDashboard--embedded .nexus-ui-body,
+.lifeTrackerView .trainingPlugin--embedded .nexus-ui-body {
+  min-height: 0;
+}
+
+.lifeTrackerWidget {
+  height: 100%;
+}
+
+.lifeTrackerWidget__summaryBody {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.lifeTrackerWidget__valueGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lifeTrackerWidget__value {
+  display: grid;
+  gap: 4px;
+  padding: 0.9rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--habitos-accent) 12%, var(--habitos-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 92%, transparent);
+}
+
+.lifeTrackerWidget__value span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.lifeTrackerWidget__value strong {
+  color: var(--color-text);
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.lifeTrackerWidget__value.is-accent {
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--habitos-accent) 16%, transparent), transparent 70%),
+    color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 92%, transparent);
+  border-color: color-mix(in srgb, var(--habitos-accent) 24%, var(--habitos-border));
+}
+
+.lifeTrackerWidget__metaList {
+  display: grid;
+  gap: 8px;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .habitosDashboard__grid {
@@ -1050,11 +1129,23 @@
   min-height: 30px;
 }
 
+.habitosView__queueCopyText {
+  min-width: 0;
+  display: grid;
+  gap: 0.14rem;
+}
+
 .habitosView__queueCopy strong {
   color: var(--color-text);
   font-size: 0.9rem;
   line-height: 1.18;
   text-align: left;
+}
+
+.habitosView__queueCopyText span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.72rem;
+  line-height: 1.35;
 }
 
 .habitosView__queueActions,
@@ -1118,6 +1209,31 @@
 .habitosView__queueCheck svg {
   width: 0.76rem;
   height: 0.76rem;
+}
+
+.habitosView__queueInlineAction {
+  min-height: 1.45rem;
+  padding: 0 0.56rem;
+  border: 1px solid color-mix(in srgb, var(--habitos-accent) 20%, var(--habitos-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 90%, transparent);
+  color: var(--color-text);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.habitosView__queueInlineAction:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--habitos-accent) 32%, var(--habitos-border));
+  background: color-mix(in srgb, var(--habitos-accent) 12%, transparent);
+}
+
+.habitosView__queueInlineAction:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .habitosView__queueCheckGlyph {
@@ -1576,7 +1692,7 @@
 
 .habitosView__createChoiceGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.85rem;
 }
 
@@ -1634,6 +1750,48 @@
 
 .habitosView__workingSummary {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.lifeTrackerTrainingModal__content,
+.lifeTrackerTrainingModal__stack,
+.lifeTrackerTrainingModal__emptyState,
+.lifeTrackerTrainingModal__captureList,
+.lifeTrackerTrainingModal__captureMeta {
+  display: grid;
+}
+
+.lifeTrackerTrainingModal__content,
+.lifeTrackerTrainingModal__stack,
+.lifeTrackerTrainingModal__emptyState,
+.lifeTrackerTrainingModal__captureList {
+  gap: 0.9rem;
+}
+
+.lifeTrackerTrainingModal__captureCard {
+  display: grid;
+  gap: 0.8rem;
+  padding: 0.9rem 0.95rem;
+  border: 1px solid var(--habitos-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 90%, transparent);
+}
+
+.lifeTrackerTrainingModal__captureHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.lifeTrackerTrainingModal__captureMeta {
+  gap: 0.18rem;
+  text-align: right;
+}
+
+.lifeTrackerTrainingModal__captureMeta span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.72rem;
+  line-height: 1.35;
 }
 
 .habitosView__wizardOptionCard {
@@ -2209,6 +2367,14 @@
 
   .habitosView__queueChecklist {
     grid-column: 1 / -1;
+  }
+
+  .lifeTrackerTrainingModal__captureHeader {
+    flex-direction: column;
+  }
+
+  .lifeTrackerTrainingModal__captureMeta {
+    text-align: left;
   }
 
   .habitosView__habitRow {

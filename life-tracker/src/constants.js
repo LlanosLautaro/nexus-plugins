@@ -1,5 +1,19 @@
-export const HABITOS_PLUGIN_ID = "nexus.habitos";
-export const HABITOS_WORKSPACE_VIEW_ID = "nexus.habitos.workspace";
+export const LIFE_TRACKER_PLUGIN_ID = "nexus.life-tracker";
+export const LIFE_TRACKER_WORKSPACE_VIEW_ID = "nexus.life-tracker.workspace";
+export const LIFE_TRACKER_HOME_CANVAS_ID = "home";
+export const LIFE_TRACKER_CANVAS_STATE_KEY = "lifeTrackerCanvases";
+export const LIFE_TRACKER_HABIT_CATEGORY_PRESET_OVERRIDES_KEY = "lifeTrackerHabitCategoryPresetOverrides";
+export const LIFE_TRACKER_LEGACY_DASHBOARD_LAYOUTS_KEY = "dashboardLayouts";
+export const LIFE_TRACKER_LEGACY_HABIT_CATEGORY_PRESET_OVERRIDES_KEY = "categoryPresetOverrides";
+export const LIFE_TRACKER_DEFAULT_SECTION = "home";
+export const LIFE_TRACKER_SECTION_OPTIONS = [
+  { value: "home", label: "Inicio" },
+  { value: "finance", label: "Dinero" },
+  { value: "training", label: "Entrenamiento" },
+];
+
+export const HABITOS_PLUGIN_ID = LIFE_TRACKER_PLUGIN_ID;
+export const HABITOS_WORKSPACE_VIEW_ID = LIFE_TRACKER_WORKSPACE_VIEW_ID;
 
 export const DAILY_FILTER_OPTIONS = [
   { value: "all", label: "Todo" },

@@ -1,5 +1,5 @@
-import HabitosView from "./HabitosView.jsx";
-import { HABITOS_PLUGIN_ID, HABITOS_WORKSPACE_VIEW_ID } from "./constants.js";
+import LifeTrackerView, { LIFE_TRACKER_HOME_WIDGET_PROVIDERS } from "./LifeTrackerView.jsx";
+import { LIFE_TRACKER_PLUGIN_ID, LIFE_TRACKER_WORKSPACE_VIEW_ID } from "./constants.js";
 import { HabitosIcon } from "./icons.jsx";
 
 let styleElement = null;
@@ -13,7 +13,7 @@ function ensureStylesheet() {
   styleElement = document.createElement("link");
   styleElement.rel = "stylesheet";
   styleElement.href = href;
-  styleElement.dataset.nexusPluginStyles = HABITOS_PLUGIN_ID;
+  styleElement.dataset.nexusPluginStyles = LIFE_TRACKER_PLUGIN_ID;
   document.head.appendChild(styleElement);
 }
 
@@ -22,39 +22,46 @@ function disposeStylesheet() {
   styleElement = null;
 }
 
-const habitosRendererPlugin = {
+const lifeTrackerRendererPlugin = {
   activate(ctx) {
     ensureStylesheet();
 
     ctx.registerView({
-      id: HABITOS_WORKSPACE_VIEW_ID,
+      id: LIFE_TRACKER_WORKSPACE_VIEW_ID,
       pluginId: ctx.pluginId,
-      title: "Habitos y tareas",
+      title: "Life Tracker",
       icon: HabitosIcon,
       tone: "document",
       surface: "workspace",
-      component: (props) => <HabitosView {...props} ctx={ctx} />,
+      component: (props) => <LifeTrackerView {...props} ctx={ctx} />,
+    });
+
+    LIFE_TRACKER_HOME_WIDGET_PROVIDERS.forEach((provider) => {
+      ctx.registerWidgetProvider({
+        ...provider,
+        pluginId: ctx.pluginId,
+      });
     });
 
     ctx.registerSideToolbarButton({
-      id: "nexus.habitos.workspace-button",
+      id: "nexus.life-tracker.workspace-button",
       pluginId: ctx.pluginId,
       order: 270,
       icon: HabitosIcon,
       tone: "document",
-      label: "Habitos",
+      label: "Life Tracker",
       onClick: () => {
         void ctx.openView({
-          viewId: HABITOS_WORKSPACE_VIEW_ID,
+          viewId: LIFE_TRACKER_WORKSPACE_VIEW_ID,
           reuse: true,
-          sourceId: "nexus.habitos.toolbar",
+          sourceId: "nexus.life-tracker.toolbar",
         });
       },
       isActive: ({ getState }) => {
         const workspaceSurface = getState().data.workspaceSurface;
         return (
           workspaceSurface?.kind === "workspace-view"
-          && workspaceSurface.viewId === HABITOS_WORKSPACE_VIEW_ID
+          && workspaceSurface.viewId === LIFE_TRACKER_WORKSPACE_VIEW_ID
         );
       },
     });
@@ -65,4 +72,4 @@ const habitosRendererPlugin = {
   },
 };
 
-export default habitosRendererPlugin;
+export default lifeTrackerRendererPlugin;
