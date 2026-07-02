@@ -1,5 +1,10 @@
 import LifeTrackerView, { LIFE_TRACKER_HOME_WIDGET_PROVIDERS } from "./LifeTrackerView.jsx";
-import { LIFE_TRACKER_PLUGIN_ID, LIFE_TRACKER_WORKSPACE_VIEW_ID } from "./constants.js";
+import {
+  LIFE_TRACKER_DEFAULT_SECTION,
+  LIFE_TRACKER_PLUGIN_ID,
+  LIFE_TRACKER_SECTION_OPTIONS,
+  LIFE_TRACKER_WORKSPACE_VIEW_ID,
+} from "./constants.js";
 import { HabitosIcon } from "./icons.jsx";
 
 let styleElement = null;
@@ -33,6 +38,10 @@ const lifeTrackerRendererPlugin = {
       icon: HabitosIcon,
       tone: "document",
       surface: "workspace",
+      workspaceFrame: {
+        sections: LIFE_TRACKER_SECTION_OPTIONS,
+        defaultSection: LIFE_TRACKER_DEFAULT_SECTION,
+      },
       component: (props) => <LifeTrackerView {...props} ctx={ctx} />,
     });
 

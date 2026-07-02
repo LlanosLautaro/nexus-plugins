@@ -1,0 +1,29 @@
+{
+  "title": "Preferencias de Booru",
+  "description": "Controla la carpeta vigilada y la resolucion del runtime Python de Booru. Los cambios aplican en vivo.",
+  "sections": [
+    {
+      "id": "booru-ingest",
+      "title": "Ingesta",
+      "description": "Booru mueve la media detectada a su storage oculto dentro del vault.",
+      "fields": [
+        {
+          "name": "watchFolderPath",
+          "type": "text",
+          "label": "Carpeta vigilada",
+          "description": "Ruta absoluta de la carpeta externa que Booru debe observar para nuevas descargas.",
+          "placeholder": "C:\\Users\\TuUsuario\\Downloads",
+          "applyMode": "live"
+        },
+        {
+          "name": "pythonExecutable",
+          "type": "text",
+          "label": "Python ejecutable",
+          "description": "Override opcional. Si queda vacio, Booru intenta `python` desde PATH.",
+          "placeholder": "python",
+          "applyMode": "live"
+        }
+      ]
+    }
+  ]
+}

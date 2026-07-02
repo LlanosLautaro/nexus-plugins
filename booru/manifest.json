@@ -1,0 +1,24 @@
+{
+  "id": "nexus.booru",
+  "displayName": "Booru",
+  "version": "0.3.7",
+  "apiVersion": 1,
+  "schemaVersion": 1,
+  "description": "Catalogo media-first con storage oculto, dedupe exacto y clasificacion propia dentro de Nexus.",
+  "author": "NEW-NEXUS",
+  "entrypoints": {
+    "backend": "./dist/backend.cjs",
+    "renderer": "./dist/renderer.js"
+  },
+  "contributes": {
+    "settings": {
+      "schema": "./settings/schema.json",
+      "defaults": "./settings/defaults.json"
+    },
+    "views": [],
+    "sideToolbar": [],
+    "frameMenu": [],
+    "fileExplorerHeader": [],
+    "engines": []
+  }
+}
