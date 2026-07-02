@@ -28519,6 +28519,11 @@ var LIFE_TRACKER_HABIT_CATEGORY_PRESET_OVERRIDES_KEY = "lifeTrackerHabitCategory
 var LIFE_TRACKER_LEGACY_DASHBOARD_LAYOUTS_KEY = "dashboardLayouts";
 var LIFE_TRACKER_LEGACY_HABIT_CATEGORY_PRESET_OVERRIDES_KEY = "categoryPresetOverrides";
 var LIFE_TRACKER_DEFAULT_SECTION = "home";
+var LIFE_TRACKER_SECTION_OPTIONS = [
+  { value: "home", label: "Inicio" },
+  { value: "finance", label: "Dinero" },
+  { value: "training", label: "Entrenamiento" }
+];
 var WEEKDAY_OPTIONS2 = [
   { value: 1, label: "Lun" },
   { value: 2, label: "Mar" },
@@ -33322,6 +33327,10 @@ var lifeTrackerRendererPlugin = {
       icon: HabitosIcon,
       tone: "document",
       surface: "workspace",
+      workspaceFrame: {
+        sections: LIFE_TRACKER_SECTION_OPTIONS,
+        defaultSection: LIFE_TRACKER_DEFAULT_SECTION
+      },
       component: (props) => /* @__PURE__ */ React.createElement(LifeTrackerView, { ...props, ctx })
     });
     LIFE_TRACKER_HOME_WIDGET_PROVIDERS.forEach((provider) => {

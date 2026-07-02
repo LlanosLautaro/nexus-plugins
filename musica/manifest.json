@@ -1,7 +1,7 @@
 {
   "id": "nexus.musica",
   "displayName": "Musica",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "apiVersion": 1,
   "schemaVersion": 1,
   "description": "Indexacion, metadata editable e IPC para audio dentro de Nexus.",
@@ -19,8 +19,19 @@
       {
         "id": "nexus.musica.audio",
         "displayName": "Musica",
-        "extensions": ["mp3", "wav", "ogg", "flac", "m4a", "aac", "opus", "oga"],
-        "mimeTypes": ["audio/*"],
+        "extensions": [
+          "mp3",
+          "wav",
+          "ogg",
+          "flac",
+          "m4a",
+          "aac",
+          "opus",
+          "oga"
+        ],
+        "mimeTypes": [
+          "audio/*"
+        ],
         "priority": 320,
         "supportsGlobalMatch": false,
         "supportsFolderAssignments": true

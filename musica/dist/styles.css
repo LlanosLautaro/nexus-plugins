@@ -91,6 +91,9 @@
 }
 
 .musicaEngine__meta {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
@@ -107,6 +110,9 @@
 .musicaEngine__actions,
 .musicaPluginSettings__actions,
 .musicaMetadata__actions {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;

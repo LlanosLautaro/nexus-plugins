@@ -14649,7 +14649,8 @@ function createDevLogger(scopeOrContext) {
 // src/backend/vault-runtime/file-system/operations/fs-rename.ts
 var renameLogger = createDevLogger("backend.filesystem");
 var RETRIABLE_RENAME_ERROR_CODES = /* @__PURE__ */ new Set(["EPERM", "EBUSY"]);
-var DEFAULT_RETRY_DELAYS_MS = [60, 160, 320];
+var FILE_RETRY_DELAYS_MS = [60, 160, 320];
+var DIRECTORY_RETRY_DELAYS_MS = [120, 260, 520, 1200, 2400];
 function wait(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -14696,7 +14697,7 @@ async function renamePathWithRetry(options) {
     to,
     operation,
     itemId = null,
-    retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
+    retryDelaysMs,
     fsApi = import_promises2.default
   } = options;
   const initialSourceState = await describePathState(from, fsApi);
@@ -14707,7 +14708,9 @@ async function renamePathWithRetry(options) {
   if (initialDestinationState.exists === true) {
     throw buildDestinationExistsError(to);
   }
-  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
+  const sourceKind = initialSourceState.exists === true ? initialSourceState.kind : "unknown";
+  const effectiveRetryDelaysMs = Array.isArray(retryDelaysMs) && retryDelaysMs.length > 0 ? retryDelaysMs : sourceKind === "directory" ? DIRECTORY_RETRY_DELAYS_MS : FILE_RETRY_DELAYS_MS;
+  for (let attempt = 0; attempt <= effectiveRetryDelaysMs.length; attempt += 1) {
     try {
       await fsApi.rename(from, to);
       if (attempt > 0) {
@@ -14719,8 +14722,9 @@ async function renamePathWithRetry(options) {
             itemId,
             from,
             to,
+            sourceKind,
             attempt: attempt + 1,
-            maxAttempts: retryDelaysMs.length + 1
+            maxAttempts: effectiveRetryDelaysMs.length + 1
           }
         );
       }
@@ -14729,7 +14733,7 @@ async function renamePathWithRetry(options) {
       const sourceState = await describePathState(from, fsApi);
       const destinationState = await describePathState(to, fsApi);
       const attemptNumber = attempt + 1;
-      const maxAttempts = retryDelaysMs.length + 1;
+      const maxAttempts = effectiveRetryDelaysMs.length + 1;
       const errorCode = error?.code ?? null;
       if (destinationState.exists === true) {
         renameLogger.error(
@@ -14740,6 +14744,7 @@ async function renamePathWithRetry(options) {
             itemId,
             from,
             to,
+            sourceKind,
             attempt: attemptNumber,
             maxAttempts,
             errorCode,
@@ -14758,6 +14763,7 @@ async function renamePathWithRetry(options) {
             itemId,
             from,
             to,
+            sourceKind,
             attempt: attemptNumber,
             maxAttempts,
             errorCode,
@@ -14767,7 +14773,7 @@ async function renamePathWithRetry(options) {
         );
         throw buildMissingSourceError(from);
       }
-      if (!isRetriableRenameError(error) || attempt >= retryDelaysMs.length) {
+      if (!isRetriableRenameError(error) || attempt >= effectiveRetryDelaysMs.length) {
         renameLogger.error(
           "items.rename.failed",
           "El rename filesystem fallo y no se pudo recuperar.",
@@ -14776,6 +14782,7 @@ async function renamePathWithRetry(options) {
             itemId,
             from,
             to,
+            sourceKind,
             attempt: attemptNumber,
             maxAttempts,
             errorCode,
@@ -14786,7 +14793,7 @@ async function renamePathWithRetry(options) {
         );
         throw error;
       }
-      const delayMs = retryDelaysMs[attempt];
+      const delayMs = effectiveRetryDelaysMs[attempt];
       renameLogger.warn(
         "items.rename.retry",
         "El rename filesystem devolvio un lock transitorio; se reintentara.",
@@ -14795,6 +14802,7 @@ async function renamePathWithRetry(options) {
           itemId,
           from,
           to,
+          sourceKind,
           attempt: attemptNumber,
           maxAttempts,
           delayMs,

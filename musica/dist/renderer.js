@@ -300,6 +300,29 @@ function joinSegments(basePath, segments, separator) {
 function joinRelativePath(segments, separator) {
   return segments.length ? segments.join(separator) : null;
 }
+function getFallbackRootItem(itemsState, byId) {
+  const normalizedRootId = normalizeItemId2(itemsState?.rootId);
+  if (normalizedRootId && byId[normalizedRootId]) {
+    return byId[normalizedRootId];
+  }
+  return Object.values(byId).find((candidate) => {
+    if (!candidate?.id) {
+      return false;
+    }
+    return !normalizeItemId2(candidate.parentId);
+  }) || null;
+}
+function getRootPathFromItemsState(itemsState, rootItem, options = {}) {
+  const explicitRootPath = trimTrailingSeparators(
+    options.rootPath || options.vaultContentPath || ""
+  );
+  if (explicitRootPath) {
+    return explicitRootPath;
+  }
+  const byId = itemsState?.byId || {};
+  const preferredRootItem = rootItem || getFallbackRootItem(itemsState, byId);
+  return trimTrailingSeparators(preferredRootItem?.path || "");
+}
 function resolveItemLocationFromItemsState(itemsState, itemId, options = {}) {
   const byId = itemsState?.byId || {};
   const normalizedItemId = normalizeItemId2(itemId);
@@ -340,8 +363,8 @@ function resolveItemLocationFromItemsState(itemsState, itemId, options = {}) {
   if (!rootItem) {
     return null;
   }
-  const rootPathCandidate = options.rootPath || options.vaultContentPath || "";
-  const separator = guessSeparator(rootPathCandidate);
+  const rootPathCandidate = getRootPathFromItemsState(itemsState, rootItem, options);
+  const separator = guessSeparator(rootPathCandidate, rootItem?.path, item?.path);
   const orderedSegments = [...relativeSegments].reverse();
   const resolvedRelativePath = joinRelativePath(orderedSegments, separator);
   return {
@@ -658,7 +681,14 @@ function MusicAudioEngine({
       });
     }
   };
-  return /* @__PURE__ */ React.createElement("div", { className: "musicaEngine" }, /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__shell" }, /* @__PURE__ */ React.createElement("section", { className: "musicaEngine__hero" }, /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__cover" }, audioState.audioFile?.cover ? /* @__PURE__ */ React.createElement("img", { src: audioState.audioFile.cover, alt: audioState.audioFile.title || getFileName(filePath) }) : /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__coverPlaceholder" }, /* @__PURE__ */ React.createElement("strong", null, getFileName(filePath).slice(0, 1).toUpperCase()), /* @__PURE__ */ React.createElement("span", null, "Music engine"))), /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__copy" }, /* @__PURE__ */ React.createElement("span", { className: "musicaEngine__eyebrow" }, "Plugin musica"), /* @__PURE__ */ React.createElement("h1", null, audioState.audioFile?.title || getFileName(filePath)), /* @__PURE__ */ React.createElement("p", null, audioState.audioFile?.authors?.length ? audioState.audioFile.authors.join(", ") : "Sin autores curados"), /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__meta" }, /* @__PURE__ */ React.createElement("span", null, audioState.audioFile?.album || "Sin album"), /* @__PURE__ */ React.createElement("span", null, audioState.audioFile?.genre || "Sin genero"), /* @__PURE__ */ React.createElement("span", null, formatTime(playback.duration || audioState.audioFile?.duration || 0))), /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__actions" }, /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => void openNeighbor(previousItem), disabled: !previousItem }, "Anterior"), /* @__PURE__ */ React.createElement("button", { type: "button", className: "is-primary", onClick: () => void togglePlayback(), disabled: !audioState.src }, playback.isPlaying ? "Pausar" : "Reproducir"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => void openNeighbor(nextItem), disabled: !nextItem }, "Siguiente"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => void handleOpenMetadata(), disabled: !itemId }, "Editar metadata")))), audioState.error ? /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__state musicaEngine__state--error" }, audioState.error) : /* @__PURE__ */ React.createElement("section", { className: "musicaEngine__playerPanel" }, /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { className: "musicaEngine" }, /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__shell" }, /* @__PURE__ */ React.createElement("section", { className: "musicaEngine__hero" }, /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__cover" }, audioState.audioFile?.cover ? /* @__PURE__ */ React.createElement(
+    "img",
+    {
+      src: audioState.audioFile.cover,
+      alt: audioState.audioFile.title || getFileName(filePath),
+      draggable: "false"
+    }
+  ) : /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__coverPlaceholder" }, /* @__PURE__ */ React.createElement("strong", null, getFileName(filePath).slice(0, 1).toUpperCase()), /* @__PURE__ */ React.createElement("span", null, "Music engine"))), /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__copy" }, /* @__PURE__ */ React.createElement("span", { className: "musicaEngine__eyebrow" }, "Plugin musica"), /* @__PURE__ */ React.createElement("h1", null, audioState.audioFile?.title || getFileName(filePath)), /* @__PURE__ */ React.createElement("p", null, audioState.audioFile?.authors?.length ? audioState.audioFile.authors.join(", ") : "Sin autores curados"), /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__meta" }, /* @__PURE__ */ React.createElement("span", null, audioState.audioFile?.album || "Sin album"), /* @__PURE__ */ React.createElement("span", null, audioState.audioFile?.genre || "Sin genero"), /* @__PURE__ */ React.createElement("span", null, formatTime(playback.duration || audioState.audioFile?.duration || 0))), /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__actions" }, /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => void openNeighbor(previousItem), disabled: !previousItem }, "Anterior"), /* @__PURE__ */ React.createElement("button", { type: "button", className: "is-primary", onClick: () => void togglePlayback(), disabled: !audioState.src }, playback.isPlaying ? "Pausar" : "Reproducir"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => void openNeighbor(nextItem), disabled: !nextItem }, "Siguiente"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => void handleOpenMetadata(), disabled: !itemId }, "Editar metadata")))), audioState.error ? /* @__PURE__ */ React.createElement("div", { className: "musicaEngine__state musicaEngine__state--error" }, audioState.error) : /* @__PURE__ */ React.createElement("section", { className: "musicaEngine__playerPanel" }, /* @__PURE__ */ React.createElement(
     "audio",
     {
       ref: audioRef,
