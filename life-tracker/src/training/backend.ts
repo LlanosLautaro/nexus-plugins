@@ -171,6 +171,7 @@ type TrainingConceptTemplateDefinition = {
 type TrainingConceptNotePayload = {
   title: string;
   slug?: string | null;
+  fileBaseName?: string | null;
   relativeDirectoryPath?: string | null;
   templateId?: string | null;
   frontmatter?: Record<string, unknown> | null;
@@ -325,6 +326,73 @@ function resolveAbsoluteContentPath(ctx: NexusBackendPluginContext, relativePath
     : "";
 }
 
+function normalizeTrainingNoteFileBaseName(value: unknown, fallback = "Concepto") {
+  const source = normalizeOptionalText(value) || fallback;
+  const sanitized = source
+    .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/[. ]+$/g, "")
+    .trim();
+
+  return sanitized || fallback;
+}
+
+function buildTrainingConceptRelativePath(directoryRelativePath: string, fileBaseName: string) {
+  const normalizedDirectoryPath = normalizeRelativeContentPath(directoryRelativePath);
+  const normalizedFileBaseName = normalizeTrainingNoteFileBaseName(fileBaseName, "Concepto");
+  return normalizeRelativeContentPath(
+    normalizedDirectoryPath
+      ? `${normalizedDirectoryPath}/${normalizedFileBaseName}.md`
+      : `${normalizedFileBaseName}.md`,
+  );
+}
+
+function getTrainingMuscleConceptPreferredFileBaseName(
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+) {
+  return normalizeTrainingNoteFileBaseName(muscle.title, muscle.id);
+}
+
+function getTrainingMuscleConceptPreferredRelativePath(
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+) {
+  return buildTrainingConceptRelativePath(
+    TRAINING_MUSCLE_CONCEPTS_DIRECTORY,
+    getTrainingMuscleConceptPreferredFileBaseName(muscle),
+  );
+}
+
+function getTrainingMuscleConceptLegacyRelativePaths(
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+) {
+  return [
+    normalizeRelativeContentPath(`${TRAINING_MUSCLE_CONCEPTS_DIRECTORY}/${muscle.id}.md`),
+  ].filter((relativePath, index, list) => relativePath && list.indexOf(relativePath) === index);
+}
+
+function getTrainingExerciseConceptPreferredFileBaseName(
+  exercise: Pick<TrainingExerciseRecord, "title" | "slug">,
+) {
+  return normalizeTrainingNoteFileBaseName(exercise.title, exercise.slug || "Ejercicio");
+}
+
+function getTrainingExerciseConceptPreferredRelativePath(
+  exercise: Pick<TrainingExerciseRecord, "title" | "slug">,
+) {
+  return buildTrainingConceptRelativePath(
+    TRAINING_EXERCISE_CONCEPTS_DIRECTORY,
+    getTrainingExerciseConceptPreferredFileBaseName(exercise),
+  );
+}
+
+function getTrainingExerciseConceptLegacyRelativePaths(
+  exercise: Pick<TrainingExerciseRecord, "slug">,
+) {
+  return [
+    normalizeRelativeContentPath(`${TRAINING_EXERCISE_CONCEPTS_DIRECTORY}/${exercise.slug}.md`),
+  ].filter((relativePath, index, list) => relativePath && list.indexOf(relativePath) === index);
+}
+
 function readFrontmatterFromMarkdownPath(markdownPath: string) {
   if (!markdownPath) {
     return {};
@@ -430,12 +498,7 @@ function enrichTrainingMuscleCatalogSync(
   return muscles.map((muscle) => ({
     ...muscle,
     doc: docsById.get(muscle.id)
-      || findTrainingDocRecordByRelativePathSync(
-        ctx,
-        normalizeRelativeContentPath(`${TRAINING_MUSCLE_CONCEPTS_DIRECTORY}/${muscle.id}.md`),
-        muscle.title,
-        `${muscle.groupTitle} - ${muscle.regionTitle}`,
-      )
+      || findTrainingExistingMuscleDocRecordSync(ctx, muscle)
       || null,
   }));
 }
@@ -545,14 +608,19 @@ function buildTrainingConceptMarkdownContent(
   });
 }
 
-async function allocateTrainingConceptMarkdownPath(directoryAbsolutePath: string, baseSlug: string) {
-  let filePath = path.join(directoryAbsolutePath, `${baseSlug}.md`);
+async function allocateTrainingConceptMarkdownPath(
+  directoryAbsolutePath: string,
+  baseFileName: string,
+  duplicateSeparator = "-",
+) {
+  const normalizedBaseFileName = normalizeTrainingNoteFileBaseName(baseFileName, "Concepto");
+  let filePath = path.join(directoryAbsolutePath, `${normalizedBaseFileName}.md`);
   let suffix = 2;
 
   while (true) {
     try {
       await fs.access(filePath);
-      filePath = path.join(directoryAbsolutePath, `${baseSlug}-${suffix}.md`);
+      filePath = path.join(directoryAbsolutePath, `${normalizedBaseFileName}${duplicateSeparator}${suffix}.md`);
       suffix += 1;
     } catch {
       return filePath;
@@ -569,7 +637,7 @@ function selectTrainingItemRowsByPathSync(sqlite: any, relativePath: string) {
   return sqlite.prepare(`
     SELECT *
     FROM items
-    WHERE LOWER(path) = LOWER(?)
+    WHERE LOWER(REPLACE(path, '\\', '/')) = LOWER(?)
       AND COALESCE(deleted, 0) = 0
     ORDER BY
       CASE WHEN type = 'file' THEN 0 ELSE 1 END ASC,
@@ -779,6 +847,7 @@ async function createTrainingConceptNote(
   const repositories = getRepositories(ctx);
   const title = assertNonEmptyString(payload?.title, "title");
   const baseSlug = normalizeTrainingSlug(payload.slug || title, "concept");
+  const fileBaseName = normalizeTrainingNoteFileBaseName(payload.fileBaseName || title, title);
   const slug = await allocateUniqueSlug(
     baseSlug,
     (nextSlug) => repositories.concepts.findBySlug(nextSlug),
@@ -787,7 +856,11 @@ async function createTrainingConceptNote(
     payload.relativeDirectoryPath || TRAINING_CONCEPTS_ROOT,
   );
   const directoryAbsolutePath = resolveAbsoluteContentPath(ctx, relativeDirectoryPath);
-  const markdownAbsolutePath = await allocateTrainingConceptMarkdownPath(directoryAbsolutePath, slug);
+  const markdownAbsolutePath = await allocateTrainingConceptMarkdownPath(
+    directoryAbsolutePath,
+    fileBaseName,
+    payload.fileBaseName ? " " : "-",
+  );
   const markdownFileName = path.basename(markdownAbsolutePath);
   const markdownRelativePath = normalizeRelativeContentPath(
     relativeDirectoryPath
@@ -955,12 +1028,11 @@ function normalizeExerciseRecord(ctx: NexusBackendPluginContext, row: any): Trai
       muscleLoads,
     }),
     doc: getTrainingDocRecordByConceptIdSync(ctx, row.concept_id)
-      || findTrainingDocRecordByRelativePathSync(
-        ctx,
-        normalizeRelativeContentPath(`${TRAINING_EXERCISE_CONCEPTS_DIRECTORY}/${String(row.slug || "").trim()}.md`),
-        String(row.title || "").trim(),
-        row.summary == null ? null : String(row.summary),
-      ),
+      || findTrainingExistingExerciseDocRecordSync(ctx, {
+        title: String(row.title || "").trim(),
+        slug: String(row.slug || "").trim(),
+        summary: row.summary == null ? null : String(row.summary),
+      }),
   };
 }
 
@@ -1328,6 +1400,110 @@ async function ensureTrainingMarkdownItem(
   return findTrainingItemByRelativePath(ctx, normalizedRelativePath, "file");
 }
 
+async function renameTrainingMarkdownItemPath(
+  ctx: NexusBackendPluginContext,
+  currentRelativePath: string,
+  nextRelativePath: string,
+  itemId: string | null = null,
+) {
+  const normalizedCurrentRelativePath = normalizeRelativeContentPath(currentRelativePath);
+  const normalizedNextRelativePath = normalizeRelativeContentPath(nextRelativePath);
+  const normalizedItemId = normalizeOptionalText(itemId);
+  if (!normalizedCurrentRelativePath || !normalizedNextRelativePath) {
+    return null;
+  }
+
+  if (normalizedCurrentRelativePath === normalizedNextRelativePath) {
+    return ensureTrainingMarkdownItem(ctx, normalizedNextRelativePath);
+  }
+
+  const currentAbsolutePath = resolveAbsoluteContentPath(ctx, normalizedCurrentRelativePath);
+  const nextAbsolutePath = resolveAbsoluteContentPath(ctx, normalizedNextRelativePath);
+  if (!currentAbsolutePath || !nextAbsolutePath) {
+    return null;
+  }
+
+  if (!(await doesTrainingPathExist(currentAbsolutePath))) {
+    return ensureTrainingMarkdownItem(ctx, normalizedNextRelativePath);
+  }
+
+  if (await doesTrainingPathExist(nextAbsolutePath)) {
+    return ensureTrainingMarkdownItem(ctx, normalizedCurrentRelativePath);
+  }
+
+  const repositories = getRepositories(ctx);
+  const currentItem = normalizedItemId
+    ? await repositories.items.findById(normalizedItemId)
+    : await findTrainingItemByRelativePath(ctx, normalizedCurrentRelativePath, "file");
+
+  await fs.mkdir(path.dirname(nextAbsolutePath), { recursive: true });
+  await fs.rename(currentAbsolutePath, nextAbsolutePath);
+
+  if (currentItem?.id) {
+    await repositories.items.updateById(String(currentItem.id), {
+      name: path.basename(normalizedNextRelativePath),
+      path: normalizedNextRelativePath,
+      relative_path: normalizedNextRelativePath,
+      extension: path.extname(normalizedNextRelativePath).replace(/^\./, "") || null,
+    });
+  }
+
+  if (!normalizedItemId) {
+    deleteTrainingItemRowsByPathSync(getSqlite(ctx), normalizedCurrentRelativePath);
+  }
+
+  return ensureTrainingMarkdownItem(ctx, normalizedNextRelativePath);
+}
+
+function findTrainingExistingMuscleDocRecordSync(
+  ctx: NexusBackendPluginContext,
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+) {
+  const fallbackSummary = `${muscle.groupTitle} - ${muscle.regionTitle}`;
+  const candidateRelativePaths = [
+    getTrainingMuscleConceptPreferredRelativePath(muscle),
+    ...getTrainingMuscleConceptLegacyRelativePaths(muscle),
+  ];
+
+  for (const relativePath of candidateRelativePaths) {
+    const doc = findTrainingDocRecordByRelativePathSync(
+      ctx,
+      relativePath,
+      muscle.title,
+      fallbackSummary,
+    );
+    if (doc) {
+      return doc;
+    }
+  }
+
+  return null;
+}
+
+function findTrainingExistingExerciseDocRecordSync(
+  ctx: NexusBackendPluginContext,
+  exercise: Pick<TrainingExerciseRecord, "title" | "slug" | "summary">,
+) {
+  const candidateRelativePaths = [
+    getTrainingExerciseConceptPreferredRelativePath(exercise),
+    ...getTrainingExerciseConceptLegacyRelativePaths(exercise),
+  ];
+
+  for (const relativePath of candidateRelativePaths) {
+    const doc = findTrainingDocRecordByRelativePathSync(
+      ctx,
+      relativePath,
+      exercise.title,
+      exercise.summary ?? null,
+    );
+    if (doc) {
+      return doc;
+    }
+  }
+
+  return null;
+}
+
 async function ensureTrainingConceptForItem(
   ctx: NexusBackendPluginContext,
   payload: {
@@ -1537,14 +1713,33 @@ async function ensureTrainingMuscleConcept(ctx: NexusBackendPluginContext, muscl
   const existingDoc = existingBinding?.concept_id
     ? getTrainingDocRecordByConceptIdSync(ctx, existingBinding.concept_id)
     : null;
-  if (existingDoc) {
+  await ensureTrainingConceptFolders(ctx);
+  const preferredRelativePath = getTrainingMuscleConceptPreferredRelativePath(muscle);
+  const legacyRelativePath = getTrainingMuscleConceptLegacyRelativePaths(muscle)[0] || null;
+
+  if (existingDoc?.relativePath) {
+    if (existingDoc.relativePath !== preferredRelativePath) {
+      await renameTrainingMarkdownItemPath(ctx, existingDoc.relativePath, preferredRelativePath, existingDoc.itemId);
+      return getTrainingDocRecordByConceptIdSync(ctx, existingBinding?.concept_id);
+    }
+
     return existingDoc;
   }
 
-  await ensureTrainingConceptFolders(ctx);
   const muscleSummary = `${muscle.groupTitle} - ${muscle.regionTitle}`;
-  const existingRelativePath = normalizeRelativeContentPath(`${TRAINING_MUSCLE_CONCEPTS_DIRECTORY}/${muscle.id}.md`);
-  const existingItem = await ensureTrainingMarkdownItem(ctx, existingRelativePath);
+  let existingItem = await ensureTrainingMarkdownItem(ctx, preferredRelativePath);
+  if (!existingItem && legacyRelativePath) {
+    const legacyItem = await ensureTrainingMarkdownItem(ctx, legacyRelativePath);
+    if (legacyItem) {
+      existingItem = await renameTrainingMarkdownItemPath(
+        ctx,
+        legacyRelativePath,
+        preferredRelativePath,
+        String(legacyItem.id),
+      );
+    }
+  }
+
   const concept = existingItem?.id
     ? await ensureTrainingConceptForItem(ctx, {
         itemId: String(existingItem.id),
@@ -1555,6 +1750,7 @@ async function ensureTrainingMuscleConcept(ctx: NexusBackendPluginContext, muscl
     : (await createTrainingConceptNote(ctx, {
         title: muscle.title,
         slug: muscle.id,
+        fileBaseName: getTrainingMuscleConceptPreferredFileBaseName(muscle),
         relativeDirectoryPath: TRAINING_MUSCLE_CONCEPTS_DIRECTORY,
         templateId: "fitness-muscle",
         summary: muscleSummary,
@@ -1630,14 +1826,33 @@ async function ensureTrainingExerciseConcept(ctx: NexusBackendPluginContext, exe
     throw new Error("No encontramos ese ejercicio.");
   }
 
+  await ensureTrainingConceptFolders(ctx);
+  const preferredRelativePath = getTrainingExerciseConceptPreferredRelativePath(exercise);
+  const legacyRelativePath = getTrainingExerciseConceptLegacyRelativePaths(exercise)[0] || null;
+
   if (exercise.doc && normalizeOptionalText(existingRow?.concept_id)) {
+    if (exercise.doc.relativePath && exercise.doc.relativePath !== preferredRelativePath) {
+      await renameTrainingMarkdownItemPath(ctx, exercise.doc.relativePath, preferredRelativePath, exercise.doc.itemId);
+      return getTrainingDocRecordByConceptIdSync(ctx, existingRow?.concept_id);
+    }
+
     return exercise.doc;
   }
 
-  await ensureTrainingConceptFolders(ctx);
   const exerciseSummary = exercise.summary || exercise.searchSummary || "Documento de ejercicio.";
-  const existingRelativePath = normalizeRelativeContentPath(`${TRAINING_EXERCISE_CONCEPTS_DIRECTORY}/${exercise.slug}.md`);
-  const existingItem = await ensureTrainingMarkdownItem(ctx, existingRelativePath);
+  let existingItem = await ensureTrainingMarkdownItem(ctx, preferredRelativePath);
+  if (!existingItem && legacyRelativePath) {
+    const legacyItem = await ensureTrainingMarkdownItem(ctx, legacyRelativePath);
+    if (legacyItem) {
+      existingItem = await renameTrainingMarkdownItemPath(
+        ctx,
+        legacyRelativePath,
+        preferredRelativePath,
+        String(legacyItem.id),
+      );
+    }
+  }
+
   const created = existingItem?.id
     ? {
         concept: await ensureTrainingConceptForItem(ctx, {
@@ -1650,6 +1865,7 @@ async function ensureTrainingExerciseConcept(ctx: NexusBackendPluginContext, exe
     : await createTrainingConceptNote(ctx, {
         title: exercise.title,
         slug: exercise.slug || exercise.title,
+        fileBaseName: getTrainingExerciseConceptPreferredFileBaseName(exercise),
         relativeDirectoryPath: TRAINING_EXERCISE_CONCEPTS_DIRECTORY,
         templateId: "fitness-exercise",
         summary: exerciseSummary,

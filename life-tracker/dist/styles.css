@@ -1159,8 +1159,7 @@
 .habitosDashboard__grid .react-grid-item {
   z-index: 0;
   overflow: visible;
-  transition: all 200ms ease;
-  transition-property: left, top, width, height, transform;
+  transition: transform 90ms linear, width 120ms ease, height 120ms ease;
 }
 
 .habitosDashboard__grid .react-grid-item.cssTransforms {
@@ -1183,6 +1182,8 @@
 .habitosDashboard__grid .react-grid-item.react-grid-placeholder {
   z-index: 1;
   overflow: hidden;
+  transition: none;
+  will-change: transform, width, height;
   border: 1px dashed color-mix(in srgb, var(--habitos-accent) 52%, var(--habitos-border));
   border-radius: 16px;
   background: linear-gradient(135deg, color-mix(in srgb, var(--habitos-accent) 12%, transparent), transparent 72%), color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 92%, transparent);

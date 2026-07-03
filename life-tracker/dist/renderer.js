@@ -17018,10 +17018,11 @@ function CanvasWorkspace({
   );
   const [renderedLayouts, setRenderedLayouts] = useState3(() => normalizedCanvasState.layouts);
   const [gridMounted, setGridMounted] = useState3(false);
-  const persistedLayoutsRef = useRef3(normalizedCanvasState.layouts);
   const persistedLayoutsSignatureRef = useRef3(persistedLayoutsSignature);
   const persistTimerRef = useRef3(null);
   const appliedPersistedLayoutsSignatureRef = useRef3(persistedLayoutsSignature);
+  const latestLayoutsRef = useRef3(normalizedCanvasState.layouts);
+  const activeBreakpointRef = useRef3(Object.keys(breakpoints)[0] || "lg");
   const providersById = useMemo2(
     () => new Map(providers.map((provider) => [provider.id, provider])),
     [providers]
@@ -17034,8 +17035,8 @@ function CanvasWorkspace({
       return;
     }
     appliedPersistedLayoutsSignatureRef.current = persistedLayoutsSignature;
-    persistedLayoutsRef.current = normalizedCanvasState.layouts;
     persistedLayoutsSignatureRef.current = persistedLayoutsSignature;
+    latestLayoutsRef.current = normalizedCanvasState.layouts;
     setRenderedLayouts((currentValue) => getCanvasLayoutsSignature(currentValue) === persistedLayoutsSignature ? currentValue : normalizedCanvasState.layouts);
   }, [normalizedCanvasState.layouts, persistedLayoutsSignature]);
   useEffect3(() => {
@@ -17045,47 +17046,51 @@ function CanvasWorkspace({
       }
     };
   }, []);
-  const commitLayouts = (allLayouts) => {
-    const nextCanvasState = normalizeCanvasState(
-      {
-        ...normalizedCanvasState,
-        layouts: allLayouts
-      },
-      providers,
-      { breakpoints, colsByBreakpoint: cols }
-    );
-    const nextSignature = getCanvasLayoutsSignature(nextCanvasState.layouts);
-    persistedLayoutsRef.current = nextCanvasState.layouts;
-    persistedLayoutsSignatureRef.current = nextSignature;
-    setRenderedLayouts(nextCanvasState.layouts);
-    if (nextSignature === persistedLayoutsSignature) {
+  const buildCanvasStateFromLayouts = (layouts2) => normalizeCanvasState(
+    {
+      ...normalizedCanvasState,
+      layouts: layouts2
+    },
+    providers,
+    { breakpoints, colsByBreakpoint: cols }
+  );
+  const schedulePersist = (nextCanvasState, nextSignature) => {
+    if (nextSignature === persistedLayoutsSignatureRef.current) {
       return;
     }
+    const previousSignature = appliedPersistedLayoutsSignatureRef.current;
+    persistedLayoutsSignatureRef.current = nextSignature;
     if (persistTimerRef.current !== null) {
       window.clearTimeout(persistTimerRef.current);
     }
     persistTimerRef.current = window.setTimeout(() => {
       persistTimerRef.current = null;
       Promise.resolve(onPersistCanvasState?.(nextCanvasState)).catch((error2) => {
+        persistedLayoutsSignatureRef.current = previousSignature;
         onPersistError?.(error2);
       });
     }, persistDebounceMs);
   };
   const handleLayoutChange = (_currentLayout, allLayouts) => {
-    const nextCanvasState = normalizeCanvasState(
-      {
-        ...normalizedCanvasState,
-        layouts: allLayouts
-      },
-      providers,
-      { breakpoints, colsByBreakpoint: cols }
-    );
-    const nextSignature = getCanvasLayoutsSignature(nextCanvasState.layouts);
-    if (nextSignature === persistedLayoutsSignatureRef.current) {
+    const nextCanvasState = buildCanvasStateFromLayouts(allLayouts);
+    latestLayoutsRef.current = nextCanvasState.layouts;
+  };
+  const handleBreakpointChange = (nextBreakpoint) => {
+    activeBreakpointRef.current = nextBreakpoint;
+  };
+  const handleLayoutCommit = (currentLayout) => {
+    if (!editMode) {
       return;
     }
-    persistedLayoutsRef.current = nextCanvasState.layouts;
-    persistedLayoutsSignatureRef.current = nextSignature;
+    const nextLayouts = {
+      ...latestLayoutsRef.current,
+      [activeBreakpointRef.current]: Array.isArray(currentLayout) ? currentLayout : latestLayoutsRef.current?.[activeBreakpointRef.current] || []
+    };
+    const nextCanvasState = buildCanvasStateFromLayouts(nextLayouts);
+    const nextSignature = getCanvasLayoutsSignature(nextCanvasState.layouts);
+    latestLayoutsRef.current = nextCanvasState.layouts;
+    setRenderedLayouts((currentValue) => getCanvasLayoutsSignature(currentValue) === nextSignature ? currentValue : nextCanvasState.layouts);
+    schedulePersist(nextCanvasState, nextSignature);
   };
   return /* @__PURE__ */ React4.createElement(
     ResponsiveGridLayout2,
@@ -17107,9 +17112,10 @@ function CanvasWorkspace({
       isResizable: editMode,
       draggableHandle: `.${editOverlayClassName}`,
       draggableCancel,
+      onBreakpointChange: handleBreakpointChange,
       onLayoutChange: handleLayoutChange,
-      onDragStop: (_currentLayout, allLayouts) => commitLayouts(allLayouts),
-      onResizeStop: (_currentLayout, allLayouts) => commitLayouts(allLayouts)
+      onDragStop: handleLayoutCommit,
+      onResizeStop: handleLayoutCommit
     },
     normalizedCanvasState.widgetInstances.map((instance) => {
       const provider = providersById.get(instance.providerId);
