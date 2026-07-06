@@ -1,4 +1,5 @@
 import LifeTrackerView, { LIFE_TRACKER_HOME_WIDGET_PROVIDERS } from "./LifeTrackerView.jsx";
+import TrainingHostSettingsSection from "./training/TrainingHostSettingsSection.jsx";
 import {
   LIFE_TRACKER_DEFAULT_SECTION,
   LIFE_TRACKER_PLUGIN_ID,
@@ -50,6 +51,13 @@ const lifeTrackerRendererPlugin = {
         ...provider,
         pluginId: ctx.pluginId,
       });
+    });
+
+    ctx.registerSettingsSection({
+      id: "nexus.life-tracker.training",
+      pluginId: ctx.pluginId,
+      title: "Entrenamiento",
+      component: () => <TrainingHostSettingsSection ctx={ctx} />,
     });
 
     ctx.registerSideToolbarButton({

@@ -25,10 +25,18 @@ import {
   TRAINING_MUSCLE_CATALOG,
   TRAINING_MUSCLE_GROUPS,
   TRAINING_MUSCLE_REGIONS,
+  getTrainingMuscleById,
   listTrainingMuscles,
 } from "./training-muscles.js";
 import {
+  TRAINING_STARTER_EXERCISES,
+  TRAINING_STARTER_LIBRARY_VERSION,
+} from "./training-starter-library.js";
+import {
+  buildTrainingExerciseTagSummary,
+  buildTrainingExerciseTypeSummary,
   buildTrainingExerciseSummary,
+  buildTrainingMeasurementCategorySummary,
   buildTrainingMetricSummary,
   buildTrainingRoutineStepSummary,
   buildTrainingRoutineSummary,
@@ -38,7 +46,10 @@ import {
   normalizeOptionalText,
   normalizeTrainingAssignmentInput,
   normalizeTrainingCompletionMode,
+  normalizeTrainingExerciseTags,
+  normalizeTrainingExerciseType,
   normalizeTrainingMeasurement,
+  normalizeTrainingMeasurementCategory,
   normalizeTrainingMuscleLoads,
   normalizeTrainingOccurrenceResult,
   normalizeTrainingPrescription,
@@ -57,7 +68,22 @@ const TRAINING_CONCEPTS_ROOT = "Concepts/Fitness";
 const TRAINING_MUSCLE_CONCEPTS_DIRECTORY = `${TRAINING_CONCEPTS_ROOT}/Muscles`;
 const TRAINING_EXERCISE_CONCEPTS_DIRECTORY = `${TRAINING_CONCEPTS_ROOT}/Exercises`;
 const TRAINING_LEGACY_FOLDER_NOTE_FILE_NAME = "_folder.md";
+const TRAINING_TRANSFER_SCHEMA_VERSION = 2;
 const trainingConceptCoverageInFlight = new Map<string, Promise<void>>();
+const TRAINING_STARTER_LIBRARY_STATE_KEY = "starterLibraryVersion";
+
+type TrainingExerciseType = "exercise" | "stretch" | "warmup" | "coordination";
+type TrainingMeasurementCategory = "strength" | "cardio" | "balance" | "flexibility";
+type TrainingExerciseTag =
+  | "strength"
+  | "cardio"
+  | "balance"
+  | "flexibility"
+  | "endurance"
+  | "motor-control"
+  | "isometric"
+  | "unilateral"
+  | "explosive";
 
 type TrainingDocRecord = {
   conceptId: string;
@@ -76,9 +102,15 @@ type TrainingExerciseRecord = {
   slug: string;
   summary: string | null;
   notes: string | null;
+  exerciseType: TrainingExerciseType;
+  measurementCategory: TrainingMeasurementCategory;
+  tags: TrainingExerciseTag[];
   measurement: Record<string, unknown>;
   muscleLoads: Array<Record<string, unknown>>;
   legacyWarnings: Array<Record<string, unknown>>;
+  templateKey: string | null;
+  personalDifficultyScore: number | null;
+  isStarter: boolean;
   createdAt: string;
   updatedAt: string;
   searchSummary: string;
@@ -143,8 +175,14 @@ type TrainingExerciseInput = {
   slug?: string | null;
   summary?: string | null;
   notes?: string | null;
+  exerciseType?: unknown;
+  measurementCategory?: unknown;
+  tags?: Array<unknown>;
   measurement?: unknown;
   muscleLoads?: Array<unknown>;
+  templateKey?: string | null;
+  personalDifficultyScore?: unknown;
+  docMarkdown?: string | null;
 };
 
 type TrainingRoutineInput = {
@@ -155,6 +193,45 @@ type TrainingRoutineInput = {
   notes?: string | null;
   structure?: Array<unknown>;
   steps?: Array<unknown>;
+};
+
+type TrainingTransferMuscleRecord = {
+  id: string;
+  title: string;
+  regionId: string;
+  regionTitle: string;
+  groupId: string;
+  groupTitle: string;
+  markdown: string;
+};
+
+type TrainingTransferExerciseRecord = {
+  title: string;
+  summary: string | null;
+  exerciseType: TrainingExerciseType;
+  measurementCategory: TrainingMeasurementCategory;
+  tags: TrainingExerciseTag[];
+  measurement: Record<string, unknown>;
+  muscleLoads: Array<Record<string, unknown>>;
+  templateKey: string | null;
+  personalDifficultyScore: number | null;
+  markdown: string;
+};
+
+type TrainingTransferRoutineSegment = Record<string, unknown>;
+
+type TrainingTransferRoutineRecord = {
+  title: string;
+  summary: string | null;
+  notes: string | null;
+  structure: TrainingTransferRoutineSegment[];
+};
+
+type TrainingTransferEnvelope = {
+  version: number;
+  muscles: TrainingTransferMuscleRecord[];
+  exercises: TrainingTransferExerciseRecord[];
+  routines: TrainingTransferRoutineRecord[];
 };
 
 type TrainingConceptTemplateContext = {
@@ -177,6 +254,23 @@ type TrainingConceptNotePayload = {
   frontmatter?: Record<string, unknown> | null;
   summary?: string | null;
   content?: string | null;
+};
+
+type TrainingManagedDocRecord = {
+  id: string;
+  kind: "starter-exercise" | "muscle";
+  group: "Ejercicios" | "Musculos";
+  label: string;
+  description: string | null;
+  status: "original" | "edited" | "missing";
+  relativePath: string;
+  currentRelativePath: string | null;
+  itemId: string | null;
+  itemPath: string | null;
+  conceptId: string | null;
+  exerciseId: string | null;
+  exerciseTemplateKey: string | null;
+  muscleId: string | null;
 };
 
 const TRAINING_CONCEPT_TEMPLATES: Record<string, TrainingConceptTemplateDefinition> = {
@@ -240,6 +334,10 @@ const TRAINING_CONCEPT_TEMPLATES: Record<string, TrainingConceptTemplateDefiniti
   },
 };
 
+const TRAINING_STARTER_EXERCISE_BY_TEMPLATE_KEY = new Map(
+  TRAINING_STARTER_EXERCISES.map((exercise) => [exercise.templateKey, exercise]),
+);
+
 function createSuccess(data: unknown) {
   return { ok: true, data };
 }
@@ -265,7 +363,40 @@ function assertNonEmptyString(value: unknown, fieldName: string) {
   return normalized;
 }
 
+function normalizeOptionalNumber(value: unknown) {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  const normalized = Number(String(value).replace(",", "."));
+  return Number.isFinite(normalized) ? normalized : null;
+}
+
+function getTrainingStarterExerciseDefinition(templateKey: unknown) {
+  const normalizedTemplateKey = normalizeOptionalText(templateKey);
+  return normalizedTemplateKey
+    ? TRAINING_STARTER_EXERCISE_BY_TEMPLATE_KEY.get(normalizedTemplateKey) || null
+    : null;
+}
+
 function parseRowJson<T = Record<string, unknown>>(value: unknown, fallback: T): T {
+  if (Array.isArray(fallback)) {
+    if (value == null || value === "") {
+      return [...fallback] as T;
+    }
+
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return (Array.isArray(parsed) ? parsed : [...fallback]) as T;
+      } catch {
+        return [...fallback] as T;
+      }
+    }
+
+    return (Array.isArray(value) ? value : [...fallback]) as T;
+  }
+
   const parsed = parseJsonObject(value, fallback as Record<string, unknown>);
   return parsed as T;
 }
@@ -391,6 +522,225 @@ function getTrainingExerciseConceptLegacyRelativePaths(
   return [
     normalizeRelativeContentPath(`${TRAINING_EXERCISE_CONCEPTS_DIRECTORY}/${exercise.slug}.md`),
   ].filter((relativePath, index, list) => relativePath && list.indexOf(relativePath) === index);
+}
+
+function getTrainingStarterExerciseManagedDocId(templateKey: string) {
+  return `starter-exercise:${templateKey}`;
+}
+
+function getTrainingMuscleManagedDocId(muscleId: string) {
+  return `muscle:${muscleId}`;
+}
+
+function buildTrainingMuscleConceptSummary(
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+) {
+  return `${muscle.groupTitle} - ${muscle.regionTitle}`;
+}
+
+function joinTrainingNaturalList(items: string[]) {
+  if (!items.length) {
+    return "";
+  }
+
+  if (items.length === 1) {
+    return items[0];
+  }
+
+  if (items.length === 2) {
+    return `${items[0]} y ${items[1]}`;
+  }
+
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+}
+
+function buildTrainingMuscleInlineLink(
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+) {
+  return `[${muscle.title}](${getTrainingMuscleConceptPreferredFileBaseName(muscle)}.md)`;
+}
+
+function buildTrainingMuscleRelatedSummary(
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+) {
+  const relatedLinks = (Array.isArray(muscle.relatedMuscleIds) ? muscle.relatedMuscleIds : [])
+    .map((relatedMuscleId) => getTrainingMuscleById(relatedMuscleId))
+    .filter(Boolean)
+    .map((relatedMuscle) => buildTrainingMuscleInlineLink(relatedMuscle));
+
+  if (!relatedLinks.length) {
+    return "Suele trabajar junto a otros musculos cercanos del mismo patron.";
+  }
+
+  return `Suele trabajar junto a ${joinTrainingNaturalList(relatedLinks)}.`;
+}
+
+function buildTrainingMuscleBody(
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+) {
+  const summary = buildTrainingMuscleConceptSummary(muscle);
+  const movementSummary = String(muscle.movementSummary || "").trim()
+    || "Describe la funcion principal de este musculo y como se siente cuando trabaja.";
+
+  return [
+    `# ${muscle.title}`,
+    "",
+    summary,
+    "",
+    "## Funcion",
+    "",
+    movementSummary,
+    "",
+    "## Trabaja con",
+    "",
+    buildTrainingMuscleRelatedSummary(muscle),
+  ].join("\n");
+}
+
+function buildManagedStarterExerciseMuscleLines(
+  definition: (typeof TRAINING_STARTER_EXERCISES)[number],
+) {
+  return definition.muscleLoads.map((entry) => {
+    const muscle = getTrainingMuscleById(entry.muscleId);
+    const muscleTitle = muscle?.title || entry.muscleId;
+    const musclePath = muscle
+      ? `../Muscles/${getTrainingMuscleConceptPreferredFileBaseName(muscle)}.md`
+      : "";
+
+    return musclePath
+      ? `- [${muscleTitle}](${musclePath}): ${entry.percentage}%`
+      : `- ${muscleTitle}: ${entry.percentage}%`;
+  });
+}
+
+function buildTrainingStarterExerciseTaxonomyLines(
+  definition: (typeof TRAINING_STARTER_EXERCISES)[number],
+) {
+  const typeSummary = buildTrainingExerciseTypeSummary(definition.exerciseType);
+  const categorySummary = buildTrainingMeasurementCategorySummary(definition.measurementCategory);
+  const tagSummary = buildTrainingExerciseTagSummary(definition.tags, {
+    measurementCategory: definition.measurementCategory,
+  });
+
+  return [
+    `- Tipo: ${typeSummary}`,
+    `- Perfil principal: ${categorySummary}`,
+    tagSummary ? `- Tags: ${tagSummary}` : null,
+  ].filter(Boolean) as string[];
+}
+
+function buildTrainingStarterExerciseBody(
+  definition: (typeof TRAINING_STARTER_EXERCISES)[number],
+) {
+  return [
+    `# ${definition.title}`,
+    "",
+    definition.description,
+    "",
+    "## Perfil",
+    "",
+    ...buildTrainingStarterExerciseTaxonomyLines(definition),
+    "",
+    "## Tecnica",
+    "",
+    ...definition.technique.map((line) => `- ${line}`),
+    "",
+    "## Puntos clave",
+    "",
+    ...definition.keyPoints.map((line) => `- ${line}`),
+    "",
+    "## Musculos implicados",
+    "",
+    ...buildManagedStarterExerciseMuscleLines(definition),
+    "",
+    "## Notas",
+    "",
+    ...definition.notes.map((line) => `- ${line}`),
+  ].join("\n");
+}
+
+function buildTrainingStarterExerciseConceptPayload(
+  definition: (typeof TRAINING_STARTER_EXERCISES)[number],
+  exerciseId: string,
+): TrainingConceptNotePayload {
+  return {
+    title: definition.title,
+    slug: definition.title,
+    fileBaseName: definition.title,
+    relativeDirectoryPath: TRAINING_EXERCISE_CONCEPTS_DIRECTORY,
+    summary: definition.summary,
+    content: buildTrainingStarterExerciseBody(definition),
+    frontmatter: {
+      nexus: {
+        defaultView: "read",
+        card: {
+          title: definition.title,
+          summary: definition.summary,
+        },
+      },
+      fitness: {
+        domain: "training",
+        kind: "exercise",
+        targetId: exerciseId,
+        templateKey: definition.templateKey,
+        exerciseType: normalizeTrainingExerciseType(definition.exerciseType),
+        measurementCategory: normalizeTrainingMeasurementCategory(definition.measurementCategory),
+        tags: normalizeTrainingExerciseTags(definition.tags, {
+          measurementCategory: definition.measurementCategory,
+        }),
+      },
+    },
+  };
+}
+
+function buildLegacyTrainingMuscleConceptPayload(
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+): TrainingConceptNotePayload {
+  return {
+    title: muscle.title,
+    slug: muscle.id,
+    fileBaseName: getTrainingMuscleConceptPreferredFileBaseName(muscle),
+    relativeDirectoryPath: TRAINING_MUSCLE_CONCEPTS_DIRECTORY,
+    templateId: "fitness-muscle",
+    summary: buildTrainingMuscleConceptSummary(muscle),
+    frontmatter: {
+      fitness: {
+        domain: "training",
+        kind: "muscle",
+        targetId: muscle.id,
+        regionId: muscle.regionId,
+        groupId: muscle.groupId,
+      },
+      nexus: {
+        card: {
+          title: muscle.title,
+          summary: buildTrainingMuscleConceptSummary(muscle),
+        },
+      },
+    },
+  };
+}
+
+function buildTrainingMuscleConceptPayload(
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+): TrainingConceptNotePayload {
+  return {
+    ...buildLegacyTrainingMuscleConceptPayload(muscle),
+    content: buildTrainingMuscleBody(muscle),
+  };
+}
+
+function normalizeTrainingMarkdownForComparison(value: unknown) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .trim();
+}
+
+function getRealTrainingConceptId(value: unknown) {
+  const normalizedValue = normalizeOptionalText(value);
+  return normalizedValue && !normalizedValue.startsWith("item:")
+    ? normalizedValue
+    : null;
 }
 
 function readFrontmatterFromMarkdownPath(markdownPath: string) {
@@ -949,6 +1299,49 @@ function findTrainingExerciseBySlugSync(sqlite: any, slug: string) {
   `).get(slug) ?? null;
 }
 
+function findTrainingExerciseByTemplateKeySync(sqlite: any, templateKey: string) {
+  return sqlite.prepare(`
+    SELECT *
+    FROM training_exercises
+    WHERE template_key = ?
+      AND status = 'active'
+    LIMIT 1
+  `).get(templateKey) ?? null;
+}
+
+function findTrainingExerciseByTitleExactSync(sqlite: any, title: string) {
+  return sqlite.prepare(`
+    SELECT *
+    FROM training_exercises
+    WHERE title = ? COLLATE NOCASE
+      AND status = 'active'
+    ORDER BY title COLLATE NOCASE ASC, title ASC
+    LIMIT 1
+  `).get(title) ?? null;
+}
+
+function findTrainingRoutineByTitleExactSync(sqlite: any, title: string) {
+  return sqlite.prepare(`
+    SELECT *
+    FROM training_routines
+    WHERE title = ? COLLATE NOCASE
+      AND status = 'active'
+    ORDER BY title COLLATE NOCASE ASC, title ASC
+    LIMIT 1
+  `).get(title) ?? null;
+}
+
+function findTrainingMuscleByTitleSync(title: unknown) {
+  const normalizedTitle = normalizeOptionalText(title);
+  if (!normalizedTitle) {
+    return null;
+  }
+
+  return TRAINING_MUSCLE_CATALOG.find((entry) => entry.title.localeCompare(normalizedTitle, undefined, { sensitivity: "accent" }) === 0)
+    || TRAINING_MUSCLE_CATALOG.find((entry) => normalizeTrainingSlug(entry.title, "muscle") === normalizeTrainingSlug(normalizedTitle, "muscle"))
+    || null;
+}
+
 function findTrainingRoutineBySlugSync(sqlite: any, slug: string) {
   return sqlite.prepare(`
     SELECT *
@@ -978,6 +1371,30 @@ function listLegacyExerciseMusclesSync(sqlite: any, entityRefId: string) {
   })).filter((entry: any) => entry.title || entry.slug);
 }
 
+function normalizeLegacyExerciseMetadataMuscles(rawMuscles: unknown) {
+  if (!Array.isArray(rawMuscles)) {
+    return [];
+  }
+
+  return rawMuscles.map((entry: any) => {
+    const source = entry && typeof entry === "object" ? entry : { title: entry };
+    if (source.percentage != null || source.load != null) {
+      return source;
+    }
+
+    return {
+      ...source,
+      load: 5,
+    };
+  }).filter((entry: any) => (
+    normalizeOptionalText(entry?.title)
+      || normalizeOptionalText(entry?.name)
+      || normalizeOptionalText(entry?.slug)
+      || normalizeOptionalText(entry?.muscleId)
+      || normalizeOptionalText(entry?.id)
+  ));
+}
+
 function findLegacyExerciseSearchDocumentSync(sqlite: any, entityRefId: string) {
   return sqlite.prepare(`
     SELECT id, title, subtitle, body, metadata
@@ -998,6 +1415,8 @@ function normalizeExerciseRecord(ctx: NexusBackendPluginContext, row: any): Trai
   const measurement = parseRowJson<Record<string, unknown>>(row.measurement_json, {});
   const storedMuscleLoads = parseRowJson<any[]>(row.muscle_loads_json, []);
   const storedWarnings = parseRowJson<any[]>(row.legacy_muscle_warnings_json, []);
+  const exerciseType = normalizeTrainingExerciseType(row.exercise_type);
+  const measurementCategory = normalizeTrainingMeasurementCategory(row.measurement_category);
   const fallbackLegacyMuscles = !storedMuscleLoads.length
     ? listLegacyExerciseMusclesSync(sqlite, String(row.entity_ref_id))
     : [];
@@ -1007,6 +1426,9 @@ function normalizeExerciseRecord(ctx: NexusBackendPluginContext, row: any): Trai
   const muscleLoads = storedMuscleLoads.length
     ? normalizeTrainingMuscleLoads(storedMuscleLoads)
     : fallbackLegacyData.muscleLoads;
+  const tags = normalizeTrainingExerciseTags(parseRowJson<any[]>(row.tags_json, []), {
+    measurementCategory,
+  });
   const legacyWarnings = storedWarnings.length
     ? storedWarnings
     : fallbackLegacyData.warnings;
@@ -1018,12 +1440,21 @@ function normalizeExerciseRecord(ctx: NexusBackendPluginContext, row: any): Trai
     slug: String(row.slug || "").trim(),
     summary: row.summary == null ? null : String(row.summary),
     notes: row.notes == null ? null : String(row.notes),
+    exerciseType,
+    measurementCategory,
+    tags,
     measurement,
     muscleLoads,
     legacyWarnings,
+    templateKey: normalizeOptionalText(row.template_key),
+    personalDifficultyScore: normalizeOptionalNumber(row.personal_difficulty_score),
+    isStarter: Boolean(getTrainingStarterExerciseDefinition(row.template_key)),
     createdAt: String(row.created_at || nowIso()),
     updatedAt: String(row.updated_at || row.created_at || nowIso()),
     searchSummary: buildTrainingExerciseSummary({
+      exerciseType,
+      measurementCategory,
+      tags,
       measurement,
       muscleLoads,
     }),
@@ -1074,13 +1505,16 @@ function migrateLegacySearchExercisesSync(ctx: NexusBackendPluginContext) {
     }
 
     const metadata = parseRowJson<Record<string, any>>(legacyDocument.metadata, {});
-    const rawLegacyMuscles = Array.isArray(metadata?.muscles) && metadata.muscles.length
-      ? metadata.muscles
+    const metadataMuscles = normalizeLegacyExerciseMetadataMuscles(metadata?.muscles);
+    const rawLegacyMuscles = metadataMuscles.length
+      ? metadataMuscles
       : listLegacyExerciseMusclesSync(sqlite, String(legacyRow.entity_ref_id));
     const normalizedLegacyMuscles = normalizeTrainingMuscleLoads(rawLegacyMuscles, { includeWarnings: true });
     const measurement = normalizeTrainingMeasurement(metadata?.measurement);
     const summary = normalizeOptionalText(metadata?.summary || legacyDocument.subtitle);
     const notes = normalizeOptionalText(metadata?.notes);
+    const exerciseType = normalizeTrainingExerciseType(metadata?.exerciseType);
+    const measurementCategory = normalizeTrainingMeasurementCategory(metadata?.measurementCategory);
     const exerciseId = normalizeOptionalText(metadata?.exerciseId)
       || normalizeOptionalText(metadata?.id)
       || randomUUID();
@@ -1092,33 +1526,43 @@ function migrateLegacySearchExercisesSync(ctx: NexusBackendPluginContext) {
 
     sqlite.prepare(`
       INSERT INTO training_exercises (
-        id, entity_ref_id, title, slug, summary, notes, measurement_json, muscle_loads_json,
-        legacy_muscle_warnings_json, status, created_at, updated_at
+        id, entity_ref_id, template_key, title, slug, summary, notes, exercise_type, measurement_category, tags_json,
+        measurement_json, muscle_loads_json, legacy_muscle_warnings_json, personal_difficulty_score, status, created_at, updated_at
       ) VALUES (
-        @id, @entity_ref_id, @title, @slug, @summary, @notes, @measurement_json, @muscle_loads_json,
-        @legacy_muscle_warnings_json, @status, @created_at, @updated_at
+        @id, @entity_ref_id, @template_key, @title, @slug, @summary, @notes, @exercise_type, @measurement_category, @tags_json,
+        @measurement_json, @muscle_loads_json, @legacy_muscle_warnings_json, @personal_difficulty_score, @status, @created_at, @updated_at
       )
       ON CONFLICT(id) DO UPDATE SET
         entity_ref_id = excluded.entity_ref_id,
+        template_key = excluded.template_key,
         title = excluded.title,
         slug = excluded.slug,
         summary = excluded.summary,
         notes = excluded.notes,
+        exercise_type = excluded.exercise_type,
+        measurement_category = excluded.measurement_category,
+        tags_json = excluded.tags_json,
         measurement_json = excluded.measurement_json,
         muscle_loads_json = excluded.muscle_loads_json,
         legacy_muscle_warnings_json = excluded.legacy_muscle_warnings_json,
+        personal_difficulty_score = excluded.personal_difficulty_score,
         status = excluded.status,
         updated_at = excluded.updated_at
     `).run({
       id: exerciseId,
       entity_ref_id: String(legacyRow.entity_ref_id),
+      template_key: null,
       title,
       slug,
       summary,
       notes,
+      exercise_type: exerciseType,
+      measurement_category: measurementCategory,
+      tags_json: JSON.stringify([]),
       measurement_json: JSON.stringify(measurement || {}),
       muscle_loads_json: JSON.stringify(normalizedLegacyMuscles.muscleLoads || []),
       legacy_muscle_warnings_json: JSON.stringify(normalizedLegacyMuscles.warnings || []),
+      personal_difficulty_score: null,
       status: "active",
       created_at: String(legacyRow.created_at || timestamp),
       updated_at: String(legacyRow.updated_at || legacyRow.created_at || timestamp),
@@ -1152,8 +1596,13 @@ function migrateLegacySearchExercisesSync(ctx: NexusBackendPluginContext) {
         domain: "training",
         type: "exercise",
         exerciseId: savedExercise.id,
+        exerciseType: savedExercise.exerciseType,
+        measurementCategory: savedExercise.measurementCategory,
+        tags: savedExercise.tags,
         measurement: savedExercise.measurement,
         muscleLoads: savedExercise.muscleLoads,
+        templateKey: savedExercise.templateKey,
+        personalDifficultyScore: savedExercise.personalDifficultyScore,
       },
     });
   }
@@ -1273,6 +1722,30 @@ function listTrainingAssignmentsSync(ctx: NexusBackendPluginContext) {
     .filter((assignment): assignment is TrainingRoutineAssignmentRecord => Boolean(assignment));
 }
 
+function findTrainingExerciseRecordByTitleSync(ctx: NexusBackendPluginContext, title: unknown) {
+  const normalizedTitle = normalizeOptionalText(title);
+  if (!normalizedTitle) {
+    return null;
+  }
+
+  const normalizedSlug = normalizeTrainingSlug(normalizedTitle, "exercise");
+  return listTrainingExercisesSync(ctx).find((exercise) => (
+    normalizeTrainingSlug(exercise.title, "exercise") === normalizedSlug
+  )) || null;
+}
+
+function findTrainingRoutineRecordByTitleSync(ctx: NexusBackendPluginContext, title: unknown) {
+  const normalizedTitle = normalizeOptionalText(title);
+  if (!normalizedTitle) {
+    return null;
+  }
+
+  const normalizedSlug = normalizeTrainingSlug(normalizedTitle, "routine");
+  return listTrainingRoutinesSync(ctx).find((routine) => (
+    normalizeTrainingSlug(routine.title, "routine") === normalizedSlug
+  )) || null;
+}
+
 function listTrainingOccurrencesSync(sqlite: any) {
   const rows = sqlite.prepare(`
     SELECT *
@@ -1317,6 +1790,36 @@ function upsertTrainingMuscleConceptBindingSync(sqlite: any, muscleId: string, c
   `).run({
     muscle_id: muscleId,
     concept_id: conceptId,
+    created_at: timestamp,
+    updated_at: timestamp,
+  });
+}
+
+function getTrainingSystemStateValueSync(sqlite: any, stateKey: string) {
+  const row = sqlite.prepare(`
+    SELECT state_value
+    FROM training_system_state
+    WHERE state_key = ?
+    LIMIT 1
+  `).get(stateKey);
+
+  return row?.state_value == null ? null : String(row.state_value);
+}
+
+function setTrainingSystemStateValueSync(sqlite: any, stateKey: string, stateValue: string) {
+  const timestamp = nowIso();
+  sqlite.prepare(`
+    INSERT INTO training_system_state (
+      state_key, state_value, created_at, updated_at
+    ) VALUES (
+      @state_key, @state_value, @created_at, @updated_at
+    )
+    ON CONFLICT(state_key) DO UPDATE SET
+      state_value = excluded.state_value,
+      updated_at = excluded.updated_at
+  `).run({
+    state_key: stateKey,
+    state_value: stateValue,
     created_at: timestamp,
     updated_at: timestamp,
   });
@@ -1697,6 +2200,170 @@ async function ensureTrainingConceptFolders(ctx: NexusBackendPluginContext) {
   });
 }
 
+function updateTrainingConceptRowSync(
+  sqlite: any,
+  conceptId: string,
+  {
+    itemId,
+    title,
+    summary,
+  }: {
+    itemId: string;
+    title: string;
+    summary: string | null;
+  },
+) {
+  sqlite.prepare(`
+    UPDATE concepts
+    SET item_id = ?,
+        title = ?,
+        summary = ?,
+        updated_at = ?
+    WHERE id = ?
+  `).run(itemId, title, summary, nowIso(), conceptId);
+}
+
+async function ensureTrainingManagedMarkdownItem(
+  ctx: NexusBackendPluginContext,
+  {
+    relativePath,
+    content,
+    currentRelativePath = null,
+    currentItemId = null,
+  }: {
+    relativePath: string;
+    content: string;
+    currentRelativePath?: string | null;
+    currentItemId?: string | null;
+  },
+) {
+  const normalizedRelativePath = normalizeRelativeContentPath(relativePath);
+  const normalizedCurrentRelativePath = normalizeRelativeContentPath(currentRelativePath);
+  const absolutePath = resolveAbsoluteContentPath(ctx, normalizedRelativePath);
+
+  if (!normalizedRelativePath || !absolutePath) {
+    throw new Error("La ruta del markdown gestionado no es valida.");
+  }
+
+  if (
+    normalizedCurrentRelativePath
+    && normalizedCurrentRelativePath !== normalizedRelativePath
+  ) {
+    const currentAbsolutePath = resolveAbsoluteContentPath(ctx, normalizedCurrentRelativePath);
+    if (
+      currentAbsolutePath
+      && await doesTrainingPathExist(currentAbsolutePath)
+      && !(await doesTrainingPathExist(absolutePath))
+    ) {
+      await renameTrainingMarkdownItemPath(
+        ctx,
+        normalizedCurrentRelativePath,
+        normalizedRelativePath,
+        currentItemId,
+      );
+    }
+  }
+
+  await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+  await fs.writeFile(absolutePath, content, "utf8");
+  await ensureTrainingItemPath(ctx, path.dirname(normalizedRelativePath), "folder");
+  const item = await ensureTrainingItemPath(ctx, normalizedRelativePath, "file");
+  pruneTrainingItemRowsByPathSync(getSqlite(ctx), normalizedRelativePath, "file", item?.id ? String(item.id) : null);
+  return item;
+}
+
+async function ensureTrainingManagedConceptDoc(
+  ctx: NexusBackendPluginContext,
+  {
+    relativePath,
+    currentRelativePath = null,
+    currentItemId = null,
+    currentConceptId = null,
+    title,
+    slug,
+    summary,
+    content,
+  }: {
+    relativePath: string;
+    currentRelativePath?: string | null;
+    currentItemId?: string | null;
+    currentConceptId?: string | null;
+    title: string;
+    slug: string;
+    summary: string | null;
+    content: string;
+  },
+) {
+  const item = await ensureTrainingManagedMarkdownItem(ctx, {
+    relativePath,
+    content,
+    currentRelativePath,
+    currentItemId,
+  });
+
+  if (!item?.id) {
+    throw new Error(`No se pudo registrar la nota gestionada: ${relativePath}`);
+  }
+
+  const sqlite = getSqlite(ctx);
+  const conceptId = normalizeOptionalText(currentConceptId);
+  if (conceptId) {
+    updateTrainingConceptRowSync(sqlite, conceptId, {
+      itemId: String(item.id),
+      title,
+      summary,
+    });
+    return getTrainingDocRecordByConceptIdSync(ctx, conceptId);
+  }
+
+  const concept = await ensureTrainingConceptForItem(ctx, {
+    itemId: String(item.id),
+    title,
+    slug,
+    summary,
+  });
+  return getTrainingDocRecordByConceptIdSync(ctx, String(concept.id));
+}
+
+function upsertTrainingExerciseSearchDocument(sqlite: any, exercise: TrainingExerciseRecord) {
+  const taxonomySummary = [
+    buildTrainingExerciseTypeSummary(exercise.exerciseType),
+    buildTrainingMeasurementCategorySummary(exercise.measurementCategory),
+    buildTrainingExerciseTagSummary(exercise.tags, {
+      measurementCategory: exercise.measurementCategory,
+      omitMeasurementCategory: true,
+    }),
+  ].filter(Boolean).join(" - ");
+
+  upsertTrainingSearchDocument(sqlite, {
+    id: getTrainingSearchDocumentId("exercise", exercise.id),
+    entityRefId: exercise.entityRefId,
+    kind: "concept",
+    title: exercise.title,
+    subtitle: exercise.searchSummary || exercise.summary,
+    body: [
+      exercise.summary,
+      exercise.notes,
+      taxonomySummary ? `Taxonomia: ${taxonomySummary}` : null,
+      exercise.searchSummary ? `Resumen: ${exercise.searchSummary}` : null,
+    ].filter(Boolean).join("\n\n"),
+    metadata: {
+      pluginId: TRAINING_PLUGIN_ID,
+      domain: "training",
+      type: "exercise",
+      exerciseId: exercise.id,
+      exerciseType: exercise.exerciseType,
+      measurementCategory: exercise.measurementCategory,
+      tags: exercise.tags,
+      measurement: exercise.measurement,
+      muscleLoads: exercise.muscleLoads,
+      templateKey: exercise.templateKey,
+      personalDifficultyScore: exercise.personalDifficultyScore,
+      isStarter: exercise.isStarter,
+    },
+  });
+}
+
 async function ensureTrainingMuscleConcept(ctx: NexusBackendPluginContext, muscleId: string) {
   const normalizedMuscleId = normalizeOptionalText(muscleId);
   if (!normalizedMuscleId) {
@@ -1726,7 +2393,7 @@ async function ensureTrainingMuscleConcept(ctx: NexusBackendPluginContext, muscl
     return existingDoc;
   }
 
-  const muscleSummary = `${muscle.groupTitle} - ${muscle.regionTitle}`;
+  const musclePayload = buildTrainingMuscleConceptPayload(muscle);
   let existingItem = await ensureTrainingMarkdownItem(ctx, preferredRelativePath);
   if (!existingItem && legacyRelativePath) {
     const legacyItem = await ensureTrainingMarkdownItem(ctx, legacyRelativePath);
@@ -1745,31 +2412,9 @@ async function ensureTrainingMuscleConcept(ctx: NexusBackendPluginContext, muscl
         itemId: String(existingItem.id),
         title: muscle.title,
         slug: muscle.id,
-        summary: muscleSummary,
+        summary: musclePayload.summary ?? null,
       })
-    : (await createTrainingConceptNote(ctx, {
-        title: muscle.title,
-        slug: muscle.id,
-        fileBaseName: getTrainingMuscleConceptPreferredFileBaseName(muscle),
-        relativeDirectoryPath: TRAINING_MUSCLE_CONCEPTS_DIRECTORY,
-        templateId: "fitness-muscle",
-        summary: muscleSummary,
-        frontmatter: {
-          fitness: {
-            domain: "training",
-            kind: "muscle",
-            targetId: muscle.id,
-            regionId: muscle.regionId,
-            groupId: muscle.groupId,
-          },
-          nexus: {
-            card: {
-              title: muscle.title,
-              summary: muscleSummary,
-            },
-          },
-        },
-      })).concept;
+    : (await createTrainingConceptNote(ctx, musclePayload)).concept;
 
   if (!concept?.id) {
     throw new Error("No se pudo crear la nota del musculo.");
@@ -1793,18 +2438,246 @@ async function ensureAllTrainingMuscleConcepts(ctx: NexusBackendPluginContext) {
   return docs;
 }
 
-async function ensureAllTrainingExerciseConcepts(ctx: NexusBackendPluginContext) {
-  await ensureTrainingConceptFolders(ctx);
-  const docs = [];
-
-  for (const exercise of listTrainingExercisesSync(ctx)) {
-    const doc = await ensureTrainingExerciseConcept(ctx, exercise.id);
-    if (doc) {
-      docs.push(doc);
-    }
+function buildTrainingExerciseConceptPayloadFromRecord(
+  exercise: TrainingExerciseRecord,
+): TrainingConceptNotePayload {
+  const starterDefinition = getTrainingStarterExerciseDefinition(exercise.templateKey);
+  if (starterDefinition) {
+    return buildTrainingStarterExerciseConceptPayload(starterDefinition, exercise.id);
   }
 
-  return docs;
+  const exerciseSummary = exercise.summary || exercise.searchSummary || "Documento de ejercicio.";
+  return {
+    title: exercise.title,
+    slug: exercise.slug || exercise.title,
+    fileBaseName: getTrainingExerciseConceptPreferredFileBaseName(exercise),
+    relativeDirectoryPath: TRAINING_EXERCISE_CONCEPTS_DIRECTORY,
+    templateId: "fitness-exercise",
+    summary: exerciseSummary,
+    frontmatter: {
+      fitness: {
+        domain: "training",
+        kind: "exercise",
+        targetId: exercise.id,
+        exerciseType: exercise.exerciseType,
+        measurementCategory: exercise.measurementCategory,
+        tags: exercise.tags,
+      },
+      nexus: {
+        card: {
+          title: exercise.title,
+          summary: exercise.summary || exercise.searchSummary || "",
+        },
+      },
+    },
+  };
+}
+
+function readTrainingMarkdownSource(
+  doc: TrainingDocRecord | null | undefined,
+  fallbackContent = "",
+) {
+  if (!doc?.itemPath || !existsSync(doc.itemPath)) {
+    return fallbackContent;
+  }
+
+  try {
+    return readFileSync(doc.itemPath, "utf8");
+  } catch {
+    return fallbackContent;
+  }
+}
+
+function buildTrainingExerciseMarkdownFallback(
+  exercise: TrainingExerciseRecord,
+) {
+  const payload = buildTrainingExerciseConceptPayloadFromRecord(exercise);
+  return buildTrainingConceptMarkdownContent(
+    exercise.title,
+    exercise.slug || exercise.title,
+    payload,
+  );
+}
+
+function buildTrainingMuscleMarkdownFallback(
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+) {
+  const payload = buildTrainingMuscleConceptPayload(muscle);
+  return buildTrainingConceptMarkdownContent(muscle.title, muscle.id, payload);
+}
+
+function buildLegacyTrainingMuscleMarkdownFallback(
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+) {
+  const payload = buildLegacyTrainingMuscleConceptPayload(muscle);
+  return buildTrainingConceptMarkdownContent(muscle.title, muscle.id, payload);
+}
+
+function buildTrainingTransferRoutineSegment(
+  segment: Record<string, unknown>,
+  exerciseLookup: Map<string, TrainingExerciseRecord>,
+): TrainingTransferRoutineSegment {
+  if (segment?.type === "block") {
+    return {
+      type: "block",
+      title: normalizeOptionalText(segment.title) || "",
+      repeatCount: Math.max(1, Math.round(Number(segment.repeatCount || 1)) || 1),
+      steps: Array.isArray(segment.steps)
+        ? segment.steps.map((step) => buildTrainingTransferRoutineSegment(step, exerciseLookup))
+        : [],
+    };
+  }
+
+  const stepKind = String(segment?.stepKind || segment?.kind || "exercise").trim().toLowerCase() === "rest"
+    ? "rest"
+    : "exercise";
+  const exerciseId = normalizeOptionalText(segment?.exerciseId);
+  const exercise = exerciseId ? exerciseLookup.get(exerciseId) || null : null;
+
+  return {
+    type: "step",
+    stepKind,
+    exerciseTitle: stepKind === "exercise" ? exercise?.title || "" : null,
+    prescription: cloneJsonValue(normalizeTrainingPrescription(segment?.prescription)),
+  };
+}
+
+function buildTrainingTransferMuscleRecord(
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number] & { doc: TrainingDocRecord | null },
+): TrainingTransferMuscleRecord {
+  return {
+    id: muscle.id,
+    title: muscle.title,
+    regionId: muscle.regionId,
+    regionTitle: muscle.regionTitle,
+    groupId: muscle.groupId,
+    groupTitle: muscle.groupTitle,
+    markdown: readTrainingMarkdownSource(muscle.doc, buildTrainingMuscleMarkdownFallback(muscle)),
+  };
+}
+
+function buildTrainingTransferExerciseRecord(
+  exercise: TrainingExerciseRecord,
+): TrainingTransferExerciseRecord {
+  return {
+    title: exercise.title,
+    summary: exercise.summary,
+    exerciseType: exercise.exerciseType,
+    measurementCategory: exercise.measurementCategory,
+    tags: [...(exercise.tags || [])],
+    measurement: cloneJsonValue(normalizeTrainingMeasurement(exercise.measurement)),
+    muscleLoads: (exercise.muscleLoads || []).map((entry) => ({
+      muscleId: entry.muscleId,
+      muscleTitle: entry.title || null,
+      percentage: Number(entry.percentage || 0),
+    })),
+    templateKey: exercise.templateKey,
+    personalDifficultyScore: exercise.personalDifficultyScore,
+    markdown: readTrainingMarkdownSource(exercise.doc, buildTrainingExerciseMarkdownFallback(exercise)),
+  };
+}
+
+function buildTrainingTransferRoutineRecord(
+  routine: TrainingRoutineRecord,
+  exerciseLookup: Map<string, TrainingExerciseRecord>,
+): TrainingTransferRoutineRecord {
+  return {
+    title: routine.title,
+    summary: routine.summary,
+    notes: routine.notes,
+    structure: Array.isArray(routine.structure)
+      ? routine.structure.map((segment) => buildTrainingTransferRoutineSegment(segment, exerciseLookup))
+      : [],
+  };
+}
+
+function collectTrainingExerciseIdsFromStructure(structure: Array<Record<string, unknown>>) {
+  return Array.from(new Set(
+    flattenTrainingStructureSteps(Array.isArray(structure) ? structure : [])
+      .filter((entry) => entry?.type === "step")
+      .map((entry) => normalizeOptionalText(entry.exerciseId))
+      .filter(Boolean),
+  ));
+}
+
+function collectTrainingMuscleIdsFromExercises(exercises: TrainingExerciseRecord[]) {
+  return Array.from(new Set(
+    exercises.flatMap((exercise) => (
+      Array.isArray(exercise.muscleLoads)
+        ? exercise.muscleLoads.map((entry) => normalizeOptionalText(entry.muscleId)).filter(Boolean)
+        : []
+    )),
+  ));
+}
+
+function buildTrainingTransferEnvelope(
+  ctx: NexusBackendPluginContext,
+  payload: Record<string, unknown> = {},
+): TrainingTransferEnvelope {
+  const requestedKind = normalizeOptionalText(payload.kind) || "all";
+  const requestedId = normalizeOptionalText(payload.id);
+  const exercises = listTrainingExercisesSync(ctx);
+  const routines = listTrainingRoutinesSync(ctx);
+  const muscles = enrichTrainingMuscleCatalogSync(ctx);
+  const exerciseLookup = new Map(exercises.map((exercise) => [exercise.id, exercise]));
+
+  if (requestedKind === "muscle") {
+    const muscle = muscles.find((entry) => entry.id === requestedId);
+    if (!muscle) {
+      throw new Error("No encontramos ese musculo para exportar.");
+    }
+
+    return {
+      version: TRAINING_TRANSFER_SCHEMA_VERSION,
+      muscles: [buildTrainingTransferMuscleRecord(muscle)],
+      exercises: [],
+      routines: [],
+    };
+  }
+
+  if (requestedKind === "exercise") {
+    const exercise = exercises.find((entry) => entry.id === requestedId);
+    if (!exercise) {
+      throw new Error("No encontramos ese ejercicio para exportar.");
+    }
+
+    const relatedMuscleIds = new Set(collectTrainingMuscleIdsFromExercises([exercise]));
+    return {
+      version: TRAINING_TRANSFER_SCHEMA_VERSION,
+      muscles: muscles
+        .filter((entry) => relatedMuscleIds.has(entry.id))
+        .map((entry) => buildTrainingTransferMuscleRecord(entry)),
+      exercises: [buildTrainingTransferExerciseRecord(exercise)],
+      routines: [],
+    };
+  }
+
+  if (requestedKind === "routine") {
+    const routine = routines.find((entry) => entry.id === requestedId);
+    if (!routine) {
+      throw new Error("No encontramos esa rutina para exportar.");
+    }
+
+    const relatedExerciseIds = new Set(collectTrainingExerciseIdsFromStructure(routine.structure));
+    const relatedExercises = exercises.filter((entry) => relatedExerciseIds.has(entry.id));
+    const relatedMuscleIds = new Set(collectTrainingMuscleIdsFromExercises(relatedExercises));
+
+    return {
+      version: TRAINING_TRANSFER_SCHEMA_VERSION,
+      muscles: muscles
+        .filter((entry) => relatedMuscleIds.has(entry.id))
+        .map((entry) => buildTrainingTransferMuscleRecord(entry)),
+      exercises: relatedExercises.map((entry) => buildTrainingTransferExerciseRecord(entry)),
+      routines: [buildTrainingTransferRoutineRecord(routine, exerciseLookup)],
+    };
+  }
+
+  return {
+    version: TRAINING_TRANSFER_SCHEMA_VERSION,
+    muscles: muscles.map((entry) => buildTrainingTransferMuscleRecord(entry)),
+    exercises: exercises.map((entry) => buildTrainingTransferExerciseRecord(entry)),
+    routines: routines.map((entry) => buildTrainingTransferRoutineRecord(entry, exerciseLookup)),
+  };
 }
 
 async function ensureTrainingExerciseConcept(ctx: NexusBackendPluginContext, exerciseId: string) {
@@ -1839,7 +2712,7 @@ async function ensureTrainingExerciseConcept(ctx: NexusBackendPluginContext, exe
     return exercise.doc;
   }
 
-  const exerciseSummary = exercise.summary || exercise.searchSummary || "Documento de ejercicio.";
+  const exercisePayload = buildTrainingExerciseConceptPayloadFromRecord(exercise);
   let existingItem = await ensureTrainingMarkdownItem(ctx, preferredRelativePath);
   if (!existingItem && legacyRelativePath) {
     const legacyItem = await ensureTrainingMarkdownItem(ctx, legacyRelativePath);
@@ -1859,30 +2732,10 @@ async function ensureTrainingExerciseConcept(ctx: NexusBackendPluginContext, exe
           itemId: String(existingItem.id),
           title: exercise.title,
           slug: exercise.slug || exercise.title,
-          summary: exerciseSummary,
+          summary: exercisePayload.summary ?? null,
         }),
       }
-    : await createTrainingConceptNote(ctx, {
-        title: exercise.title,
-        slug: exercise.slug || exercise.title,
-        fileBaseName: getTrainingExerciseConceptPreferredFileBaseName(exercise),
-        relativeDirectoryPath: TRAINING_EXERCISE_CONCEPTS_DIRECTORY,
-        templateId: "fitness-exercise",
-        summary: exerciseSummary,
-        frontmatter: {
-          fitness: {
-            domain: "training",
-            kind: "exercise",
-            targetId: exercise.id,
-          },
-          nexus: {
-            card: {
-              title: exercise.title,
-              summary: exercise.summary || exercise.searchSummary || "",
-            },
-          },
-        },
-      });
+    : await createTrainingConceptNote(ctx, exercisePayload);
 
   sqlite.prepare(`
     UPDATE training_exercises
@@ -1894,11 +2747,323 @@ async function ensureTrainingExerciseConcept(ctx: NexusBackendPluginContext, exe
   return getTrainingDocRecordByConceptIdSync(ctx, String(created.concept.id));
 }
 
+async function saveTrainingExerciseDocMarkdown(
+  ctx: NexusBackendPluginContext,
+  exerciseId: string,
+  markdown: string,
+) {
+  const normalizedExerciseId = normalizeOptionalText(exerciseId);
+  if (!normalizedExerciseId) {
+    throw new Error("Falta el id del ejercicio.");
+  }
+
+  const sqlite = getSqlite(ctx);
+  const exerciseRow = sqlite.prepare(`
+    SELECT *
+    FROM training_exercises
+    WHERE id = ?
+    LIMIT 1
+  `).get(normalizedExerciseId);
+  const exercise = exerciseRow ? normalizeExerciseRecord(ctx, exerciseRow) : null;
+  if (!exercise) {
+    throw new Error("No encontramos ese ejercicio.");
+  }
+
+  const doc = await ensureTrainingExerciseConcept(ctx, normalizedExerciseId);
+  const currentDoc = doc || exercise.doc;
+  const nextDoc = await ensureTrainingManagedConceptDoc(ctx, {
+    relativePath: getTrainingExerciseConceptPreferredRelativePath(exercise),
+    currentRelativePath: currentDoc?.relativePath || null,
+    currentItemId: currentDoc?.itemId || null,
+    currentConceptId: getRealTrainingConceptId(exerciseRow?.concept_id) || getRealTrainingConceptId(currentDoc?.conceptId),
+    title: exercise.title,
+    slug: exercise.slug || exercise.title,
+    summary: exercise.summary || exercise.searchSummary || null,
+    content: String(markdown ?? ""),
+  });
+
+  const conceptId = getRealTrainingConceptId(nextDoc?.conceptId);
+  if (conceptId) {
+    sqlite.prepare(`
+      UPDATE training_exercises
+      SET concept_id = ?,
+          updated_at = ?
+      WHERE id = ?
+    `).run(conceptId, nowIso(), normalizedExerciseId);
+  }
+
+  const refreshedRow = sqlite.prepare(`
+    SELECT *
+    FROM training_exercises
+    WHERE id = ?
+    LIMIT 1
+  `).get(normalizedExerciseId);
+  const refreshedExercise = refreshedRow ? normalizeExerciseRecord(ctx, refreshedRow) : null;
+  if (refreshedExercise) {
+    upsertTrainingExerciseSearchDocument(sqlite, refreshedExercise);
+  }
+
+  return refreshedExercise;
+}
+
+async function saveTrainingMuscleDocMarkdown(
+  ctx: NexusBackendPluginContext,
+  muscleId: string,
+  markdown: string,
+) {
+  const normalizedMuscleId = normalizeOptionalText(muscleId);
+  if (!normalizedMuscleId) {
+    throw new Error("Falta el id del musculo.");
+  }
+
+  const sqlite = getSqlite(ctx);
+  const muscle = TRAINING_MUSCLE_CATALOG.find((entry) => entry.id === normalizedMuscleId) || null;
+  if (!muscle) {
+    throw new Error("No encontramos ese musculo canonico.");
+  }
+
+  await ensureTrainingConceptFolders(ctx);
+  const existingBinding = findTrainingMuscleConceptBindingSync(sqlite, normalizedMuscleId);
+  const existingDoc = existingBinding?.concept_id
+    ? getTrainingDocRecordByConceptIdSync(ctx, existingBinding.concept_id)
+    : findTrainingExistingMuscleDocRecordSync(ctx, muscle);
+  const doc = await ensureTrainingManagedConceptDoc(ctx, {
+    relativePath: getTrainingMuscleConceptPreferredRelativePath(muscle),
+    currentRelativePath: existingDoc?.relativePath || null,
+    currentItemId: existingDoc?.itemId || null,
+    currentConceptId: getRealTrainingConceptId(existingBinding?.concept_id) || getRealTrainingConceptId(existingDoc?.conceptId),
+    title: muscle.title,
+    slug: muscle.id,
+    summary: buildTrainingMuscleConceptSummary(muscle),
+    content: String(markdown ?? ""),
+  });
+
+  const conceptId = getRealTrainingConceptId(doc?.conceptId);
+  if (!conceptId) {
+    throw new Error("No se pudo guardar la nota del musculo.");
+  }
+
+  upsertTrainingMuscleConceptBindingSync(sqlite, normalizedMuscleId, conceptId);
+  return enrichTrainingMuscleCatalogSync(
+    ctx,
+    TRAINING_MUSCLE_CATALOG.filter((entry) => entry.id === normalizedMuscleId),
+  )[0] || null;
+}
+
 function getTrainingConceptCoverageKey(ctx: NexusBackendPluginContext) {
   return path.normalize(String(ctx?.vault?.contentPath || "__training__"));
 }
 
+async function ensureTrainingStarterExerciseRecord(
+  ctx: NexusBackendPluginContext,
+  definition: (typeof TRAINING_STARTER_EXERCISES)[number],
+) {
+  const sqlite = getSqlite(ctx);
+  const canonicalSlug = normalizeTrainingSlug(definition.title, "exercise");
+  const existingRow = findTrainingExerciseByTemplateKeySync(sqlite, definition.templateKey)
+    || findTrainingExerciseBySlugSync(sqlite, canonicalSlug)
+    || findTrainingExerciseByTitleExactSync(sqlite, definition.title);
+  const entityRef = await ensureTrainingExerciseEntityRef(ctx, existingRow);
+  const exerciseId = existingRow?.id || randomUUID();
+  const timestamp = nowIso();
+  const exerciseType = normalizeTrainingExerciseType(definition.exerciseType);
+  const measurementCategory = normalizeTrainingMeasurementCategory(definition.measurementCategory);
+  const tags = normalizeTrainingExerciseTags(definition.tags || [], { measurementCategory });
+  const measurement = normalizeTrainingMeasurement(definition.measurement || {});
+  const muscleLoads = normalizeTrainingMuscleLoads(definition.muscleLoads || []);
+
+  sqlite.prepare(`
+    INSERT INTO training_exercises (
+      id, entity_ref_id, concept_id, template_key, title, slug, summary, notes, exercise_type, measurement_category, tags_json,
+      measurement_json, muscle_loads_json, legacy_muscle_warnings_json, personal_difficulty_score, status, created_at, updated_at
+    ) VALUES (
+      @id, @entity_ref_id, @concept_id, @template_key, @title, @slug, @summary, @notes, @exercise_type, @measurement_category, @tags_json,
+      @measurement_json, @muscle_loads_json, @legacy_muscle_warnings_json, @personal_difficulty_score, @status, @created_at, @updated_at
+    )
+    ON CONFLICT(id) DO UPDATE SET
+      entity_ref_id = excluded.entity_ref_id,
+      concept_id = excluded.concept_id,
+      template_key = excluded.template_key,
+      title = excluded.title,
+      slug = excluded.slug,
+      summary = excluded.summary,
+      notes = excluded.notes,
+      exercise_type = excluded.exercise_type,
+      measurement_category = excluded.measurement_category,
+      tags_json = excluded.tags_json,
+      measurement_json = excluded.measurement_json,
+      muscle_loads_json = excluded.muscle_loads_json,
+      legacy_muscle_warnings_json = excluded.legacy_muscle_warnings_json,
+      personal_difficulty_score = excluded.personal_difficulty_score,
+      status = excluded.status,
+      updated_at = excluded.updated_at
+  `).run({
+    id: exerciseId,
+    entity_ref_id: String((entityRef as any).id),
+    concept_id: existingRow?.concept_id ?? null,
+    template_key: definition.templateKey,
+    title: definition.title,
+    slug: canonicalSlug,
+    summary: definition.summary,
+    notes: existingRow?.notes ?? null,
+    exercise_type: exerciseType,
+    measurement_category: measurementCategory,
+    tags_json: JSON.stringify(tags),
+    measurement_json: JSON.stringify(measurement),
+    muscle_loads_json: JSON.stringify(muscleLoads),
+    legacy_muscle_warnings_json: JSON.stringify([]),
+    personal_difficulty_score: normalizeOptionalNumber(existingRow?.personal_difficulty_score),
+    status: "active",
+    created_at: existingRow?.created_at || timestamp,
+    updated_at: timestamp,
+  });
+
+  const savedRow = sqlite.prepare(`
+    SELECT *
+    FROM training_exercises
+    WHERE id = ?
+    LIMIT 1
+  `).get(exerciseId);
+  const savedExercise = savedRow ? normalizeExerciseRecord(ctx, savedRow) : null;
+
+  if (!savedExercise) {
+    throw new Error(`No se pudo preparar el ejercicio base: ${definition.title}.`);
+  }
+
+  upsertTrainingExerciseSearchDocument(sqlite, savedExercise);
+  return savedExercise;
+}
+
+async function restoreTrainingMuscleManagedDoc(ctx: NexusBackendPluginContext, muscleId: string) {
+  const normalizedMuscleId = normalizeOptionalText(muscleId);
+  if (!normalizedMuscleId) {
+    throw new Error("Falta el id del musculo.");
+  }
+
+  const sqlite = getSqlite(ctx);
+  const muscle = TRAINING_MUSCLE_CATALOG.find((entry) => entry.id === normalizedMuscleId) || null;
+  if (!muscle) {
+    throw new Error("No encontramos ese musculo canonico.");
+  }
+
+  await ensureTrainingConceptFolders(ctx);
+  const payload = buildTrainingMuscleConceptPayload(muscle);
+  const existingBinding = findTrainingMuscleConceptBindingSync(sqlite, normalizedMuscleId);
+  const existingDoc = existingBinding?.concept_id
+    ? getTrainingDocRecordByConceptIdSync(ctx, existingBinding.concept_id)
+    : findTrainingExistingMuscleDocRecordSync(ctx, muscle);
+  const doc = await ensureTrainingManagedConceptDoc(ctx, {
+    relativePath: getTrainingMuscleConceptPreferredRelativePath(muscle),
+    currentRelativePath: existingDoc?.relativePath || null,
+    currentItemId: existingDoc?.itemId || null,
+    currentConceptId: getRealTrainingConceptId(existingBinding?.concept_id) || getRealTrainingConceptId(existingDoc?.conceptId),
+    title: muscle.title,
+    slug: muscle.id,
+    summary: payload.summary ?? null,
+    content: buildTrainingConceptMarkdownContent(muscle.title, muscle.id, payload),
+  });
+
+  const conceptId = getRealTrainingConceptId(doc?.conceptId);
+  if (!conceptId) {
+    throw new Error("No se pudo restaurar la nota del musculo.");
+  }
+
+  upsertTrainingMuscleConceptBindingSync(sqlite, normalizedMuscleId, conceptId);
+  return getTrainingDocRecordByConceptIdSync(ctx, conceptId);
+}
+
+async function upgradeTrainingLegacyMuscleManagedDocIfNeeded(
+  ctx: NexusBackendPluginContext,
+  muscle: (typeof TRAINING_MUSCLE_CATALOG)[number],
+) {
+  const sqlite = getSqlite(ctx);
+  const existingBinding = findTrainingMuscleConceptBindingSync(sqlite, muscle.id);
+  const currentDoc = getRealTrainingConceptId(existingBinding?.concept_id)
+    ? getTrainingDocRecordByConceptIdSync(ctx, existingBinding?.concept_id)
+    : findTrainingExistingMuscleDocRecordSync(ctx, muscle);
+
+  if (!currentDoc?.itemPath || !existsSync(currentDoc.itemPath)) {
+    return;
+  }
+
+  const currentContent = readFileSync(currentDoc.itemPath, "utf8");
+  const normalizedCurrentContent = normalizeTrainingMarkdownForComparison(currentContent);
+  const legacyContent = buildLegacyTrainingMuscleMarkdownFallback(muscle);
+  const normalizedLegacyContent = normalizeTrainingMarkdownForComparison(legacyContent);
+  const currentBody = normalizeTrainingMarkdownForComparison(extractYamlFrontmatter(currentContent).body || "");
+  const legacyBody = normalizeTrainingMarkdownForComparison(extractYamlFrontmatter(legacyContent).body || "");
+
+  if (normalizedCurrentContent !== normalizedLegacyContent && currentBody !== legacyBody) {
+    return;
+  }
+
+  await restoreTrainingMuscleManagedDoc(ctx, muscle.id);
+}
+
+async function restoreTrainingStarterExerciseManagedDoc(
+  ctx: NexusBackendPluginContext,
+  templateKey: string,
+) {
+  const definition = getTrainingStarterExerciseDefinition(templateKey);
+  if (!definition) {
+    throw new Error("No encontramos esa plantilla de ejercicio.");
+  }
+
+  const sqlite = getSqlite(ctx);
+  await ensureTrainingConceptFolders(ctx);
+  const exercise = await ensureTrainingStarterExerciseRecord(ctx, definition);
+  const currentRow = findTrainingExerciseByTemplateKeySync(sqlite, definition.templateKey);
+  const currentDoc = getRealTrainingConceptId(currentRow?.concept_id)
+    ? getTrainingDocRecordByConceptIdSync(ctx, currentRow?.concept_id)
+    : exercise.doc || findTrainingExistingExerciseDocRecordSync(ctx, exercise);
+  const payload = buildTrainingStarterExerciseConceptPayload(definition, exercise.id);
+  const doc = await ensureTrainingManagedConceptDoc(ctx, {
+    relativePath: getTrainingExerciseConceptPreferredRelativePath(exercise),
+    currentRelativePath: currentDoc?.relativePath || null,
+    currentItemId: currentDoc?.itemId || null,
+    currentConceptId: getRealTrainingConceptId(currentRow?.concept_id) || getRealTrainingConceptId(currentDoc?.conceptId),
+    title: exercise.title,
+    slug: exercise.slug || exercise.title,
+    summary: payload.summary ?? null,
+    content: buildTrainingConceptMarkdownContent(exercise.title, exercise.slug || exercise.title, payload),
+  });
+
+  const conceptId = getRealTrainingConceptId(doc?.conceptId);
+  if (!conceptId) {
+    throw new Error("No se pudo restaurar la nota del ejercicio base.");
+  }
+
+  sqlite.prepare(`
+    UPDATE training_exercises
+    SET concept_id = ?,
+        updated_at = ?
+    WHERE id = ?
+  `).run(conceptId, nowIso(), exercise.id);
+
+  const refreshedRow = sqlite.prepare(`
+    SELECT *
+    FROM training_exercises
+    WHERE id = ?
+    LIMIT 1
+  `).get(exercise.id);
+  const refreshedExercise = refreshedRow ? normalizeExerciseRecord(ctx, refreshedRow) : null;
+  if (refreshedExercise) {
+    upsertTrainingExerciseSearchDocument(sqlite, refreshedExercise);
+  }
+
+  return {
+    exercise: refreshedExercise,
+    doc: getTrainingDocRecordByConceptIdSync(ctx, conceptId),
+  };
+}
+
 async function ensureTrainingConceptCoverage(ctx: NexusBackendPluginContext) {
+  const sqlite = getSqlite(ctx);
+  const currentVersion = Number(getTrainingSystemStateValueSync(sqlite, TRAINING_STARTER_LIBRARY_STATE_KEY) || 0);
+  if (currentVersion >= TRAINING_STARTER_LIBRARY_VERSION) {
+    return;
+  }
+
   const coverageKey = getTrainingConceptCoverageKey(ctx);
   const existingRun = trainingConceptCoverageInFlight.get(coverageKey);
   if (existingRun) {
@@ -1910,7 +3075,14 @@ async function ensureTrainingConceptCoverage(ctx: NexusBackendPluginContext) {
     try {
       await ensureTrainingConceptFolders(ctx);
       await ensureAllTrainingMuscleConcepts(ctx);
-      await ensureAllTrainingExerciseConcepts(ctx);
+      for (const muscle of TRAINING_MUSCLE_CATALOG) {
+        await upgradeTrainingLegacyMuscleManagedDocIfNeeded(ctx, muscle);
+      }
+      for (const definition of TRAINING_STARTER_EXERCISES) {
+        await ensureTrainingStarterExerciseRecord(ctx, definition);
+        await restoreTrainingStarterExerciseManagedDoc(ctx, definition.templateKey);
+      }
+      setTrainingSystemStateValueSync(sqlite, TRAINING_STARTER_LIBRARY_STATE_KEY, String(TRAINING_STARTER_LIBRARY_VERSION));
     } finally {
       trainingConceptCoverageInFlight.delete(coverageKey);
     }
@@ -1918,6 +3090,141 @@ async function ensureTrainingConceptCoverage(ctx: NexusBackendPluginContext) {
 
   trainingConceptCoverageInFlight.set(coverageKey, pendingRun);
   await pendingRun;
+}
+
+function resolveManagedTrainingDocStatus(
+  currentDoc: TrainingDocRecord | null,
+  expectedRelativePath: string,
+  expectedContent: string,
+): "original" | "edited" | "missing" {
+  if (!currentDoc?.itemPath || !existsSync(currentDoc.itemPath)) {
+    return "missing";
+  }
+
+  if (normalizeRelativeContentPath(currentDoc.relativePath) !== normalizeRelativeContentPath(expectedRelativePath)) {
+    return "edited";
+  }
+
+  const currentContent = readFileSync(currentDoc.itemPath, "utf8");
+  return normalizeTrainingMarkdownForComparison(currentContent) === normalizeTrainingMarkdownForComparison(expectedContent)
+    ? "original"
+    : "edited";
+}
+
+async function listTrainingManagedDocs(ctx: NexusBackendPluginContext) {
+  await ensureTrainingConceptCoverage(ctx);
+
+  const sqlite = getSqlite(ctx);
+  const managedDocs: TrainingManagedDocRecord[] = [];
+
+  for (const definition of TRAINING_STARTER_EXERCISES) {
+    const exerciseRow = findTrainingExerciseByTemplateKeySync(sqlite, definition.templateKey)
+      || findTrainingExerciseBySlugSync(sqlite, normalizeTrainingSlug(definition.title, "exercise"))
+      || findTrainingExerciseByTitleExactSync(sqlite, definition.title);
+    const exercise = exerciseRow ? normalizeExerciseRecord(ctx, exerciseRow) : null;
+    const conceptPayload = buildTrainingStarterExerciseConceptPayload(
+      definition,
+      exercise?.id || `starter:${definition.templateKey}`,
+    );
+    const expectedRelativePath = getTrainingExerciseConceptPreferredRelativePath({
+      title: definition.title,
+      slug: normalizeTrainingSlug(definition.title, "exercise"),
+    } as Pick<TrainingExerciseRecord, "title" | "slug">);
+    const currentDoc = exercise?.doc || findTrainingDocRecordByRelativePathSync(
+      ctx,
+      expectedRelativePath,
+      definition.title,
+      definition.summary,
+    );
+
+    managedDocs.push({
+      id: getTrainingStarterExerciseManagedDocId(definition.templateKey),
+      kind: "starter-exercise",
+      group: "Ejercicios",
+      label: definition.title,
+      description: definition.summary,
+      status: exercise
+        ? resolveManagedTrainingDocStatus(
+            currentDoc,
+            expectedRelativePath,
+            buildTrainingConceptMarkdownContent(
+              definition.title,
+              exercise.slug || normalizeTrainingSlug(definition.title, "exercise"),
+              conceptPayload,
+            ),
+          )
+        : "missing",
+      relativePath: expectedRelativePath,
+      currentRelativePath: currentDoc?.relativePath || null,
+      itemId: currentDoc?.itemId || null,
+      itemPath: currentDoc?.itemPath || null,
+      conceptId: getRealTrainingConceptId(currentDoc?.conceptId),
+      exerciseId: exercise?.id || null,
+      exerciseTemplateKey: definition.templateKey,
+      muscleId: null,
+    });
+  }
+
+  for (const muscle of TRAINING_MUSCLE_CATALOG) {
+    const payload = buildTrainingMuscleConceptPayload(muscle);
+    const expectedRelativePath = getTrainingMuscleConceptPreferredRelativePath(muscle);
+    const existingBinding = findTrainingMuscleConceptBindingSync(sqlite, muscle.id);
+    const currentDoc = getRealTrainingConceptId(existingBinding?.concept_id)
+      ? getTrainingDocRecordByConceptIdSync(ctx, existingBinding?.concept_id)
+      : findTrainingExistingMuscleDocRecordSync(ctx, muscle);
+
+    managedDocs.push({
+      id: getTrainingMuscleManagedDocId(muscle.id),
+      kind: "muscle",
+      group: "Musculos",
+      label: muscle.title,
+      description: buildTrainingMuscleConceptSummary(muscle),
+      status: resolveManagedTrainingDocStatus(
+        currentDoc,
+        expectedRelativePath,
+        buildTrainingConceptMarkdownContent(muscle.title, muscle.id, payload),
+      ),
+      relativePath: expectedRelativePath,
+      currentRelativePath: currentDoc?.relativePath || null,
+      itemId: currentDoc?.itemId || null,
+      itemPath: currentDoc?.itemPath || null,
+      conceptId: getRealTrainingConceptId(existingBinding?.concept_id) || getRealTrainingConceptId(currentDoc?.conceptId),
+      exerciseId: null,
+      exerciseTemplateKey: null,
+      muscleId: muscle.id,
+    });
+  }
+
+  return managedDocs;
+}
+
+async function restoreTrainingManagedDoc(ctx: NexusBackendPluginContext, managedDocId: string) {
+  const normalizedManagedDocId = normalizeOptionalText(managedDocId);
+  if (!normalizedManagedDocId) {
+    throw new Error("Falta el id de la nota gestionada.");
+  }
+
+  if (normalizedManagedDocId.startsWith("starter-exercise:")) {
+    const templateKey = normalizedManagedDocId.slice("starter-exercise:".length);
+    const restored = await restoreTrainingStarterExerciseManagedDoc(ctx, templateKey);
+    return {
+      restoredId: normalizedManagedDocId,
+      ...restored,
+      managedDocs: await listTrainingManagedDocs(ctx),
+    };
+  }
+
+  if (normalizedManagedDocId.startsWith("muscle:")) {
+    const muscleId = normalizedManagedDocId.slice("muscle:".length);
+    const doc = await restoreTrainingMuscleManagedDoc(ctx, muscleId);
+    return {
+      restoredId: normalizedManagedDocId,
+      doc,
+      managedDocs: await listTrainingManagedDocs(ctx),
+    };
+  }
+
+  throw new Error("No encontramos esa nota gestionada.");
 }
 
 async function ensureTrainingExerciseEntityRef(ctx: NexusBackendPluginContext, existingRow: any | null) {
@@ -1948,19 +3255,48 @@ async function ensureTrainingRoutineEntityRef(ctx: NexusBackendPluginContext, ex
   });
 }
 
+function sumTrainingMusclePercentages(muscleLoads: Array<Record<string, unknown>>) {
+  return muscleLoads.reduce((sum, entry) => sum + Number(entry?.percentage || 0), 0);
+}
+
+function assertTrainingMusclePercentagesTotal(muscleLoads: Array<Record<string, unknown>>) {
+  if (!muscleLoads.length) {
+    return;
+  }
+
+  const total = sumTrainingMusclePercentages(muscleLoads);
+  if (total !== 100) {
+    throw new Error(`Los porcentajes musculares deben sumar 100. Total actual: ${total}.`);
+  }
+}
+
 function normalizeExerciseInput(payload: TrainingExerciseInput) {
   const title = assertNonEmptyString(payload?.title, "title");
   const summary = normalizeOptionalText(payload?.summary);
   const notes = normalizeOptionalText(payload?.notes);
+  const exerciseType = normalizeTrainingExerciseType(payload?.exerciseType);
+  const measurementCategory = normalizeTrainingMeasurementCategory(payload?.measurementCategory);
+  const tags = normalizeTrainingExerciseTags(Array.isArray(payload?.tags) ? payload.tags : [], {
+    measurementCategory,
+  });
   const measurement = normalizeTrainingMeasurement(payload?.measurement);
   const muscleLoads = normalizeTrainingMuscleLoads(Array.isArray(payload?.muscleLoads) ? payload.muscleLoads : []);
+  const templateKey = normalizeOptionalText(payload?.templateKey);
+  const personalDifficultyScore = normalizeOptionalNumber(payload?.personalDifficultyScore);
+
+  assertTrainingMusclePercentagesTotal(muscleLoads);
 
   return {
     title,
     summary,
     notes,
+    exerciseType,
+    measurementCategory,
+    tags,
     measurement,
     muscleLoads,
+    templateKey,
+    personalDifficultyScore,
     slug: normalizeTrainingSlug(payload?.slug || title, "exercise"),
   };
 }
@@ -1983,6 +3319,237 @@ function normalizeRoutineInput(payload: TrainingRoutineInput, exerciseLookup: Ma
   };
 }
 
+function normalizeTrainingTransferEnvelopePayload(payload: unknown): TrainingTransferEnvelope {
+  const payloadRecord = isPlainObject(payload) ? payload : null;
+  const source = typeof payload === "string"
+    ? JSON.parse(payload)
+    : typeof payloadRecord?.text === "string"
+      ? JSON.parse(String(payloadRecord.text))
+      : payload;
+
+  if (!isPlainObject(source)) {
+    throw new Error("El import/export de entrenamiento espera un objeto JSON.");
+  }
+
+  const version = Math.round(Number(source.version || TRAINING_TRANSFER_SCHEMA_VERSION)) || TRAINING_TRANSFER_SCHEMA_VERSION;
+  if (version < 1 || version > TRAINING_TRANSFER_SCHEMA_VERSION) {
+    throw new Error(`Version de entrenamiento no soportada: ${version}.`);
+  }
+
+  return {
+    version,
+    muscles: Array.isArray(source.muscles) ? source.muscles as TrainingTransferMuscleRecord[] : [],
+    exercises: Array.isArray(source.exercises) ? source.exercises as TrainingTransferExerciseRecord[] : [],
+    routines: Array.isArray(source.routines) ? source.routines as TrainingTransferRoutineRecord[] : [],
+  };
+}
+
+function resolveTrainingImportMuscleLoads(
+  rawMuscleLoads: unknown,
+  warnings: string[],
+  label: string,
+) {
+  const source = Array.isArray(rawMuscleLoads) ? rawMuscleLoads : [];
+  const resolvedLoads = [];
+
+  for (const entry of source) {
+    const muscleTitle = normalizeOptionalText(entry?.["muscleTitle"]);
+    const muscleId = normalizeOptionalText(entry?.["muscleId"]);
+    const muscle = muscleTitle
+      ? findTrainingMuscleByTitleSync(muscleTitle)
+      : muscleId
+        ? getTrainingMuscleById(muscleId) || null
+        : null;
+
+    if (!muscle) {
+      warnings.push(`"${label}": no se reconocio el musculo "${muscleTitle || muscleId || "sin nombre"}".`);
+      continue;
+    }
+
+    resolvedLoads.push({
+      muscleId: muscle.id,
+      percentage: Number(entry?.["percentage"] || 0),
+    });
+  }
+
+  return resolvedLoads;
+}
+
+function resolveTrainingImportRoutineStructure(
+  rawStructure: unknown,
+  exerciseTitleLookup: Map<string, TrainingExerciseRecord>,
+  warnings: string[],
+  routineTitle: string,
+) {
+  const source = Array.isArray(rawStructure) ? rawStructure : [];
+  let hasResolutionError = false;
+
+  function resolveSegment(segment: any): Record<string, unknown> | null {
+    if (segment?.type === "block") {
+      const steps = Array.isArray(segment.steps)
+        ? segment.steps.map((step) => resolveSegment(step)).filter(Boolean) as Record<string, unknown>[]
+        : [];
+      return {
+        type: "block",
+        title: normalizeOptionalText(segment.title) || "Bloque",
+        repeatCount: Math.max(1, Math.round(Number(segment.repeatCount || 1)) || 1),
+        steps,
+      };
+    }
+
+    const stepKind = String(segment?.stepKind || segment?.kind || "exercise").trim().toLowerCase() === "rest"
+      ? "rest"
+      : "exercise";
+    if (stepKind === "rest") {
+      return {
+        type: "step",
+        stepKind: "rest",
+        prescription: normalizeTrainingPrescription(segment?.prescription),
+      };
+    }
+
+    const exerciseTitle = normalizeOptionalText(segment?.exerciseTitle || segment?.title || segment?.exerciseName);
+    const exerciseKey = normalizeTrainingSlug(exerciseTitle || "", "exercise");
+    const resolvedExercise = exerciseTitle ? exerciseTitleLookup.get(exerciseKey) || null : null;
+
+    if (!resolvedExercise?.id) {
+      hasResolutionError = true;
+      warnings.push(`La rutina "${routineTitle}" referencia el ejercicio "${exerciseTitle || "sin nombre"}" y no se pudo resolver.`);
+      return null;
+    }
+
+    return {
+      type: "step",
+      stepKind: "exercise",
+      exerciseId: resolvedExercise.id,
+      prescription: normalizeTrainingPrescription(segment?.prescription),
+    };
+  }
+
+  const resolvedStructure = source
+    .map((segment) => resolveSegment(segment))
+    .filter(Boolean) as Record<string, unknown>[];
+
+  if (hasResolutionError) {
+    return null;
+  }
+
+  return resolvedStructure;
+}
+
+async function importTrainingTransferEnvelope(
+  ctx: NexusBackendPluginContext,
+  payload: unknown,
+) {
+  await ensureTrainingConceptCoverage(ctx);
+
+  const envelope = normalizeTrainingTransferEnvelopePayload(payload);
+  const warnings: string[] = [];
+  const summary = {
+    muscles: { created: 0, updated: 0, skipped: 0 },
+    exercises: { created: 0, updated: 0, skipped: 0 },
+    routines: { created: 0, updated: 0, skipped: 0 },
+  };
+  const exerciseTitleLookup = new Map(
+    listTrainingExercisesSync(ctx).map((exercise) => [normalizeTrainingSlug(exercise.title, "exercise"), exercise]),
+  );
+
+  for (const entry of envelope.muscles) {
+    const title = normalizeOptionalText(entry?.title);
+    const muscle = findTrainingMuscleByTitleSync(title);
+    if (!title || !muscle) {
+      summary.muscles.skipped += 1;
+      warnings.push(`No se reconocio el musculo "${title || "sin nombre"}".`);
+      continue;
+    }
+
+    const existingDoc = findTrainingExistingMuscleDocRecordSync(ctx, muscle);
+    try {
+      await saveTrainingMuscleDocMarkdown(
+        ctx,
+        muscle.id,
+        typeof entry?.markdown === "string" && entry.markdown.length
+          ? entry.markdown
+          : buildTrainingMuscleMarkdownFallback(muscle),
+      );
+      summary.muscles[existingDoc ? "updated" : "created"] += 1;
+    } catch (error) {
+      summary.muscles.skipped += 1;
+      warnings.push(`No se pudo importar el musculo "${title}": ${error instanceof Error ? error.message : "error desconocido"}.`);
+    }
+  }
+
+  for (const entry of envelope.exercises) {
+    const title = normalizeOptionalText(entry?.title);
+    if (!title) {
+      summary.exercises.skipped += 1;
+      warnings.push("Se omitio un ejercicio sin titulo.");
+      continue;
+    }
+
+    try {
+      const exerciseKey = normalizeTrainingSlug(title, "exercise");
+      const existingExercise = exerciseTitleLookup.get(exerciseKey) || null;
+      const savedExercise = await saveTrainingExercise(ctx, {
+        id: existingExercise?.id || null,
+        title,
+        summary: normalizeOptionalText(entry?.summary),
+        exerciseType: entry?.exerciseType,
+        measurementCategory: entry?.measurementCategory,
+        tags: Array.isArray(entry?.tags) ? entry.tags : [],
+        measurement: entry?.measurement,
+        muscleLoads: resolveTrainingImportMuscleLoads(entry?.muscleLoads, warnings, title),
+        templateKey: normalizeOptionalText(entry?.templateKey),
+        personalDifficultyScore: entry?.personalDifficultyScore,
+        docMarkdown: typeof entry?.markdown === "string" && entry.markdown.length
+          ? entry.markdown
+          : null,
+      });
+      exerciseTitleLookup.set(exerciseKey, savedExercise);
+      summary.exercises[existingExercise ? "updated" : "created"] += 1;
+    } catch (error) {
+      summary.exercises.skipped += 1;
+      warnings.push(`No se pudo importar el ejercicio "${title}": ${error instanceof Error ? error.message : "error desconocido"}.`);
+    }
+  }
+
+  for (const entry of envelope.routines) {
+    const title = normalizeOptionalText(entry?.title);
+    if (!title) {
+      summary.routines.skipped += 1;
+      warnings.push("Se omitio una rutina sin titulo.");
+      continue;
+    }
+
+    const structure = resolveTrainingImportRoutineStructure(entry?.structure, exerciseTitleLookup, warnings, title);
+    if (!structure) {
+      summary.routines.skipped += 1;
+      continue;
+    }
+
+    try {
+      const existingRoutine = findTrainingRoutineRecordByTitleSync(ctx, title);
+      await saveTrainingRoutine(ctx, {
+        id: existingRoutine?.id || null,
+        title,
+        summary: normalizeOptionalText(entry?.summary),
+        notes: normalizeOptionalText(entry?.notes),
+        structure,
+      });
+      summary.routines[existingRoutine ? "updated" : "created"] += 1;
+    } catch (error) {
+      summary.routines.skipped += 1;
+      warnings.push(`No se pudo importar la rutina "${title}": ${error instanceof Error ? error.message : "error desconocido"}.`);
+    }
+  }
+
+  return {
+    version: envelope.version,
+    summary,
+    warnings,
+  };
+}
+
 async function saveTrainingExercise(ctx: NexusBackendPluginContext, payload: TrainingExerciseInput) {
   const repositories = getRepositories(ctx);
   const sqlite = repositories.sqlite;
@@ -1996,6 +3563,12 @@ async function saveTrainingExercise(ctx: NexusBackendPluginContext, payload: Tra
       `).get(requestedId)
     : null;
   const input = normalizeExerciseInput(payload);
+  const rawPayload = payload && typeof payload === "object" ? payload : {};
+  const hasSummaryField = Object.prototype.hasOwnProperty.call(rawPayload, "summary");
+  const hasNotesField = Object.prototype.hasOwnProperty.call(rawPayload, "notes");
+  const hasTemplateKeyField = Object.prototype.hasOwnProperty.call(rawPayload, "templateKey");
+  const hasDifficultyField = Object.prototype.hasOwnProperty.call(rawPayload, "personalDifficultyScore");
+  const hasDocMarkdownField = Object.prototype.hasOwnProperty.call(rawPayload, "docMarkdown");
   const entityRef = await ensureTrainingExerciseEntityRef(ctx, existing);
   const slug = await allocateUniqueSlug(
     input.slug,
@@ -2007,35 +3580,53 @@ async function saveTrainingExercise(ctx: NexusBackendPluginContext, payload: Tra
 
   sqlite.prepare(`
     INSERT INTO training_exercises (
-      id, entity_ref_id, concept_id, title, slug, summary, notes, measurement_json, muscle_loads_json,
-      legacy_muscle_warnings_json, status, created_at, updated_at
+      id, entity_ref_id, concept_id, template_key, title, slug, summary, notes, exercise_type, measurement_category, tags_json,
+      measurement_json, muscle_loads_json, legacy_muscle_warnings_json, personal_difficulty_score, status, created_at, updated_at
     ) VALUES (
-      @id, @entity_ref_id, @concept_id, @title, @slug, @summary, @notes, @measurement_json, @muscle_loads_json,
-      @legacy_muscle_warnings_json, @status, @created_at, @updated_at
+      @id, @entity_ref_id, @concept_id, @template_key, @title, @slug, @summary, @notes, @exercise_type, @measurement_category, @tags_json,
+      @measurement_json, @muscle_loads_json, @legacy_muscle_warnings_json, @personal_difficulty_score, @status, @created_at, @updated_at
     )
     ON CONFLICT(id) DO UPDATE SET
       entity_ref_id = excluded.entity_ref_id,
       concept_id = excluded.concept_id,
+      template_key = excluded.template_key,
       title = excluded.title,
       slug = excluded.slug,
       summary = excluded.summary,
       notes = excluded.notes,
+      exercise_type = excluded.exercise_type,
+      measurement_category = excluded.measurement_category,
+      tags_json = excluded.tags_json,
       measurement_json = excluded.measurement_json,
       muscle_loads_json = excluded.muscle_loads_json,
       legacy_muscle_warnings_json = excluded.legacy_muscle_warnings_json,
+      personal_difficulty_score = excluded.personal_difficulty_score,
       status = excluded.status,
       updated_at = excluded.updated_at
   `).run({
     id: exerciseId,
     entity_ref_id: String((entityRef as any).id),
     concept_id: existing?.concept_id ?? null,
+    template_key: hasTemplateKeyField
+      ? input.templateKey
+      : normalizeOptionalText(existing?.template_key),
     title: input.title,
     slug,
-    summary: input.summary,
-    notes: input.notes,
+    summary: hasSummaryField
+      ? input.summary
+      : normalizeOptionalText(existing?.summary),
+    notes: hasNotesField
+      ? input.notes
+      : normalizeOptionalText(existing?.notes),
+    exercise_type: input.exerciseType,
+    measurement_category: input.measurementCategory,
+    tags_json: JSON.stringify(input.tags || []),
     measurement_json: JSON.stringify(input.measurement || {}),
     muscle_loads_json: JSON.stringify(input.muscleLoads || []),
     legacy_muscle_warnings_json: JSON.stringify([]),
+    personal_difficulty_score: hasDifficultyField
+      ? input.personalDifficultyScore
+      : normalizeOptionalNumber(existing?.personal_difficulty_score),
     status: "active",
     created_at: existing?.created_at || timestamp,
     updated_at: timestamp,
@@ -2060,28 +3651,16 @@ async function saveTrainingExercise(ctx: NexusBackendPluginContext, payload: Tra
     WHERE id = ?
     LIMIT 1
   `).get(exerciseId);
-  const savedExerciseWithDoc = refreshedRow ? normalizeExerciseRecord(ctx, refreshedRow) : savedExercise;
+  let savedExerciseWithDoc = refreshedRow ? normalizeExerciseRecord(ctx, refreshedRow) : savedExercise;
 
-  upsertTrainingSearchDocument(sqlite, {
-    id: getTrainingSearchDocumentId("exercise", savedExerciseWithDoc.id),
-    entityRefId: savedExerciseWithDoc.entityRefId,
-    kind: "concept",
-    title: savedExerciseWithDoc.title,
-    subtitle: savedExerciseWithDoc.searchSummary || savedExerciseWithDoc.summary,
-    body: [
-      savedExerciseWithDoc.summary,
-      savedExerciseWithDoc.notes,
-      savedExerciseWithDoc.searchSummary ? `Musculos: ${savedExerciseWithDoc.searchSummary}` : null,
-    ].filter(Boolean).join("\n\n"),
-    metadata: {
-      pluginId: TRAINING_PLUGIN_ID,
-      domain: "training",
-      type: "exercise",
-      exerciseId: savedExerciseWithDoc.id,
-      measurement: savedExerciseWithDoc.measurement,
-      muscleLoads: savedExerciseWithDoc.muscleLoads,
-    },
-  });
+  if (hasDocMarkdownField && typeof rawPayload.docMarkdown === "string") {
+    const exerciseWithImportedDoc = await saveTrainingExerciseDocMarkdown(ctx, exerciseId, rawPayload.docMarkdown);
+    if (exerciseWithImportedDoc) {
+      savedExerciseWithDoc = exerciseWithImportedDoc;
+    }
+  }
+
+  upsertTrainingExerciseSearchDocument(sqlite, savedExerciseWithDoc);
 
   return savedExerciseWithDoc;
 }
@@ -2579,21 +4158,29 @@ async function saveTrainingOccurrenceResult(ctx: NexusBackendPluginContext, payl
   };
 }
 
-function migrateLegacyExerciseMusclesSync(sqlite: any) {
+function migrateLegacyExerciseMusclesSync(ctx: NexusBackendPluginContext) {
+  const sqlite = getSqlite(ctx);
   const rows = sqlite.prepare(`
     SELECT id, entity_ref_id, muscle_loads_json, legacy_muscle_warnings_json
     FROM training_exercises
   `).all() as any[];
 
   for (const row of rows) {
-    const currentLoads = parseRowJson<any[]>(row.muscle_loads_json, []);
-    const currentWarnings = parseRowJson<any[]>(row.legacy_muscle_warnings_json, []);
-    if (currentLoads.length || currentWarnings.length) {
+    const parsedLoads = parseRowJson<any[]>(row.muscle_loads_json, []);
+    const parsedWarnings = parseRowJson<any[]>(row.legacy_muscle_warnings_json, []);
+    const currentLoads = Array.isArray(parsedLoads) ? parsedLoads : [];
+    const currentWarnings = Array.isArray(parsedWarnings) ? parsedWarnings : [];
+    const needsLegacyLoadMigration = currentLoads.some((entry) => (
+      entry && typeof entry === "object" && ("load" in entry || entry.percentage == null)
+    ));
+    if ((currentLoads.length || currentWarnings.length) && !needsLegacyLoadMigration) {
       continue;
     }
 
-    const legacyMuscles = listLegacyExerciseMusclesSync(sqlite, String(row.entity_ref_id));
-    if (!legacyMuscles.length) {
+    const legacyMuscles = currentLoads.length
+      ? currentLoads
+      : listLegacyExerciseMusclesSync(sqlite, String(row.entity_ref_id));
+    if (!legacyMuscles.length && !currentWarnings.length) {
       continue;
     }
 
@@ -2608,6 +4195,17 @@ function migrateLegacyExerciseMusclesSync(sqlite: any) {
       JSON.stringify(migrated.warnings || []),
       String(row.id),
     );
+
+    const refreshedRow = sqlite.prepare(`
+      SELECT *
+      FROM training_exercises
+      WHERE id = ?
+      LIMIT 1
+    `).get(String(row.id));
+    const refreshedExercise = refreshedRow ? normalizeExerciseRecord(ctx, refreshedRow) : null;
+    if (refreshedExercise) {
+      upsertTrainingExerciseSearchDocument(sqlite, refreshedExercise);
+    }
   }
 }
 
@@ -2649,13 +4247,18 @@ function registerTrainingSchema(ctx: NexusBackendPluginContext) {
       id TEXT PRIMARY KEY NOT NULL,
       entity_ref_id TEXT NOT NULL UNIQUE REFERENCES entity_refs(id) ON DELETE CASCADE,
       concept_id TEXT UNIQUE REFERENCES concepts(id) ON DELETE SET NULL,
+      template_key TEXT UNIQUE,
       title TEXT NOT NULL,
       slug TEXT NOT NULL UNIQUE,
       summary TEXT,
       notes TEXT,
+      exercise_type TEXT NOT NULL DEFAULT 'exercise',
+      measurement_category TEXT NOT NULL DEFAULT 'strength',
+      tags_json TEXT NOT NULL DEFAULT '[]',
       measurement_json TEXT NOT NULL DEFAULT '{}',
       muscle_loads_json TEXT NOT NULL DEFAULT '[]',
       legacy_muscle_warnings_json TEXT NOT NULL DEFAULT '[]',
+      personal_difficulty_score REAL,
       status TEXT NOT NULL DEFAULT 'active',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -2667,6 +4270,13 @@ function registerTrainingSchema(ctx: NexusBackendPluginContext) {
     CREATE TABLE IF NOT EXISTS training_muscle_concepts (
       muscle_id TEXT PRIMARY KEY NOT NULL,
       concept_id TEXT NOT NULL UNIQUE REFERENCES concepts(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS training_system_state (
+      state_key TEXT PRIMARY KEY NOT NULL,
+      state_value TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -2744,11 +4354,19 @@ function registerTrainingSchema(ctx: NexusBackendPluginContext) {
   ensureTableColumn(sqlite, "training_exercises", "muscle_loads_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureTableColumn(sqlite, "training_exercises", "legacy_muscle_warnings_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureTableColumn(sqlite, "training_exercises", "concept_id", "TEXT REFERENCES concepts(id) ON DELETE SET NULL");
+  ensureTableColumn(sqlite, "training_exercises", "template_key", "TEXT");
+  ensureTableColumn(sqlite, "training_exercises", "personal_difficulty_score", "REAL");
+  ensureTableColumn(sqlite, "training_exercises", "exercise_type", "TEXT NOT NULL DEFAULT 'exercise'");
+  ensureTableColumn(sqlite, "training_exercises", "measurement_category", "TEXT NOT NULL DEFAULT 'strength'");
+  ensureTableColumn(sqlite, "training_exercises", "tags_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureTableColumn(sqlite, "training_routines", "structure_json", "TEXT NOT NULL DEFAULT '[]'");
 
   sqlite.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_training_exercises_concept_id
       ON training_exercises (concept_id);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_training_exercises_template_key
+      ON training_exercises (template_key);
 
     CREATE TABLE IF NOT EXISTS training_muscle_concepts (
       muscle_id TEXT PRIMARY KEY NOT NULL,
@@ -2761,11 +4379,22 @@ function registerTrainingSchema(ctx: NexusBackendPluginContext) {
   sqlite.prepare(`
     UPDATE training_exercises
     SET muscle_loads_json = COALESCE(NULLIF(TRIM(muscle_loads_json), ''), '[]'),
-        legacy_muscle_warnings_json = COALESCE(NULLIF(TRIM(legacy_muscle_warnings_json), ''), '[]')
+        legacy_muscle_warnings_json = COALESCE(NULLIF(TRIM(legacy_muscle_warnings_json), ''), '[]'),
+        exercise_type = COALESCE(NULLIF(TRIM(exercise_type), ''), 'exercise'),
+        measurement_category = COALESCE(NULLIF(TRIM(measurement_category), ''), 'strength'),
+        tags_json = COALESCE(NULLIF(TRIM(tags_json), ''), '[]'),
+        template_key = NULLIF(TRIM(template_key), '')
     WHERE muscle_loads_json IS NULL
        OR TRIM(muscle_loads_json) = ''
        OR legacy_muscle_warnings_json IS NULL
        OR TRIM(legacy_muscle_warnings_json) = ''
+       OR exercise_type IS NULL
+       OR TRIM(exercise_type) = ''
+       OR measurement_category IS NULL
+       OR TRIM(measurement_category) = ''
+       OR tags_json IS NULL
+       OR TRIM(tags_json) = ''
+       OR template_key IS NOT NULL
   `).run();
 
   sqlite.prepare(`
@@ -2776,7 +4405,7 @@ function registerTrainingSchema(ctx: NexusBackendPluginContext) {
   `).run();
 
   migrateLegacySearchExercisesSync(ctx);
-  migrateLegacyExerciseMusclesSync(sqlite);
+  migrateLegacyExerciseMusclesSync(ctx);
   migrateLegacyRoutineStructuresSync(ctx);
 }
 
@@ -2877,6 +4506,61 @@ const trainingPlugin: NexusBackendPluginModule = {
         });
       } catch (error) {
         return createError(error, "No se pudo crear la base de notas musculares.");
+      }
+    });
+
+    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:list-managed-docs`, async () => {
+      try {
+        return createSuccess({
+          managedDocs: await listTrainingManagedDocs(ctx),
+        });
+      } catch (error) {
+        return createError(error, "No se pudo cargar el estado de las notas de entrenamiento.");
+      }
+    });
+
+    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:restore-managed-doc`, async (_event, payload: any) => {
+      try {
+        const managedDocId = normalizeOptionalText(typeof payload === "string" ? payload : payload?.id || payload?.managedDocId);
+        if (!managedDocId) {
+          throw new Error("Falta el id de la nota gestionada.");
+        }
+
+        return createSuccess(await restoreTrainingManagedDoc(ctx, managedDocId));
+      } catch (error) {
+        return createError(error, "No se pudo restaurar la nota gestionada.");
+      }
+    });
+
+    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:export`, async (_event, payload: any) => {
+      try {
+        await ensureTrainingConceptCoverage(ctx);
+        return createSuccess(buildTrainingTransferEnvelope(ctx, isPlainObject(payload) ? payload : {}));
+      } catch (error) {
+        return createError(error, "No se pudo exportar entrenamiento.");
+      }
+    });
+
+    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:import`, async (_event, payload: any) => {
+      try {
+        return createSuccess(await importTrainingTransferEnvelope(ctx, payload));
+      } catch (error) {
+        return createError(error, "No se pudo importar entrenamiento.");
+      }
+    });
+
+    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:save-muscle-doc`, async (_event, payload: any) => {
+      try {
+        const muscleId = normalizeOptionalText(typeof payload === "string" ? payload : payload?.id || payload?.muscleId);
+        if (!muscleId) {
+          throw new Error("Falta el id del musculo.");
+        }
+
+        return createSuccess({
+          muscle: await saveTrainingMuscleDocMarkdown(ctx, muscleId, typeof payload?.markdown === "string" ? payload.markdown : ""),
+        });
+      } catch (error) {
+        return createError(error, "No se pudo guardar la nota del musculo.");
       }
     });
 

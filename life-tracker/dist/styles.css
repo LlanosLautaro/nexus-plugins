@@ -847,6 +847,136 @@
   white-space: nowrap;
 }
 
+.trainingPlugin__muscleLoadSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 88%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--shell-panel-soft) 76%, transparent);
+}
+.trainingPlugin__muscleLoadSummary strong {
+  color: var(--color-text);
+  font-size: 0.82rem;
+}
+.trainingPlugin__muscleLoadSummary span {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+.trainingPlugin__muscleLoadSummary.is-valid {
+  border-color: color-mix(in srgb, var(--color-success) 34%, var(--color-line));
+  background: color-mix(in srgb, var(--color-success) 10%, var(--shell-panel-soft));
+}
+.trainingPlugin__muscleLoadSummary.is-under {
+  border-color: color-mix(in srgb, var(--color-warning) 28%, var(--color-line));
+}
+.trainingPlugin__muscleLoadSummary.is-over {
+  border-color: color-mix(in srgb, var(--color-danger) 28%, var(--color-line));
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--shell-panel-soft));
+}
+
+.trainingPlugin__chipGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.trainingPlugin__tagToggleGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.trainingPlugin__tagToggle {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--shell-panel-soft) 78%, transparent);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+.trainingPlugin__tagToggle:hover, .trainingPlugin__tagToggle:focus-visible {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-line));
+  background: color-mix(in srgb, var(--shell-panel-highlight) 80%, transparent);
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+.trainingPlugin__tagToggle span {
+  min-width: 0;
+  text-align: left;
+}
+.trainingPlugin__tagToggle strong {
+  color: inherit;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trainingPlugin__tagToggle.is-active {
+  border-color: color-mix(in srgb, var(--color-accent) 36%, var(--color-line));
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--shell-panel-soft));
+  color: var(--color-text);
+}
+
+.trainingPlugin__tagToggle.is-locked {
+  cursor: default;
+}
+
+.trainingPlugin__tagToggle:disabled {
+  opacity: 1;
+}
+
+.trainingPlugin__muscleChip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--shell-panel-soft) 80%, transparent);
+}
+
+.trainingPlugin__muscleChipCopy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.trainingPlugin__muscleChipCopy strong {
+  color: var(--color-text);
+  font-size: 0.84rem;
+}
+.trainingPlugin__muscleChipCopy span {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+}
+
+.trainingPlugin__muscleChipControls {
+  display: inline-grid;
+  grid-template-columns: 58px auto auto;
+  gap: 6px;
+  align-items: center;
+}
+.trainingPlugin__muscleChipControls input {
+  width: 58px;
+  min-width: 58px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.trainingPlugin__muscleChipSuffix {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .trainingPlugin__chipRemove {
   width: 18px;
   height: 18px;
@@ -1027,12 +1157,247 @@
   line-height: 1.35;
 }
 
+.trainingPlugin__content--compact {
+  min-height: 0;
+}
+
+.trainingPlugin__rail,
+.trainingPlugin__railPanel,
+.trainingPlugin__detailStack,
+.trainingPlugin__detailMain,
+.trainingPlugin__detailAside,
+.trainingPlugin__structurePreview {
+  min-height: 0;
+}
+
+.trainingPlugin__rail {
+  width: 232px;
+  min-width: 232px;
+}
+
+.trainingPlugin__railPanel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--workspace-rail-bg) 94%, transparent), color-mix(in srgb, var(--workspace-rail-bg) 80%, var(--shell-panel-soft)));
+}
+
+.trainingPlugin__railList {
+  display: grid;
+  gap: 8px;
+}
+
+.trainingPlugin__railFooter {
+  margin-top: auto;
+}
+
+.trainingPlugin__railButton,
+.trainingPlugin__galleryCard {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: calc(var(--radius-m) + 2px);
+  background: color-mix(in srgb, var(--shell-panel-soft) 82%, transparent);
+  color: var(--color-text);
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+.trainingPlugin__railButton:hover, .trainingPlugin__railButton:focus-visible,
+.trainingPlugin__galleryCard:hover,
+.trainingPlugin__galleryCard:focus-visible {
+  border-color: var(--color-line-strong);
+  background: color-mix(in srgb, var(--shell-panel-highlight) 82%, transparent);
+  transform: translateY(-1px);
+}
+
+.trainingPlugin__railButton {
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+}
+.trainingPlugin__railButton strong {
+  font-size: 0.84rem;
+}
+.trainingPlugin__railButton span {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+}
+
+.trainingPlugin__railButton.is-active,
+.trainingPlugin__galleryCard.is-active {
+  background: var(--gradient-active);
+  border-color: var(--color-border-accent);
+  color: var(--color-text);
+  box-shadow: inset 0 1px 0 var(--fx-sheen-strong), 0 12px 24px rgba(0, 0, 0, 0.18);
+}
+
+.trainingPlugin__galleryHeader {
+  gap: var(--space-3);
+  position: relative;
+  z-index: 2;
+  isolation: isolate;
+  overflow: visible;
+}
+
+.trainingPlugin__galleryToolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 2;
+}
+.trainingPlugin__galleryToolbar .nexus-ui-inline-field {
+  flex: 0 1 168px;
+}
+.trainingPlugin__galleryToolbar .nexus-ui-inline-field--grow {
+  flex: 1 1 260px;
+}
+
+.trainingPlugin__gallerySearch {
+  min-width: min(320px, 100%);
+}
+
+.trainingPlugin__galleryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  position: relative;
+  z-index: 0;
+}
+
+.trainingPlugin__galleryCard {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  position: relative;
+  z-index: 0;
+}
+.trainingPlugin__galleryCard strong {
+  color: var(--color-text);
+  font-size: 0.86rem;
+  line-height: 1.3;
+}
+
+.trainingPlugin__galleryCardSummary,
+.trainingPlugin__galleryCardMeta {
+  color: var(--color-text-muted);
+  font-size: 0.77rem;
+  line-height: 1.35;
+}
+
+.trainingPlugin__galleryCardMeta {
+  color: var(--color-text-subtle);
+}
+
+.trainingPlugin__detailStack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.trainingPlugin__detailColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.trainingPlugin__detailMain,
+.trainingPlugin__detailAside {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.trainingPlugin__metaPanel {
+  height: fit-content;
+}
+
+.trainingPlugin__metaList {
+  display: grid;
+  gap: 8px;
+}
+
+.trainingPlugin__metaListRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--shell-panel-soft) 74%, transparent);
+}
+.trainingPlugin__metaListRow span {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+}
+.trainingPlugin__metaListRow strong {
+  color: var(--color-text);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.trainingPlugin__documentPreview {
+  min-height: 360px;
+  max-height: none;
+}
+
+.trainingPlugin__documentPreview.is-edit {
+  min-height: 460px;
+  overflow: hidden;
+}
+
+.trainingPlugin__documentPreview.is-edit .markdown-engine-liveEditor {
+  height: 100%;
+  min-height: 460px;
+}
+
+.trainingPlugin__documentPreview .markdown-engine-document {
+  padding: 0;
+}
+
+.trainingPlugin__structurePreview {
+  display: grid;
+  gap: 8px;
+}
+
+.trainingPlugin__structureRow {
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--shell-panel-soft) 76%, transparent);
+}
+.trainingPlugin__structureRow strong {
+  color: var(--color-text);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+.trainingPlugin__structureRow span {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.trainingPlugin__structureRow.is-block {
+  background: color-mix(in srgb, var(--shell-panel-highlight) 72%, transparent);
+}
+
+.trainingPlugin__muscleChip.is-static .trainingPlugin__muscleChipControls {
+  grid-template-columns: auto;
+}
+
 .trainingPlugin__empty {
   min-height: 160px;
 }
 
 @media (max-width: 1180px) {
   .trainingPlugin__exerciseLayout {
+    grid-template-columns: 1fr;
+  }
+  .trainingPlugin__detailColumns {
     grid-template-columns: 1fr;
   }
   .trainingPlugin__card--aside {
@@ -1043,6 +1408,17 @@
   .trainingPlugin__measureRow,
   .trainingPlugin__inputActionRow {
     grid-template-columns: 1fr;
+  }
+  .trainingPlugin__galleryToolbar {
+    align-items: stretch;
+  }
+  .trainingPlugin__gallerySearch {
+    min-width: 0;
+    width: 100%;
+  }
+  .trainingPlugin__rail {
+    width: 100%;
+    min-width: 0;
   }
 }
 @media (max-width: 760px) {
@@ -1061,6 +1437,9 @@
   .trainingPlugin__selectorItemActions {
     width: 100%;
     justify-content: flex-start;
+  }
+  .trainingPlugin__galleryGrid {
+    grid-template-columns: 1fr;
   }
 }
 .habitosView {
@@ -1159,7 +1538,7 @@
 .habitosDashboard__grid .react-grid-item {
   z-index: 0;
   overflow: visible;
-  transition: transform 90ms linear, width 120ms ease, height 120ms ease;
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), width 130ms ease-out, height 130ms ease-out;
 }
 
 .habitosDashboard__grid .react-grid-item.cssTransforms {
@@ -1776,6 +2155,231 @@
   font-size: 0.78rem;
 }
 
+.habitosView__trainingManagedGroups,
+.habitosView__trainingManagedGroup,
+.habitosView__trainingManagedRows,
+.habitosView__trainingManagedRowCopy {
+  display: flex;
+  flex-direction: column;
+}
+
+.habitosView__trainingManagedGroups {
+  gap: 0.85rem;
+}
+
+.habitosView__trainingManagedGroup {
+  gap: 0.5rem;
+}
+
+.habitosView__trainingManagedGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  padding: 0 0.2rem;
+}
+.habitosView__trainingManagedGroupHeader strong {
+  color: var(--color-text);
+  font-size: 0.84rem;
+}
+.habitosView__trainingManagedGroupHeader span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.74rem;
+}
+
+.habitosView__trainingManagedRows {
+  gap: 0.46rem;
+}
+
+.habitosView__trainingManagedRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.72rem 0.82rem;
+  border: 1px solid var(--habitos-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 90%, transparent);
+}
+
+.habitosView__trainingManagedRowCopy {
+  min-width: 0;
+  gap: 0.14rem;
+}
+.habitosView__trainingManagedRowCopy strong {
+  color: var(--color-text);
+  line-height: 1.2;
+}
+.habitosView__trainingManagedRowCopy span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.76rem;
+  line-height: 1.28;
+  word-break: break-word;
+}
+
+.habitosView__trainingManagedRowActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.habitosView__trainingManagedStatus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.45rem;
+  padding: 0 0.58rem;
+  border: 1px solid var(--habitos-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 88%, transparent);
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.habitosView__trainingManagedStatus.is-original {
+  border-color: color-mix(in srgb, var(--color-success) 34%, var(--habitos-border));
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success);
+}
+
+.habitosView__trainingManagedStatus.is-edited {
+  border-color: color-mix(in srgb, var(--color-warning) 34%, var(--habitos-border));
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+  color: var(--color-warning);
+}
+
+.habitosView__trainingManagedStatus.is-missing {
+  border-color: color-mix(in srgb, var(--color-danger) 32%, var(--habitos-border));
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: var(--color-danger);
+}
+
+.lifeTrackerTrainingSettings,
+.lifeTrackerTrainingSettings__section,
+.lifeTrackerTrainingSettings__groups,
+.lifeTrackerTrainingSettings__group,
+.lifeTrackerTrainingSettings__rows,
+.lifeTrackerTrainingSettings__rowCopy,
+.lifeTrackerTrainingSettings__actions {
+  display: flex;
+  flex-direction: column;
+}
+
+.lifeTrackerTrainingSettings {
+  gap: 0.85rem;
+}
+
+.lifeTrackerTrainingSettings__section {
+  gap: 0.85rem;
+}
+
+.lifeTrackerTrainingSettings__sectionHeader,
+.lifeTrackerTrainingSettings__groupHeader,
+.lifeTrackerTrainingSettings__row,
+.lifeTrackerTrainingSettings__rowActions,
+.lifeTrackerTrainingSettings__copyRow,
+.lifeTrackerTrainingSettings__actions--inline {
+  display: flex;
+  align-items: center;
+}
+
+.lifeTrackerTrainingSettings__sectionHeader,
+.lifeTrackerTrainingSettings__groupHeader,
+.lifeTrackerTrainingSettings__row,
+.lifeTrackerTrainingSettings__copyRow {
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.lifeTrackerTrainingSettings__sectionHeader strong,
+.lifeTrackerTrainingSettings__groupHeader strong,
+.lifeTrackerTrainingSettings__rowCopy strong {
+  color: var(--color-text);
+}
+
+.lifeTrackerTrainingSettings__divider {
+  height: 1px;
+  background: color-mix(in srgb, var(--color-line) 88%, transparent);
+}
+
+.lifeTrackerTrainingSettings__copyRow {
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.lifeTrackerTrainingSettings__groups,
+.lifeTrackerTrainingSettings__group,
+.lifeTrackerTrainingSettings__rows {
+  gap: 0.6rem;
+}
+
+.lifeTrackerTrainingSettings__groupHeader span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.74rem;
+}
+
+.lifeTrackerTrainingSettings__row {
+  padding: 0.72rem 0.82rem;
+  border: 1px solid var(--habitos-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 90%, transparent);
+}
+
+.lifeTrackerTrainingSettings__rowCopy {
+  min-width: 0;
+  gap: 0.14rem;
+}
+.lifeTrackerTrainingSettings__rowCopy span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.76rem;
+  line-height: 1.28;
+  word-break: break-word;
+}
+
+.lifeTrackerTrainingSettings__rowActions,
+.lifeTrackerTrainingSettings__actions--inline {
+  justify-content: flex-end;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.lifeTrackerTrainingSettings__status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.45rem;
+  padding: 0 0.58rem;
+  border: 1px solid var(--habitos-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 88%, transparent);
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.lifeTrackerTrainingSettings__status.is-original {
+  border-color: color-mix(in srgb, var(--color-success) 34%, var(--habitos-border));
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success);
+}
+
+.lifeTrackerTrainingSettings__status.is-edited {
+  border-color: color-mix(in srgb, var(--color-warning) 34%, var(--habitos-border));
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+  color: var(--color-warning);
+}
+
+.lifeTrackerTrainingSettings__status.is-missing {
+  border-color: color-mix(in srgb, var(--color-danger) 32%, var(--habitos-border));
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: var(--color-danger);
+}
+
 .habitosView__habitGroup,
 .habitosView__habitGroupList,
 .habitosView__habitRowCopy,
@@ -2152,6 +2756,11 @@
   height: 0.92rem;
 }
 
+.habitosView__queueBadge svg {
+  width: 0.88rem;
+  height: 0.88rem;
+}
+
 .habitosView__queueCopy {
   min-width: 0;
   display: flex;
@@ -2328,6 +2937,15 @@
   line-height: 1.15;
 }
 
+.habitosView__queueExpand:hover:not(:disabled) {
+  color: var(--color-text);
+}
+
+.habitosView__queueExpand:disabled {
+  opacity: 0.52;
+  cursor: default;
+}
+
 .habitosView__queueChecklist {
   grid-column: 2/-1;
 }
@@ -2447,6 +3065,16 @@
   background: color-mix(in srgb, var(--color-success) 10%, transparent);
 }
 
+.habitosView__queueChecklistItem:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--habitos-accent) 22%, var(--habitos-border));
+  background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.05)) 86%, transparent);
+}
+
+.habitosView__queueChecklistItem:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+
 .habitosView__queueChecklistMark {
   width: 0.92rem;
   height: 0.92rem;
@@ -2473,7 +3101,6 @@
 .habitosView__editorNav,
 .habitosView__sectionIntro,
 .habitosView__subitemDraftRow,
-.habitosView__secondaryCard,
 .habitosView__booleanGrid,
 .habitosView__booleanField,
 .habitosView__toggleCard,
@@ -2483,7 +3110,6 @@
 }
 
 .habitosView__sectionIntro,
-.habitosView__secondaryCard,
 .habitosView__booleanGrid {
   flex-direction: column;
 }
@@ -2495,8 +3121,7 @@
   justify-content: space-between;
 }
 
-.habitosView__sectionIntro span,
-.habitosView__secondaryCard span {
+.habitosView__sectionIntro span {
   margin-top: 0.2rem;
   color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
 }
@@ -2559,20 +3184,26 @@
   white-space: pre-wrap;
 }
 
+.habitosView__subitemEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.48rem;
+}
+
 .habitosView__subitemsDraft {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.38rem;
   padding-top: 0.12rem;
 }
 
 .habitosView__subitemDraftRow {
   gap: 0.55rem;
-  min-height: 44px;
-  padding: 0.34rem 0.42rem;
+  min-height: 40px;
+  padding: 0.26rem 0.34rem;
   border: 1px solid var(--habitos-border);
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 90%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 94%, transparent);
   transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
 }
 
@@ -2594,18 +3225,18 @@
 }
 
 .habitosView__subitemDragHandle {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.24rem;
-  flex: 0 0 28px;
+  flex: 0 0 26px;
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--habitos-accent) 14%, var(--habitos-border));
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 90%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 94%, transparent);
   color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
   cursor: grab;
 }
@@ -2636,6 +3267,8 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  color: var(--color-text);
+  font-size: 0.84rem;
 }
 
 .habitosView__booleanGrid {
@@ -2677,12 +3310,14 @@
 
 .habitosView__secondaryCard {
   width: 100%;
+  display: flex;
+  align-items: flex-start;
   text-align: left;
-  gap: 0.2rem;
-  padding: 0.8rem 0.9rem;
-  border-radius: 14px;
+  gap: 0.72rem;
+  padding: 0.68rem 0.78rem;
+  border-radius: 12px;
   border: 1px solid var(--habitos-border);
-  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 88%, transparent);
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 92%, transparent);
   cursor: default;
   user-select: none;
   transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
@@ -2691,6 +3326,42 @@
 .habitosView__secondaryCard.is-selected {
   border-color: color-mix(in srgb, var(--habitos-accent) 26%, var(--habitos-border));
   background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.05)) 90%, transparent);
+}
+
+.habitosView__secondaryCardIcon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--habitos-item-accent) 28%, var(--habitos-border));
+  background: color-mix(in srgb, var(--habitos-item-accent) 12%, transparent);
+  color: var(--habitos-item-accent);
+}
+
+.habitosView__secondaryCardIcon svg {
+  width: 0.88rem;
+  height: 0.88rem;
+}
+
+.habitosView__secondaryCardCopy {
+  min-width: 0;
+  display: grid;
+  gap: 0.16rem;
+}
+
+.habitosView__secondaryCardCopy strong {
+  color: var(--color-text);
+  font-size: 0.9rem;
+  line-height: 1.18;
+}
+
+.habitosView__secondaryCardCopy span {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 0.72rem;
+  line-height: 1.34;
 }
 
 .habitosView input[type=number]::-webkit-outer-spin-button,
@@ -2706,24 +3377,42 @@
 
 .habitosView__createChoiceGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.72rem;
 }
 
 .habitosView__createChoice {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 1rem 1.05rem;
+  gap: 0.28rem;
+  padding: 0.86rem 0.92rem;
   text-align: left;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid var(--habitos-border);
-  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 88%, transparent);
+  background: color-mix(in srgb, var(--color-surface-1, rgba(255, 255, 255, 0.03)) 92%, transparent);
   color: inherit;
   cursor: pointer;
   user-select: none;
   transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+}
+
+.habitosView__createChoiceIcon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.1rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--habitos-accent) 22%, var(--habitos-border));
+  background: color-mix(in srgb, var(--habitos-accent) 10%, transparent);
+  color: var(--habitos-accent);
+}
+
+.habitosView__createChoiceIcon svg {
+  width: 0.88rem;
+  height: 0.88rem;
 }
 
 .habitosView__createChoice:hover,
@@ -2734,9 +3423,16 @@
   background: color-mix(in srgb, var(--color-surface-2, rgba(255, 255, 255, 0.04)) 90%, transparent);
 }
 
+.habitosView__createChoice strong {
+  color: var(--color-text);
+  font-size: 0.88rem;
+  line-height: 1.18;
+}
+
 .habitosView__createChoice span {
   color: var(--color-text-muted, rgba(255, 255, 255, 0.72));
-  line-height: 1.45;
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .habitosView__wizardOptionGrid,
@@ -3337,6 +4033,15 @@
   .habitosView__dayNavCurrent {
     min-width: 0;
     flex: 1 1 220px;
+  }
+  .lifeTrackerTrainingSettings__copyRow,
+  .lifeTrackerTrainingSettings__row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .lifeTrackerTrainingSettings__rowActions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 @media (max-width: 720px) {

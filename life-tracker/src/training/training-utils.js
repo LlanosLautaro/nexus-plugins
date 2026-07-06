@@ -158,6 +158,126 @@ const TRAINING_MEASUREMENT_MODE_LABELS = {
   weight: "Peso",
 };
 
+export const TRAINING_EXERCISE_TYPE_LABELS = Object.freeze({
+  exercise: "Ejercicio",
+  stretch: "Estiramiento",
+  warmup: "Calentamiento",
+  coordination: "Coordinación",
+});
+
+export const TRAINING_MEASUREMENT_CATEGORY_LABELS = Object.freeze({
+  strength: "Fuerza",
+  cardio: "Cardio",
+  balance: "Equilibrio",
+  flexibility: "Flexibilidad",
+});
+
+export const TRAINING_EXERCISE_TAG_LABELS = Object.freeze({
+  strength: "Fuerza",
+  cardio: "Cardio",
+  balance: "Equilibrio",
+  flexibility: "Flexibilidad",
+  endurance: "Resistencia",
+  "motor-control": "Motricidad",
+  isometric: "Isométrico",
+  unilateral: "Unilateral",
+  explosive: "Explosivo",
+});
+
+export const TRAINING_EXERCISE_TAG_ORDER = Object.freeze([
+  "strength",
+  "cardio",
+  "balance",
+  "flexibility",
+  "endurance",
+  "motor-control",
+  "isometric",
+  "unilateral",
+  "explosive",
+]);
+
+export function normalizeTrainingExerciseType(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(TRAINING_EXERCISE_TYPE_LABELS, normalized)
+    ? normalized
+    : "exercise";
+}
+
+export function normalizeTrainingMeasurementCategory(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(TRAINING_MEASUREMENT_CATEGORY_LABELS, normalized)
+    ? normalized
+    : "strength";
+}
+
+export function normalizeTrainingExerciseTags(value, options = {}) {
+  const source = Array.isArray(value) ? value : [];
+  const uniqueTags = new Set();
+  const measurementCategory = normalizeOptionalText(options.measurementCategory)
+    ? normalizeTrainingMeasurementCategory(options.measurementCategory)
+    : null;
+
+  for (const entry of source) {
+    const rawValue = entry && typeof entry === "object"
+      ? entry.id || entry.value || entry.tag
+      : entry;
+    const normalizedTag = normalizeOptionalText(rawValue)?.toLowerCase() || null;
+    if (!normalizedTag || !Object.prototype.hasOwnProperty.call(TRAINING_EXERCISE_TAG_LABELS, normalizedTag)) {
+      continue;
+    }
+    if (measurementCategory && normalizedTag === measurementCategory) {
+      continue;
+    }
+
+    uniqueTags.add(normalizedTag);
+  }
+
+  return TRAINING_EXERCISE_TAG_ORDER.filter((tagId) => uniqueTags.has(tagId));
+}
+
+export function resolveTrainingExerciseTags(tags, measurementCategory) {
+  const normalizedMeasurementCategory = normalizeOptionalText(measurementCategory)
+    ? normalizeTrainingMeasurementCategory(measurementCategory)
+    : null;
+  const explicitTags = normalizeTrainingExerciseTags(tags, {
+    measurementCategory: normalizedMeasurementCategory,
+  });
+  const uniqueTags = new Set(explicitTags);
+
+  if (normalizedMeasurementCategory && Object.prototype.hasOwnProperty.call(TRAINING_EXERCISE_TAG_LABELS, normalizedMeasurementCategory)) {
+    uniqueTags.add(normalizedMeasurementCategory);
+  }
+
+  return TRAINING_EXERCISE_TAG_ORDER.filter((tagId) => uniqueTags.has(tagId));
+}
+
+export function buildTrainingExerciseTypeSummary(value) {
+  const normalized = normalizeTrainingExerciseType(value);
+  return TRAINING_EXERCISE_TYPE_LABELS[normalized] || "";
+}
+
+export function buildTrainingMeasurementCategorySummary(value) {
+  const normalized = normalizeTrainingMeasurementCategory(value);
+  return TRAINING_MEASUREMENT_CATEGORY_LABELS[normalized] || "";
+}
+
+export function buildTrainingExerciseTagSummary(tags, options = {}) {
+  const normalizedMeasurementCategory = normalizeOptionalText(options.measurementCategory)
+    ? normalizeTrainingMeasurementCategory(options.measurementCategory)
+    : null;
+  const normalizedTags = resolveTrainingExerciseTags(tags, normalizedMeasurementCategory).filter((tagId) => (
+    options.omitMeasurementCategory && normalizedMeasurementCategory
+      ? tagId !== normalizedMeasurementCategory
+      : true
+  ));
+  const maxItems = Math.max(0, Number(options.maxItems || 0)) || null;
+  const visibleTags = maxItems ? normalizedTags.slice(0, maxItems) : normalizedTags;
+
+  return visibleTags
+    .map((tagId) => TRAINING_EXERCISE_TAG_LABELS[tagId] || tagId)
+    .join(", ");
+}
+
 export function buildTrainingMeasurementUnitSummary(measurement) {
   const data = parseJsonObject(measurement, {});
   const mode = normalizeOptionalText(data.mode);
@@ -225,21 +345,93 @@ function normalizeTrainingLoad(value) {
   return Math.min(10, Math.max(1, numericValue));
 }
 
+function normalizeTrainingPercentage(value) {
+  const numericValue = Math.round(Number(value));
+  if (!Number.isInteger(numericValue)) {
+    return null;
+  }
+
+  return Math.min(100, Math.max(1, numericValue));
+}
+
+function sortTrainingMuscleLoads(muscleLoads) {
+  return [...muscleLoads].sort((left, right) => {
+    const groupCompare = String(left.groupTitle || "").localeCompare(String(right.groupTitle || ""));
+    if (groupCompare !== 0) {
+      return groupCompare;
+    }
+
+    return String(left.title || "").localeCompare(String(right.title || ""));
+  });
+}
+
+function normalizeLegacyMuscleLoadPercentages(muscleLoads) {
+  const totalWeight = muscleLoads.reduce((sum, entry) => sum + Number(entry.legacyWeight || 0), 0);
+  if (!totalWeight) {
+    return muscleLoads.map(({ legacyWeight, ...entry }) => ({
+      ...entry,
+      percentage: normalizeTrainingPercentage(entry.percentage) || 1,
+    }));
+  }
+
+  const exactRows = muscleLoads.map((entry) => {
+    const exact = (Number(entry.legacyWeight || 0) / totalWeight) * 100;
+    return {
+      entry,
+      base: Math.floor(exact),
+      remainder: exact - Math.floor(exact),
+    };
+  });
+
+  let remainderPool = 100 - exactRows.reduce((sum, row) => sum + row.base, 0);
+  const sortedByRemainder = [...exactRows]
+    .sort((left, right) => right.remainder - left.remainder);
+  const assigned = new Map();
+
+  for (const row of sortedByRemainder) {
+    assigned.set(row.entry.muscleId, row.base);
+  }
+
+  for (const row of sortedByRemainder) {
+    if (remainderPool <= 0) {
+      break;
+    }
+
+    assigned.set(row.entry.muscleId, Number(assigned.get(row.entry.muscleId) || 0) + 1);
+    remainderPool -= 1;
+  }
+
+  return muscleLoads.map(({ legacyWeight, ...entry }) => ({
+    ...entry,
+    percentage: normalizeTrainingPercentage(assigned.get(entry.muscleId) || entry.percentage) || 1,
+  }));
+}
+
 export function normalizeTrainingMuscleLoads(value, options = {}) {
   const source = Array.isArray(value) ? value : [];
   const includeWarnings = Boolean(options.includeWarnings);
   const uniqueLoads = new Map();
   const warnings = [];
+  let hasExplicitPercentages = false;
+  let hasLegacyLoads = false;
 
   for (const entry of source) {
     const raw = entry && typeof entry === "object" ? entry : { muscleId: entry };
     const rawMuscleId = normalizeOptionalText(raw.muscleId || raw.id);
-    const load = normalizeTrainingLoad(raw.load);
+    const percentage = normalizeTrainingPercentage(raw.percentage);
+    const legacyLoad = normalizeTrainingLoad(raw.load);
     const resolvedMuscle = rawMuscleId
       ? getTrainingMuscleById(rawMuscleId)
       : findTrainingMuscleByAlias(raw.title || raw.name || raw.slug || "");
 
-    if (!resolvedMuscle || load == null) {
+    if (percentage != null) {
+      hasExplicitPercentages = true;
+    }
+    if (legacyLoad != null) {
+      hasLegacyLoads = true;
+    }
+
+    if (!resolvedMuscle || (percentage == null && legacyLoad == null)) {
       if (includeWarnings) {
         const warningLabel = normalizeOptionalText(raw.title || raw.name || raw.slug || rawMuscleId);
         if (warningLabel) {
@@ -254,7 +446,8 @@ export function normalizeTrainingMuscleLoads(value, options = {}) {
 
     uniqueLoads.set(resolvedMuscle.id, {
       muscleId: resolvedMuscle.id,
-      load,
+      percentage,
+      legacyWeight: legacyLoad,
       title: resolvedMuscle.title,
       slug: resolvedMuscle.slug,
       regionId: resolvedMuscle.regionId,
@@ -264,14 +457,13 @@ export function normalizeTrainingMuscleLoads(value, options = {}) {
     });
   }
 
-  const muscleLoads = [...uniqueLoads.values()].sort((left, right) => {
-    const groupCompare = String(left.groupTitle || "").localeCompare(String(right.groupTitle || ""));
-    if (groupCompare !== 0) {
-      return groupCompare;
-    }
-
-    return String(left.title || "").localeCompare(String(right.title || ""));
-  });
+  const rawMuscleLoads = sortTrainingMuscleLoads([...uniqueLoads.values()]);
+  const muscleLoads = (!hasExplicitPercentages && hasLegacyLoads)
+    ? normalizeLegacyMuscleLoadPercentages(rawMuscleLoads)
+    : rawMuscleLoads.map(({ legacyWeight, ...entry }) => ({
+        ...entry,
+        percentage: normalizeTrainingPercentage(entry.percentage ?? legacyWeight) || 1,
+      }));
 
   return includeWarnings
     ? {
@@ -285,16 +477,36 @@ export function buildTrainingMuscleLoadSummary(muscleLoads) {
   const list = Array.isArray(muscleLoads) ? muscleLoads : [];
   return list
     .slice(0, 4)
-    .map((entry) => `${entry.title || getTrainingMuscleById(entry.muscleId)?.title || entry.muscleId} ${entry.load}/10`)
+    .map((entry) => `${entry.title || getTrainingMuscleById(entry.muscleId)?.title || entry.muscleId} ${entry.percentage}%`)
     .join(", ");
 }
 
 export function buildTrainingExerciseSummary(exercise) {
   const parts = [];
+  const typeId = normalizeTrainingExerciseType(exercise?.exerciseType);
+  const typeSummary = buildTrainingExerciseTypeSummary(typeId);
+  const categorySummary = buildTrainingMeasurementCategorySummary(exercise?.measurementCategory);
   const measurementSummary = buildTrainingMeasurementUnitSummary(exercise?.measurement);
+  const tagSummary = buildTrainingExerciseTagSummary(exercise?.tags, {
+    measurementCategory: exercise?.measurementCategory,
+    omitMeasurementCategory: true,
+    maxItems: 2,
+  });
+
+  if (typeSummary && typeId !== "exercise") {
+    parts.push(typeSummary);
+  }
+
+  if (categorySummary) {
+    parts.push(categorySummary);
+  }
 
   if (measurementSummary) {
     parts.push(measurementSummary);
+  }
+
+  if (tagSummary) {
+    parts.push(tagSummary);
   }
 
   const muscleSummary = buildTrainingMuscleLoadSummary(exercise?.muscleLoads);

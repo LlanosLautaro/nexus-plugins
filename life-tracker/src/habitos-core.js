@@ -1386,6 +1386,49 @@ export function toggleTaskSync(sqlite, taskId, options = {}) {
   return findTaskByIdSync(sqlite, task.id);
 }
 
+export function toggleTaskSubitemSync(sqlite, taskId, subitemId, options = {}) {
+  const task = findTaskByIdSync(sqlite, taskId);
+
+  if (!task) {
+    throw new Error("No encontramos la tarea solicitada.");
+  }
+
+  if (task.status === "completed") {
+    throw new Error("Reabre la tarea antes de cambiar sus sub-items.");
+  }
+
+  const normalizedSubitemId = String(subitemId || "").trim();
+  if (!normalizedSubitemId) {
+    throw new Error("No encontramos el sub-item solicitado.");
+  }
+
+  const subitemIndex = task.subitems.findIndex((entry) => entry.id === normalizedSubitemId);
+  if (subitemIndex === -1) {
+    throw new Error("No encontramos el sub-item solicitado.");
+  }
+
+  const timestamp = options.now || nowIso();
+  const nextSubitems = task.subitems.map((entry) => (
+    entry.id === normalizedSubitemId
+      ? {
+          ...entry,
+          isCompleted: !entry.isCompleted,
+        }
+      : entry
+  ));
+
+  sqlite.transaction(() => {
+    replaceTaskSubitemsSync(sqlite, task.id, nextSubitems, timestamp);
+    sqlite.prepare(`
+      UPDATE habits_tasks
+      SET updated_at = ?
+      WHERE id = ?
+    `).run(timestamp, task.id);
+  })();
+
+  return findTaskByIdSync(sqlite, task.id);
+}
+
 export function deleteTaskSync(sqlite, taskId) {
   sqlite.transaction(() => {
     sqlite.prepare(`

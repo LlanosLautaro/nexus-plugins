@@ -1,4 +1,4 @@
-const React = window.React;
+﻿const React = window.React;
 const {
   startTransition,
   useEffect,
@@ -57,11 +57,10 @@ import { TRAINING_SETTINGS_DEFAULTS } from "./training/plugin-settings.js";
 import {
   DEFAULT_CUSTOM_HABIT_CATEGORY_COLOR,
   DEFAULT_CUSTOM_HABIT_CATEGORY_ICON_ID,
+  HABIT_EDITOR_STEPS,
   HABIT_CATEGORY_PRESETS,
-  HABIT_EDIT_WIZARD_STEPS,
   HABIT_PROGRESS_OPTIONS,
   HABIT_QUANTITY_MODE_OPTIONS,
-  HABIT_WIZARD_STEPS,
   LIFE_TRACKER_CANVAS_STATE_KEY,
   LIFE_TRACKER_DEFAULT_SECTION,
   LIFE_TRACKER_HABIT_CATEGORY_PRESET_OVERRIDES_KEY,
@@ -75,6 +74,7 @@ import {
 } from "./constants.js";
 import {
   CheckIcon,
+  ClockIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   PencilIcon,
@@ -82,6 +82,31 @@ import {
   SettingsIcon,
   TrashIcon,
 } from "./icons.jsx";
+import {
+  CreateChooserModal,
+  FloatingWorkbenchModal,
+  HabitEditor,
+  TaskEditor,
+} from "./home/editors.jsx";
+import {
+  addDaysToLocalDate,
+  buildHabitPayload,
+  createDraftChecklistItem,
+  createDraftId,
+  createHabitCategoryDraft,
+  createHabitDraft,
+  createTaskDraft,
+  getHabitChecklistItemsValue,
+  getHabitQuantityConfigValue,
+  getInclusiveDayCount,
+  normalizeCategoryNameValue,
+  normalizeHexColorDraftValue,
+  normalizeIntegerDraftValue,
+  parseHabitProgressConfigValue,
+  todayLocalDate,
+  tokenizeSearch,
+} from "./home/drafts.js";
+import { QueueItemCard } from "./home/queue.jsx";
 
 const { ipcRenderer } = window.require("electron");
 
@@ -105,6 +130,7 @@ const LIFE_TRACKER_HABITS_CHANNELS = {
   getHome: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:get-home`,
   saveTask: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:save-task`,
   toggleTask: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:toggle-task`,
+  toggleTaskSubitem: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:toggle-task-subitem`,
   deleteTask: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:delete-task`,
   saveHabit: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:save-habit`,
   toggleOccurrence: `${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:toggle-occurrence`,
@@ -439,89 +465,6 @@ function buildManagedHabitCategories(customCategories = [], presetOverrides = {}
   ];
 }
 
-function todayLocalDate(baseDate = new Date()) {
-  const now = baseDate;
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function createTaskDraft(source = null) {
-  return {
-    id: source?.id || "",
-    title: source?.title || "",
-    category: source?.category || "",
-    dueDate: source?.dueDate || todayLocalDate(),
-    time: source?.time || "",
-    priority: String(source?.priority || 1),
-    notes: source?.notes || "",
-    reminderAt: source?.reminderAt ? String(source.reminderAt).slice(0, 16) : "",
-    isPersistent: source?.isPersistent ?? true,
-    subitemsBlocking: source?.subitemsBlocking ?? false,
-    subitems: Array.isArray(source?.subitems) && source.subitems.length
-      ? source.subitems.map((entry) => ({
-          id: entry.id || "",
-          title: entry.title || "",
-          isCompleted: Boolean(entry.isCompleted),
-        }))
-      : [],
-  };
-}
-
-function createDraftChecklistItem(source = null) {
-  return {
-    id: source?.id || createDraftId("draft-item"),
-    title: source?.title || "",
-  };
-}
-
-function createHabitCategoryDraft(source = null) {
-  return {
-    id: source?.id || "",
-    kind: source?.kind || "custom",
-    presetId: source?.presetId || "",
-    originalName: source?.originalName || source?.name || "",
-    name: source?.name || "",
-    iconId: source?.iconId || DEFAULT_CUSTOM_HABIT_CATEGORY_ICON_ID,
-    color: source?.color || DEFAULT_CUSTOM_HABIT_CATEGORY_COLOR,
-  };
-}
-
-function normalizeCategoryNameValue(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function normalizeHexColorDraftValue(value, fallbackValue = DEFAULT_CUSTOM_HABIT_CATEGORY_COLOR) {
-  const normalized = String(value || "").trim();
-  if (!normalized) {
-    return fallbackValue;
-  }
-
-  const prefixedValue = normalized.startsWith("#") ? normalized : `#${normalized}`;
-  return /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(prefixedValue)
-    ? prefixedValue
-    : fallbackValue;
-}
-
-function tokenizeSearch(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
-function addDaysToLocalDate(localDate, daysToAdd) {
-  const base = new Date(`${localDate}T00:00:00`);
-  if (Number.isNaN(base.getTime())) {
-    return todayLocalDate();
-  }
-
-  base.setDate(base.getDate() + daysToAdd);
-  return todayLocalDate(base);
-}
-
 function compareLocalDates(left, right) {
   return String(left || "").localeCompare(String(right || ""));
 }
@@ -530,130 +473,6 @@ function clampViewDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim())
     ? String(value).trim()
     : todayLocalDate();
-}
-
-function getInclusiveDayCount(startDate, endDate) {
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
-    return 1;
-  }
-
-  const diffMs = end.getTime() - start.getTime();
-  return Math.floor(diffMs / 86400000) + 1;
-}
-
-function normalizeIntegerDraftValue(value, {
-  min = Number.MIN_SAFE_INTEGER,
-  max = Number.MAX_SAFE_INTEGER,
-  fallback = "",
-} = {}) {
-  const normalized = String(value ?? "").trim();
-  if (!normalized) {
-    return fallback;
-  }
-
-  const numericValue = Number(normalized);
-  if (!Number.isFinite(numericValue)) {
-    return fallback;
-  }
-
-  return String(Math.min(max, Math.max(min, Math.round(numericValue))));
-}
-
-function createDraftId(prefix = "draft") {
-  if (globalThis.crypto?.randomUUID) {
-    return globalThis.crypto.randomUUID();
-  }
-
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function parseHabitProgressConfigValue(source = null) {
-  if (!source?.progressConfigJson) {
-    return {};
-  }
-
-  if (typeof source.progressConfigJson === "object") {
-    return source.progressConfigJson;
-  }
-
-  try {
-    return JSON.parse(String(source.progressConfigJson));
-  } catch {
-    return {};
-  }
-}
-
-function getHabitChecklistItemsValue(source = null) {
-  const progressConfig = parseHabitProgressConfigValue(source);
-  const itemsSource = Array.isArray(source?.checklistItems)
-    ? source.checklistItems
-    : progressConfig.items;
-
-  return Array.isArray(itemsSource)
-    ? itemsSource
-      .map((entry, index) => {
-        const title = String(entry?.title || "").trim();
-        if (!title) {
-          return null;
-        }
-
-        return {
-          id: String(entry?.id || createDraftId("habit-item")),
-          title,
-          sortOrder: Number.isFinite(Number(entry?.sortOrder)) ? Number(entry.sortOrder) : index,
-        };
-      })
-      .filter(Boolean)
-    : [];
-}
-
-function getHabitQuantityConfigValue(source = null) {
-  const progressConfig = parseHabitProgressConfigValue(source);
-
-  return {
-    quantityMode: source?.quantityMode ?? progressConfig.quantityMode ?? "at-least",
-    quantityTarget: source?.quantityTarget ?? progressConfig.quantityTarget ?? "",
-    quantityUnit: source?.quantityUnit ?? progressConfig.quantityUnit ?? "",
-  };
-}
-
-function createHabitDraft(source = null) {
-  const startDate = source?.startDate || todayLocalDate();
-  const normalizedEndDate = source?.endDate || "";
-  const hasEndDate = Boolean(normalizedEndDate);
-  const checklistItems = getHabitChecklistItemsValue(source);
-  const quantityConfig = getHabitQuantityConfigValue(source);
-
-  return {
-    id: source?.id || "",
-    title: source?.title || "",
-    category: source?.category || "",
-    progressMode: source ? (source.progressMode || "yes-no") : "",
-    quantityMode: quantityConfig.quantityMode,
-    quantityTarget: quantityConfig.quantityTarget === null ? "" : String(quantityConfig.quantityTarget),
-    quantityUnit: quantityConfig.quantityUnit || "",
-    checklistItems: checklistItems.length
-      ? checklistItems.map((entry) => createDraftChecklistItem(entry))
-      : [
-          createDraftChecklistItem(),
-          createDraftChecklistItem(),
-        ],
-    scheduleType: source?.scheduleType || "daily",
-    weekdays: Array.isArray(source?.scheduleConfigJson?.weekdays)
-      ? source.scheduleConfigJson.weekdays
-      : [1, 2, 3, 4, 5],
-    startDate,
-    hasEndDate,
-    endDate: hasEndDate ? normalizedEndDate : "",
-    durationDays: hasEndDate ? String(getInclusiveDayCount(startDate, normalizedEndDate)) : "1",
-    time: source?.time || "",
-    priority: String(source?.priority || 1),
-    notes: source?.notes || "",
-    status: source?.status || "active",
-  };
 }
 
 async function invoke(channel, payload) {
@@ -1469,58 +1288,6 @@ function getLatestHabitHistoryEntry(home, habitId) {
   return home.recentHistory.find((entry) => entry.type === "habit" && entry.habit?.id === habitId) || null;
 }
 
-function buildHabitPayload(source = null, overrides = {}) {
-  const scheduleType = overrides.scheduleType ?? source?.scheduleType ?? "daily";
-  const progressConfig = parseHabitProgressConfigValue(source);
-  const progressMode = overrides.progressMode ?? source?.progressMode ?? "yes-no";
-  const weekdaysSource = overrides.weekdays
-    ?? overrides.scheduleConfigJson?.weekdays
-    ?? source?.weekdays
-    ?? source?.scheduleConfigJson?.weekdays
-    ?? [];
-  const weekdays = Array.isArray(weekdaysSource)
-    ? weekdaysSource
-      .map((entry) => Number(entry))
-      .filter((entry) => Number.isInteger(entry))
-    : [];
-  const checklistItemsSource = Array.isArray(overrides.checklistItems)
-    ? overrides.checklistItems
-    : Array.isArray(source?.checklistItems)
-      ? source.checklistItems
-      : progressConfig.items;
-
-  return {
-    id: overrides.id ?? source?.id ?? "",
-    title: overrides.title ?? source?.title ?? "",
-    category: overrides.category ?? source?.category ?? "",
-    progressMode,
-    quantityMode: overrides.quantityMode ?? source?.quantityMode ?? progressConfig.quantityMode ?? "at-least",
-    quantityTarget: overrides.quantityTarget ?? source?.quantityTarget ?? progressConfig.quantityTarget ?? "",
-    quantityUnit: overrides.quantityUnit ?? source?.quantityUnit ?? progressConfig.quantityUnit ?? "",
-    checklistItems: Array.isArray(checklistItemsSource)
-      ? checklistItemsSource.map((entry, index) => ({
-          id: String(entry?.id || createDraftId("habit-item")),
-          title: String(entry?.title || ""),
-          sortOrder: Number.isFinite(Number(entry?.sortOrder)) ? Number(entry.sortOrder) : index,
-        }))
-      : [],
-    scheduleType,
-    scheduleConfigJson: {
-      weekdays: scheduleType === "weekdays" ? weekdays : [],
-    },
-    startDate: overrides.startDate ?? source?.startDate ?? todayLocalDate(),
-    endDate: overrides.endDate ?? source?.endDate ?? "",
-    time: overrides.time ?? source?.time ?? "",
-    priority: normalizeIntegerDraftValue(overrides.priority ?? source?.priority ?? 1, {
-      min: 1,
-      max: 100,
-      fallback: "1",
-    }),
-    notes: overrides.notes ?? source?.notes ?? "",
-    status: overrides.status ?? source?.status ?? "active",
-  };
-}
-
 function buildUpcomingTaskMenuItem(task) {
   return {
     id: `upcoming-task:${task.id}`,
@@ -1661,12 +1428,10 @@ function getChecklistProgressSummary(item) {
   return `${[...checkedIds].filter((entry) => checklistItems.some((itemEntry) => itemEntry.id === entry)).length}/${checklistItems.length}`;
 }
 
-function QueueStatusPill({ status, label }) {
-  return (
-    <span className={["habitosView__queueStatusPill", `is-${status || "pending"}`].join(" ")}>
-      {label}
-    </span>
-  );
+function getTaskSubitemsProgressSummary(task) {
+  const subitems = Array.isArray(task?.subitems) ? task.subitems : [];
+  const completedCount = subitems.filter((entry) => entry?.isCompleted).length;
+  return `${completedCount}/${subitems.length}`;
 }
 
 function QuantityQueueInput({
@@ -1751,369 +1516,6 @@ function QuantityQueueInput({
         }
       }}
     />
-  );
-}
-
-function QueueItemCard({
-  item,
-  categoryCatalog = [],
-  presetOverrides = {},
-  isSelected = false,
-  saving = false,
-  resultEditable = true,
-  onToggle,
-  onContextMenu,
-  onCommitQuantity,
-  onToggleChecklistItem,
-  onToggleChecklistExpanded,
-  isChecklistExpanded = false,
-}) {
-  const accent = resolveQueueCategoryPresentation(item, categoryCatalog, presetOverrides);
-  const toggleMeta = getQueueToggleMeta(item);
-  const isSettled = isQueueItemSettled(item);
-  const checklistItems = item.type === "habit" && item.progressMode === "checklist"
-    ? getHabitChecklistItemsValue(item)
-    : [];
-  const checkedIds = new Set(
-    Array.isArray(item?.progressDataJson?.checkedItemIds)
-      ? item.progressDataJson.checkedItemIds
-      : [],
-  );
-  const controlsDisabled = saving || !resultEditable;
-  const routineDetailActionLabel = item.type === "routine" && item.completionMode === "detailed"
-    ? getRoutineDetailedActionLabel(item)
-    : "";
-  const secondaryCopy = item.type === "routine"
-    ? [item.meta, item.summary].filter(Boolean).join(" - ")
-    : "";
-
-  return (
-    <article
-      className={[
-        "habitosView__queueItem",
-        item.isOverdue ? "is-overdue" : "",
-        isSelected ? "is-selected" : "",
-        item.status ? `is-status-${item.status}` : "",
-        isSettled ? "is-settled" : "",
-      ].filter(Boolean).join(" ")}
-      onContextMenu={(event) => onContextMenu?.(event, item)}
-    >
-      <div
-        className="habitosView__queueBadge"
-        style={{ "--habitos-item-accent": accent.color }}
-        aria-hidden="true"
-      >
-        <RemoteCategoryIcon iconId={accent.iconId} color={accent.color} />
-      </div>
-
-      <div className="habitosView__queueCopy">
-        <div className="habitosView__queueCopyText">
-          <strong>{item.title}</strong>
-          {secondaryCopy ? <span>{secondaryCopy}</span> : null}
-        </div>
-      </div>
-
-      <div className="habitosView__queueActions">
-        {item.type === "routine" && shouldShowQueueStatusPill(item) ? (
-          <QueueStatusPill status={item.status} label={item.statusLabel} />
-        ) : null}
-
-        {item.type === "habit" && item.progressMode === "quantity" ? (
-          <>
-            {shouldShowQueueStatusPill(item) ? (
-              <QueueStatusPill status={item.status} label={item.statusLabel} />
-            ) : null}
-            <div className="habitosView__queueQuantityControl">
-              <QuantityQueueInput
-                item={item}
-                disabled={controlsDisabled}
-                onCommit={(value) => onCommitQuantity?.(item, value)}
-              />
-            </div>
-          </>
-        ) : null}
-
-        {item.type === "habit" && item.progressMode === "checklist" ? (
-          <>
-            {shouldShowQueueStatusPill(item) ? (
-              <QueueStatusPill status={item.status} label={item.statusLabel} />
-            ) : null}
-            <button
-              type="button"
-              className={["habitosView__queueExpand", isChecklistExpanded ? "is-expanded" : ""].filter(Boolean).join(" ")}
-              onClick={() => onToggleChecklistExpanded?.(item.recordId)}
-              disabled={saving}
-              aria-expanded={isChecklistExpanded ? "true" : "false"}
-            >
-              <ChevronRightIcon />
-              <span>Sub-items {getChecklistProgressSummary(item)}</span>
-            </button>
-          </>
-        ) : null}
-
-        {item.type === "routine" && item.completionMode === "detailed" ? (
-          <button
-            type="button"
-            className="habitosView__queueInlineAction"
-            onClick={onToggle}
-            disabled={controlsDisabled}
-          >
-            {routineDetailActionLabel}
-          </button>
-        ) : null}
-
-        {toggleMeta ? (
-          <button
-            type="button"
-            className={["habitosView__queueCheck", toggleMeta.className].filter(Boolean).join(" ")}
-            onClick={onToggle}
-            aria-label={toggleMeta.ariaLabel}
-            aria-pressed={toggleMeta.isPressed ? "true" : "false"}
-            disabled={controlsDisabled}
-          >
-            {toggleMeta.content}
-          </button>
-        ) : null}
-      </div>
-
-      {item.type === "habit" && item.progressMode === "checklist" ? (
-        <div
-          className={[
-            "habitosView__queueChecklistRegion",
-            isChecklistExpanded ? "is-expanded" : "",
-          ].filter(Boolean).join(" ")}
-          aria-hidden={isChecklistExpanded ? undefined : "true"}
-        >
-          <div className="habitosView__queueChecklist">
-          {checklistItems.map((checklistItem) => {
-            const isCompleted = checkedIds.has(checklistItem.id);
-
-            return (
-              <button
-                key={checklistItem.id}
-                type="button"
-                className={["habitosView__queueChecklistItem", isCompleted ? "is-completed" : ""].filter(Boolean).join(" ")}
-                onClick={() => onToggleChecklistItem?.(item, checklistItem.id)}
-                disabled={controlsDisabled || !isChecklistExpanded}
-                tabIndex={isChecklistExpanded ? 0 : -1}
-              >
-                <span className="habitosView__queueChecklistMark" aria-hidden="true">
-                  {isCompleted ? <CheckIcon /> : null}
-                </span>
-                <span>{checklistItem.title}</span>
-              </button>
-            );
-          })}
-          </div>
-        </div>
-      ) : null}
-    </article>
-  );
-}
-
-function DraftNumberInput({
-  value,
-  onChange,
-  onCommit,
-  ...inputProps
-}) {
-  return (
-    <input
-      {...inputProps}
-      type="number"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      onBlur={(event) => onCommit?.(event.target.value)}
-    />
-  );
-}
-
-function StepperNumberInput({
-  value,
-  onChange,
-  onCommit,
-  min,
-  max,
-  step = 1,
-  disabled = false,
-  ...inputProps
-}) {
-  const minValue = Number.isFinite(Number(min)) ? Number(min) : null;
-  const maxValue = Number.isFinite(Number(max)) ? Number(max) : null;
-  const stepValue = Number.isFinite(Number(step)) && Number(step) > 0 ? Number(step) : 1;
-  const currentValue = Number(String(value ?? "").trim());
-  const hasNumericValue = Number.isFinite(currentValue);
-
-  const clampValue = (nextValue) => {
-    let normalizedValue = nextValue;
-
-    if (minValue !== null) {
-      normalizedValue = Math.max(minValue, normalizedValue);
-    }
-
-    if (maxValue !== null) {
-      normalizedValue = Math.min(maxValue, normalizedValue);
-    }
-
-    return Math.round(normalizedValue);
-  };
-
-  const commitValue = (rawValue) => {
-    onCommit?.(rawValue);
-  };
-
-  const adjustValue = (direction) => {
-    if (disabled) {
-      return;
-    }
-
-    const baseValue = hasNumericValue
-      ? currentValue
-      : minValue ?? 0;
-    const nextValue = String(clampValue(baseValue + (direction * stepValue)));
-
-    onChange(nextValue);
-    commitValue(nextValue);
-  };
-
-  const isDecrementDisabled = disabled || (hasNumericValue && minValue !== null && currentValue <= minValue);
-  const isIncrementDisabled = disabled || (hasNumericValue && maxValue !== null && currentValue >= maxValue);
-
-  return (
-    <div className={["habitosView__numberStepper", disabled ? "is-disabled" : ""].filter(Boolean).join(" ")}>
-      <button
-        type="button"
-        className="habitosView__numberStepperButton"
-        onClick={() => adjustValue(-1)}
-        disabled={isDecrementDisabled}
-        aria-label="Bajar valor"
-      >
-        <ChevronLeftIcon />
-      </button>
-
-      <input
-        {...inputProps}
-        type="number"
-        inputMode="numeric"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        onBlur={(event) => commitValue(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            commitValue(event.currentTarget.value);
-          }
-        }}
-      />
-
-      <button
-        type="button"
-        className="habitosView__numberStepperButton"
-        onClick={() => adjustValue(1)}
-        disabled={isIncrementDisabled}
-        aria-label="Subir valor"
-      >
-        <ChevronRightIcon />
-      </button>
-    </div>
-  );
-}
-
-function DateDraftInput({
-  value,
-  onChange,
-  showTodayLabel = false,
-  ...inputProps
-}) {
-  const isTodayDefault = showTodayLabel && value === todayLocalDate();
-
-  return (
-    <div className={["habitosView__dateField", isTodayDefault ? "is-default-today" : ""].filter(Boolean).join(" ")}>
-      <input
-        {...inputProps}
-        className="habitosView__dateFieldInput"
-        type="date"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {isTodayDefault ? (
-        <span className="habitosView__dateFieldGhost" aria-hidden="true">
-          Hoy
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-function FloatingWorkbenchModal({
-  isVisible,
-  saving = false,
-  onClose,
-  layout = "centered",
-  children,
-}) {
-  if (!isVisible) {
-    return null;
-  }
-
-  return (
-    <div
-      className={["habitosView__modalBackdrop", layout === "drawer" ? "is-drawer" : ""].filter(Boolean).join(" ")}
-      onClick={() => {
-        if (!saving) {
-          onClose?.();
-        }
-      }}
-    >
-      <div
-        className={["habitosView__modalShell", layout === "drawer" ? "is-drawer" : ""].filter(Boolean).join(" ")}
-        onClick={(event) => event.stopPropagation()}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function CreateChooserModal({
-  onTask,
-  onHabit,
-  onRoutine,
-  onCancel,
-}) {
-  return (
-    <SectionPanel tone="highlight" className="habitosView__modalPanel">
-      <PanelHeader>
-        <PanelTitle title="Crear nuevo" />
-      </PanelHeader>
-
-      <div className="habitosView__createChoiceGrid">
-        <button type="button" className="habitosView__createChoice" onClick={onTask}>
-          <strong>Tarea</strong>
-          <span>Actividad de instancia unica sin seguimiento en el tiempo.</span>
-        </button>
-
-        <button type="button" className="habitosView__createChoice" onClick={onHabit}>
-          <strong>Habito</strong>
-          <span>Actividad que se repite en el tiempo. Posee un seguimiento detallado y estadisticas.</span>
-        </button>
-
-        <button type="button" className="habitosView__createChoice" onClick={onRoutine}>
-          <strong>Rutina de ejercicios</strong>
-          <span>Asigna una rutina existente con recurrencia propia y seguimiento simple o detallado.</span>
-        </button>
-      </div>
-
-      <div className="habitosView__editorActions">
-        <Button type="button" onClick={onCancel}>
-          Cancelar
-        </Button>
-      </div>
-    </SectionPanel>
   );
 }
 
@@ -2510,32 +1912,6 @@ function HabitCategoryPicker({
         />
       ) : null}
     </div>
-  );
-}
-
-function WizardOptionCard({
-  title,
-  description,
-  isSelected = false,
-  disabled = false,
-  onClick,
-}) {
-  return (
-    <button
-      type="button"
-      className={[
-        "habitosView__wizardOptionCard",
-        isSelected ? "is-selected" : "",
-      ].filter(Boolean).join(" ")}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      <strong>{title}</strong>
-      <span>{description}</span>
-      {disabled ? (
-        <small>Sin soporte por ahora</small>
-      ) : null}
-    </button>
   );
 }
 
@@ -3142,7 +2518,7 @@ function SettingsDrawer({
                 onEditHabit={onEditHabit}
                 onToggleHabitStatus={onToggleHabitStatus}
               />
-            ) : (
+            ) : activeTab === "categories" ? (
               <CategorySettingsSection
                 categories={categories}
                 selectedCategoryId={selectedCategoryId}
@@ -3159,774 +2535,10 @@ function SettingsDrawer({
                 onSaveCategoryBuilder={onSaveCategoryBuilder}
                 onCloseCategoryBuilder={onCloseCategoryBuilder}
               />
-            )}
+            ) : null}
           </SplitDetail>
         </SplitLayout>
       </div>
-    </SectionPanel>
-  );
-}
-
-function TaskEditor({
-  draft,
-  advancedOpen,
-  saving,
-  onChange,
-  onSubitemChange,
-  onAddSubitem,
-  onRemoveSubitem,
-  onToggleAdvanced,
-  onCommitNumber,
-  onSubmit,
-  onCancel,
-}) {
-  return (
-    <SectionPanel tone="highlight" className="habitosView__modalPanel">
-      <PanelHeader
-        actions={(
-          <Button type="button" onClick={onToggleAdvanced}>
-            {advancedOpen ? "Ocultar avanzado" : "Mostrar avanzado"}
-          </Button>
-        )}
-      >
-        <PanelTitle title={draft.id ? "Editar tarea" : "Nueva tarea"} />
-      </PanelHeader>
-
-      <form className="habitosView__editorForm" onSubmit={onSubmit}>
-        <FieldGrid>
-          <Field label="Nombre" wide>
-            <input
-              value={draft.title}
-              onChange={(event) => onChange("title", event.target.value)}
-              placeholder="Ej. Llamar al tecnico"
-              required
-            />
-          </Field>
-
-          <Field label="Categoria">
-            <input
-              value={draft.category}
-              onChange={(event) => onChange("category", event.target.value)}
-              placeholder="Trabajo, hogar, estudio..."
-            />
-          </Field>
-
-          <Field label="Fecha">
-            <input
-              type="date"
-              value={draft.dueDate}
-              onChange={(event) => onChange("dueDate", event.target.value)}
-              required
-            />
-          </Field>
-
-          <Field label="Prioridad">
-            <StepperNumberInput
-              min="1"
-              max="100"
-              step="1"
-              value={draft.priority}
-              onChange={(value) => onChange("priority", value)}
-              onCommit={(value) => onCommitNumber("priority", value)}
-            />
-          </Field>
-        </FieldGrid>
-
-        <div className="habitosView__subitemEditor">
-          <div className="habitosView__sectionIntro">
-            <strong>Sub-items</strong>
-          </div>
-
-          {draft.subitems.length ? (
-            <div className="habitosView__subitemsDraft">
-              {draft.subitems.map((subitem, index) => (
-                <div key={subitem.id || index} className="habitosView__subitemDraftRow">
-                  <label className="habitosView__subitemToggle">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(subitem.isCompleted)}
-                      onChange={(event) => onSubitemChange(index, "isCompleted", event.target.checked)}
-                    />
-                    <span>Hecho</span>
-                  </label>
-                  <input
-                    value={subitem.title}
-                    onChange={(event) => onSubitemChange(index, "title", event.target.value)}
-                    placeholder={`Paso ${index + 1}`}
-                  />
-                  <IconButton
-                    type="button"
-                    aria-label="Quitar sub-item"
-                    tone="danger"
-                    onClick={() => onRemoveSubitem(index)}
-                  >
-                    <TrashIcon />
-                  </IconButton>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          <Button type="button" onClick={onAddSubitem}>
-            <PlusIcon />
-            <span>Agregar sub-item</span>
-          </Button>
-        </div>
-
-        {advancedOpen ? (
-          <FieldGrid>
-            <Field label="Hora">
-              <input
-                type="time"
-                value={draft.time}
-                onChange={(event) => onChange("time", event.target.value)}
-              />
-            </Field>
-
-            <Field label="Recordatorio">
-              <input
-                type="datetime-local"
-                value={draft.reminderAt}
-                onChange={(event) => onChange("reminderAt", event.target.value)}
-              />
-            </Field>
-
-            <Field label="Notas" wide>
-              <textarea
-                rows="3"
-                value={draft.notes}
-                onChange={(event) => onChange("notes", event.target.value)}
-                placeholder="Contexto breve para esta tarea."
-              />
-            </Field>
-
-            <div className="habitosView__booleanGrid">
-              <label className="habitosView__booleanField">
-                <input
-                  type="checkbox"
-                  checked={Boolean(draft.isPersistent)}
-                  onChange={(event) => onChange("isPersistent", event.target.checked)}
-                />
-                <span>Se mostrara todos los dias hasta completarse</span>
-              </label>
-
-              <label className="habitosView__booleanField">
-                <input
-                  type="checkbox"
-                  checked={Boolean(draft.subitemsBlocking)}
-                  onChange={(event) => onChange("subitemsBlocking", event.target.checked)}
-                />
-                <span>Los sub-items bloquean el completado</span>
-              </label>
-            </div>
-          </FieldGrid>
-        ) : null}
-
-        <div className="habitosView__editorActions">
-          <Button type="submit" tone="primary" disabled={saving}>
-            {saving ? "Guardando..." : draft.id ? "Guardar tarea" : "Crear tarea"}
-          </Button>
-          <Button type="button" onClick={onCancel} disabled={saving}>
-            Cancelar
-          </Button>
-        </div>
-      </form>
-    </SectionPanel>
-  );
-}
-
-function HabitEditor({
-  draft,
-  categories,
-  presetOverrides = {},
-  step,
-  saving,
-  wizardError,
-  categoryBuilderOpen,
-  categoryBuilderDraft,
-  categoryBuilderError,
-  onChange,
-  onSelectExistingCategory,
-  onOpenCategoryBuilder,
-  onCloseCategoryBuilder,
-  onChangeCategoryBuilder,
-  onSaveCategoryBuilder,
-  onOpenCategoryMenu,
-  onSelectCategory,
-  onSelectProgressMode,
-  onToggleWeekday,
-  onBack,
-  onNext,
-  onCommitNumber,
-  onSubmit,
-  onCancel,
-}) {
-  const [draggedChecklistIndex, setDraggedChecklistIndex] = useState(null);
-  const [dropChecklistIndex, setDropChecklistIndex] = useState(null);
-  const checklistDragIntentRef = useRef(null);
-
-  useEffect(() => {
-    checklistDragIntentRef.current = null;
-    setDraggedChecklistIndex(null);
-    setDropChecklistIndex(null);
-  }, [draft.id, draft.progressMode, step]);
-
-  const resetChecklistDragState = () => {
-    checklistDragIntentRef.current = null;
-    setDraggedChecklistIndex(null);
-    setDropChecklistIndex(null);
-  };
-
-  const handleChecklistDrop = (targetIndex) => {
-    if (draggedChecklistIndex === null || draggedChecklistIndex === targetIndex) {
-      resetChecklistDragState();
-      return;
-    }
-
-    onChange("moveChecklistItem", {
-      fromIndex: draggedChecklistIndex,
-      toIndex: targetIndex,
-    });
-    resetChecklistDragState();
-  };
-
-  if (draft.id) {
-    const isLastStep = step === HABIT_EDIT_WIZARD_STEPS.length - 1;
-
-    return (
-      <SectionPanel tone="highlight" className="habitosView__modalPanel">
-        <PanelHeader>
-          <PanelTitle title="Editar habito" />
-        </PanelHeader>
-
-        <form className="habitosView__editorForm" onSubmit={onSubmit}>
-          <div className="habitosView__modalStep">
-            <span>Paso {step + 1} de {HABIT_EDIT_WIZARD_STEPS.length}</span>
-            <strong>{HABIT_EDIT_WIZARD_STEPS[step]?.label || "Paso"}</strong>
-          </div>
-
-          {step === 0 ? (
-            <div className="habitosView__wizardStep">
-              <FieldGrid>
-                <Field label="Nombre" wide>
-                  <input
-                    value={draft.title}
-                    onChange={(event) => onChange("title", event.target.value)}
-                    placeholder="Ej. Leer 20 minutos"
-                    required
-                  />
-                </Field>
-              </FieldGrid>
-
-              <HabitCategoryPicker
-                categories={categories}
-                presetOverrides={presetOverrides}
-                selectedCategory={draft.category}
-                saving={saving}
-                builderOpen={categoryBuilderOpen}
-                builderDraft={categoryBuilderDraft}
-                builderError={categoryBuilderError}
-                onSelectCategory={onSelectExistingCategory}
-                onOpenBuilder={onOpenCategoryBuilder}
-                onCloseBuilder={onCloseCategoryBuilder}
-                onChangeCategoryBuilder={onChangeCategoryBuilder}
-                onSaveCategoryBuilder={onSaveCategoryBuilder}
-                onOpenCategoryMenu={onOpenCategoryMenu}
-              />
-            </div>
-          ) : null}
-
-          {step === 1 ? (
-            <div className="habitosView__wizardStep">
-              <Field label="Frecuencia">
-                <select
-                  value={draft.scheduleType}
-                  onChange={(event) => onChange("scheduleType", event.target.value)}
-                >
-                  <option value="daily">Todos los dias</option>
-                  <option value="weekdays">Dias de la semana</option>
-                </select>
-              </Field>
-
-              {draft.scheduleType === "weekdays" ? (
-                <div className="habitosView__weekdayGrid">
-                  {WEEKDAY_OPTIONS.map((option) => {
-                    const active = draft.weekdays.includes(option.value);
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={["habitosView__weekdayButton", active ? "is-active" : ""].filter(Boolean).join(" ")}
-                        onClick={() => onToggleWeekday(option.value)}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <Notice tone="info">
-                  Se genera una ocurrencia por dia.
-                </Notice>
-              )}
-            </div>
-          ) : null}
-
-          {step === 2 ? (
-            <FieldGrid>
-              <Field label="Inicio">
-                <input
-                  type="date"
-                  value={draft.startDate}
-                  onChange={(event) => onChange("startDate", event.target.value)}
-                  required
-                />
-              </Field>
-
-              <Field label="Fin opcional">
-                <input
-                  type="date"
-                  value={draft.endDate}
-                  onChange={(event) => onChange("endDate", event.target.value)}
-                />
-              </Field>
-
-              <Field label="Hora">
-                <input
-                  type="time"
-                  value={draft.time}
-                  onChange={(event) => onChange("time", event.target.value)}
-                />
-              </Field>
-
-              <Field label="Prioridad">
-                <StepperNumberInput
-                  min="1"
-                  max="100"
-                  step="1"
-                  value={draft.priority}
-                  onChange={(value) => onChange("priority", value)}
-                  onCommit={(value) => onCommitNumber("priority", value)}
-                />
-              </Field>
-
-              <Field label="Notas" wide>
-                <textarea
-                  rows="3"
-                  value={draft.notes}
-                  onChange={(event) => onChange("notes", event.target.value)}
-                  placeholder="Criterio simple de uso diario."
-                />
-              </Field>
-            </FieldGrid>
-          ) : null}
-
-          <div className="habitosView__editorActions">
-            <div className="habitosView__editorNav">
-              <Button type="button" onClick={onBack} disabled={step === 0 || saving}>
-                <ChevronLeftIcon />
-                <span>Atras</span>
-              </Button>
-              {!isLastStep ? (
-                <Button type="button" onClick={onNext} disabled={saving}>
-                  <span>Siguiente</span>
-                  <ChevronRightIcon />
-                </Button>
-              ) : null}
-            </div>
-
-            <div className="habitosView__editorNav">
-              {isLastStep ? (
-                <Button type="submit" tone="primary" disabled={saving}>
-                  {saving ? "Guardando..." : "Guardar habito"}
-                </Button>
-              ) : null}
-              <Button type="button" onClick={onCancel} disabled={saving}>
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        </form>
-      </SectionPanel>
-    );
-  }
-
-  const isLastStep = step === HABIT_WIZARD_STEPS.length - 1;
-  return (
-    <SectionPanel tone="highlight" className="habitosView__modalPanel">
-      <PanelHeader>
-        <PanelTitle title="Nuevo habito" />
-      </PanelHeader>
-
-      <form className="habitosView__editorForm" onSubmit={onSubmit}>
-        <div className="habitosView__modalStep">
-          <span>Paso {step + 1} de {HABIT_WIZARD_STEPS.length}</span>
-          <strong>{HABIT_WIZARD_STEPS[step]?.label || "Paso"}</strong>
-        </div>
-
-        {wizardError ? (
-          <Notice tone="danger">
-            {wizardError}
-          </Notice>
-        ) : null}
-
-        {step === 0 ? (
-          <HabitCategoryPicker
-            categories={categories}
-            presetOverrides={presetOverrides}
-            selectedCategory={draft.category}
-            saving={saving}
-            builderOpen={categoryBuilderOpen}
-            builderDraft={categoryBuilderDraft}
-            builderError={categoryBuilderError}
-            onSelectCategory={onSelectCategory}
-            onOpenBuilder={onOpenCategoryBuilder}
-            onCloseBuilder={onCloseCategoryBuilder}
-            onChangeCategoryBuilder={onChangeCategoryBuilder}
-            onSaveCategoryBuilder={onSaveCategoryBuilder}
-            onOpenCategoryMenu={onOpenCategoryMenu}
-          />
-        ) : null}
-
-        {step === 1 ? (
-          <div className="habitosView__wizardStep">
-            <div className="habitosView__sectionIntro">
-              <strong>Como quieres evaluarlo?</strong>
-            </div>
-
-            <div className="habitosView__wizardOptionGrid habitosView__wizardOptionGrid--stacked">
-              {HABIT_PROGRESS_OPTIONS.map((option) => (
-                <WizardOptionCard
-                  key={option.value}
-                  title={option.label}
-                  description={option.description}
-                  isSelected={draft.progressMode === option.value}
-                  onClick={() => onSelectProgressMode(option.value)}
-                />
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {step === 2 ? (
-          <div className="habitosView__wizardStep">
-            {draft.progressMode === "yes-no" ? (
-              <FieldGrid>
-                <Field label="Nombre" wide>
-                  <input
-                    value={draft.title}
-                    onChange={(event) => onChange("title", event.target.value)}
-                    placeholder="Nombre del habito"
-                    required
-                  />
-                </Field>
-
-                <Field label="Descripcion" wide>
-                  <textarea
-                    rows="3"
-                    value={draft.notes}
-                    onChange={(event) => onChange("notes", event.target.value)}
-                    placeholder="Descripcion (opcional)"
-                  />
-                </Field>
-              </FieldGrid>
-            ) : null}
-
-            {draft.progressMode === "quantity" ? (
-              <FieldGrid>
-                <Field label="Nombre" wide>
-                  <input
-                    value={draft.title}
-                    onChange={(event) => onChange("title", event.target.value)}
-                    placeholder="Nombre del habito"
-                    required
-                  />
-                </Field>
-
-                <Field label="Objetivo diario" wide>
-                  <div className="habitosView__quantitySentence">
-                    <select
-                      value={draft.quantityMode}
-                      onChange={(event) => onChange("quantityMode", event.target.value)}
-                    >
-                      {HABIT_QUANTITY_MODE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-
-                    <DraftNumberInput
-                      min="0"
-                      step="1"
-                      value={draft.quantityTarget}
-                      onChange={(value) => onChange("quantityTarget", value)}
-                      onCommit={(value) => onCommitNumber("quantityTarget", value)}
-                      placeholder="Objetivo int"
-                      disabled={draft.quantityMode === "no-target"}
-                    />
-
-                    <input
-                      value={draft.quantityUnit}
-                      onChange={(event) => onChange("quantityUnit", event.target.value)}
-                      placeholder="Unidad (opcional)"
-                    />
-
-                    <span className="habitosView__quantitySuffix">en el dia</span>
-                  </div>
-                </Field>
-
-                <Field label="Descripcion" wide>
-                  <textarea
-                    rows="3"
-                    value={draft.notes}
-                    onChange={(event) => onChange("notes", event.target.value)}
-                    placeholder="Descripcion (opcional)"
-                  />
-                </Field>
-              </FieldGrid>
-            ) : null}
-
-            {draft.progressMode === "checklist" ? (
-              <>
-                <FieldGrid>
-                  <Field label="Nombre" wide>
-                    <input
-                      value={draft.title}
-                      onChange={(event) => onChange("title", event.target.value)}
-                      placeholder="Nombre del habito"
-                      required
-                    />
-                  </Field>
-                </FieldGrid>
-
-                <div className="habitosView__subitemEditor">
-                  <div className="habitosView__sectionIntro">
-                    <strong>Sub-items</strong>
-                  </div>
-
-                  <div className="habitosView__subitemsDraft">
-                    {draft.checklistItems.map((item, index) => (
-                      <div
-                        key={item.id || index}
-                        className={[
-                          "habitosView__subitemDraftRow",
-                          draggedChecklistIndex === index ? "is-dragging" : "",
-                          dropChecklistIndex === index && draggedChecklistIndex !== index ? "is-drop-target" : "",
-                        ].filter(Boolean).join(" ")}
-                        draggable={draft.checklistItems.length > 1}
-                        onDragStart={(event) => {
-                          if (checklistDragIntentRef.current !== index) {
-                            event.preventDefault();
-                            return;
-                          }
-
-                          event.dataTransfer.effectAllowed = "move";
-                          event.dataTransfer.setData("text/plain", String(index));
-                          setDraggedChecklistIndex(index);
-                          setDropChecklistIndex(index);
-                        }}
-                        onDragEnd={() => {
-                          resetChecklistDragState();
-                        }}
-                        onDragOver={(event) => {
-                          if (draggedChecklistIndex === null) {
-                            return;
-                          }
-
-                          event.preventDefault();
-                          if (dropChecklistIndex !== index) {
-                            setDropChecklistIndex(index);
-                          }
-                        }}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          handleChecklistDrop(index);
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="habitosView__subitemDragHandle"
-                          aria-label="Reordenar item"
-                          draggable={false}
-                          onPointerDown={() => {
-                            checklistDragIntentRef.current = index;
-                          }}
-                          onPointerUp={() => {
-                            checklistDragIntentRef.current = null;
-                          }}
-                          onPointerCancel={() => {
-                            checklistDragIntentRef.current = null;
-                          }}
-                        >
-                          <span />
-                          <span />
-                        </button>
-
-                        <input
-                          value={item.title}
-                          onChange={(event) => onChange("checklistItem", {
-                            index,
-                            value: event.target.value,
-                          })}
-                          placeholder="item"
-                        />
-                        <IconButton
-                          type="button"
-                          aria-label="Eliminar item"
-                          tone="danger"
-                          onClick={() => onChange("removeChecklistItem", index)}
-                        >
-                          <TrashIcon />
-                        </IconButton>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="habitosView__centeredAction">
-                    <Button type="button" onClick={() => onChange("addChecklistItem")}>
-                      Agregar item
-                    </Button>
-                  </div>
-                </div>
-              </>
-            ) : null}
-          </div>
-        ) : null}
-
-        {step === 3 ? (
-          <div className="habitosView__wizardStep">
-            <div className="habitosView__sectionIntro">
-              <strong>Frecuencia</strong>
-            </div>
-
-            <Field label="Frecuencia">
-              <select
-                value={draft.scheduleType}
-                onChange={(event) => onChange("scheduleType", event.target.value)}
-              >
-                <option value="daily">Todos los dias</option>
-                <option value="weekdays">Dias de la semana</option>
-              </select>
-            </Field>
-
-            {draft.scheduleType === "weekdays" ? (
-              <div className="habitosView__weekdayGrid">
-                {WEEKDAY_OPTIONS.map((option) => {
-                  const active = draft.weekdays.includes(option.value);
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={["habitosView__weekdayButton", active ? "is-active" : ""].filter(Boolean).join(" ")}
-                      onClick={() => onToggleWeekday(option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {step === 4 ? (
-          <div className="habitosView__wizardStep">
-            <div className="habitosView__sectionIntro">
-              <strong>Cuando quieres hacerlo?</strong>
-            </div>
-
-            <FieldGrid>
-              <Field label="Fecha de inicio">
-                <DateDraftInput
-                  value={draft.startDate}
-                  onChange={(value) => onChange("startDate", value)}
-                  showTodayLabel
-                />
-              </Field>
-
-              <div className="habitosView__toggleCard">
-                <label className="habitosView__booleanField habitosView__booleanField--inline">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(draft.hasEndDate)}
-                    onChange={(event) => onChange("hasEndDate", event.target.checked)}
-                  />
-                  <span>Fecha de fin</span>
-                </label>
-              </div>
-            </FieldGrid>
-
-            {draft.hasEndDate ? (
-              <FieldGrid>
-                <Field label="Fecha de fin">
-                  <input
-                    type="date"
-                    value={draft.endDate}
-                    onChange={(event) => onChange("endDate", event.target.value)}
-                  />
-                </Field>
-
-                <Field label="Duracion">
-                  <div className="habitosView__durationField">
-                    <DraftNumberInput
-                      min="1"
-                      step="1"
-                      value={draft.durationDays}
-                      onChange={(value) => onChange("durationDays", value)}
-                      onCommit={(value) => onCommitNumber("durationDays", value)}
-                    />
-                    <span className="habitosView__quantitySuffix">dias</span>
-                  </div>
-                </Field>
-              </FieldGrid>
-            ) : null}
-
-            <div className="habitosView__inlineHint">
-              Hora y recordatorios: pronto.
-            </div>
-
-            <FieldGrid>
-              <Field label="Prioridad">
-                <StepperNumberInput
-                  min="1"
-                  max="100"
-                  step="1"
-                  value={draft.priority}
-                  onChange={(value) => onChange("priority", value)}
-                  onCommit={(value) => onCommitNumber("priority", value)}
-                />
-              </Field>
-            </FieldGrid>
-          </div>
-        ) : null}
-
-          <div className="habitosView__editorActions">
-            <div className="habitosView__editorNav">
-              <Button type="button" onClick={onBack} disabled={step === 0 || saving}>
-                <ChevronLeftIcon />
-                <span>Atras</span>
-              </Button>
-              {![0, 1].includes(step) && !isLastStep ? (
-                <Button type="button" onClick={onNext} disabled={saving}>
-                  <span>Siguiente</span>
-                  <ChevronRightIcon />
-                </Button>
-              ) : null}
-            </div>
-
-          <div className="habitosView__editorNav">
-            {isLastStep ? (
-              <Button type="submit" tone="primary" disabled={saving}>
-                {saving ? "Guardando..." : "Crear habito"}
-              </Button>
-            ) : null}
-            <Button type="button" onClick={onCancel} disabled={saving}>
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      </form>
     </SectionPanel>
   );
 }
@@ -4024,15 +2636,11 @@ export default function LifeTrackerView({ ctx, input = null }) {
   const [trainingRefreshToken, setTrainingRefreshToken] = useState(0);
   const [queueMenu, setQueueMenu] = useState(null);
   const [categoryMenu, setCategoryMenu] = useState(null);
-  const [expandedChecklistIds, setExpandedChecklistIds] = useState([]);
+  const [expandedQueueSubitemIds, setExpandedQueueSubitemIds] = useState([]);
   const [manualEditableOccurrenceIds, setManualEditableOccurrenceIds] = useState([]);
   const [viewDate, setViewDate] = useState(systemToday);
   const viewDatePickerRef = useRef(null);
-  const isEditingHabitDraft = Boolean(habitDraft.id);
-  const activeHabitWizardSteps = isEditingHabitDraft
-    ? HABIT_EDIT_WIZARD_STEPS
-    : HABIT_WIZARD_STEPS;
-  const lastHabitStepIndex = activeHabitWizardSteps.length - 1;
+  const lastHabitStepIndex = HABIT_EDITOR_STEPS.length - 1;
   const managedCategories = useMemo(
     () => buildManagedHabitCategories(home.categoryCatalog, presetCategoryOverrides),
     [home.categoryCatalog, presetCategoryOverrides],
@@ -4140,13 +2748,16 @@ export default function LifeTrackerView({ ctx, input = null }) {
   }, [isHabitsDrawerOpen, managedCategories, selectedCategoryId]);
 
   useEffect(() => {
-    const visibleChecklistIds = new Set(
+    const visibleExpandableQueueIds = new Set(
       home.dailyQueue
-        .filter((entry) => entry.type === "habit" && entry.progressMode === "checklist")
-        .map((entry) => entry.recordId),
+        .filter((entry) => (
+          (entry.type === "habit" && entry.progressMode === "checklist")
+          || (entry.type === "task" && Array.isArray(entry.subitems) && entry.subitems.length)
+        ))
+        .map((entry) => entry.id),
     );
 
-    setExpandedChecklistIds((currentValue) => currentValue.filter((entry) => visibleChecklistIds.has(entry)));
+    setExpandedQueueSubitemIds((currentValue) => currentValue.filter((entry) => visibleExpandableQueueIds.has(entry)));
   }, [home.dailyQueue]);
 
   useEffect(() => {
@@ -4242,7 +2853,13 @@ export default function LifeTrackerView({ ctx, input = null }) {
     setQueueMenu(null);
     setError("");
     setTaskDraft(createTaskDraft(source));
-    setTaskAdvancedOpen(Boolean(source?.notes || source?.time || source?.reminderAt || source?.subitems?.length));
+    setTaskAdvancedOpen(Boolean(
+      source?.notes
+      || source?.time
+      || source?.reminderAt
+      || source?.subitemsBlocking
+      || source?.isPersistent === false,
+    ));
     setModalMode("task");
   };
 
@@ -4542,15 +3159,32 @@ export default function LifeTrackerView({ ctx, input = null }) {
     }));
   };
 
-  const handleSelectExistingHabitCategory = (value) => {
-    setCategoryBuilderError("");
-    setCategoryBuilderOpen(false);
-    setCategoryMenu(null);
-    setHabitDraft((currentValue) => ({
-      ...currentValue,
-      category: value,
-    }));
-  };
+  const renderSharedCategoryPicker = ({
+    selectedCategory = "",
+    onSelectCategory,
+    saving: pickerSaving = saving,
+  } = {}) => (
+    <HabitCategoryPicker
+      categories={home.categoryCatalog}
+      presetOverrides={presetCategoryOverrides}
+      selectedCategory={selectedCategory}
+      saving={pickerSaving}
+      builderOpen={categoryBuilderOpen}
+      builderDraft={categoryBuilderDraft}
+      builderError={categoryBuilderError}
+      onSelectCategory={(value) => {
+        setCategoryBuilderError("");
+        setCategoryBuilderOpen(false);
+        setCategoryMenu(null);
+        onSelectCategory?.(value);
+      }}
+      onOpenBuilder={handleOpenCategoryBuilder}
+      onCloseBuilder={handleCloseCategoryBuilder}
+      onChangeCategoryBuilder={handleChangeCategoryBuilder}
+      onSaveBuilder={() => void handleSaveCategoryBuilder()}
+      onOpenCategoryMenu={handleOpenCategoryMenu}
+    />
+  );
 
   const handleSaveCategoryBuilder = async () => {
     const normalizedName = normalizeCategoryNameValue(categoryBuilderDraft.name);
@@ -4774,18 +3408,46 @@ export default function LifeTrackerView({ ctx, input = null }) {
     }));
   };
 
-  const handleTaskSubitemChange = (index, field, value) => {
+  const handleTaskSubitemTitleChange = (index, value) => {
     setTaskDraft((currentValue) => ({
       ...currentValue,
       subitems: currentValue.subitems.map((entry, entryIndex) => (
         entryIndex === index
           ? {
               ...entry,
-              [field]: value,
+              title: value,
             }
           : entry
       )),
     }));
+  };
+
+  const handleTaskSubitemMove = (fromIndex, toIndex) => {
+    setTaskDraft((currentValue) => {
+      if (
+        !Number.isInteger(fromIndex)
+        || !Number.isInteger(toIndex)
+        || fromIndex < 0
+        || toIndex < 0
+        || fromIndex >= currentValue.subitems.length
+        || toIndex >= currentValue.subitems.length
+        || fromIndex === toIndex
+      ) {
+        return currentValue;
+      }
+
+      const nextSubitems = [...currentValue.subitems];
+      const [movedItem] = nextSubitems.splice(fromIndex, 1);
+      nextSubitems.splice(toIndex, 0, movedItem);
+
+      return {
+        ...currentValue,
+        subitems: nextSubitems.map((entry, index) => ({
+          ...entry,
+          sortOrder: index,
+        })),
+      };
+    });
   };
 
   const handleHabitDraftChange = (field, value) => {
@@ -5004,19 +3666,12 @@ export default function LifeTrackerView({ ctx, input = null }) {
     }
   };
 
-  const handleSelectHabitCategory = (value) => {
-    setHabitWizardError("");
-    handleSelectExistingHabitCategory(value);
-    setHabitStep(1);
-  };
-
   const handleSelectHabitProgressMode = (value) => {
     setHabitWizardError("");
     setHabitDraft((currentValue) => ({
       ...currentValue,
       progressMode: value,
     }));
-    setHabitStep(2);
   };
 
   const handleTaskSubmit = async (event) => {
@@ -5044,63 +3699,71 @@ export default function LifeTrackerView({ ctx, input = null }) {
   const handleHabitSubmit = async (event) => {
     event.preventDefault();
 
-    if (habitStep < lastHabitStepIndex) {
-      if (!isEditingHabitDraft && habitStep === 0 && !habitDraft.category) {
-        setHabitWizardError("Elige una categoria para seguir.");
-        return;
+    const validateHabitCategoryStep = () => {
+      if (!String(habitDraft.category || "").trim()) {
+        setHabitWizardError("Elige una categoria para continuar.");
+        return false;
       }
 
-      if (!isEditingHabitDraft && habitStep === 1 && !habitDraft.progressMode) {
+      return true;
+    };
+
+    const validateHabitEvaluationStep = () => {
+      if (!String(habitDraft.progressMode || "").trim()) {
         setHabitWizardError("Elige como quieres evaluar tu progreso.");
+        return false;
+      }
+
+      const normalizedTitle = String(habitDraft.title || "").trim();
+      if (!normalizedTitle) {
+        setHabitWizardError("El nombre del habito es obligatorio.");
+        return false;
+      }
+
+      if (habitDraft.progressMode === "quantity") {
+        if (habitDraft.quantityMode !== "no-target" && String(habitDraft.quantityTarget || "").trim() === "") {
+          setHabitWizardError("Define el objetivo numerico para continuar.");
+          return false;
+        }
+      }
+
+      if (habitDraft.progressMode === "checklist") {
+        const items = habitDraft.checklistItems.map((entry) => String(entry.title || "").trim());
+
+        if (!items.some(Boolean)) {
+          setHabitWizardError("Agrega al menos un sub-item.");
+          return false;
+        }
+
+        if (items.some((entry) => !entry)) {
+          setHabitWizardError("Completa o elimina los sub-items vacios.");
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    const validateHabitFrequencyStep = () => {
+      if (habitDraft.scheduleType === "weekdays" && !habitDraft.weekdays.length) {
+        setHabitWizardError("Elige al menos un dia de la semana.");
+        return false;
+      }
+
+      return true;
+    };
+
+    if (habitStep < lastHabitStepIndex) {
+      if (habitStep === 0 && !validateHabitCategoryStep()) {
         return;
       }
 
-      if (
-        (isEditingHabitDraft && habitStep === 0)
-        || (!isEditingHabitDraft && habitStep === 2)
-      ) {
-        const title = String(habitDraft.title || "").trim();
-
-        if (!title) {
-          setHabitWizardError("El nombre del habito es obligatorio.");
-          return;
-        }
-
-        if (!String(habitDraft.category || "").trim()) {
-          setHabitWizardError("Elige una categoria para continuar.");
-          return;
-        }
-
-        if (habitDraft.progressMode === "quantity") {
-          if (habitDraft.quantityMode !== "no-target" && String(habitDraft.quantityTarget || "").trim() === "") {
-            setHabitWizardError("Define el objetivo numerico para continuar.");
-            return;
-          }
-        }
-
-        if (habitDraft.progressMode === "checklist") {
-          const items = habitDraft.checklistItems.map((entry) => String(entry.title || "").trim());
-
-          if (!items.some(Boolean)) {
-            setHabitWizardError("Agrega al menos un sub-item.");
-            return;
-          }
-
-          if (items.some((entry) => !entry)) {
-            setHabitWizardError("Completa o elimina los sub-items vacios.");
-            return;
-          }
-        }
+      if (habitStep === 1 && !validateHabitEvaluationStep()) {
+        return;
       }
 
-      if (
-        (isEditingHabitDraft && habitStep === 1)
-        || (!isEditingHabitDraft && habitStep === 3)
-      ) {
-        if (habitDraft.scheduleType === "weekdays" && !habitDraft.weekdays.length) {
-          setHabitWizardError("Elige al menos un dia de la semana.");
-          return;
-        }
+      if (habitStep === 2 && !validateHabitFrequencyStep()) {
+        return;
       }
 
       setHabitWizardError("");
@@ -5108,43 +3771,8 @@ export default function LifeTrackerView({ ctx, input = null }) {
       return;
     }
 
-    const normalizedTitle = String(habitDraft.title || "").trim();
-    if (!normalizedTitle) {
-      setHabitWizardError("El nombre del habito es obligatorio.");
+    if (!validateHabitCategoryStep() || !validateHabitEvaluationStep() || !validateHabitFrequencyStep()) {
       return;
-    }
-
-    if (!String(habitDraft.category || "").trim()) {
-      setHabitWizardError("Elige una categoria para continuar.");
-      return;
-    }
-
-    if (habitDraft.scheduleType === "weekdays" && !habitDraft.weekdays.length) {
-      setHabitWizardError("Elige al menos un dia de la semana.");
-      return;
-    }
-
-    if (
-      habitDraft.progressMode === "quantity"
-      && habitDraft.quantityMode !== "no-target"
-      && String(habitDraft.quantityTarget || "").trim() === ""
-    ) {
-      setHabitWizardError("Define el objetivo numerico para guardar.");
-      return;
-    }
-
-    if (habitDraft.progressMode === "checklist") {
-      const items = habitDraft.checklistItems.map((entry) => String(entry.title || "").trim());
-
-      if (!items.some(Boolean)) {
-        setHabitWizardError("Agrega al menos un sub-item.");
-        return;
-      }
-
-      if (items.some((entry) => !entry)) {
-        setHabitWizardError("Completa o elimina los sub-items vacios.");
-        return;
-      }
     }
 
     setHabitWizardError("");
@@ -5231,11 +3859,22 @@ export default function LifeTrackerView({ ctx, input = null }) {
     });
   };
 
-  const handleToggleChecklistExpanded = (occurrenceId) => {
-    setExpandedChecklistIds((currentValue) => (
-      currentValue.includes(occurrenceId)
-        ? currentValue.filter((entry) => entry !== occurrenceId)
-        : [...currentValue, occurrenceId]
+  const handleToggleTaskSubitem = async (item, subitemId) => {
+    if (item.type !== "task" || viewDate !== actualToday || item.status === "completed") {
+      return;
+    }
+
+    await runMutation(LIFE_TRACKER_HABITS_CHANNELS.toggleTaskSubitem, {
+      taskId: item.recordId,
+      subitemId,
+    });
+  };
+
+  const handleToggleQueueSubitemsExpanded = (queueItemId) => {
+    setExpandedQueueSubitemIds((currentValue) => (
+      currentValue.includes(queueItemId)
+        ? currentValue.filter((entry) => entry !== queueItemId)
+        : [...currentValue, queueItemId]
     ));
   };
 
@@ -5323,19 +3962,131 @@ export default function LifeTrackerView({ ctx, input = null }) {
     );
   };
 
-  const renderSecondaryTask = (task) => (
-    <article
-      key={task.id}
-      className={[
-        "habitosView__secondaryCard",
-        queueMenu?.item?.id === `upcoming-task:${task.id}` ? "is-selected" : "",
-      ].filter(Boolean).join(" ")}
-      onContextMenu={(event) => handleOpenQueueMenu(event, buildUpcomingTaskMenuItem(task))}
-    >
-      <strong>{task.title}</strong>
-      <span>{formatLocalDate(task.dueDate)}{task.time ? ` - ${task.time}` : ""}</span>
-    </article>
-  );
+  const renderSecondaryTask = (task) => {
+    const accent = resolveQueueCategoryPresentation({
+      type: "task",
+      title: task.title,
+      category: task.category,
+    }, home.categoryCatalog, presetCategoryOverrides);
+    const secondaryParts = [
+      task.category || "",
+      formatLocalDate(task.dueDate),
+      task.time || "",
+    ].filter(Boolean);
+
+    return (
+      <article
+        key={task.id}
+        className={[
+          "habitosView__secondaryCard",
+          queueMenu?.item?.id === `upcoming-task:${task.id}` ? "is-selected" : "",
+        ].filter(Boolean).join(" ")}
+        onContextMenu={(event) => handleOpenQueueMenu(event, buildUpcomingTaskMenuItem(task))}
+      >
+        <span
+          className="habitosView__secondaryCardIcon"
+          style={{ "--habitos-item-accent": accent.color }}
+          aria-hidden="true"
+        >
+          <ClockIcon />
+        </span>
+        <div className="habitosView__secondaryCardCopy">
+          <strong>{task.title}</strong>
+          <span>{secondaryParts.join(" - ")}</span>
+        </div>
+      </article>
+    );
+  };
+
+  const renderDailyQueueItem = (item) => {
+    const accent = resolveQueueCategoryPresentation(item, home.categoryCatalog, presetCategoryOverrides);
+    const isTask = item.type === "task";
+    const isRoutine = item.type === "routine";
+    const isChecklistHabit = item.type === "habit" && item.progressMode === "checklist";
+    const isQuantityHabit = item.type === "habit" && item.progressMode === "quantity";
+    const toggleDisabled = isTask
+      ? viewDate !== actualToday
+      : !canEditQueueItemResult(item);
+    const toggleMeta = getQueueToggleMeta(item);
+    const secondaryCopy = isRoutine
+      ? [item.meta, item.summary].filter(Boolean).join(" - ")
+      : isTask
+        ? [item.category, item.meta || item.summary].filter(Boolean).join(" - ")
+        : "";
+
+    let subitems = null;
+    if (isChecklistHabit) {
+      const checklistItems = getHabitChecklistItemsValue(item);
+      const checkedIds = new Set(
+        Array.isArray(item?.progressDataJson?.checkedItemIds)
+          ? item.progressDataJson.checkedItemIds
+          : [],
+      );
+      subitems = {
+        label: `Sub-items ${getChecklistProgressSummary(item)}`,
+        isExpanded: expandedQueueSubitemIds.includes(item.id),
+        toggleDisabled,
+        items: checklistItems.map((checklistItem) => ({
+          id: checklistItem.id,
+          title: checklistItem.title,
+          isCompleted: checkedIds.has(checklistItem.id),
+        })),
+      };
+    } else if (isTask && Array.isArray(item.subitems) && item.subitems.length) {
+      subitems = {
+        label: `Sub-items ${getTaskSubitemsProgressSummary(item)}`,
+        isExpanded: expandedQueueSubitemIds.includes(item.id),
+        toggleDisabled: viewDate !== actualToday || item.status === "completed",
+        items: item.subitems.map((subitem) => ({
+          id: subitem.id,
+          title: subitem.title,
+          isCompleted: Boolean(subitem.isCompleted),
+        })),
+      };
+    }
+
+    return (
+      <QueueItemCard
+        key={item.id}
+        item={item}
+        badge={{
+          accentColor: accent.color,
+          icon: isTask
+            ? <ClockIcon />
+            : <RemoteCategoryIcon iconId={accent.iconId} color={accent.color} />,
+        }}
+        secondaryCopy={secondaryCopy}
+        toggleMeta={toggleMeta ? { ...toggleMeta, disabled: toggleDisabled } : null}
+        isSelected={queueMenu?.item?.id === item.id}
+        isSettled={isQueueItemSettled(item)}
+        saving={saving}
+        showStatusPill={shouldShowQueueStatusPill(item)}
+        quantityControl={isQuantityHabit ? (
+          <div className="habitosView__queueQuantityControl">
+            <QuantityQueueInput
+              item={item}
+              disabled={saving || !canEditQueueItemResult(item)}
+              onCommit={(value) => handleCommitOccurrenceQuantity(item, value)}
+            />
+          </div>
+        ) : null}
+        inlineActionLabel={isRoutine && item.completionMode === "detailed" ? getRoutineDetailedActionLabel(item) : ""}
+        inlineActionDisabled={!canEditQueueItemResult(item)}
+        subitems={subitems}
+        onToggle={() => void handleToggleQueueItem(item)}
+        onInlineAction={() => void handleToggleQueueItem(item)}
+        onContextMenu={handleOpenQueueMenu}
+        onToggleExpanded={handleToggleQueueSubitemsExpanded}
+        onToggleSubitem={(queueItem, itemId) => {
+          if (queueItem.type === "task") {
+            return void handleToggleTaskSubitem(queueItem, itemId);
+          }
+
+          return void handleToggleOccurrenceChecklistItem(queueItem, itemId);
+        }}
+      />
+    );
+  };
 
   const handleOpenQueueMenu = (event, item) => {
     event.preventDefault();
@@ -5444,23 +4195,7 @@ export default function LifeTrackerView({ ctx, input = null }) {
           <StateBlock title="Cargando..." />
         ) : home.dailyQueue.length ? (
           <div className="habitosView__queueList">
-            {home.dailyQueue.map((item) => (
-              <QueueItemCard
-                key={item.id}
-                item={item}
-                categoryCatalog={home.categoryCatalog}
-                presetOverrides={presetCategoryOverrides}
-                isSelected={queueMenu?.item?.id === item.id}
-                saving={saving}
-                resultEditable={item.type === "task" ? viewDate === actualToday : canEditQueueItemResult(item)}
-                onToggle={() => void handleToggleQueueItem(item)}
-                onContextMenu={handleOpenQueueMenu}
-                onCommitQuantity={(queueItem, value) => handleCommitOccurrenceQuantity(queueItem, value)}
-                onToggleChecklistItem={(queueItem, itemId) => handleToggleOccurrenceChecklistItem(queueItem, itemId)}
-                onToggleChecklistExpanded={handleToggleChecklistExpanded}
-                isChecklistExpanded={expandedChecklistIds.includes(item.recordId)}
-              />
-            ))}
+            {home.dailyQueue.map(renderDailyQueueItem)}
           </div>
         ) : (
           <StateBlock
@@ -5765,22 +4500,24 @@ export default function LifeTrackerView({ ctx, input = null }) {
           draft={taskDraft}
           advancedOpen={taskAdvancedOpen}
           saving={saving}
+          renderCategoryPicker={renderSharedCategoryPicker}
           onChange={handleTaskDraftChange}
           onCommitNumber={handleTaskDraftNumberCommit}
-          onSubitemChange={handleTaskSubitemChange}
           onAddSubitem={() => {
             setTaskDraft((currentValue) => ({
               ...currentValue,
               subitems: [
                 ...currentValue.subitems,
                 {
-                  id: "",
+                  id: createDraftId("task-subitem"),
                   title: "",
                   isCompleted: false,
                 },
               ],
             }));
           }}
+          onChangeSubitemTitle={handleTaskSubitemTitleChange}
+          onMoveSubitem={handleTaskSubitemMove}
           onRemoveSubitem={(index) => {
             setTaskDraft((currentValue) => ({
               ...currentValue,
@@ -5802,23 +4539,16 @@ export default function LifeTrackerView({ ctx, input = null }) {
       >
         <HabitEditor
           draft={habitDraft}
-          categories={home.categoryCatalog}
-          presetOverrides={presetCategoryOverrides}
           step={habitStep}
           saving={saving}
           wizardError={habitWizardError}
-          categoryBuilderOpen={categoryBuilderOpen}
-          categoryBuilderDraft={categoryBuilderDraft}
-          categoryBuilderError={categoryBuilderError}
+          stepLabels={HABIT_EDITOR_STEPS}
+          progressOptions={HABIT_PROGRESS_OPTIONS}
+          quantityModeOptions={HABIT_QUANTITY_MODE_OPTIONS}
+          weekdayOptions={WEEKDAY_OPTIONS}
+          renderCategoryPicker={renderSharedCategoryPicker}
           onChange={handleHabitDraftChange}
-          onSelectExistingCategory={handleSelectExistingHabitCategory}
-          onOpenCategoryBuilder={handleOpenCategoryBuilder}
-          onCloseCategoryBuilder={handleCloseCategoryBuilder}
-          onChangeCategoryBuilder={handleChangeCategoryBuilder}
-          onSaveCategoryBuilder={() => void handleSaveCategoryBuilder()}
-          onOpenCategoryMenu={handleOpenCategoryMenu}
           onCommitNumber={handleHabitDraftNumberCommit}
-          onSelectCategory={handleSelectHabitCategory}
           onSelectProgressMode={handleSelectHabitProgressMode}
           onToggleWeekday={(weekday) => {
             setHabitDraft((currentValue) => {
@@ -5843,3 +4573,4 @@ export default function LifeTrackerView({ ctx, input = null }) {
     </WorkspacePage>
   );
 }
+

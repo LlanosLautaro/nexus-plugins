@@ -1125,6 +1125,37 @@ function toggleTaskSync(sqlite, taskId, options = {}) {
   );
   return findTaskByIdSync(sqlite, task.id);
 }
+function toggleTaskSubitemSync(sqlite, taskId, subitemId, options = {}) {
+  const task = findTaskByIdSync(sqlite, taskId);
+  if (!task) {
+    throw new Error("No encontramos la tarea solicitada.");
+  }
+  if (task.status === "completed") {
+    throw new Error("Reabre la tarea antes de cambiar sus sub-items.");
+  }
+  const normalizedSubitemId = String(subitemId || "").trim();
+  if (!normalizedSubitemId) {
+    throw new Error("No encontramos el sub-item solicitado.");
+  }
+  const subitemIndex = task.subitems.findIndex((entry) => entry.id === normalizedSubitemId);
+  if (subitemIndex === -1) {
+    throw new Error("No encontramos el sub-item solicitado.");
+  }
+  const timestamp2 = options.now || nowIso();
+  const nextSubitems = task.subitems.map((entry) => entry.id === normalizedSubitemId ? {
+    ...entry,
+    isCompleted: !entry.isCompleted
+  } : entry);
+  sqlite.transaction(() => {
+    replaceTaskSubitemsSync(sqlite, task.id, nextSubitems, timestamp2);
+    sqlite.prepare(`
+      UPDATE habits_tasks
+      SET updated_at = ?
+      WHERE id = ?
+    `).run(timestamp2, task.id);
+  })();
+  return findTaskByIdSync(sqlite, task.id);
+}
 function deleteTaskSync(sqlite, taskId) {
   sqlite.transaction(() => {
     sqlite.prepare(`
@@ -4993,6 +5024,144 @@ function getOccurrenceWindowEndAt2(occurrenceDate) {
 function normalizeComparableText2(value) {
   return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 }
+var MUSCLE_NOTE_METADATA = Object.freeze({
+  "pectoralis-major-clavicular": {
+    movementSummary: "Ayuda a llevar el brazo al frente y hacia adentro, sobre todo en empujes con inclinacion.",
+    worksWith: ["pectoralis-major-sternal", "deltoid-anterior", "serratus-anterior", "triceps-lateral-medial"]
+  },
+  "pectoralis-major-sternal": {
+    movementSummary: "Empuja el brazo hacia delante y hacia adentro en presses, flexiones y abrazos fuertes.",
+    worksWith: ["pectoralis-major-clavicular", "deltoid-anterior", "triceps-lateral-medial", "serratus-anterior"]
+  },
+  "pectoralis-minor": {
+    movementSummary: "Ayuda a mover y estabilizar la escapula cuando empujas o llevas los hombros hacia delante.",
+    worksWith: ["serratus-anterior", "pectoralis-major-sternal", "deltoid-anterior", "trapezius-middle-lower"]
+  },
+  "deltoid-anterior": {
+    movementSummary: "Eleva el brazo al frente y ayuda en casi todo empuje por encima o delante del cuerpo.",
+    worksWith: ["pectoralis-major-clavicular", "pectoralis-major-sternal", "triceps-lateral-medial", "serratus-anterior"]
+  },
+  "deltoid-lateral": {
+    movementSummary: "Se encarga de separar el brazo del cuerpo hacia el costado.",
+    worksWith: ["deltoid-anterior", "deltoid-posterior", "trapezius-middle-lower", "serratus-anterior"]
+  },
+  "deltoid-posterior": {
+    movementSummary: "Lleva el brazo hacia atras y ayuda a abrirlo y estabilizar el hombro.",
+    worksWith: ["rhomboids", "trapezius-middle-lower", "latissimus-dorsi", "teres-major"]
+  },
+  "latissimus-dorsi": {
+    movementSummary: "Tira del brazo hacia abajo y hacia el cuerpo en dominadas, remos y gestos de trepa.",
+    worksWith: ["teres-major", "rhomboids", "biceps-brachii", "trapezius-middle-lower"]
+  },
+  "teres-major": {
+    movementSummary: "Ayuda a llevar el brazo hacia atras y pegado al torso, muy cerca del trabajo del dorsal.",
+    worksWith: ["latissimus-dorsi", "rhomboids", "deltoid-posterior", "biceps-brachii"]
+  },
+  "rhomboids": {
+    movementSummary: "Juntan las escapulas y ayudan a mantener el pecho abierto en remos y otras tracciones.",
+    worksWith: ["trapezius-middle-lower", "deltoid-posterior", "latissimus-dorsi", "teres-major"]
+  },
+  "trapezius-middle-lower": {
+    movementSummary: "Baja y acomoda las escapulas para dar una base estable a hombros y espalda.",
+    worksWith: ["rhomboids", "serratus-anterior", "deltoid-posterior", "latissimus-dorsi"]
+  },
+  "trapezius-upper": {
+    movementSummary: "Eleva la escapula y ayuda a sostener el hombro cuando cargas o elevas los brazos.",
+    worksWith: ["levator-scapulae", "serratus-anterior", "trapezius-middle-lower", "deltoid-lateral"]
+  },
+  "levator-scapulae": {
+    movementSummary: "Eleva la escapula y ayuda a inclinar o girar el cuello en movimientos cortos.",
+    worksWith: ["trapezius-upper", "rhomboids", "trapezius-middle-lower", "deltoid-posterior"]
+  },
+  "biceps-brachii": {
+    movementSummary: "Flexiona el codo y ayuda a supinar el antebrazo y a tirar del brazo hacia el cuerpo.",
+    worksWith: ["brachialis", "brachioradialis", "latissimus-dorsi", "teres-major"]
+  },
+  brachialis: {
+    movementSummary: "Flexiona el codo con casi cualquier agarre y da mucha base al tiron del brazo.",
+    worksWith: ["biceps-brachii", "brachioradialis", "forearm-flexors", "latissimus-dorsi"]
+  },
+  "triceps-long-head": {
+    movementSummary: "Extiende el codo y tambien ayuda cuando llevas el brazo hacia atras.",
+    worksWith: ["triceps-lateral-medial", "deltoid-anterior", "pectoralis-major-sternal", "latissimus-dorsi"]
+  },
+  "triceps-lateral-medial": {
+    movementSummary: "Extienden el codo en presses, flexiones y bloqueos del brazo.",
+    worksWith: ["triceps-long-head", "pectoralis-major-sternal", "deltoid-anterior", "serratus-anterior"]
+  },
+  brachioradialis: {
+    movementSummary: "Ayuda a flexionar el codo cuando el agarre es neutro o prono.",
+    worksWith: ["biceps-brachii", "brachialis", "forearm-flexors", "forearm-extensors"]
+  },
+  "forearm-flexors": {
+    movementSummary: "Cierran la mano y ayudan a sostener agarres, barras y apoyos de manos.",
+    worksWith: ["brachioradialis", "forearm-extensors", "biceps-brachii"]
+  },
+  "forearm-extensors": {
+    movementSummary: "Abren y estabilizan la muneca y los dedos cuando agarras o apoyas la mano.",
+    worksWith: ["brachioradialis", "forearm-flexors", "deltoid-posterior"]
+  },
+  "rectus-abdominis": {
+    movementSummary: "Flexiona el tronco y ayuda a acercar costillas y pelvis.",
+    worksWith: ["transverse-abdominis", "obliques", "hip-flexors"]
+  },
+  "transverse-abdominis": {
+    movementSummary: "Aprieta el abdomen como una faja y estabiliza la cintura antes de mover brazos o piernas.",
+    worksWith: ["rectus-abdominis", "obliques", "erector-spinae", "serratus-anterior"]
+  },
+  obliques: {
+    movementSummary: "Giran e inclinan el tronco y ayudan a resistir rotaciones no deseadas.",
+    worksWith: ["transverse-abdominis", "rectus-abdominis", "serratus-anterior", "gluteus-medius"]
+  },
+  "serratus-anterior": {
+    movementSummary: "Empuja y rota la escapula hacia delante y arriba para que el hombro se mueva limpio.",
+    worksWith: ["trapezius-middle-lower", "trapezius-upper", "pectoralis-minor", "deltoid-anterior"]
+  },
+  "erector-spinae": {
+    movementSummary: "Mantienen la espalda extendida y sostienen el tronco cuando te inclinas o cargas.",
+    worksWith: ["transverse-abdominis", "gluteus-maximus", "hamstrings", "rhomboids"]
+  },
+  "gluteus-maximus": {
+    movementSummary: "Extiende la cadera al ponerte de pie, saltar o empujar el cuerpo hacia delante.",
+    worksWith: ["hamstrings", "erector-spinae", "quadriceps", "gluteus-medius"]
+  },
+  "gluteus-medius": {
+    movementSummary: "Estabiliza la pelvis y separa la pierna del cuerpo, clave al apoyar una sola pierna.",
+    worksWith: ["abductors", "obliques", "gluteus-maximus", "quadriceps"]
+  },
+  quadriceps: {
+    movementSummary: "Extienden la rodilla en sentadillas, pasos, saltos y al ponerse de pie.",
+    worksWith: ["vastus-medialis", "gluteus-maximus", "gastrocnemius", "hip-flexors"]
+  },
+  "vastus-medialis": {
+    movementSummary: "Ayuda en la extension final de la rodilla y a que la rodilla siga una linea estable.",
+    worksWith: ["quadriceps", "gluteus-medius", "gastrocnemius", "hamstrings"]
+  },
+  hamstrings: {
+    movementSummary: "Llevan la cadera hacia atras y doblan la rodilla en bisagras, puentes y carrera.",
+    worksWith: ["gluteus-maximus", "erector-spinae", "gastrocnemius", "quadriceps"]
+  },
+  gastrocnemius: {
+    movementSummary: "Empuja el tobillo hacia abajo al caminar, correr, saltar y ponerte de puntas.",
+    worksWith: ["soleus", "hamstrings", "quadriceps"]
+  },
+  soleus: {
+    movementSummary: "Ayuda a empujar el suelo con el tobillo, sobre todo con rodilla flexionada y en aguantes largos.",
+    worksWith: ["gastrocnemius", "quadriceps", "hamstrings"]
+  },
+  adductors: {
+    movementSummary: "Acercan la pierna hacia el centro y ayudan a estabilizar pelvis y rodilla.",
+    worksWith: ["gluteus-medius", "gluteus-maximus", "quadriceps", "hamstrings"]
+  },
+  abductors: {
+    movementSummary: "Separan la pierna del cuerpo y ayudan a mantener estable la pelvis.",
+    worksWith: ["gluteus-medius", "obliques", "quadriceps", "adductors"]
+  },
+  "hip-flexors": {
+    movementSummary: "Llevan la rodilla o el muslo hacia el pecho y ayudan a fijar la pelvis en el core.",
+    worksWith: ["rectus-abdominis", "transverse-abdominis", "quadriceps", "adductors"]
+  }
+});
 var REGION_DEFINITIONS = [
   {
     id: "upper",
@@ -5288,6 +5457,7 @@ var TRAINING_MUSCLE_GROUPS = REGION_DEFINITIONS.flatMap(
 var TRAINING_MUSCLE_CATALOG = REGION_DEFINITIONS.flatMap(
   (region) => region.groups.flatMap(
     (group) => group.muscles.map((muscle) => {
+      const noteMetadata = MUSCLE_NOTE_METADATA[muscle.id] || null;
       const aliases = Array.isArray(muscle.aliases) ? [...new Set([muscle.title, ...muscle.aliases].map((entry) => String(entry).trim()).filter(Boolean))] : [muscle.title];
       return {
         id: muscle.id,
@@ -5298,6 +5468,8 @@ var TRAINING_MUSCLE_CATALOG = REGION_DEFINITIONS.flatMap(
         regionTitle: region.title,
         groupId: group.id,
         groupTitle: group.title,
+        movementSummary: noteMetadata?.movementSummary || "",
+        relatedMuscleIds: Array.isArray(noteMetadata?.worksWith) ? [...noteMetadata.worksWith] : [],
         searchText: normalizeComparableText2([muscle.id, muscle.title, region.title, group.title, ...aliases].join(" "))
       };
     })
@@ -5338,6 +5510,1533 @@ function listTrainingMuscles({
     return muscle.searchText.includes(normalizedQuery);
   });
 }
+
+// ../nexus-plugins/life-tracker/src/training/training-starter-library.js
+var TRAINING_STARTER_LIBRARY_VERSION = 5;
+function createStarterExercise(definition) {
+  return Object.freeze({
+    exerciseType: "exercise",
+    measurementCategory: "strength",
+    tags: [],
+    ...definition
+  });
+}
+var reps = Object.freeze({ mode: "reps" });
+var time = Object.freeze({ mode: "time" });
+var TRAINING_STARTER_EXERCISES = Object.freeze([
+  createStarterExercise({
+    templateKey: "bodyweight-squat",
+    title: "Sentadilla con peso corporal",
+    summary: "Patr\xF3n base de sentadilla sin carga externa para piernas y control postural.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "quadriceps", percentage: 40 },
+      { muscleId: "gluteus-maximus", percentage: 30 },
+      { muscleId: "hamstrings", percentage: 15 },
+      { muscleId: "gastrocnemius", percentage: 10 },
+      { muscleId: "erector-spinae", percentage: 5 }
+    ],
+    description: "Sentadilla b\xE1sica para construir fuerza de piernas y control general.",
+    technique: [
+      "Separa los pies al ancho de hombros y reparte el peso en todo el pie.",
+      "Baja la cadera con el pecho estable y las rodillas siguiendo la l\xEDnea de los pies.",
+      "Sube empujando el suelo sin perder equilibrio."
+    ],
+    keyPoints: [
+      "Controla la profundidad antes de buscar velocidad.",
+      "Evita colapsar rodillas o despegar talones."
+    ],
+    notes: [
+      "Si te falta equilibrio, usa un apoyo ligero al principio."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "elbow-plank",
+    title: "Plancha con codos apoyados",
+    summary: "Isom\xE9trico base de core para sostener tronco y pelvis alineados.",
+    measurementCategory: "balance",
+    tags: ["isometric"],
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "transverse-abdominis", percentage: 35 },
+      { muscleId: "rectus-abdominis", percentage: 30 },
+      { muscleId: "obliques", percentage: 20 },
+      { muscleId: "erector-spinae", percentage: 10 },
+      { muscleId: "serratus-anterior", percentage: 5 }
+    ],
+    description: "Plancha frontal sobre antebrazos para reforzar el core y la estabilidad corporal.",
+    technique: [
+      "Apoya antebrazos y puntas de pie con hombros encima de los codos.",
+      "Aprieta abdomen y gl\xFAteos para sostener una l\xEDnea larga.",
+      "Respira corto y controlado sin hundir la cadera."
+    ],
+    keyPoints: [
+      "La postura limpia vale m\xE1s que aguantar m\xE1s segundos con mala forma.",
+      "Evita llevar toda la tensi\xF3n al cuello."
+    ],
+    notes: [
+      "\xDAsala como referencia base antes de progresiones m\xE1s exigentes."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "push-up",
+    title: "Flexiones simples de brazo",
+    summary: "Empuje horizontal cl\xE1sico con peso corporal para pecho, hombros y tr\xEDceps.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "pectoralis-major-sternal", percentage: 35 },
+      { muscleId: "deltoid-anterior", percentage: 25 },
+      { muscleId: "triceps-lateral-medial", percentage: 25 },
+      { muscleId: "serratus-anterior", percentage: 10 },
+      { muscleId: "transverse-abdominis", percentage: 5 }
+    ],
+    description: "Flexi\xF3n cl\xE1sica en el suelo para desarrollar empuje de tren superior.",
+    technique: [
+      "Coloca manos algo m\xE1s abiertas que hombros y alinea el cuerpo completo.",
+      "Baja con codos en una trayectoria natural, sin abrirlos del todo.",
+      "Empuja el suelo hasta extender brazos sin soltar el core."
+    ],
+    keyPoints: [
+      "Mant\xE9n el tronco firme para no compensar con la lumbar.",
+      "Reduce rango o eleva manos si a\xFAn no salen repeticiones limpias."
+    ],
+    notes: [
+      "Sirve como base para varias progresiones de flexiones."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "pull-up-pronated",
+    title: "Dominadas pronas",
+    summary: "Tir\xF3n vertical dominante de espalda para fuerza relativa de tren superior.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "latissimus-dorsi", percentage: 40 },
+      { muscleId: "rhomboids", percentage: 15 },
+      { muscleId: "trapezius-middle-lower", percentage: 15 },
+      { muscleId: "biceps-brachii", percentage: 15 },
+      { muscleId: "brachialis", percentage: 10 },
+      { muscleId: "brachioradialis", percentage: 5 }
+    ],
+    description: "Dominada con agarre prono para espalda y brazos.",
+    technique: [
+      "Cuelga con hombros activos antes de iniciar el tir\xF3n.",
+      "Lleva el pecho hacia la barra guiando el movimiento con los codos.",
+      "Desciende controlado hasta recuperar una extensi\xF3n estable."
+    ],
+    keyPoints: [
+      "Evita balanceos si quieres una referencia consistente.",
+      "La primera parte del tir\xF3n sale desde la espalda, no solo desde los brazos."
+    ],
+    notes: [
+      "Si a\xFAn no salen, puedes trabajar negativas o asistencia."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "leg-raise",
+    title: "Elevaciones de piernas",
+    summary: "Movimiento de flexi\xF3n de cadera y abdomen para control del core anterior.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "hip-flexors", percentage: 45 },
+      { muscleId: "rectus-abdominis", percentage: 30 },
+      { muscleId: "transverse-abdominis", percentage: 15 },
+      { muscleId: "obliques", percentage: 5 },
+      { muscleId: "adductors", percentage: 5 }
+    ],
+    description: "Elevaci\xF3n de piernas controlada para reforzar abdomen y flexores de cadera.",
+    technique: [
+      "Inicia con la espalda estable y las piernas juntas.",
+      "Eleva las piernas sin despegar la zona lumbar antes de tiempo.",
+      "Baja lento para no convertir la bajada en un balanceo libre."
+    ],
+    keyPoints: [
+      "Si la lumbar se arquea demasiado, reduce rango o flexiona rodillas.",
+      "El control de la bajada cuenta como parte real del ejercicio."
+    ],
+    notes: [
+      "Usa siempre la misma variante si quieres comparar dificultad."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "side-leg-raise",
+    title: "Elevaciones laterales de piernas",
+    summary: "Trabajo lateral de cadera para gl\xFAteo medio y abductores.",
+    tags: ["unilateral"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "abductors", percentage: 45 },
+      { muscleId: "gluteus-medius", percentage: 35 },
+      { muscleId: "obliques", percentage: 10 },
+      { muscleId: "transverse-abdominis", percentage: 10 }
+    ],
+    description: "Elevaci\xF3n lateral de la pierna superior para fortalecer la cadera.",
+    technique: [
+      "Mant\xE9n pelvis y tronco alineados mientras elevas la pierna.",
+      "Sube hasta donde puedas sostener tensi\xF3n real en la cadera lateral.",
+      "Baja lento sin dejar caer la pierna."
+    ],
+    keyPoints: [
+      "Evita inclinar el torso para hacer trampa.",
+      "La sensaci\xF3n principal debe ir a la parte lateral de la cadera."
+    ],
+    notes: [
+      "Es la variante superior acostado de lado; la inferior va separada."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "side-plank",
+    title: "Plancha lateral",
+    summary: "Isom\xE9trico lateral para oblicuos, cadera y estabilidad del tronco.",
+    measurementCategory: "balance",
+    tags: ["isometric", "unilateral"],
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "obliques", percentage: 35 },
+      { muscleId: "transverse-abdominis", percentage: 25 },
+      { muscleId: "gluteus-medius", percentage: 15 },
+      { muscleId: "erector-spinae", percentage: 15 },
+      { muscleId: "serratus-anterior", percentage: 10 }
+    ],
+    description: "Plancha lateral para desarrollar estabilidad frontal y lateral.",
+    technique: [
+      "Apoya antebrazo o mano y apila hombros, costillas y pelvis.",
+      "Eleva la cadera hasta formar una l\xEDnea larga desde hombro hasta pies.",
+      "Respira sin perder la alineaci\xF3n lateral."
+    ],
+    keyPoints: [
+      "No dejes que la cadera se hunda al final de la serie.",
+      "Flexiona rodillas al inicio si la versi\xF3n larga a\xFAn es demasiada."
+    ],
+    notes: [
+      "Muy \xFAtil para detectar asimetr\xEDas entre lados."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "barbell-biceps-curl-20kg",
+    title: "Curl de b\xEDceps con barra (20 kg)",
+    summary: "Curl bilateral con barra para trabajo directo de b\xEDceps y antebrazo.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "biceps-brachii", percentage: 45 },
+      { muscleId: "brachialis", percentage: 25 },
+      { muscleId: "brachioradialis", percentage: 20 },
+      { muscleId: "forearm-flexors", percentage: 10 }
+    ],
+    description: "Curl con barra recta usando una carga fija de referencia.",
+    technique: [
+      "Mant\xE9n codos cerca del cuerpo y torso estable.",
+      "Sube la barra sin balancear la espalda ni adelantar hombros.",
+      "Baja controlado hasta una extensi\xF3n c\xF3moda."
+    ],
+    keyPoints: [
+      "La trampa con el torso falsea mucho la dificultad real.",
+      "Si la carga supera tu t\xE9cnica limpia, baja el objetivo."
+    ],
+    notes: [
+      "T\xF3malo como curl estricto, no como cheat curl."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "basic-burpee",
+    title: "Burpee b\xE1sico",
+    summary: "Burpee simple como referencia metab\xF3lica de cuerpo completo.",
+    measurementCategory: "cardio",
+    tags: ["endurance", "explosive"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "quadriceps", percentage: 20 },
+      { muscleId: "gluteus-maximus", percentage: 15 },
+      { muscleId: "pectoralis-major-sternal", percentage: 15 },
+      { muscleId: "deltoid-anterior", percentage: 10 },
+      { muscleId: "triceps-lateral-medial", percentage: 10 },
+      { muscleId: "rectus-abdominis", percentage: 10 },
+      { muscleId: "gastrocnemius", percentage: 10 },
+      { muscleId: "latissimus-dorsi", percentage: 5 },
+      { muscleId: "erector-spinae", percentage: 5 }
+    ],
+    description: "Burpee b\xE1sico: bajar, volver de pie y cerrar con salto corto.",
+    technique: [
+      "Baja al apoyo de manos con control y lleva piernas atr\xE1s.",
+      "Recoge piernas debajo del cuerpo con estabilidad.",
+      "Ponte de pie de forma explosiva y cierra con salto corto."
+    ],
+    keyPoints: [
+      "Esta biblioteca usa la versi\xF3n b\xE1sica como referencia estable.",
+      "Cambiar salto o a\xF1adir flexi\xF3n profunda ya crea otra variante."
+    ],
+    notes: [
+      "\xDAsalo como ejercicio metab\xF3lico general."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "dumbbell-biceps-curl-20kg-max",
+    title: "Curl con mancuernas (m\xE1x 20 kg)",
+    summary: "Curl con mancuernas como referencia flexible para trabajo directo de b\xEDceps.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "biceps-brachii", percentage: 40 },
+      { muscleId: "brachialis", percentage: 25 },
+      { muscleId: "brachioradialis", percentage: 20 },
+      { muscleId: "forearm-flexors", percentage: 15 }
+    ],
+    description: "Curl con una o dos mancuernas como variante pr\xE1ctica para brazo.",
+    technique: [
+      "Parte con hombros quietos y codos cerca del torso.",
+      "Eleva la mancuerna con control, sin balancear el cuerpo.",
+      "Desciende lento para sostener tensi\xF3n real."
+    ],
+    keyPoints: [
+      "Si usas versi\xF3n alternada, mant\xE9n siempre la misma convenci\xF3n.",
+      "Una mancuerna demasiado pesada invita a compensar enseguida."
+    ],
+    notes: [
+      "Puede hacerse sentado o de pie, pero conviene fijar una sola variante."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "chair-dips",
+    title: "Fondos en silla",
+    summary: "Empuje de tr\xEDceps con apoyo posterior en silla o banco estable.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "triceps-lateral-medial", percentage: 40 },
+      { muscleId: "triceps-long-head", percentage: 20 },
+      { muscleId: "pectoralis-minor", percentage: 20 },
+      { muscleId: "deltoid-anterior", percentage: 15 },
+      { muscleId: "serratus-anterior", percentage: 5 }
+    ],
+    description: "Fondos apoyando las manos detr\xE1s del cuerpo en una silla firme.",
+    technique: [
+      "Apoya manos detr\xE1s del cuerpo y adelanta pies seg\xFAn la dificultad.",
+      "Baja flexionando codos sin encoger hombros hacia las orejas.",
+      "Empuja hasta extender codos manteniendo control del torso."
+    ],
+    keyPoints: [
+      "No hace falta bajar a un rango extremo si el hombro molesta.",
+      "Cuanto m\xE1s lejos est\xE9n los pies, mayor ser\xE1 la carga real."
+    ],
+    notes: [
+      "Si molesta el hombro, reduce rango o reemplaza la variante."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "decline-push-up",
+    title: "Flexiones declinadas",
+    summary: "Variante de flexi\xF3n con pies elevados para aumentar la carga en pecho y hombro.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "pectoralis-major-clavicular", percentage: 35 },
+      { muscleId: "deltoid-anterior", percentage: 30 },
+      { muscleId: "triceps-lateral-medial", percentage: 20 },
+      { muscleId: "serratus-anterior", percentage: 10 },
+      { muscleId: "transverse-abdominis", percentage: 5 }
+    ],
+    description: "Flexi\xF3n con pies elevados para hacer m\xE1s exigente el empuje.",
+    technique: [
+      "Apoya los pies en una silla o superficie estable.",
+      "Baja el pecho con el tronco firme y codos controlados.",
+      "Empuja hasta recuperar una l\xEDnea limpia del cuerpo."
+    ],
+    keyPoints: [
+      "La elevaci\xF3n debe ser estable; no uses un apoyo inestable.",
+      "Si la lumbar se arquea, reduce altura."
+    ],
+    notes: [
+      "\xDAsala cuando la flexi\xF3n simple ya quede corta."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "staggered-push-up",
+    title: "Flexiones escalonadas",
+    summary: "Flexi\xF3n asim\xE9trica con una mano algo m\xE1s adelantada para variar la carga.",
+    tags: ["unilateral"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "pectoralis-major-sternal", percentage: 35 },
+      { muscleId: "deltoid-anterior", percentage: 20 },
+      { muscleId: "triceps-lateral-medial", percentage: 20 },
+      { muscleId: "obliques", percentage: 15 },
+      { muscleId: "transverse-abdominis", percentage: 10 }
+    ],
+    description: "Flexi\xF3n con manos en escal\xF3n para sumar asimetr\xEDa y control.",
+    technique: [
+      "Coloca una mano levemente m\xE1s adelantada que la otra.",
+      "Desciende manteniendo el pecho centrado y el core firme.",
+      "Empuja sin girar el torso ni colapsar hacia un lado."
+    ],
+    keyPoints: [
+      "Alterna lados para evitar sesgos persistentes.",
+      "La asimetr\xEDa debe ser moderada, no extrema."
+    ],
+    notes: [
+      "Absorbe el caso de flexi\xF3n offset de esta ronda."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "push-up-with-rotation",
+    title: "Flexiones con rotaci\xF3n",
+    summary: "Flexi\xF3n seguida de rotaci\xF3n lateral para sumar control de hombro y tronco.",
+    measurementCategory: "balance",
+    tags: ["unilateral", "motor-control"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "pectoralis-major-sternal", percentage: 25 },
+      { muscleId: "obliques", percentage: 20 },
+      { muscleId: "deltoid-anterior", percentage: 20 },
+      { muscleId: "triceps-lateral-medial", percentage: 20 },
+      { muscleId: "serratus-anterior", percentage: 15 }
+    ],
+    description: "Flexi\xF3n que abre a rotaci\xF3n lateral al final de cada repetici\xF3n.",
+    technique: [
+      "Haz la flexi\xF3n normal manteniendo el cuerpo alineado.",
+      "Al subir, rota hacia un lado abriendo el pecho y el brazo libre.",
+      "Vuelve al centro y repite alternando lados."
+    ],
+    keyPoints: [
+      "No dejes que la cadera se quede atr\xE1s en la rotaci\xF3n.",
+      "La transici\xF3n debe ser estable, no apurada."
+    ],
+    notes: [
+      "Sirve para combinar empuje, core y control escapular."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "hindu-push-up",
+    title: "Flexiones hind\xFAes",
+    summary: "Empuje fluido con recorrido amplio de hombros, pecho y tronco.",
+    tags: ["endurance"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "deltoid-anterior", percentage: 25 },
+      { muscleId: "pectoralis-major-sternal", percentage: 25 },
+      { muscleId: "triceps-lateral-medial", percentage: 20 },
+      { muscleId: "serratus-anterior", percentage: 15 },
+      { muscleId: "erector-spinae", percentage: 15 }
+    ],
+    description: "Flexi\xF3n con recorrido tipo ola para mezclar fuerza y amplitud.",
+    technique: [
+      "Parte desde una pica suave con cadera elevada.",
+      "Desliza el pecho hacia delante y abajo en una curva continua.",
+      "Termina con pecho abierto y vuelve por el mismo camino."
+    ],
+    keyPoints: [
+      "Mant\xE9n el recorrido fluido sin golpear la lumbar.",
+      "Reduce amplitud si hombros o espalda no lo toleran bien."
+    ],
+    notes: [
+      "Puede sentirse exigente tambi\xE9n como patr\xF3n de movilidad activa."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "diamond-push-up",
+    title: "Flexiones diamante",
+    summary: "Flexi\xF3n con manos cerradas para enfatizar tr\xEDceps y control del empuje.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "triceps-lateral-medial", percentage: 40 },
+      { muscleId: "triceps-long-head", percentage: 20 },
+      { muscleId: "pectoralis-major-sternal", percentage: 20 },
+      { muscleId: "deltoid-anterior", percentage: 10 },
+      { muscleId: "serratus-anterior", percentage: 10 }
+    ],
+    description: "Flexi\xF3n con manos cerradas bajo el pecho para cargar m\xE1s los tr\xEDceps.",
+    technique: [
+      "Coloca manos cerca del centro del pecho formando un cierre estrecho.",
+      "Baja controlado sin abrir demasiado los codos.",
+      "Empuja manteniendo el tronco firme."
+    ],
+    keyPoints: [
+      "Si molesta mu\xF1eca u hombro, abre un poco la mano o cambia de variante.",
+      "No hace falta tocar el pecho a cualquier costo."
+    ],
+    notes: [
+      "Es una progresi\xF3n m\xE1s dura que la flexi\xF3n simple."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "pike-push-up",
+    title: "Flexiones en pica",
+    summary: "Empuje vertical con el cuerpo en pica para cargar m\xE1s hombros.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "deltoid-anterior", percentage: 35 },
+      { muscleId: "triceps-lateral-medial", percentage: 20 },
+      { muscleId: "pectoralis-major-clavicular", percentage: 20 },
+      { muscleId: "serratus-anterior", percentage: 15 },
+      { muscleId: "transverse-abdominis", percentage: 10 }
+    ],
+    description: "Flexi\xF3n en pica para acercarse al patr\xF3n de empuje vertical.",
+    technique: [
+      "Eleva la cadera y acorta la distancia entre pies y manos.",
+      "Baja la cabeza entre las manos apuntando al suelo.",
+      "Empuja hacia arriba sin perder la forma de pica."
+    ],
+    keyPoints: [
+      "Cuanto m\xE1s vertical quede el cuerpo, m\xE1s carga real en hombros.",
+      "Evita derrumbar la zona escapular al fondo."
+    ],
+    notes: [
+      "\xDAtil como puente hacia progresiones m\xE1s verticales."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "anchored-crunch",
+    title: "Crunch abdominal con pies fijos",
+    summary: "Crunch cl\xE1sico con pies fijados para reforzar abdomen anterior.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "rectus-abdominis", percentage: 45 },
+      { muscleId: "transverse-abdominis", percentage: 20 },
+      { muscleId: "obliques", percentage: 15 },
+      { muscleId: "hip-flexors", percentage: 15 },
+      { muscleId: "adductors", percentage: 5 }
+    ],
+    description: "Crunch b\xE1sico con apoyo fijo de pies para trabajar el abdomen.",
+    technique: [
+      "Flexiona rodillas y fija los pies si lo necesitas.",
+      "Despega hombros del suelo enrollando el torso.",
+      "Baja controlado sin perder tensi\xF3n por completo."
+    ],
+    keyPoints: [
+      "No conviertas el gesto en un tir\xF3n de cuello.",
+      "Busca acortar el tronco, no sentarte entero."
+    ],
+    notes: [
+      "La fijaci\xF3n de pies puede meter m\xE1s flexor de cadera; tenlo en cuenta."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "bicycle-crunch",
+    title: "Crunch de bicicleta",
+    summary: "Abdominal alternado con rotaci\xF3n para core anterior y oblicuos.",
+    tags: ["motor-control"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "rectus-abdominis", percentage: 30 },
+      { muscleId: "obliques", percentage: 30 },
+      { muscleId: "hip-flexors", percentage: 20 },
+      { muscleId: "transverse-abdominis", percentage: 15 },
+      { muscleId: "adductors", percentage: 5 }
+    ],
+    description: "Crunch alternado que cruza codo y rodilla contraria.",
+    technique: [
+      "Eleva hombros del suelo y lleva una rodilla hacia el pecho.",
+      "Rota el torso para acercar el codo contrario a esa rodilla.",
+      "Alterna lados manteniendo ritmo controlado."
+    ],
+    keyPoints: [
+      "La rotaci\xF3n debe salir del tronco, no solo del codo.",
+      "No acelere tanto que pierdas la forma."
+    ],
+    notes: [
+      "\xDAtil para trabajo abdominal m\xE1s din\xE1mico que el crunch b\xE1sico."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "v-up",
+    title: "Abdominal en V",
+    summary: "Abdominal global que acerca tronco y piernas en una misma subida.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "rectus-abdominis", percentage: 35 },
+      { muscleId: "hip-flexors", percentage: 25 },
+      { muscleId: "transverse-abdominis", percentage: 15 },
+      { muscleId: "obliques", percentage: 10 },
+      { muscleId: "adductors", percentage: 15 }
+    ],
+    description: "Subida simult\xE1nea de torso y piernas para una V controlada.",
+    technique: [
+      "Parte extendido con piernas juntas y brazos listos.",
+      "Eleva torso y piernas al mismo tiempo hasta acercarlos.",
+      "Baja con control sin caer de golpe."
+    ],
+    keyPoints: [
+      "Si se rompe mucho la forma, reduce rango.",
+      "Busca coordinaci\xF3n limpia, no solo velocidad."
+    ],
+    notes: [
+      "Suele ser claramente m\xE1s duro que crunches b\xE1sicos."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "heel-touch",
+    title: "Toques al tal\xF3n",
+    summary: "Abdominal corto con inclinaci\xF3n lateral para oblicuos y control del tronco.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "obliques", percentage: 35 },
+      { muscleId: "rectus-abdominis", percentage: 25 },
+      { muscleId: "transverse-abdominis", percentage: 20 },
+      { muscleId: "hip-flexors", percentage: 10 },
+      { muscleId: "adductors", percentage: 10 }
+    ],
+    description: "Desplazamiento lateral corto para tocar talones desde el suelo.",
+    technique: [
+      "Acu\xE9state con rodillas flexionadas y pies cerca de gl\xFAteos.",
+      "Desliza un lado del torso hacia un tal\xF3n y luego al otro.",
+      "Mant\xE9n hombros algo elevados para sostener la tensi\xF3n."
+    ],
+    keyPoints: [
+      "Evita convertirlo en un balanceo completo de todo el cuerpo.",
+      "La amplitud es corta, pero la sensaci\xF3n debe ser clara."
+    ],
+    notes: [
+      "Sirve como accesorio simple para oblicuos."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "mountain-climber",
+    title: "Escaladores",
+    summary: "Trabajo din\xE1mico de suelo para cardio, core y ritmo de piernas.",
+    measurementCategory: "cardio",
+    tags: ["endurance"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "hip-flexors", percentage: 25 },
+      { muscleId: "rectus-abdominis", percentage: 20 },
+      { muscleId: "deltoid-anterior", percentage: 15 },
+      { muscleId: "quadriceps", percentage: 15 },
+      { muscleId: "transverse-abdominis", percentage: 15 },
+      { muscleId: "serratus-anterior", percentage: 10 }
+    ],
+    description: "Alternancia r\xE1pida de rodillas al pecho desde apoyo de plancha.",
+    technique: [
+      "Parte desde apoyo de manos con el cuerpo alineado.",
+      "Lleva una rodilla hacia el pecho y alterna sin perder el apoyo.",
+      "Mant\xE9n un ritmo vivo pero controlado."
+    ],
+    keyPoints: [
+      "No dejes rebotar la cadera de m\xE1s.",
+      "La velocidad \xFAtil no debe destruir la postura."
+    ],
+    notes: [
+      "Puedes contarlo por repeticiones o por bloques de tiempo en rutina."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "glute-bridge",
+    title: "Puente de gl\xFAteos",
+    summary: "Extensi\xF3n de cadera en el suelo para gl\xFAteos, isquios y control p\xE9lvico.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "gluteus-maximus", percentage: 45 },
+      { muscleId: "hamstrings", percentage: 25 },
+      { muscleId: "erector-spinae", percentage: 15 },
+      { muscleId: "transverse-abdominis", percentage: 10 },
+      { muscleId: "adductors", percentage: 5 }
+    ],
+    description: "Puente b\xE1sico para reforzar la extensi\xF3n de cadera.",
+    technique: [
+      "Acu\xE9state con rodillas flexionadas y pies firmes cerca de gl\xFAteos.",
+      "Eleva la cadera apretando gl\xFAteos hasta formar una l\xEDnea limpia.",
+      "Baja controlado sin soltar del todo la postura."
+    ],
+    keyPoints: [
+      "Empuja con talones y no con la zona lumbar.",
+      "No hace falta hiperextender arriba."
+    ],
+    notes: [
+      "Puedes pausarlo arriba si quieres m\xE1s control."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "jump-squat",
+    title: "Sentadillas con salto",
+    summary: "Sentadilla explosiva para piernas y capacidad metab\xF3lica.",
+    measurementCategory: "cardio",
+    tags: ["explosive"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "quadriceps", percentage: 30 },
+      { muscleId: "gluteus-maximus", percentage: 25 },
+      { muscleId: "gastrocnemius", percentage: 20 },
+      { muscleId: "hamstrings", percentage: 15 },
+      { muscleId: "erector-spinae", percentage: 10 }
+    ],
+    description: "Sentadilla que termina con salto corto y aterrizaje controlado.",
+    technique: [
+      "Haz una sentadilla s\xF3lida con peso repartido en todo el pie.",
+      "Sube de forma explosiva y despega del suelo con un salto corto.",
+      "Aterriza suave y entra a la siguiente repetici\xF3n con control."
+    ],
+    keyPoints: [
+      "La ca\xEDda debe ser silenciosa y estable.",
+      "Si la t\xE9cnica se derrumba, corta antes."
+    ],
+    notes: [
+      "Muy \xFAtil para meter intensidad sin equipamiento."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "wall-sit",
+    title: "Sentadilla en pared",
+    summary: "Isom\xE9trico de piernas apoyado en pared para aguante local.",
+    tags: ["isometric"],
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "quadriceps", percentage: 45 },
+      { muscleId: "gluteus-maximus", percentage: 20 },
+      { muscleId: "hamstrings", percentage: 15 },
+      { muscleId: "gastrocnemius", percentage: 10 },
+      { muscleId: "erector-spinae", percentage: 10 }
+    ],
+    description: "Sost\xE9n isom\xE9trico de piernas contra la pared.",
+    technique: [
+      "Apoya la espalda en la pared y desliza hasta la altura deseada.",
+      "Mant\xE9n pies firmes y rodillas estables.",
+      "Sost\xE9n el tiempo sin subir ni bajar de m\xE1s."
+    ],
+    keyPoints: [
+      "La postura debe sentirse pareja en ambas piernas.",
+      "No hace falta bajar tanto si pierdes control."
+    ],
+    notes: [
+      "T\xF3malo como ejercicio de aguante m\xE1s que de recorrido."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "bottom-side-leg-raise",
+    title: "Elevaciones inferiores de pierna acostado de lado",
+    summary: "Trabajo de aductores elevando la pierna inferior desde dec\xFAbito lateral.",
+    tags: ["unilateral"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "adductors", percentage: 50 },
+      { muscleId: "transverse-abdominis", percentage: 15 },
+      { muscleId: "obliques", percentage: 15 },
+      { muscleId: "gluteus-medius", percentage: 10 },
+      { muscleId: "hip-flexors", percentage: 10 }
+    ],
+    description: "Elevaci\xF3n de la pierna inferior para enfatizar aductores.",
+    technique: [
+      "Acu\xE9state de lado y deja la pierna superior fuera del camino.",
+      "Eleva la pierna inferior sin girar la pelvis.",
+      "Baja lento manteniendo la tensi\xF3n."
+    ],
+    keyPoints: [
+      "La amplitud \xFAtil suele ser corta; no fuerces con balanceo.",
+      "Mant\xE9n el tronco tranquilo para aislar mejor."
+    ],
+    notes: [
+      "Es la variante inferior complementaria a la lateral cl\xE1sica."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "rear-leg-raise",
+    title: "Elevaciones traseras de pierna",
+    summary: "Extensi\xF3n de cadera a una pierna para gl\xFAteo y control posterior.",
+    tags: ["unilateral"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "gluteus-maximus", percentage: 45 },
+      { muscleId: "hamstrings", percentage: 20 },
+      { muscleId: "erector-spinae", percentage: 15 },
+      { muscleId: "gluteus-medius", percentage: 10 },
+      { muscleId: "transverse-abdominis", percentage: 10 }
+    ],
+    description: "Elevaci\xF3n de la pierna hacia atr\xE1s desde suelo o apoyo simple.",
+    technique: [
+      "Col\xF3cate estable y deja la pelvis mirando al suelo.",
+      "Lleva la pierna hacia atr\xE1s sin abrir de m\xE1s la cadera.",
+      "Baja lento manteniendo control del torso."
+    ],
+    keyPoints: [
+      "No compenses con arqueo lumbar.",
+      "Piensa en extender la cadera, no solo en mover el pie."
+    ],
+    notes: [
+      "Muy \xFAtil como accesorio de gl\xFAteo sin equipamiento."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "side-lying-leg-circle",
+    title: "C\xEDrculos de pierna acostado de lado",
+    summary: "Movimiento lateral controlado para cadera, coordinaci\xF3n y estabilidad.",
+    measurementCategory: "balance",
+    tags: ["unilateral", "motor-control"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "gluteus-medius", percentage: 30 },
+      { muscleId: "abductors", percentage: 25 },
+      { muscleId: "adductors", percentage: 15 },
+      { muscleId: "obliques", percentage: 15 },
+      { muscleId: "transverse-abdominis", percentage: 15 }
+    ],
+    description: "C\xEDrculos controlados con la pierna superior desde dec\xFAbito lateral.",
+    technique: [
+      "Acu\xE9state de lado y eleva la pierna superior hasta un rango \xFAtil.",
+      "Dibuja c\xEDrculos peque\xF1os y controlados sin mover toda la pelvis.",
+      "Invierte el sentido sin perder tensi\xF3n."
+    ],
+    keyPoints: [
+      "El tama\xF1o del c\xEDrculo importa menos que el control.",
+      "Si tiembla demasiado el torso, reduce amplitud."
+    ],
+    notes: [
+      "Sirve para refinar control lateral de cadera."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "standing-calf-raise",
+    title: "Elevaciones de talones de pie",
+    summary: "Trabajo de pantorrilla en apoyo de pie para gemelos y s\xF3leo.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "gastrocnemius", percentage: 55 },
+      { muscleId: "soleus", percentage: 30 },
+      { muscleId: "tibialis-anterior", percentage: 5 },
+      { muscleId: "gluteus-medius", percentage: 5 },
+      { muscleId: "transverse-abdominis", percentage: 5 }
+    ],
+    description: "Subida y bajada de talones desde posici\xF3n de pie.",
+    technique: [
+      "Apoya el peso en ambos pies y eleva talones al m\xE1ximo controlado.",
+      "Pausa breve arriba si hace falta sentir la contracci\xF3n.",
+      "Baja lento sin dejarte caer."
+    ],
+    keyPoints: [
+      "No acortes siempre la bajada; ah\xED tambi\xE9n hay trabajo real.",
+      "Usa apoyo ligero si el equilibrio limita demasiado."
+    ],
+    notes: [
+      "Muy pr\xE1ctica para meter volumen en pantorrilla."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "seated-calf-raise",
+    title: "Elevaciones de talones sentado",
+    summary: "Trabajo de pantorrilla sentado con m\xE1s \xE9nfasis local y menos balance.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "soleus", percentage: 45 },
+      { muscleId: "gastrocnemius", percentage: 35 },
+      { muscleId: "tibialis-anterior", percentage: 10 },
+      { muscleId: "adductors", percentage: 5 },
+      { muscleId: "transverse-abdominis", percentage: 5 }
+    ],
+    description: "Elevaci\xF3n de talones sentado para aislar m\xE1s el trabajo de pantorrilla.",
+    technique: [
+      "Si\xE9ntate con pies firmes y rodillas flexionadas.",
+      "Eleva talones lo m\xE1s alto que puedas sin despegar la punta.",
+      "Baja controlado manteniendo el recorrido."
+    ],
+    keyPoints: [
+      "Busca recorrido limpio aunque la carga sea improvisada.",
+      "No conviertas la repetici\xF3n en rebote."
+    ],
+    notes: [
+      "Buena variante cuando quieres menos demanda de equilibrio."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "prone-back-extension",
+    title: "Hiperextensiones en el suelo",
+    summary: "Extensi\xF3n de tronco en prono para espalda posterior y control lumbar.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "erector-spinae", percentage: 45 },
+      { muscleId: "gluteus-maximus", percentage: 20 },
+      { muscleId: "hamstrings", percentage: 15 },
+      { muscleId: "trapezius-middle-lower", percentage: 10 },
+      { muscleId: "deltoid-posterior", percentage: 10 }
+    ],
+    description: "Elevaci\xF3n controlada del tronco desde apoyo boca abajo.",
+    technique: [
+      "Acu\xE9state boca abajo y deja piernas largas y estables.",
+      "Eleva pecho y hombros sin forzar una curva exagerada.",
+      "Baja lento manteniendo la extensi\xF3n activa."
+    ],
+    keyPoints: [
+      "La sensaci\xF3n debe ir a espalda posterior, no a pinzamiento lumbar.",
+      "No hace falta buscar una altura extrema."
+    ],
+    notes: [
+      "Puede servir como trabajo suave de cadena posterior."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "decline-row",
+    title: "Remo declinado",
+    summary: "Tir\xF3n horizontal en \xE1ngulo declinado para espalda media y brazos.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "latissimus-dorsi", percentage: 25 },
+      { muscleId: "rhomboids", percentage: 20 },
+      { muscleId: "trapezius-middle-lower", percentage: 20 },
+      { muscleId: "biceps-brachii", percentage: 20 },
+      { muscleId: "brachialis", percentage: 15 }
+    ],
+    description: "Remo corporal en \xE1ngulo para espalda y b\xEDceps.",
+    technique: [
+      "Coloca el cuerpo en \xE1ngulo bajo un apoyo seguro.",
+      "Tira llevando el pecho hacia el agarre sin encoger hombros.",
+      "Desciende controlado hasta una extensi\xF3n estable."
+    ],
+    keyPoints: [
+      "Mant\xE9n el cuerpo r\xEDgido para que el tir\xF3n sea limpio.",
+      "Ajusta el \xE1ngulo si a\xFAn no puedes sostener buena forma."
+    ],
+    notes: [
+      "\xDAtil como tir\xF3n horizontal cuando no tienes mucha carga externa."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "hanging-leg-raise",
+    title: "Elevaciones de piernas en barra",
+    summary: "Elevaci\xF3n de piernas colgado para abdomen, flexores de cadera y control del cuerpo.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "hip-flexors", percentage: 40 },
+      { muscleId: "rectus-abdominis", percentage: 25 },
+      { muscleId: "transverse-abdominis", percentage: 15 },
+      { muscleId: "latissimus-dorsi", percentage: 10 },
+      { muscleId: "forearm-flexors", percentage: 10 }
+    ],
+    description: "Elevaci\xF3n de piernas colgando para sumar core y control de balanceo.",
+    technique: [
+      "Cuelga con agarre firme y hombros activos.",
+      "Eleva piernas con el tronco estable, sin usar p\xE9ndulo libre.",
+      "Baja controlado antes de iniciar otra repetici\xF3n."
+    ],
+    keyPoints: [
+      "La bajada limpia es parte real del trabajo.",
+      "Si hay demasiado balanceo, reduce rango."
+    ],
+    notes: [
+      "No la mezcles con elevaciones en suelo si quieres comparar progreso."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "terminal-wall-squat",
+    title: "Sentadilla terminal contra pared",
+    summary: "Mini sentadilla contra pared para reforzar el tramo final de la extension de rodilla.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "vastus-medialis", percentage: 40 },
+      { muscleId: "quadriceps", percentage: 30 },
+      { muscleId: "gluteus-maximus", percentage: 10 },
+      { muscleId: "gastrocnemius", percentage: 10 },
+      { muscleId: "hamstrings", percentage: 5 },
+      { muscleId: "transverse-abdominis", percentage: 5 }
+    ],
+    description: "Mini sentadilla apoyando la espalda en la pared para enfatizar el cierre de rodilla.",
+    technique: [
+      "Apoya la espalda en la pared y baja solo un rango corto y controlado.",
+      "Empuja el suelo hasta casi extender la rodilla del todo.",
+      "Haz una pausa breve arriba antes de repetir."
+    ],
+    keyPoints: [
+      "La tension util esta en el tramo corto, no en bajar profundo.",
+      "No dejes que la rodilla colapse hacia dentro."
+    ],
+    notes: [
+      "Entra como idea corporal directa para dar cobertura al vasto medial."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "wall-lateral-raise-isometric",
+    title: "Elevacion lateral isometrica contra pared",
+    summary: "Empuje lateral isometrico contra pared para sentir mejor el hombro medio.",
+    tags: ["isometric", "unilateral"],
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "deltoid-lateral", percentage: 45 },
+      { muscleId: "deltoid-anterior", percentage: 15 },
+      { muscleId: "deltoid-posterior", percentage: 10 },
+      { muscleId: "trapezius-middle-lower", percentage: 10 },
+      { muscleId: "obliques", percentage: 10 },
+      { muscleId: "transverse-abdominis", percentage: 10 }
+    ],
+    description: "Empuje del brazo contra una pared para cargar el deltoides lateral sin material.",
+    technique: [
+      "Ponte de lado junto a una pared y apoya la mano o el antebrazo.",
+      "Empuja hacia afuera como si quisieras elevar el brazo lateralmente.",
+      "Sosten la tension sin girar el tronco."
+    ],
+    keyPoints: [
+      "La intensidad sale de la presion, no del movimiento.",
+      "Cambia de lado y usa siempre el mismo angulo para comparar."
+    ],
+    notes: [
+      "Es la opcion mas directa del chat para cubrir deltoides lateral sin peso."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "pike-shrug",
+    title: "Encogimiento en pica",
+    summary: "Trabajo escapular en posicion de pica para trapecio superior y control del hombro.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "trapezius-upper", percentage: 45 },
+      { muscleId: "serratus-anterior", percentage: 20 },
+      { muscleId: "deltoid-anterior", percentage: 15 },
+      { muscleId: "trapezius-middle-lower", percentage: 10 },
+      { muscleId: "transverse-abdominis", percentage: 10 }
+    ],
+    description: "Encogimiento escapular con cadera alta para cargar trapecio superior sin flexionar codos.",
+    technique: [
+      "Arma una pica comoda con manos firmes en el suelo y cadera alta.",
+      "Deja que hombros suban y luego empuja el suelo para alejarlos de las orejas.",
+      "Mueve solo la escapula, no los codos."
+    ],
+    keyPoints: [
+      "Si pierdes la forma de pica, reduce rango o intensidad.",
+      "Busca una subida y bajada clara de hombros, no un rebote rapido."
+    ],
+    notes: [
+      "Sale directo del chat como opcion corporal para trapecio superior."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "unilateral-bodyweight-shrug",
+    title: "Encogimiento unilateral sin peso",
+    summary: "Elevacion controlada de una escapula para trabajo suave de trapecio alto y elevador.",
+    tags: ["unilateral"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "levator-scapulae", percentage: 45 },
+      { muscleId: "trapezius-upper", percentage: 25 },
+      { muscleId: "rhomboids", percentage: 15 },
+      { muscleId: "trapezius-middle-lower", percentage: 10 },
+      { muscleId: "obliques", percentage: 5 }
+    ],
+    description: "Encogimiento de un hombro hacia la oreja con control y sin carga externa.",
+    technique: [
+      "Ponte de pie con cuello relajado y hombros sueltos.",
+      "Eleva un hombro hacia la oreja y sosten un instante.",
+      "Baja lento antes de cambiar de lado."
+    ],
+    keyPoints: [
+      "Este movimiento conviene hacerlo suave y deliberado.",
+      "Si genera molestias raras de cuello, corta rango."
+    ],
+    notes: [
+      "Se agrega como idea prudente para dar cobertura al elevador de la escapula."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "table-low-row",
+    title: "Remo bajo con mesa",
+    summary: "Tiron horizontal con mesa firme para espalda, brazos y foco extra en redondo mayor.",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "teres-major", percentage: 30 },
+      { muscleId: "latissimus-dorsi", percentage: 25 },
+      { muscleId: "rhomboids", percentage: 15 },
+      { muscleId: "trapezius-middle-lower", percentage: 15 },
+      { muscleId: "biceps-brachii", percentage: 10 },
+      { muscleId: "brachialis", percentage: 5 }
+    ],
+    description: "Remo corporal bajo una mesa estable para cubrir tiron horizontal sin barra.",
+    technique: [
+      "Acostate bajo una mesa firme y toma el borde con agarre seguro.",
+      "Tira llevando el pecho hacia la mesa con codos cerca del torso.",
+      "Baja controlado hasta extender de nuevo los brazos."
+    ],
+    keyPoints: [
+      "La mesa tiene que ser realmente estable antes de usarla.",
+      "Si el cuerpo se arquea de mas, reduce el angulo o acorta la serie."
+    ],
+    notes: [
+      "Entra como idea corporal del chat para cubrir redondo mayor."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "jumping-jack",
+    title: "Saltos de tijera",
+    summary: "Calentamiento cl\xE1sico de cuerpo completo para activar pulso y coordinaci\xF3n simple.",
+    exerciseType: "warmup",
+    measurementCategory: "cardio",
+    tags: ["explosive"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "gastrocnemius", percentage: 20 },
+      { muscleId: "quadriceps", percentage: 20 },
+      { muscleId: "deltoid-anterior", percentage: 15 },
+      { muscleId: "gluteus-maximus", percentage: 15 },
+      { muscleId: "obliques", percentage: 10 },
+      { muscleId: "transverse-abdominis", percentage: 10 },
+      { muscleId: "serratus-anterior", percentage: 10 }
+    ],
+    description: "Salto b\xE1sico abriendo y cerrando piernas y brazos.",
+    technique: [
+      "Salta suave abriendo piernas mientras elevas brazos.",
+      "Cierra volviendo al centro sin golpear el suelo.",
+      "Sost\xE9n un ritmo continuo y respirable."
+    ],
+    keyPoints: [
+      "La meta es entrar en calor, no agotarte de golpe.",
+      "Aterriza liviano para no castigar tobillos."
+    ],
+    notes: [
+      "Muy \xFAtil como arranque general de sesi\xF3n."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "arm-circles",
+    title: "Rotaciones de brazos",
+    summary: "Calentamiento articular simple para hombros y cintura escapular.",
+    exerciseType: "warmup",
+    measurementCategory: "flexibility",
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "deltoid-anterior", percentage: 25 },
+      { muscleId: "deltoid-posterior", percentage: 20 },
+      { muscleId: "trapezius-middle-lower", percentage: 15 },
+      { muscleId: "serratus-anterior", percentage: 15 },
+      { muscleId: "pectoralis-major-clavicular", percentage: 15 },
+      { muscleId: "triceps-long-head", percentage: 10 }
+    ],
+    description: "C\xEDrculos de brazos para soltar hombros antes de cargar.",
+    technique: [
+      "Mant\xE9n el tronco estable y brazos largos.",
+      "Haz c\xEDrculos peque\xF1os al inicio y ampl\xEDalos progresivamente.",
+      "Invierte el sentido despu\xE9s de unas repeticiones."
+    ],
+    keyPoints: [
+      "No hace falta velocidad; busca movilidad c\xF3moda.",
+      "Si el hombro molesta, reduce amplitud."
+    ],
+    notes: [
+      "\xDAtil como calentamiento espec\xEDfico de tren superior."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "high-knees-to-chest",
+    title: "Elevaciones de rodillas al pecho",
+    summary: "Calentamiento din\xE1mico para activar cadera, core y pulso.",
+    exerciseType: "warmup",
+    measurementCategory: "cardio",
+    tags: ["endurance"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "hip-flexors", percentage: 30 },
+      { muscleId: "rectus-abdominis", percentage: 15 },
+      { muscleId: "quadriceps", percentage: 15 },
+      { muscleId: "gastrocnemius", percentage: 15 },
+      { muscleId: "gluteus-maximus", percentage: 15 },
+      { muscleId: "transverse-abdominis", percentage: 10 }
+    ],
+    description: "Marcha o trote corto elevando rodillas hacia el pecho.",
+    technique: [
+      "Mant\xE9n el torso largo y activo.",
+      "Eleva una rodilla y alterna con ritmo fluido.",
+      "Acompa\xF1a con brazos para sostener el ritmo."
+    ],
+    keyPoints: [
+      "Busca activaci\xF3n, no sprint descontrolado.",
+      "Si molesta cadera, reduce altura."
+    ],
+    notes: [
+      "Puede servir de puente entre calentamiento y trabajo principal."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "inchworm",
+    title: "Caminata de manos",
+    summary: "Calentamiento din\xE1mico que combina bisagra, hombros y control del cuerpo.",
+    exerciseType: "warmup",
+    measurementCategory: "flexibility",
+    tags: ["motor-control"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "hamstrings", percentage: 20 },
+      { muscleId: "deltoid-anterior", percentage: 20 },
+      { muscleId: "transverse-abdominis", percentage: 15 },
+      { muscleId: "serratus-anterior", percentage: 15 },
+      { muscleId: "gastrocnemius", percentage: 15 },
+      { muscleId: "pectoralis-major-sternal", percentage: 15 }
+    ],
+    description: "Entrada y salida con manos desde una flexi\xF3n de tronco para activar varias cadenas.",
+    technique: [
+      "Incl\xEDnate hacia delante y camina con las manos hasta apoyo largo.",
+      "Sost\xE9n un instante la posici\xF3n sin perder el core.",
+      "Regresa caminando con las manos o con los pies seg\xFAn tu variante."
+    ],
+    keyPoints: [
+      "No hace falta llegar al suelo con piernas totalmente rectas.",
+      "Mant\xE9n el movimiento controlado y continuo."
+    ],
+    notes: [
+      "Muy \xFAtil para calentar hombros, tronco e isquios a la vez."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "cobra-stretch",
+    title: "Estiramiento cobra",
+    summary: "Extensi\xF3n suave de tronco para abdomen anterior y apertura frontal.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "rectus-abdominis", percentage: 30 },
+      { muscleId: "hip-flexors", percentage: 20 },
+      { muscleId: "pectoralis-major-sternal", percentage: 15 },
+      { muscleId: "erector-spinae", percentage: 15 },
+      { muscleId: "serratus-anterior", percentage: 10 },
+      { muscleId: "deltoid-anterior", percentage: 10 }
+    ],
+    description: "Apertura frontal en el suelo inspirada en la postura cobra.",
+    technique: [
+      "Acu\xE9state boca abajo y apoya manos bajo hombros.",
+      "Extiende el tronco con control dejando pelvis c\xF3moda en el suelo.",
+      "Respira profundo sin forzar el cuello."
+    ],
+    keyPoints: [
+      "No fuerces una extensi\xF3n lumbar que se sienta agresiva.",
+      "La sensaci\xF3n debe ser de apertura, no de dolor."
+    ],
+    notes: [
+      "Sirve bien tras trabajo abdominal o mucha flexi\xF3n."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "doorway-chest-stretch",
+    title: "Estiramiento de pecho en marco de puerta",
+    summary: "Apertura frontal del pecho usando ambos brazos apoyados en un marco.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "pectoralis-major-sternal", percentage: 45 },
+      { muscleId: "pectoralis-major-clavicular", percentage: 20 },
+      { muscleId: "deltoid-anterior", percentage: 15 },
+      { muscleId: "biceps-brachii", percentage: 10 },
+      { muscleId: "serratus-anterior", percentage: 10 }
+    ],
+    description: "Apertura de pecho en puerta empujando el torso hacia delante.",
+    technique: [
+      "Apoya ambos brazos en el marco a una altura c\xF3moda.",
+      "Avanza el torso hasta sentir apertura en pecho y hombro anterior.",
+      "Respira sin elevar hombros hacia las orejas."
+    ],
+    keyPoints: [
+      "No cierres la espalda alta al entrar al estiramiento.",
+      "Ajusta altura de brazos seg\xFAn tolerancia."
+    ],
+    notes: [
+      "Muy \xFAtil si pasas mucho tiempo con hombros adelantados."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "wall-chest-biceps-stretch",
+    title: "Estiramiento de pecho/b\xEDceps en pared",
+    summary: "Apertura unilateral apoyando un brazo y girando el torso en direcci\xF3n opuesta.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    tags: ["unilateral"],
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "pectoralis-major-sternal", percentage: 35 },
+      { muscleId: "biceps-brachii", percentage: 25 },
+      { muscleId: "pectoralis-major-clavicular", percentage: 15 },
+      { muscleId: "deltoid-anterior", percentage: 15 },
+      { muscleId: "forearm-flexors", percentage: 10 }
+    ],
+    description: "Estiramiento unilateral apoyando un brazo contra la pared y rotando el torso.",
+    technique: [
+      "Apoya la palma o el brazo en la pared con el codo c\xF3modo.",
+      "Gira el torso en direcci\xF3n opuesta hasta sentir apertura frontal.",
+      "Mant\xE9n hombro y cuello relajados mientras respiras."
+    ],
+    keyPoints: [
+      "No busques dolor en codo o mu\xF1eca para sentirlo mejor.",
+      "Ajusta la altura del brazo seg\xFAn lo notes en pecho o b\xEDceps."
+    ],
+    notes: [
+      "Puede sentirse m\xE1s en pecho o b\xEDceps seg\xFAn el \xE1ngulo elegido."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "lumbar-rotation-stretch",
+    title: "Giro lumbar",
+    summary: "Rotaci\xF3n suave de tronco en el suelo para zona lumbar y cadera.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "obliques", percentage: 25 },
+      { muscleId: "erector-spinae", percentage: 25 },
+      { muscleId: "gluteus-maximus", percentage: 15 },
+      { muscleId: "adductors", percentage: 15 },
+      { muscleId: "transverse-abdominis", percentage: 10 },
+      { muscleId: "hip-flexors", percentage: 10 }
+    ],
+    description: "Rotaci\xF3n lumbar suave para descargar espalda y cadera.",
+    technique: [
+      "Acu\xE9state boca arriba con brazos abiertos para estabilizar.",
+      "Lleva rodillas o una pierna hacia un lado con control.",
+      "Respira y deja que el tronco se relaje en la posici\xF3n."
+    ],
+    keyPoints: [
+      "La sensaci\xF3n debe ser de soltura, no de pinzamiento.",
+      "No fuerces con las manos el rango final."
+    ],
+    notes: [
+      "Suele ir bien como cierre de sesi\xF3n."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "triceps-stretch",
+    title: "Estiramiento de tr\xEDceps",
+    summary: "Apertura de tr\xEDceps y hombro llevando el codo por encima de la cabeza.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    tags: ["unilateral"],
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "triceps-long-head", percentage: 45 },
+      { muscleId: "deltoid-anterior", percentage: 20 },
+      { muscleId: "latissimus-dorsi", percentage: 15 },
+      { muscleId: "serratus-anterior", percentage: 10 },
+      { muscleId: "pectoralis-major-clavicular", percentage: 10 }
+    ],
+    description: "Estiramiento cl\xE1sico de tr\xEDceps llevando un brazo sobre la cabeza.",
+    technique: [
+      "Lleva un brazo por encima de la cabeza y flexiona el codo.",
+      "Ayuda suave con la otra mano sin tirar de golpe.",
+      "Mant\xE9n costillas controladas y cuello relajado."
+    ],
+    keyPoints: [
+      "No compenses arqueando mucho la espalda.",
+      "La presi\xF3n debe ser suave y sostenida."
+    ],
+    notes: [
+      "Alterna lados con el mismo tiempo."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "shoulder-stretch",
+    title: "Estiramiento de hombros",
+    summary: "Estiramiento simple cruzando el brazo al frente para hombro posterior.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    tags: ["unilateral"],
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "deltoid-posterior", percentage: 35 },
+      { muscleId: "trapezius-middle-lower", percentage: 20 },
+      { muscleId: "rhomboids", percentage: 20 },
+      { muscleId: "deltoid-anterior", percentage: 15 },
+      { muscleId: "serratus-anterior", percentage: 10 }
+    ],
+    description: "Cruce de brazo al frente para descargar hombro posterior y espalda alta.",
+    technique: [
+      "Cruza un brazo frente al pecho a una altura c\xF3moda.",
+      "Ac\xE9rcalo suave con el otro brazo sin subir el hombro.",
+      "Respira manteniendo la esc\xE1pula tranquila."
+    ],
+    keyPoints: [
+      "No aprietes tanto que se cierre el cuello.",
+      "Ajusta el \xE1ngulo hasta sentirlo en la zona correcta."
+    ],
+    notes: [
+      "Buen complemento tras empujes o mucho trabajo de hombro."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "standing-quadriceps-stretch",
+    title: "Estiramiento de cu\xE1driceps de pie",
+    summary: "Estiramiento cl\xE1sico llevando el tal\xF3n hacia atr\xE1s con ayuda de la mano.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    tags: ["unilateral", "balance"],
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "quadriceps", percentage: 45 },
+      { muscleId: "hip-flexors", percentage: 20 },
+      { muscleId: "adductors", percentage: 10 },
+      { muscleId: "gluteus-maximus", percentage: 10 },
+      { muscleId: "transverse-abdominis", percentage: 15 }
+    ],
+    description: "Estiramiento de cu\xE1driceps de pie sujetando el pie detr\xE1s del cuerpo.",
+    technique: [
+      "Sost\xE9n un apoyo si hace falta y toma el pie por detr\xE1s.",
+      "Acerca el tal\xF3n hacia el gl\xFAteo sin abrir la rodilla de m\xE1s.",
+      "Mant\xE9n pelvis neutra mientras respiras."
+    ],
+    keyPoints: [
+      "No lo conviertas en arqueo lumbar.",
+      "El equilibrio no debe robar toda la atenci\xF3n del estiramiento."
+    ],
+    notes: [
+      "Si el equilibrio limita demasiado, usa pared o silla."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "wall-calf-stretch",
+    title: "Estiramiento de pantorrilla en pared",
+    summary: "Estiramiento de gemelo y s\xF3leo usando pared o apoyo fijo.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    tags: ["unilateral"],
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "gastrocnemius", percentage: 45 },
+      { muscleId: "soleus", percentage: 30 },
+      { muscleId: "hamstrings", percentage: 10 },
+      { muscleId: "tibialis-anterior", percentage: 5 },
+      { muscleId: "gluteus-maximus", percentage: 10 }
+    ],
+    description: "Estiramiento de pantorrilla apoyando manos en pared y retrasando una pierna.",
+    technique: [
+      "Apoya manos en pared y adelanta una pierna.",
+      "Deja la otra atr\xE1s con tal\xF3n buscando el suelo.",
+      "Inclina el cuerpo hasta sentir el estiramiento en pantorrilla."
+    ],
+    keyPoints: [
+      "El tal\xF3n retrasado debe permanecer estable.",
+      "Ajusta la distancia seg\xFAn quieras m\xE1s gemelo o m\xE1s s\xF3leo."
+    ],
+    notes: [
+      "Muy \xFAtil si corres, saltas o cargas mucho pantorrilla."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "child-pose",
+    title: "Postura del beb\xE9",
+    summary: "Postura de descanso y apertura suave para espalda, cadera y hombros.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "latissimus-dorsi", percentage: 20 },
+      { muscleId: "erector-spinae", percentage: 20 },
+      { muscleId: "gluteus-maximus", percentage: 15 },
+      { muscleId: "adductors", percentage: 15 },
+      { muscleId: "deltoid-anterior", percentage: 15 },
+      { muscleId: "transverse-abdominis", percentage: 15 }
+    ],
+    description: "Postura de descanso en el suelo para soltar espalda y hombros.",
+    technique: [
+      "Si\xE9ntate hacia talones y extiende brazos al frente.",
+      "Deja el pecho hundirse hacia el suelo dentro de tu rango c\xF3modo.",
+      "Respira largo sin tensionar cuello."
+    ],
+    keyPoints: [
+      "Ajusta apertura de rodillas seg\xFAn cadera y torso.",
+      "Debe sentirse calmante, no forzada."
+    ],
+    notes: [
+      "Muy buena como pausa o cierre de sesi\xF3n."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "toe-touch-hamstring-stretch",
+    title: "Estiramiento de isquiotibiales al tocar los pies",
+    summary: "Flexi\xF3n simple hacia los pies para cadena posterior e isquiotibiales.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "hamstrings", percentage: 45 },
+      { muscleId: "gastrocnemius", percentage: 20 },
+      { muscleId: "erector-spinae", percentage: 15 },
+      { muscleId: "gluteus-maximus", percentage: 10 },
+      { muscleId: "adductors", percentage: 10 }
+    ],
+    description: "Flexi\xF3n hacia pies para soltar la cadena posterior.",
+    technique: [
+      "Incl\xEDnate hacia delante desde la cadera dentro de un rango c\xF3modo.",
+      "Deja brazos caer hacia pies, tobillos o tibias seg\xFAn tolerancia.",
+      "Respira sin forzar tirones bruscos."
+    ],
+    keyPoints: [
+      "No hace falta tocar los pies para que sea \xFAtil.",
+      "Busca longitud, no rebote."
+    ],
+    notes: [
+      "Flexionar un poco rodillas puede hacerlo m\xE1s limpio."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "standing-adductor-stretch",
+    title: "Estiramiento de abductores de pie",
+    summary: "Apertura lateral de cadera en pie con apoyo de un lado y otro estirado.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    tags: ["unilateral"],
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "abductors", percentage: 30 },
+      { muscleId: "adductors", percentage: 30 },
+      { muscleId: "gluteus-medius", percentage: 15 },
+      { muscleId: "hamstrings", percentage: 10 },
+      { muscleId: "transverse-abdominis", percentage: 15 }
+    ],
+    description: "Apertura lateral en pie para trabajar la cadera desde una base simple.",
+    technique: [
+      "Abre piernas m\xE1s que hombros y desplaza el peso hacia un lado.",
+      "Mant\xE9n la otra pierna m\xE1s larga para sentir la apertura.",
+      "Respira con el tronco estable y alterna lados."
+    ],
+    keyPoints: [
+      "Ajusta la amplitud seg\xFAn lo sientas en cadera interna o lateral.",
+      "No conviertas la postura en colapso de espalda."
+    ],
+    notes: [
+      "Queda bien como estiramiento de cierre o entre bloques."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "table-wrist-stretch",
+    title: "Estiramiento de mu\xF1eca en mesa",
+    summary: "Movilidad de mu\xF1eca apoyando palma y elevando poco a poco el brazo.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    measurement: time,
+    muscleLoads: [
+      { muscleId: "forearm-flexors", percentage: 35 },
+      { muscleId: "forearm-extensors", percentage: 35 },
+      { muscleId: "biceps-brachii", percentage: 10 },
+      { muscleId: "brachialis", percentage: 10 },
+      { muscleId: "triceps-long-head", percentage: 10 }
+    ],
+    description: "Movilidad de mu\xF1eca apoyando la palma y elevando progresivamente el brazo.",
+    technique: [
+      "Apoya bien la palma en una mesa o superficie firme.",
+      "Mant\xE9n la mano quieta y eleva poco a poco el brazo.",
+      "Det\xE9nte en el punto de tensi\xF3n \xFAtil y respira."
+    ],
+    keyPoints: [
+      "No hace falta llegar a 90 grados si la mu\xF1eca a\xFAn no lo tolera.",
+      "La progresi\xF3n debe ser muy gradual."
+    ],
+    notes: [
+      "Pensado como uno de los estiramientos base de mu\xF1eca."
+    ]
+  }),
+  createStarterExercise({
+    templateKey: "reverse-snow-angel",
+    title: "\xC1ngel de nieve invertido",
+    summary: "Movimiento de suelo para abrir hombros y mejorar control escapular.",
+    exerciseType: "stretch",
+    measurementCategory: "flexibility",
+    tags: ["motor-control"],
+    measurement: reps,
+    muscleLoads: [
+      { muscleId: "deltoid-posterior", percentage: 20 },
+      { muscleId: "trapezius-middle-lower", percentage: 20 },
+      { muscleId: "serratus-anterior", percentage: 15 },
+      { muscleId: "latissimus-dorsi", percentage: 15 },
+      { muscleId: "erector-spinae", percentage: 15 },
+      { muscleId: "pectoralis-major-clavicular", percentage: 15 }
+    ],
+    description: "Recorrido amplio de brazos boca abajo para hombros y esc\xE1pulas.",
+    technique: [
+      "Acu\xE9state boca abajo con brazos extendidos en un rango c\xF3modo.",
+      "Desliza o eleva brazos trazando un arco controlado.",
+      "Vuelve sin perder la postura del tronco."
+    ],
+    keyPoints: [
+      "No lo aceleres; el control es parte central del gesto.",
+      "Reduce rango si el hombro no tolera la apertura completa."
+    ],
+    notes: [
+      "Puede funcionar como movilidad activa ligera de hombro."
+    ]
+  })
+]);
 
 // ../nexus-plugins/life-tracker/src/training/training-utils.js
 function normalizeText(value) {
@@ -5445,6 +7144,91 @@ var TRAINING_MEASUREMENT_MODE_LABELS = {
   distance: "Distancia",
   weight: "Peso"
 };
+var TRAINING_EXERCISE_TYPE_LABELS = Object.freeze({
+  exercise: "Ejercicio",
+  stretch: "Estiramiento",
+  warmup: "Calentamiento",
+  coordination: "Coordinaci\xF3n"
+});
+var TRAINING_MEASUREMENT_CATEGORY_LABELS = Object.freeze({
+  strength: "Fuerza",
+  cardio: "Cardio",
+  balance: "Equilibrio",
+  flexibility: "Flexibilidad"
+});
+var TRAINING_EXERCISE_TAG_LABELS = Object.freeze({
+  strength: "Fuerza",
+  cardio: "Cardio",
+  balance: "Equilibrio",
+  flexibility: "Flexibilidad",
+  endurance: "Resistencia",
+  "motor-control": "Motricidad",
+  isometric: "Isom\xE9trico",
+  unilateral: "Unilateral",
+  explosive: "Explosivo"
+});
+var TRAINING_EXERCISE_TAG_ORDER = Object.freeze([
+  "strength",
+  "cardio",
+  "balance",
+  "flexibility",
+  "endurance",
+  "motor-control",
+  "isometric",
+  "unilateral",
+  "explosive"
+]);
+function normalizeTrainingExerciseType(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(TRAINING_EXERCISE_TYPE_LABELS, normalized) ? normalized : "exercise";
+}
+function normalizeTrainingMeasurementCategory(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(TRAINING_MEASUREMENT_CATEGORY_LABELS, normalized) ? normalized : "strength";
+}
+function normalizeTrainingExerciseTags(value, options = {}) {
+  const source = Array.isArray(value) ? value : [];
+  const uniqueTags = /* @__PURE__ */ new Set();
+  const measurementCategory = normalizeOptionalText3(options.measurementCategory) ? normalizeTrainingMeasurementCategory(options.measurementCategory) : null;
+  for (const entry of source) {
+    const rawValue = entry && typeof entry === "object" ? entry.id || entry.value || entry.tag : entry;
+    const normalizedTag = normalizeOptionalText3(rawValue)?.toLowerCase() || null;
+    if (!normalizedTag || !Object.prototype.hasOwnProperty.call(TRAINING_EXERCISE_TAG_LABELS, normalizedTag)) {
+      continue;
+    }
+    if (measurementCategory && normalizedTag === measurementCategory) {
+      continue;
+    }
+    uniqueTags.add(normalizedTag);
+  }
+  return TRAINING_EXERCISE_TAG_ORDER.filter((tagId) => uniqueTags.has(tagId));
+}
+function resolveTrainingExerciseTags(tags, measurementCategory) {
+  const normalizedMeasurementCategory = normalizeOptionalText3(measurementCategory) ? normalizeTrainingMeasurementCategory(measurementCategory) : null;
+  const explicitTags = normalizeTrainingExerciseTags(tags, {
+    measurementCategory: normalizedMeasurementCategory
+  });
+  const uniqueTags = new Set(explicitTags);
+  if (normalizedMeasurementCategory && Object.prototype.hasOwnProperty.call(TRAINING_EXERCISE_TAG_LABELS, normalizedMeasurementCategory)) {
+    uniqueTags.add(normalizedMeasurementCategory);
+  }
+  return TRAINING_EXERCISE_TAG_ORDER.filter((tagId) => uniqueTags.has(tagId));
+}
+function buildTrainingExerciseTypeSummary(value) {
+  const normalized = normalizeTrainingExerciseType(value);
+  return TRAINING_EXERCISE_TYPE_LABELS[normalized] || "";
+}
+function buildTrainingMeasurementCategorySummary(value) {
+  const normalized = normalizeTrainingMeasurementCategory(value);
+  return TRAINING_MEASUREMENT_CATEGORY_LABELS[normalized] || "";
+}
+function buildTrainingExerciseTagSummary(tags, options = {}) {
+  const normalizedMeasurementCategory = normalizeOptionalText3(options.measurementCategory) ? normalizeTrainingMeasurementCategory(options.measurementCategory) : null;
+  const normalizedTags = resolveTrainingExerciseTags(tags, normalizedMeasurementCategory).filter((tagId) => options.omitMeasurementCategory && normalizedMeasurementCategory ? tagId !== normalizedMeasurementCategory : true);
+  const maxItems = Math.max(0, Number(options.maxItems || 0)) || null;
+  const visibleTags = maxItems ? normalizedTags.slice(0, maxItems) : normalizedTags;
+  return visibleTags.map((tagId) => TRAINING_EXERCISE_TAG_LABELS[tagId] || tagId).join(", ");
+}
 function buildTrainingMeasurementUnitSummary(measurement) {
   const data = parseJsonObject2(measurement, {});
   const mode = normalizeOptionalText3(data.mode);
@@ -5503,17 +7287,76 @@ function normalizeTrainingLoad(value) {
   }
   return Math.min(10, Math.max(1, numericValue));
 }
+function normalizeTrainingPercentage(value) {
+  const numericValue = Math.round(Number(value));
+  if (!Number.isInteger(numericValue)) {
+    return null;
+  }
+  return Math.min(100, Math.max(1, numericValue));
+}
+function sortTrainingMuscleLoads(muscleLoads) {
+  return [...muscleLoads].sort((left, right) => {
+    const groupCompare = String(left.groupTitle || "").localeCompare(String(right.groupTitle || ""));
+    if (groupCompare !== 0) {
+      return groupCompare;
+    }
+    return String(left.title || "").localeCompare(String(right.title || ""));
+  });
+}
+function normalizeLegacyMuscleLoadPercentages(muscleLoads) {
+  const totalWeight = muscleLoads.reduce((sum, entry) => sum + Number(entry.legacyWeight || 0), 0);
+  if (!totalWeight) {
+    return muscleLoads.map(({ legacyWeight, ...entry }) => ({
+      ...entry,
+      percentage: normalizeTrainingPercentage(entry.percentage) || 1
+    }));
+  }
+  const exactRows = muscleLoads.map((entry) => {
+    const exact = Number(entry.legacyWeight || 0) / totalWeight * 100;
+    return {
+      entry,
+      base: Math.floor(exact),
+      remainder: exact - Math.floor(exact)
+    };
+  });
+  let remainderPool = 100 - exactRows.reduce((sum, row) => sum + row.base, 0);
+  const sortedByRemainder = [...exactRows].sort((left, right) => right.remainder - left.remainder);
+  const assigned = /* @__PURE__ */ new Map();
+  for (const row of sortedByRemainder) {
+    assigned.set(row.entry.muscleId, row.base);
+  }
+  for (const row of sortedByRemainder) {
+    if (remainderPool <= 0) {
+      break;
+    }
+    assigned.set(row.entry.muscleId, Number(assigned.get(row.entry.muscleId) || 0) + 1);
+    remainderPool -= 1;
+  }
+  return muscleLoads.map(({ legacyWeight, ...entry }) => ({
+    ...entry,
+    percentage: normalizeTrainingPercentage(assigned.get(entry.muscleId) || entry.percentage) || 1
+  }));
+}
 function normalizeTrainingMuscleLoads(value, options = {}) {
   const source = Array.isArray(value) ? value : [];
   const includeWarnings = Boolean(options.includeWarnings);
   const uniqueLoads = /* @__PURE__ */ new Map();
   const warnings = [];
+  let hasExplicitPercentages = false;
+  let hasLegacyLoads = false;
   for (const entry of source) {
     const raw = entry && typeof entry === "object" ? entry : { muscleId: entry };
     const rawMuscleId = normalizeOptionalText3(raw.muscleId || raw.id);
-    const load2 = normalizeTrainingLoad(raw.load);
+    const percentage = normalizeTrainingPercentage(raw.percentage);
+    const legacyLoad = normalizeTrainingLoad(raw.load);
     const resolvedMuscle = rawMuscleId ? getTrainingMuscleById(rawMuscleId) : findTrainingMuscleByAlias(raw.title || raw.name || raw.slug || "");
-    if (!resolvedMuscle || load2 == null) {
+    if (percentage != null) {
+      hasExplicitPercentages = true;
+    }
+    if (legacyLoad != null) {
+      hasLegacyLoads = true;
+    }
+    if (!resolvedMuscle || percentage == null && legacyLoad == null) {
       if (includeWarnings) {
         const warningLabel = normalizeOptionalText3(raw.title || raw.name || raw.slug || rawMuscleId);
         if (warningLabel) {
@@ -5527,7 +7370,8 @@ function normalizeTrainingMuscleLoads(value, options = {}) {
     }
     uniqueLoads.set(resolvedMuscle.id, {
       muscleId: resolvedMuscle.id,
-      load: load2,
+      percentage,
+      legacyWeight: legacyLoad,
       title: resolvedMuscle.title,
       slug: resolvedMuscle.slug,
       regionId: resolvedMuscle.regionId,
@@ -5536,13 +7380,11 @@ function normalizeTrainingMuscleLoads(value, options = {}) {
       groupTitle: resolvedMuscle.groupTitle
     });
   }
-  const muscleLoads = [...uniqueLoads.values()].sort((left, right) => {
-    const groupCompare = String(left.groupTitle || "").localeCompare(String(right.groupTitle || ""));
-    if (groupCompare !== 0) {
-      return groupCompare;
-    }
-    return String(left.title || "").localeCompare(String(right.title || ""));
-  });
+  const rawMuscleLoads = sortTrainingMuscleLoads([...uniqueLoads.values()]);
+  const muscleLoads = !hasExplicitPercentages && hasLegacyLoads ? normalizeLegacyMuscleLoadPercentages(rawMuscleLoads) : rawMuscleLoads.map(({ legacyWeight, ...entry }) => ({
+    ...entry,
+    percentage: normalizeTrainingPercentage(entry.percentage ?? legacyWeight) || 1
+  }));
   return includeWarnings ? {
     muscleLoads,
     warnings
@@ -5550,13 +7392,30 @@ function normalizeTrainingMuscleLoads(value, options = {}) {
 }
 function buildTrainingMuscleLoadSummary(muscleLoads) {
   const list = Array.isArray(muscleLoads) ? muscleLoads : [];
-  return list.slice(0, 4).map((entry) => `${entry.title || getTrainingMuscleById(entry.muscleId)?.title || entry.muscleId} ${entry.load}/10`).join(", ");
+  return list.slice(0, 4).map((entry) => `${entry.title || getTrainingMuscleById(entry.muscleId)?.title || entry.muscleId} ${entry.percentage}%`).join(", ");
 }
 function buildTrainingExerciseSummary(exercise) {
   const parts = [];
+  const typeId = normalizeTrainingExerciseType(exercise?.exerciseType);
+  const typeSummary = buildTrainingExerciseTypeSummary(typeId);
+  const categorySummary = buildTrainingMeasurementCategorySummary(exercise?.measurementCategory);
   const measurementSummary = buildTrainingMeasurementUnitSummary(exercise?.measurement);
+  const tagSummary = buildTrainingExerciseTagSummary(exercise?.tags, {
+    measurementCategory: exercise?.measurementCategory,
+    omitMeasurementCategory: true,
+    maxItems: 2
+  });
+  if (typeSummary && typeId !== "exercise") {
+    parts.push(typeSummary);
+  }
+  if (categorySummary) {
+    parts.push(categorySummary);
+  }
   if (measurementSummary) {
     parts.push(measurementSummary);
+  }
+  if (tagSummary) {
+    parts.push(tagSummary);
   }
   const muscleSummary = buildTrainingMuscleLoadSummary(exercise?.muscleLoads);
   if (muscleSummary) {
@@ -5758,7 +7617,9 @@ var TRAINING_CONCEPTS_ROOT = "Concepts/Fitness";
 var TRAINING_MUSCLE_CONCEPTS_DIRECTORY = `${TRAINING_CONCEPTS_ROOT}/Muscles`;
 var TRAINING_EXERCISE_CONCEPTS_DIRECTORY = `${TRAINING_CONCEPTS_ROOT}/Exercises`;
 var TRAINING_LEGACY_FOLDER_NOTE_FILE_NAME = "_folder.md";
+var TRAINING_TRANSFER_SCHEMA_VERSION = 2;
 var trainingConceptCoverageInFlight = /* @__PURE__ */ new Map();
+var TRAINING_STARTER_LIBRARY_STATE_KEY = "starterLibraryVersion";
 var TRAINING_CONCEPT_TEMPLATES = {
   "fitness-muscle": {
     frontmatter: ({ payload, title }) => ({
@@ -5819,6 +7680,9 @@ var TRAINING_CONCEPT_TEMPLATES = {
     ].join("\n")
   }
 };
+var TRAINING_STARTER_EXERCISE_BY_TEMPLATE_KEY = new Map(
+  TRAINING_STARTER_EXERCISES.map((exercise) => [exercise.templateKey, exercise])
+);
 function createSuccess2(data) {
   return { ok: true, data };
 }
@@ -5838,7 +7702,32 @@ function assertNonEmptyString(value, fieldName) {
   }
   return normalized;
 }
+function normalizeOptionalNumber(value) {
+  if (value == null || value === "") {
+    return null;
+  }
+  const normalized = Number(String(value).replace(",", "."));
+  return Number.isFinite(normalized) ? normalized : null;
+}
+function getTrainingStarterExerciseDefinition(templateKey) {
+  const normalizedTemplateKey = normalizeOptionalText3(templateKey);
+  return normalizedTemplateKey ? TRAINING_STARTER_EXERCISE_BY_TEMPLATE_KEY.get(normalizedTemplateKey) || null : null;
+}
 function parseRowJson(value, fallback) {
+  if (Array.isArray(fallback)) {
+    if (value == null || value === "") {
+      return [...fallback];
+    }
+    if (typeof value === "string") {
+      try {
+        const parsed2 = JSON.parse(value);
+        return Array.isArray(parsed2) ? parsed2 : [...fallback];
+      } catch {
+        return [...fallback];
+      }
+    }
+    return Array.isArray(value) ? value : [...fallback];
+  }
   const parsed = parseJsonObject2(value, fallback);
   return parsed;
 }
@@ -5916,6 +7805,169 @@ function getTrainingExerciseConceptLegacyRelativePaths(exercise) {
   return [
     normalizeRelativeContentPath(`${TRAINING_EXERCISE_CONCEPTS_DIRECTORY}/${exercise.slug}.md`)
   ].filter((relativePath, index, list) => relativePath && list.indexOf(relativePath) === index);
+}
+function getTrainingStarterExerciseManagedDocId(templateKey) {
+  return `starter-exercise:${templateKey}`;
+}
+function getTrainingMuscleManagedDocId(muscleId) {
+  return `muscle:${muscleId}`;
+}
+function buildTrainingMuscleConceptSummary(muscle) {
+  return `${muscle.groupTitle} - ${muscle.regionTitle}`;
+}
+function joinTrainingNaturalList(items) {
+  if (!items.length) {
+    return "";
+  }
+  if (items.length === 1) {
+    return items[0];
+  }
+  if (items.length === 2) {
+    return `${items[0]} y ${items[1]}`;
+  }
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+}
+function buildTrainingMuscleInlineLink(muscle) {
+  return `[${muscle.title}](${getTrainingMuscleConceptPreferredFileBaseName(muscle)}.md)`;
+}
+function buildTrainingMuscleRelatedSummary(muscle) {
+  const relatedLinks = (Array.isArray(muscle.relatedMuscleIds) ? muscle.relatedMuscleIds : []).map((relatedMuscleId) => getTrainingMuscleById(relatedMuscleId)).filter(Boolean).map((relatedMuscle) => buildTrainingMuscleInlineLink(relatedMuscle));
+  if (!relatedLinks.length) {
+    return "Suele trabajar junto a otros musculos cercanos del mismo patron.";
+  }
+  return `Suele trabajar junto a ${joinTrainingNaturalList(relatedLinks)}.`;
+}
+function buildTrainingMuscleBody(muscle) {
+  const summary = buildTrainingMuscleConceptSummary(muscle);
+  const movementSummary = String(muscle.movementSummary || "").trim() || "Describe la funcion principal de este musculo y como se siente cuando trabaja.";
+  return [
+    `# ${muscle.title}`,
+    "",
+    summary,
+    "",
+    "## Funcion",
+    "",
+    movementSummary,
+    "",
+    "## Trabaja con",
+    "",
+    buildTrainingMuscleRelatedSummary(muscle)
+  ].join("\n");
+}
+function buildManagedStarterExerciseMuscleLines(definition) {
+  return definition.muscleLoads.map((entry) => {
+    const muscle = getTrainingMuscleById(entry.muscleId);
+    const muscleTitle = muscle?.title || entry.muscleId;
+    const musclePath = muscle ? `../Muscles/${getTrainingMuscleConceptPreferredFileBaseName(muscle)}.md` : "";
+    return musclePath ? `- [${muscleTitle}](${musclePath}): ${entry.percentage}%` : `- ${muscleTitle}: ${entry.percentage}%`;
+  });
+}
+function buildTrainingStarterExerciseTaxonomyLines(definition) {
+  const typeSummary = buildTrainingExerciseTypeSummary(definition.exerciseType);
+  const categorySummary = buildTrainingMeasurementCategorySummary(definition.measurementCategory);
+  const tagSummary = buildTrainingExerciseTagSummary(definition.tags, {
+    measurementCategory: definition.measurementCategory
+  });
+  return [
+    `- Tipo: ${typeSummary}`,
+    `- Perfil principal: ${categorySummary}`,
+    tagSummary ? `- Tags: ${tagSummary}` : null
+  ].filter(Boolean);
+}
+function buildTrainingStarterExerciseBody(definition) {
+  return [
+    `# ${definition.title}`,
+    "",
+    definition.description,
+    "",
+    "## Perfil",
+    "",
+    ...buildTrainingStarterExerciseTaxonomyLines(definition),
+    "",
+    "## Tecnica",
+    "",
+    ...definition.technique.map((line) => `- ${line}`),
+    "",
+    "## Puntos clave",
+    "",
+    ...definition.keyPoints.map((line) => `- ${line}`),
+    "",
+    "## Musculos implicados",
+    "",
+    ...buildManagedStarterExerciseMuscleLines(definition),
+    "",
+    "## Notas",
+    "",
+    ...definition.notes.map((line) => `- ${line}`)
+  ].join("\n");
+}
+function buildTrainingStarterExerciseConceptPayload(definition, exerciseId) {
+  return {
+    title: definition.title,
+    slug: definition.title,
+    fileBaseName: definition.title,
+    relativeDirectoryPath: TRAINING_EXERCISE_CONCEPTS_DIRECTORY,
+    summary: definition.summary,
+    content: buildTrainingStarterExerciseBody(definition),
+    frontmatter: {
+      nexus: {
+        defaultView: "read",
+        card: {
+          title: definition.title,
+          summary: definition.summary
+        }
+      },
+      fitness: {
+        domain: "training",
+        kind: "exercise",
+        targetId: exerciseId,
+        templateKey: definition.templateKey,
+        exerciseType: normalizeTrainingExerciseType(definition.exerciseType),
+        measurementCategory: normalizeTrainingMeasurementCategory(definition.measurementCategory),
+        tags: normalizeTrainingExerciseTags(definition.tags, {
+          measurementCategory: definition.measurementCategory
+        })
+      }
+    }
+  };
+}
+function buildLegacyTrainingMuscleConceptPayload(muscle) {
+  return {
+    title: muscle.title,
+    slug: muscle.id,
+    fileBaseName: getTrainingMuscleConceptPreferredFileBaseName(muscle),
+    relativeDirectoryPath: TRAINING_MUSCLE_CONCEPTS_DIRECTORY,
+    templateId: "fitness-muscle",
+    summary: buildTrainingMuscleConceptSummary(muscle),
+    frontmatter: {
+      fitness: {
+        domain: "training",
+        kind: "muscle",
+        targetId: muscle.id,
+        regionId: muscle.regionId,
+        groupId: muscle.groupId
+      },
+      nexus: {
+        card: {
+          title: muscle.title,
+          summary: buildTrainingMuscleConceptSummary(muscle)
+        }
+      }
+    }
+  };
+}
+function buildTrainingMuscleConceptPayload(muscle) {
+  return {
+    ...buildLegacyTrainingMuscleConceptPayload(muscle),
+    content: buildTrainingMuscleBody(muscle)
+  };
+}
+function normalizeTrainingMarkdownForComparison(value) {
+  return String(value || "").replace(/\r\n/g, "\n").trim();
+}
+function getRealTrainingConceptId(value) {
+  const normalizedValue = normalizeOptionalText3(value);
+  return normalizedValue && !normalizedValue.startsWith("item:") ? normalizedValue : null;
 }
 function readFrontmatterFromMarkdownPath(markdownPath) {
   if (!markdownPath) {
@@ -6330,6 +8382,32 @@ function findTrainingExerciseBySlugSync(sqlite, slug) {
     LIMIT 1
   `).get(slug) ?? null;
 }
+function findTrainingExerciseByTemplateKeySync(sqlite, templateKey) {
+  return sqlite.prepare(`
+    SELECT *
+    FROM training_exercises
+    WHERE template_key = ?
+      AND status = 'active'
+    LIMIT 1
+  `).get(templateKey) ?? null;
+}
+function findTrainingExerciseByTitleExactSync(sqlite, title) {
+  return sqlite.prepare(`
+    SELECT *
+    FROM training_exercises
+    WHERE title = ? COLLATE NOCASE
+      AND status = 'active'
+    ORDER BY title COLLATE NOCASE ASC, title ASC
+    LIMIT 1
+  `).get(title) ?? null;
+}
+function findTrainingMuscleByTitleSync(title) {
+  const normalizedTitle = normalizeOptionalText3(title);
+  if (!normalizedTitle) {
+    return null;
+  }
+  return TRAINING_MUSCLE_CATALOG.find((entry) => entry.title.localeCompare(normalizedTitle, void 0, { sensitivity: "accent" }) === 0) || TRAINING_MUSCLE_CATALOG.find((entry) => normalizeTrainingSlug(entry.title, "muscle") === normalizeTrainingSlug(normalizedTitle, "muscle")) || null;
+}
 function findTrainingRoutineBySlugSync(sqlite, slug) {
   return sqlite.prepare(`
     SELECT *
@@ -6357,6 +8435,21 @@ function listLegacyExerciseMusclesSync(sqlite, entityRefId) {
     load: 5
   })).filter((entry) => entry.title || entry.slug);
 }
+function normalizeLegacyExerciseMetadataMuscles(rawMuscles) {
+  if (!Array.isArray(rawMuscles)) {
+    return [];
+  }
+  return rawMuscles.map((entry) => {
+    const source = entry && typeof entry === "object" ? entry : { title: entry };
+    if (source.percentage != null || source.load != null) {
+      return source;
+    }
+    return {
+      ...source,
+      load: 5
+    };
+  }).filter((entry) => normalizeOptionalText3(entry?.title) || normalizeOptionalText3(entry?.name) || normalizeOptionalText3(entry?.slug) || normalizeOptionalText3(entry?.muscleId) || normalizeOptionalText3(entry?.id));
+}
 function findLegacyExerciseSearchDocumentSync(sqlite, entityRefId) {
   return sqlite.prepare(`
     SELECT id, title, subtitle, body, metadata
@@ -6375,9 +8468,14 @@ function normalizeExerciseRecord(ctx, row) {
   const measurement = parseRowJson(row.measurement_json, {});
   const storedMuscleLoads = parseRowJson(row.muscle_loads_json, []);
   const storedWarnings = parseRowJson(row.legacy_muscle_warnings_json, []);
+  const exerciseType = normalizeTrainingExerciseType(row.exercise_type);
+  const measurementCategory = normalizeTrainingMeasurementCategory(row.measurement_category);
   const fallbackLegacyMuscles = !storedMuscleLoads.length ? listLegacyExerciseMusclesSync(sqlite, String(row.entity_ref_id)) : [];
   const fallbackLegacyData = fallbackLegacyMuscles.length ? normalizeTrainingMuscleLoads(fallbackLegacyMuscles, { includeWarnings: true }) : { muscleLoads: [], warnings: [] };
   const muscleLoads = storedMuscleLoads.length ? normalizeTrainingMuscleLoads(storedMuscleLoads) : fallbackLegacyData.muscleLoads;
+  const tags = normalizeTrainingExerciseTags(parseRowJson(row.tags_json, []), {
+    measurementCategory
+  });
   const legacyWarnings = storedWarnings.length ? storedWarnings : fallbackLegacyData.warnings;
   return {
     id: String(row.id),
@@ -6386,12 +8484,21 @@ function normalizeExerciseRecord(ctx, row) {
     slug: String(row.slug || "").trim(),
     summary: row.summary == null ? null : String(row.summary),
     notes: row.notes == null ? null : String(row.notes),
+    exerciseType,
+    measurementCategory,
+    tags,
     measurement,
     muscleLoads,
     legacyWarnings,
+    templateKey: normalizeOptionalText3(row.template_key),
+    personalDifficultyScore: normalizeOptionalNumber(row.personal_difficulty_score),
+    isStarter: Boolean(getTrainingStarterExerciseDefinition(row.template_key)),
     createdAt: String(row.created_at || nowIso3()),
     updatedAt: String(row.updated_at || row.created_at || nowIso3()),
     searchSummary: buildTrainingExerciseSummary({
+      exerciseType,
+      measurementCategory,
+      tags,
       measurement,
       muscleLoads
     }),
@@ -6433,11 +8540,14 @@ function migrateLegacySearchExercisesSync(ctx) {
       continue;
     }
     const metadata = parseRowJson(legacyDocument.metadata, {});
-    const rawLegacyMuscles = Array.isArray(metadata?.muscles) && metadata.muscles.length ? metadata.muscles : listLegacyExerciseMusclesSync(sqlite, String(legacyRow.entity_ref_id));
+    const metadataMuscles = normalizeLegacyExerciseMetadataMuscles(metadata?.muscles);
+    const rawLegacyMuscles = metadataMuscles.length ? metadataMuscles : listLegacyExerciseMusclesSync(sqlite, String(legacyRow.entity_ref_id));
     const normalizedLegacyMuscles = normalizeTrainingMuscleLoads(rawLegacyMuscles, { includeWarnings: true });
     const measurement = normalizeTrainingMeasurement(metadata?.measurement);
     const summary = normalizeOptionalText3(metadata?.summary || legacyDocument.subtitle);
     const notes = normalizeOptionalText3(metadata?.notes);
+    const exerciseType = normalizeTrainingExerciseType(metadata?.exerciseType);
+    const measurementCategory = normalizeTrainingMeasurementCategory(metadata?.measurementCategory);
     const exerciseId = normalizeOptionalText3(metadata?.exerciseId) || normalizeOptionalText3(metadata?.id) || (0, import_node_crypto2.randomUUID)();
     const slug = allocateUniqueSlugSync(
       normalizeTrainingSlug(metadata?.slug || title, "exercise"),
@@ -6446,33 +8556,43 @@ function migrateLegacySearchExercisesSync(ctx) {
     const timestamp2 = nowIso3();
     sqlite.prepare(`
       INSERT INTO training_exercises (
-        id, entity_ref_id, title, slug, summary, notes, measurement_json, muscle_loads_json,
-        legacy_muscle_warnings_json, status, created_at, updated_at
+        id, entity_ref_id, template_key, title, slug, summary, notes, exercise_type, measurement_category, tags_json,
+        measurement_json, muscle_loads_json, legacy_muscle_warnings_json, personal_difficulty_score, status, created_at, updated_at
       ) VALUES (
-        @id, @entity_ref_id, @title, @slug, @summary, @notes, @measurement_json, @muscle_loads_json,
-        @legacy_muscle_warnings_json, @status, @created_at, @updated_at
+        @id, @entity_ref_id, @template_key, @title, @slug, @summary, @notes, @exercise_type, @measurement_category, @tags_json,
+        @measurement_json, @muscle_loads_json, @legacy_muscle_warnings_json, @personal_difficulty_score, @status, @created_at, @updated_at
       )
       ON CONFLICT(id) DO UPDATE SET
         entity_ref_id = excluded.entity_ref_id,
+        template_key = excluded.template_key,
         title = excluded.title,
         slug = excluded.slug,
         summary = excluded.summary,
         notes = excluded.notes,
+        exercise_type = excluded.exercise_type,
+        measurement_category = excluded.measurement_category,
+        tags_json = excluded.tags_json,
         measurement_json = excluded.measurement_json,
         muscle_loads_json = excluded.muscle_loads_json,
         legacy_muscle_warnings_json = excluded.legacy_muscle_warnings_json,
+        personal_difficulty_score = excluded.personal_difficulty_score,
         status = excluded.status,
         updated_at = excluded.updated_at
     `).run({
       id: exerciseId,
       entity_ref_id: String(legacyRow.entity_ref_id),
+      template_key: null,
       title,
       slug,
       summary,
       notes,
+      exercise_type: exerciseType,
+      measurement_category: measurementCategory,
+      tags_json: JSON.stringify([]),
       measurement_json: JSON.stringify(measurement || {}),
       muscle_loads_json: JSON.stringify(normalizedLegacyMuscles.muscleLoads || []),
       legacy_muscle_warnings_json: JSON.stringify(normalizedLegacyMuscles.warnings || []),
+      personal_difficulty_score: null,
       status: "active",
       created_at: String(legacyRow.created_at || timestamp2),
       updated_at: String(legacyRow.updated_at || legacyRow.created_at || timestamp2)
@@ -6503,8 +8623,13 @@ function migrateLegacySearchExercisesSync(ctx) {
         domain: "training",
         type: "exercise",
         exerciseId: savedExercise.id,
+        exerciseType: savedExercise.exerciseType,
+        measurementCategory: savedExercise.measurementCategory,
+        tags: savedExercise.tags,
         measurement: savedExercise.measurement,
-        muscleLoads: savedExercise.muscleLoads
+        muscleLoads: savedExercise.muscleLoads,
+        templateKey: savedExercise.templateKey,
+        personalDifficultyScore: savedExercise.personalDifficultyScore
       }
     });
   }
@@ -6603,6 +8728,14 @@ function listTrainingAssignmentsSync(ctx) {
   `).all();
   return rows.map((row) => normalizeAssignmentRecord(ctx, row, routineLookup)).filter((assignment) => Boolean(assignment));
 }
+function findTrainingRoutineRecordByTitleSync(ctx, title) {
+  const normalizedTitle = normalizeOptionalText3(title);
+  if (!normalizedTitle) {
+    return null;
+  }
+  const normalizedSlug = normalizeTrainingSlug(normalizedTitle, "routine");
+  return listTrainingRoutinesSync(ctx).find((routine) => normalizeTrainingSlug(routine.title, "routine") === normalizedSlug) || null;
+}
 function listTrainingOccurrencesSync(sqlite) {
   const rows = sqlite.prepare(`
     SELECT *
@@ -6644,6 +8777,33 @@ function upsertTrainingMuscleConceptBindingSync(sqlite, muscleId, conceptId) {
   `).run({
     muscle_id: muscleId,
     concept_id: conceptId,
+    created_at: timestamp2,
+    updated_at: timestamp2
+  });
+}
+function getTrainingSystemStateValueSync(sqlite, stateKey) {
+  const row = sqlite.prepare(`
+    SELECT state_value
+    FROM training_system_state
+    WHERE state_key = ?
+    LIMIT 1
+  `).get(stateKey);
+  return row?.state_value == null ? null : String(row.state_value);
+}
+function setTrainingSystemStateValueSync(sqlite, stateKey, stateValue) {
+  const timestamp2 = nowIso3();
+  sqlite.prepare(`
+    INSERT INTO training_system_state (
+      state_key, state_value, created_at, updated_at
+    ) VALUES (
+      @state_key, @state_value, @created_at, @updated_at
+    )
+    ON CONFLICT(state_key) DO UPDATE SET
+      state_value = excluded.state_value,
+      updated_at = excluded.updated_at
+  `).run({
+    state_key: stateKey,
+    state_value: stateValue,
     created_at: timestamp2,
     updated_at: timestamp2
   });
@@ -6929,6 +9089,124 @@ async function ensureTrainingConceptFolders(ctx) {
     kind: "exercise"
   });
 }
+function updateTrainingConceptRowSync(sqlite, conceptId, {
+  itemId,
+  title,
+  summary
+}) {
+  sqlite.prepare(`
+    UPDATE concepts
+    SET item_id = ?,
+        title = ?,
+        summary = ?,
+        updated_at = ?
+    WHERE id = ?
+  `).run(itemId, title, summary, nowIso3(), conceptId);
+}
+async function ensureTrainingManagedMarkdownItem(ctx, {
+  relativePath,
+  content,
+  currentRelativePath = null,
+  currentItemId = null
+}) {
+  const normalizedRelativePath = normalizeRelativeContentPath(relativePath);
+  const normalizedCurrentRelativePath = normalizeRelativeContentPath(currentRelativePath);
+  const absolutePath = resolveAbsoluteContentPath(ctx, normalizedRelativePath);
+  if (!normalizedRelativePath || !absolutePath) {
+    throw new Error("La ruta del markdown gestionado no es valida.");
+  }
+  if (normalizedCurrentRelativePath && normalizedCurrentRelativePath !== normalizedRelativePath) {
+    const currentAbsolutePath = resolveAbsoluteContentPath(ctx, normalizedCurrentRelativePath);
+    if (currentAbsolutePath && await doesTrainingPathExist(currentAbsolutePath) && !await doesTrainingPathExist(absolutePath)) {
+      await renameTrainingMarkdownItemPath(
+        ctx,
+        normalizedCurrentRelativePath,
+        normalizedRelativePath,
+        currentItemId
+      );
+    }
+  }
+  await import_promises.default.mkdir(import_node_path.default.dirname(absolutePath), { recursive: true });
+  await import_promises.default.writeFile(absolutePath, content, "utf8");
+  await ensureTrainingItemPath(ctx, import_node_path.default.dirname(normalizedRelativePath), "folder");
+  const item = await ensureTrainingItemPath(ctx, normalizedRelativePath, "file");
+  pruneTrainingItemRowsByPathSync(getSqlite(ctx), normalizedRelativePath, "file", item?.id ? String(item.id) : null);
+  return item;
+}
+async function ensureTrainingManagedConceptDoc(ctx, {
+  relativePath,
+  currentRelativePath = null,
+  currentItemId = null,
+  currentConceptId = null,
+  title,
+  slug,
+  summary,
+  content
+}) {
+  const item = await ensureTrainingManagedMarkdownItem(ctx, {
+    relativePath,
+    content,
+    currentRelativePath,
+    currentItemId
+  });
+  if (!item?.id) {
+    throw new Error(`No se pudo registrar la nota gestionada: ${relativePath}`);
+  }
+  const sqlite = getSqlite(ctx);
+  const conceptId = normalizeOptionalText3(currentConceptId);
+  if (conceptId) {
+    updateTrainingConceptRowSync(sqlite, conceptId, {
+      itemId: String(item.id),
+      title,
+      summary
+    });
+    return getTrainingDocRecordByConceptIdSync(ctx, conceptId);
+  }
+  const concept = await ensureTrainingConceptForItem(ctx, {
+    itemId: String(item.id),
+    title,
+    slug,
+    summary
+  });
+  return getTrainingDocRecordByConceptIdSync(ctx, String(concept.id));
+}
+function upsertTrainingExerciseSearchDocument(sqlite, exercise) {
+  const taxonomySummary = [
+    buildTrainingExerciseTypeSummary(exercise.exerciseType),
+    buildTrainingMeasurementCategorySummary(exercise.measurementCategory),
+    buildTrainingExerciseTagSummary(exercise.tags, {
+      measurementCategory: exercise.measurementCategory,
+      omitMeasurementCategory: true
+    })
+  ].filter(Boolean).join(" - ");
+  upsertTrainingSearchDocument(sqlite, {
+    id: getTrainingSearchDocumentId("exercise", exercise.id),
+    entityRefId: exercise.entityRefId,
+    kind: "concept",
+    title: exercise.title,
+    subtitle: exercise.searchSummary || exercise.summary,
+    body: [
+      exercise.summary,
+      exercise.notes,
+      taxonomySummary ? `Taxonomia: ${taxonomySummary}` : null,
+      exercise.searchSummary ? `Resumen: ${exercise.searchSummary}` : null
+    ].filter(Boolean).join("\n\n"),
+    metadata: {
+      pluginId: TRAINING_PLUGIN_ID,
+      domain: "training",
+      type: "exercise",
+      exerciseId: exercise.id,
+      exerciseType: exercise.exerciseType,
+      measurementCategory: exercise.measurementCategory,
+      tags: exercise.tags,
+      measurement: exercise.measurement,
+      muscleLoads: exercise.muscleLoads,
+      templateKey: exercise.templateKey,
+      personalDifficultyScore: exercise.personalDifficultyScore,
+      isStarter: exercise.isStarter
+    }
+  });
+}
 async function ensureTrainingMuscleConcept(ctx, muscleId) {
   const normalizedMuscleId = normalizeOptionalText3(muscleId);
   if (!normalizedMuscleId) {
@@ -6951,7 +9229,7 @@ async function ensureTrainingMuscleConcept(ctx, muscleId) {
     }
     return existingDoc;
   }
-  const muscleSummary = `${muscle.groupTitle} - ${muscle.regionTitle}`;
+  const musclePayload = buildTrainingMuscleConceptPayload(muscle);
   let existingItem = await ensureTrainingMarkdownItem(ctx, preferredRelativePath);
   if (!existingItem && legacyRelativePath) {
     const legacyItem = await ensureTrainingMarkdownItem(ctx, legacyRelativePath);
@@ -6968,30 +9246,8 @@ async function ensureTrainingMuscleConcept(ctx, muscleId) {
     itemId: String(existingItem.id),
     title: muscle.title,
     slug: muscle.id,
-    summary: muscleSummary
-  }) : (await createTrainingConceptNote(ctx, {
-    title: muscle.title,
-    slug: muscle.id,
-    fileBaseName: getTrainingMuscleConceptPreferredFileBaseName(muscle),
-    relativeDirectoryPath: TRAINING_MUSCLE_CONCEPTS_DIRECTORY,
-    templateId: "fitness-muscle",
-    summary: muscleSummary,
-    frontmatter: {
-      fitness: {
-        domain: "training",
-        kind: "muscle",
-        targetId: muscle.id,
-        regionId: muscle.regionId,
-        groupId: muscle.groupId
-      },
-      nexus: {
-        card: {
-          title: muscle.title,
-          summary: muscleSummary
-        }
-      }
-    }
-  })).concept;
+    summary: musclePayload.summary ?? null
+  }) : (await createTrainingConceptNote(ctx, musclePayload)).concept;
   if (!concept?.id) {
     throw new Error("No se pudo crear la nota del musculo.");
   }
@@ -7009,16 +9265,182 @@ async function ensureAllTrainingMuscleConcepts(ctx) {
   }
   return docs;
 }
-async function ensureAllTrainingExerciseConcepts(ctx) {
-  await ensureTrainingConceptFolders(ctx);
-  const docs = [];
-  for (const exercise of listTrainingExercisesSync(ctx)) {
-    const doc = await ensureTrainingExerciseConcept(ctx, exercise.id);
-    if (doc) {
-      docs.push(doc);
-    }
+function buildTrainingExerciseConceptPayloadFromRecord(exercise) {
+  const starterDefinition = getTrainingStarterExerciseDefinition(exercise.templateKey);
+  if (starterDefinition) {
+    return buildTrainingStarterExerciseConceptPayload(starterDefinition, exercise.id);
   }
-  return docs;
+  const exerciseSummary = exercise.summary || exercise.searchSummary || "Documento de ejercicio.";
+  return {
+    title: exercise.title,
+    slug: exercise.slug || exercise.title,
+    fileBaseName: getTrainingExerciseConceptPreferredFileBaseName(exercise),
+    relativeDirectoryPath: TRAINING_EXERCISE_CONCEPTS_DIRECTORY,
+    templateId: "fitness-exercise",
+    summary: exerciseSummary,
+    frontmatter: {
+      fitness: {
+        domain: "training",
+        kind: "exercise",
+        targetId: exercise.id,
+        exerciseType: exercise.exerciseType,
+        measurementCategory: exercise.measurementCategory,
+        tags: exercise.tags
+      },
+      nexus: {
+        card: {
+          title: exercise.title,
+          summary: exercise.summary || exercise.searchSummary || ""
+        }
+      }
+    }
+  };
+}
+function readTrainingMarkdownSource(doc, fallbackContent = "") {
+  if (!doc?.itemPath || !(0, import_node_fs.existsSync)(doc.itemPath)) {
+    return fallbackContent;
+  }
+  try {
+    return (0, import_node_fs.readFileSync)(doc.itemPath, "utf8");
+  } catch {
+    return fallbackContent;
+  }
+}
+function buildTrainingExerciseMarkdownFallback(exercise) {
+  const payload = buildTrainingExerciseConceptPayloadFromRecord(exercise);
+  return buildTrainingConceptMarkdownContent(
+    exercise.title,
+    exercise.slug || exercise.title,
+    payload
+  );
+}
+function buildTrainingMuscleMarkdownFallback(muscle) {
+  const payload = buildTrainingMuscleConceptPayload(muscle);
+  return buildTrainingConceptMarkdownContent(muscle.title, muscle.id, payload);
+}
+function buildLegacyTrainingMuscleMarkdownFallback(muscle) {
+  const payload = buildLegacyTrainingMuscleConceptPayload(muscle);
+  return buildTrainingConceptMarkdownContent(muscle.title, muscle.id, payload);
+}
+function buildTrainingTransferRoutineSegment(segment, exerciseLookup) {
+  if (segment?.type === "block") {
+    return {
+      type: "block",
+      title: normalizeOptionalText3(segment.title) || "",
+      repeatCount: Math.max(1, Math.round(Number(segment.repeatCount || 1)) || 1),
+      steps: Array.isArray(segment.steps) ? segment.steps.map((step) => buildTrainingTransferRoutineSegment(step, exerciseLookup)) : []
+    };
+  }
+  const stepKind = String(segment?.stepKind || segment?.kind || "exercise").trim().toLowerCase() === "rest" ? "rest" : "exercise";
+  const exerciseId = normalizeOptionalText3(segment?.exerciseId);
+  const exercise = exerciseId ? exerciseLookup.get(exerciseId) || null : null;
+  return {
+    type: "step",
+    stepKind,
+    exerciseTitle: stepKind === "exercise" ? exercise?.title || "" : null,
+    prescription: cloneJsonValue(normalizeTrainingPrescription(segment?.prescription))
+  };
+}
+function buildTrainingTransferMuscleRecord(muscle) {
+  return {
+    id: muscle.id,
+    title: muscle.title,
+    regionId: muscle.regionId,
+    regionTitle: muscle.regionTitle,
+    groupId: muscle.groupId,
+    groupTitle: muscle.groupTitle,
+    markdown: readTrainingMarkdownSource(muscle.doc, buildTrainingMuscleMarkdownFallback(muscle))
+  };
+}
+function buildTrainingTransferExerciseRecord(exercise) {
+  return {
+    title: exercise.title,
+    summary: exercise.summary,
+    exerciseType: exercise.exerciseType,
+    measurementCategory: exercise.measurementCategory,
+    tags: [...exercise.tags || []],
+    measurement: cloneJsonValue(normalizeTrainingMeasurement(exercise.measurement)),
+    muscleLoads: (exercise.muscleLoads || []).map((entry) => ({
+      muscleId: entry.muscleId,
+      muscleTitle: entry.title || null,
+      percentage: Number(entry.percentage || 0)
+    })),
+    templateKey: exercise.templateKey,
+    personalDifficultyScore: exercise.personalDifficultyScore,
+    markdown: readTrainingMarkdownSource(exercise.doc, buildTrainingExerciseMarkdownFallback(exercise))
+  };
+}
+function buildTrainingTransferRoutineRecord(routine, exerciseLookup) {
+  return {
+    title: routine.title,
+    summary: routine.summary,
+    notes: routine.notes,
+    structure: Array.isArray(routine.structure) ? routine.structure.map((segment) => buildTrainingTransferRoutineSegment(segment, exerciseLookup)) : []
+  };
+}
+function collectTrainingExerciseIdsFromStructure(structure) {
+  return Array.from(new Set(
+    flattenTrainingStructureSteps(Array.isArray(structure) ? structure : []).filter((entry) => entry?.type === "step").map((entry) => normalizeOptionalText3(entry.exerciseId)).filter(Boolean)
+  ));
+}
+function collectTrainingMuscleIdsFromExercises(exercises) {
+  return Array.from(new Set(
+    exercises.flatMap((exercise) => Array.isArray(exercise.muscleLoads) ? exercise.muscleLoads.map((entry) => normalizeOptionalText3(entry.muscleId)).filter(Boolean) : [])
+  ));
+}
+function buildTrainingTransferEnvelope(ctx, payload = {}) {
+  const requestedKind = normalizeOptionalText3(payload.kind) || "all";
+  const requestedId = normalizeOptionalText3(payload.id);
+  const exercises = listTrainingExercisesSync(ctx);
+  const routines = listTrainingRoutinesSync(ctx);
+  const muscles = enrichTrainingMuscleCatalogSync(ctx);
+  const exerciseLookup = new Map(exercises.map((exercise) => [exercise.id, exercise]));
+  if (requestedKind === "muscle") {
+    const muscle = muscles.find((entry) => entry.id === requestedId);
+    if (!muscle) {
+      throw new Error("No encontramos ese musculo para exportar.");
+    }
+    return {
+      version: TRAINING_TRANSFER_SCHEMA_VERSION,
+      muscles: [buildTrainingTransferMuscleRecord(muscle)],
+      exercises: [],
+      routines: []
+    };
+  }
+  if (requestedKind === "exercise") {
+    const exercise = exercises.find((entry) => entry.id === requestedId);
+    if (!exercise) {
+      throw new Error("No encontramos ese ejercicio para exportar.");
+    }
+    const relatedMuscleIds = new Set(collectTrainingMuscleIdsFromExercises([exercise]));
+    return {
+      version: TRAINING_TRANSFER_SCHEMA_VERSION,
+      muscles: muscles.filter((entry) => relatedMuscleIds.has(entry.id)).map((entry) => buildTrainingTransferMuscleRecord(entry)),
+      exercises: [buildTrainingTransferExerciseRecord(exercise)],
+      routines: []
+    };
+  }
+  if (requestedKind === "routine") {
+    const routine = routines.find((entry) => entry.id === requestedId);
+    if (!routine) {
+      throw new Error("No encontramos esa rutina para exportar.");
+    }
+    const relatedExerciseIds = new Set(collectTrainingExerciseIdsFromStructure(routine.structure));
+    const relatedExercises = exercises.filter((entry) => relatedExerciseIds.has(entry.id));
+    const relatedMuscleIds = new Set(collectTrainingMuscleIdsFromExercises(relatedExercises));
+    return {
+      version: TRAINING_TRANSFER_SCHEMA_VERSION,
+      muscles: muscles.filter((entry) => relatedMuscleIds.has(entry.id)).map((entry) => buildTrainingTransferMuscleRecord(entry)),
+      exercises: relatedExercises.map((entry) => buildTrainingTransferExerciseRecord(entry)),
+      routines: [buildTrainingTransferRoutineRecord(routine, exerciseLookup)]
+    };
+  }
+  return {
+    version: TRAINING_TRANSFER_SCHEMA_VERSION,
+    muscles: muscles.map((entry) => buildTrainingTransferMuscleRecord(entry)),
+    exercises: exercises.map((entry) => buildTrainingTransferExerciseRecord(entry)),
+    routines: routines.map((entry) => buildTrainingTransferRoutineRecord(entry, exerciseLookup))
+  };
 }
 async function ensureTrainingExerciseConcept(ctx, exerciseId) {
   const sqlite = getSqlite(ctx);
@@ -7046,7 +9468,7 @@ async function ensureTrainingExerciseConcept(ctx, exerciseId) {
     }
     return exercise.doc;
   }
-  const exerciseSummary = exercise.summary || exercise.searchSummary || "Documento de ejercicio.";
+  const exercisePayload = buildTrainingExerciseConceptPayloadFromRecord(exercise);
   let existingItem = await ensureTrainingMarkdownItem(ctx, preferredRelativePath);
   if (!existingItem && legacyRelativePath) {
     const legacyItem = await ensureTrainingMarkdownItem(ctx, legacyRelativePath);
@@ -7064,29 +9486,9 @@ async function ensureTrainingExerciseConcept(ctx, exerciseId) {
       itemId: String(existingItem.id),
       title: exercise.title,
       slug: exercise.slug || exercise.title,
-      summary: exerciseSummary
+      summary: exercisePayload.summary ?? null
     })
-  } : await createTrainingConceptNote(ctx, {
-    title: exercise.title,
-    slug: exercise.slug || exercise.title,
-    fileBaseName: getTrainingExerciseConceptPreferredFileBaseName(exercise),
-    relativeDirectoryPath: TRAINING_EXERCISE_CONCEPTS_DIRECTORY,
-    templateId: "fitness-exercise",
-    summary: exerciseSummary,
-    frontmatter: {
-      fitness: {
-        domain: "training",
-        kind: "exercise",
-        targetId: exercise.id
-      },
-      nexus: {
-        card: {
-          title: exercise.title,
-          summary: exercise.summary || exercise.searchSummary || ""
-        }
-      }
-    }
-  });
+  } : await createTrainingConceptNote(ctx, exercisePayload);
   sqlite.prepare(`
     UPDATE training_exercises
     SET concept_id = ?,
@@ -7095,10 +9497,262 @@ async function ensureTrainingExerciseConcept(ctx, exerciseId) {
   `).run(String(created.concept.id), nowIso3(), normalizedExerciseId);
   return getTrainingDocRecordByConceptIdSync(ctx, String(created.concept.id));
 }
+async function saveTrainingExerciseDocMarkdown(ctx, exerciseId, markdown) {
+  const normalizedExerciseId = normalizeOptionalText3(exerciseId);
+  if (!normalizedExerciseId) {
+    throw new Error("Falta el id del ejercicio.");
+  }
+  const sqlite = getSqlite(ctx);
+  const exerciseRow = sqlite.prepare(`
+    SELECT *
+    FROM training_exercises
+    WHERE id = ?
+    LIMIT 1
+  `).get(normalizedExerciseId);
+  const exercise = exerciseRow ? normalizeExerciseRecord(ctx, exerciseRow) : null;
+  if (!exercise) {
+    throw new Error("No encontramos ese ejercicio.");
+  }
+  const doc = await ensureTrainingExerciseConcept(ctx, normalizedExerciseId);
+  const currentDoc = doc || exercise.doc;
+  const nextDoc = await ensureTrainingManagedConceptDoc(ctx, {
+    relativePath: getTrainingExerciseConceptPreferredRelativePath(exercise),
+    currentRelativePath: currentDoc?.relativePath || null,
+    currentItemId: currentDoc?.itemId || null,
+    currentConceptId: getRealTrainingConceptId(exerciseRow?.concept_id) || getRealTrainingConceptId(currentDoc?.conceptId),
+    title: exercise.title,
+    slug: exercise.slug || exercise.title,
+    summary: exercise.summary || exercise.searchSummary || null,
+    content: String(markdown ?? "")
+  });
+  const conceptId = getRealTrainingConceptId(nextDoc?.conceptId);
+  if (conceptId) {
+    sqlite.prepare(`
+      UPDATE training_exercises
+      SET concept_id = ?,
+          updated_at = ?
+      WHERE id = ?
+    `).run(conceptId, nowIso3(), normalizedExerciseId);
+  }
+  const refreshedRow = sqlite.prepare(`
+    SELECT *
+    FROM training_exercises
+    WHERE id = ?
+    LIMIT 1
+  `).get(normalizedExerciseId);
+  const refreshedExercise = refreshedRow ? normalizeExerciseRecord(ctx, refreshedRow) : null;
+  if (refreshedExercise) {
+    upsertTrainingExerciseSearchDocument(sqlite, refreshedExercise);
+  }
+  return refreshedExercise;
+}
+async function saveTrainingMuscleDocMarkdown(ctx, muscleId, markdown) {
+  const normalizedMuscleId = normalizeOptionalText3(muscleId);
+  if (!normalizedMuscleId) {
+    throw new Error("Falta el id del musculo.");
+  }
+  const sqlite = getSqlite(ctx);
+  const muscle = TRAINING_MUSCLE_CATALOG.find((entry) => entry.id === normalizedMuscleId) || null;
+  if (!muscle) {
+    throw new Error("No encontramos ese musculo canonico.");
+  }
+  await ensureTrainingConceptFolders(ctx);
+  const existingBinding = findTrainingMuscleConceptBindingSync(sqlite, normalizedMuscleId);
+  const existingDoc = existingBinding?.concept_id ? getTrainingDocRecordByConceptIdSync(ctx, existingBinding.concept_id) : findTrainingExistingMuscleDocRecordSync(ctx, muscle);
+  const doc = await ensureTrainingManagedConceptDoc(ctx, {
+    relativePath: getTrainingMuscleConceptPreferredRelativePath(muscle),
+    currentRelativePath: existingDoc?.relativePath || null,
+    currentItemId: existingDoc?.itemId || null,
+    currentConceptId: getRealTrainingConceptId(existingBinding?.concept_id) || getRealTrainingConceptId(existingDoc?.conceptId),
+    title: muscle.title,
+    slug: muscle.id,
+    summary: buildTrainingMuscleConceptSummary(muscle),
+    content: String(markdown ?? "")
+  });
+  const conceptId = getRealTrainingConceptId(doc?.conceptId);
+  if (!conceptId) {
+    throw new Error("No se pudo guardar la nota del musculo.");
+  }
+  upsertTrainingMuscleConceptBindingSync(sqlite, normalizedMuscleId, conceptId);
+  return enrichTrainingMuscleCatalogSync(
+    ctx,
+    TRAINING_MUSCLE_CATALOG.filter((entry) => entry.id === normalizedMuscleId)
+  )[0] || null;
+}
 function getTrainingConceptCoverageKey(ctx) {
   return import_node_path.default.normalize(String(ctx?.vault?.contentPath || "__training__"));
 }
+async function ensureTrainingStarterExerciseRecord(ctx, definition) {
+  const sqlite = getSqlite(ctx);
+  const canonicalSlug = normalizeTrainingSlug(definition.title, "exercise");
+  const existingRow = findTrainingExerciseByTemplateKeySync(sqlite, definition.templateKey) || findTrainingExerciseBySlugSync(sqlite, canonicalSlug) || findTrainingExerciseByTitleExactSync(sqlite, definition.title);
+  const entityRef = await ensureTrainingExerciseEntityRef(ctx, existingRow);
+  const exerciseId = existingRow?.id || (0, import_node_crypto2.randomUUID)();
+  const timestamp2 = nowIso3();
+  const exerciseType = normalizeTrainingExerciseType(definition.exerciseType);
+  const measurementCategory = normalizeTrainingMeasurementCategory(definition.measurementCategory);
+  const tags = normalizeTrainingExerciseTags(definition.tags || [], { measurementCategory });
+  const measurement = normalizeTrainingMeasurement(definition.measurement || {});
+  const muscleLoads = normalizeTrainingMuscleLoads(definition.muscleLoads || []);
+  sqlite.prepare(`
+    INSERT INTO training_exercises (
+      id, entity_ref_id, concept_id, template_key, title, slug, summary, notes, exercise_type, measurement_category, tags_json,
+      measurement_json, muscle_loads_json, legacy_muscle_warnings_json, personal_difficulty_score, status, created_at, updated_at
+    ) VALUES (
+      @id, @entity_ref_id, @concept_id, @template_key, @title, @slug, @summary, @notes, @exercise_type, @measurement_category, @tags_json,
+      @measurement_json, @muscle_loads_json, @legacy_muscle_warnings_json, @personal_difficulty_score, @status, @created_at, @updated_at
+    )
+    ON CONFLICT(id) DO UPDATE SET
+      entity_ref_id = excluded.entity_ref_id,
+      concept_id = excluded.concept_id,
+      template_key = excluded.template_key,
+      title = excluded.title,
+      slug = excluded.slug,
+      summary = excluded.summary,
+      notes = excluded.notes,
+      exercise_type = excluded.exercise_type,
+      measurement_category = excluded.measurement_category,
+      tags_json = excluded.tags_json,
+      measurement_json = excluded.measurement_json,
+      muscle_loads_json = excluded.muscle_loads_json,
+      legacy_muscle_warnings_json = excluded.legacy_muscle_warnings_json,
+      personal_difficulty_score = excluded.personal_difficulty_score,
+      status = excluded.status,
+      updated_at = excluded.updated_at
+  `).run({
+    id: exerciseId,
+    entity_ref_id: String(entityRef.id),
+    concept_id: existingRow?.concept_id ?? null,
+    template_key: definition.templateKey,
+    title: definition.title,
+    slug: canonicalSlug,
+    summary: definition.summary,
+    notes: existingRow?.notes ?? null,
+    exercise_type: exerciseType,
+    measurement_category: measurementCategory,
+    tags_json: JSON.stringify(tags),
+    measurement_json: JSON.stringify(measurement),
+    muscle_loads_json: JSON.stringify(muscleLoads),
+    legacy_muscle_warnings_json: JSON.stringify([]),
+    personal_difficulty_score: normalizeOptionalNumber(existingRow?.personal_difficulty_score),
+    status: "active",
+    created_at: existingRow?.created_at || timestamp2,
+    updated_at: timestamp2
+  });
+  const savedRow = sqlite.prepare(`
+    SELECT *
+    FROM training_exercises
+    WHERE id = ?
+    LIMIT 1
+  `).get(exerciseId);
+  const savedExercise = savedRow ? normalizeExerciseRecord(ctx, savedRow) : null;
+  if (!savedExercise) {
+    throw new Error(`No se pudo preparar el ejercicio base: ${definition.title}.`);
+  }
+  upsertTrainingExerciseSearchDocument(sqlite, savedExercise);
+  return savedExercise;
+}
+async function restoreTrainingMuscleManagedDoc(ctx, muscleId) {
+  const normalizedMuscleId = normalizeOptionalText3(muscleId);
+  if (!normalizedMuscleId) {
+    throw new Error("Falta el id del musculo.");
+  }
+  const sqlite = getSqlite(ctx);
+  const muscle = TRAINING_MUSCLE_CATALOG.find((entry) => entry.id === normalizedMuscleId) || null;
+  if (!muscle) {
+    throw new Error("No encontramos ese musculo canonico.");
+  }
+  await ensureTrainingConceptFolders(ctx);
+  const payload = buildTrainingMuscleConceptPayload(muscle);
+  const existingBinding = findTrainingMuscleConceptBindingSync(sqlite, normalizedMuscleId);
+  const existingDoc = existingBinding?.concept_id ? getTrainingDocRecordByConceptIdSync(ctx, existingBinding.concept_id) : findTrainingExistingMuscleDocRecordSync(ctx, muscle);
+  const doc = await ensureTrainingManagedConceptDoc(ctx, {
+    relativePath: getTrainingMuscleConceptPreferredRelativePath(muscle),
+    currentRelativePath: existingDoc?.relativePath || null,
+    currentItemId: existingDoc?.itemId || null,
+    currentConceptId: getRealTrainingConceptId(existingBinding?.concept_id) || getRealTrainingConceptId(existingDoc?.conceptId),
+    title: muscle.title,
+    slug: muscle.id,
+    summary: payload.summary ?? null,
+    content: buildTrainingConceptMarkdownContent(muscle.title, muscle.id, payload)
+  });
+  const conceptId = getRealTrainingConceptId(doc?.conceptId);
+  if (!conceptId) {
+    throw new Error("No se pudo restaurar la nota del musculo.");
+  }
+  upsertTrainingMuscleConceptBindingSync(sqlite, normalizedMuscleId, conceptId);
+  return getTrainingDocRecordByConceptIdSync(ctx, conceptId);
+}
+async function upgradeTrainingLegacyMuscleManagedDocIfNeeded(ctx, muscle) {
+  const sqlite = getSqlite(ctx);
+  const existingBinding = findTrainingMuscleConceptBindingSync(sqlite, muscle.id);
+  const currentDoc = getRealTrainingConceptId(existingBinding?.concept_id) ? getTrainingDocRecordByConceptIdSync(ctx, existingBinding?.concept_id) : findTrainingExistingMuscleDocRecordSync(ctx, muscle);
+  if (!currentDoc?.itemPath || !(0, import_node_fs.existsSync)(currentDoc.itemPath)) {
+    return;
+  }
+  const currentContent = (0, import_node_fs.readFileSync)(currentDoc.itemPath, "utf8");
+  const normalizedCurrentContent = normalizeTrainingMarkdownForComparison(currentContent);
+  const legacyContent = buildLegacyTrainingMuscleMarkdownFallback(muscle);
+  const normalizedLegacyContent = normalizeTrainingMarkdownForComparison(legacyContent);
+  const currentBody = normalizeTrainingMarkdownForComparison(extractYamlFrontmatter(currentContent).body || "");
+  const legacyBody = normalizeTrainingMarkdownForComparison(extractYamlFrontmatter(legacyContent).body || "");
+  if (normalizedCurrentContent !== normalizedLegacyContent && currentBody !== legacyBody) {
+    return;
+  }
+  await restoreTrainingMuscleManagedDoc(ctx, muscle.id);
+}
+async function restoreTrainingStarterExerciseManagedDoc(ctx, templateKey) {
+  const definition = getTrainingStarterExerciseDefinition(templateKey);
+  if (!definition) {
+    throw new Error("No encontramos esa plantilla de ejercicio.");
+  }
+  const sqlite = getSqlite(ctx);
+  await ensureTrainingConceptFolders(ctx);
+  const exercise = await ensureTrainingStarterExerciseRecord(ctx, definition);
+  const currentRow = findTrainingExerciseByTemplateKeySync(sqlite, definition.templateKey);
+  const currentDoc = getRealTrainingConceptId(currentRow?.concept_id) ? getTrainingDocRecordByConceptIdSync(ctx, currentRow?.concept_id) : exercise.doc || findTrainingExistingExerciseDocRecordSync(ctx, exercise);
+  const payload = buildTrainingStarterExerciseConceptPayload(definition, exercise.id);
+  const doc = await ensureTrainingManagedConceptDoc(ctx, {
+    relativePath: getTrainingExerciseConceptPreferredRelativePath(exercise),
+    currentRelativePath: currentDoc?.relativePath || null,
+    currentItemId: currentDoc?.itemId || null,
+    currentConceptId: getRealTrainingConceptId(currentRow?.concept_id) || getRealTrainingConceptId(currentDoc?.conceptId),
+    title: exercise.title,
+    slug: exercise.slug || exercise.title,
+    summary: payload.summary ?? null,
+    content: buildTrainingConceptMarkdownContent(exercise.title, exercise.slug || exercise.title, payload)
+  });
+  const conceptId = getRealTrainingConceptId(doc?.conceptId);
+  if (!conceptId) {
+    throw new Error("No se pudo restaurar la nota del ejercicio base.");
+  }
+  sqlite.prepare(`
+    UPDATE training_exercises
+    SET concept_id = ?,
+        updated_at = ?
+    WHERE id = ?
+  `).run(conceptId, nowIso3(), exercise.id);
+  const refreshedRow = sqlite.prepare(`
+    SELECT *
+    FROM training_exercises
+    WHERE id = ?
+    LIMIT 1
+  `).get(exercise.id);
+  const refreshedExercise = refreshedRow ? normalizeExerciseRecord(ctx, refreshedRow) : null;
+  if (refreshedExercise) {
+    upsertTrainingExerciseSearchDocument(sqlite, refreshedExercise);
+  }
+  return {
+    exercise: refreshedExercise,
+    doc: getTrainingDocRecordByConceptIdSync(ctx, conceptId)
+  };
+}
 async function ensureTrainingConceptCoverage(ctx) {
+  const sqlite = getSqlite(ctx);
+  const currentVersion = Number(getTrainingSystemStateValueSync(sqlite, TRAINING_STARTER_LIBRARY_STATE_KEY) || 0);
+  if (currentVersion >= TRAINING_STARTER_LIBRARY_VERSION) {
+    return;
+  }
   const coverageKey = getTrainingConceptCoverageKey(ctx);
   const existingRun = trainingConceptCoverageInFlight.get(coverageKey);
   if (existingRun) {
@@ -7109,13 +9763,129 @@ async function ensureTrainingConceptCoverage(ctx) {
     try {
       await ensureTrainingConceptFolders(ctx);
       await ensureAllTrainingMuscleConcepts(ctx);
-      await ensureAllTrainingExerciseConcepts(ctx);
+      for (const muscle of TRAINING_MUSCLE_CATALOG) {
+        await upgradeTrainingLegacyMuscleManagedDocIfNeeded(ctx, muscle);
+      }
+      for (const definition of TRAINING_STARTER_EXERCISES) {
+        await ensureTrainingStarterExerciseRecord(ctx, definition);
+        await restoreTrainingStarterExerciseManagedDoc(ctx, definition.templateKey);
+      }
+      setTrainingSystemStateValueSync(sqlite, TRAINING_STARTER_LIBRARY_STATE_KEY, String(TRAINING_STARTER_LIBRARY_VERSION));
     } finally {
       trainingConceptCoverageInFlight.delete(coverageKey);
     }
   })();
   trainingConceptCoverageInFlight.set(coverageKey, pendingRun);
   await pendingRun;
+}
+function resolveManagedTrainingDocStatus(currentDoc, expectedRelativePath, expectedContent) {
+  if (!currentDoc?.itemPath || !(0, import_node_fs.existsSync)(currentDoc.itemPath)) {
+    return "missing";
+  }
+  if (normalizeRelativeContentPath(currentDoc.relativePath) !== normalizeRelativeContentPath(expectedRelativePath)) {
+    return "edited";
+  }
+  const currentContent = (0, import_node_fs.readFileSync)(currentDoc.itemPath, "utf8");
+  return normalizeTrainingMarkdownForComparison(currentContent) === normalizeTrainingMarkdownForComparison(expectedContent) ? "original" : "edited";
+}
+async function listTrainingManagedDocs(ctx) {
+  await ensureTrainingConceptCoverage(ctx);
+  const sqlite = getSqlite(ctx);
+  const managedDocs = [];
+  for (const definition of TRAINING_STARTER_EXERCISES) {
+    const exerciseRow = findTrainingExerciseByTemplateKeySync(sqlite, definition.templateKey) || findTrainingExerciseBySlugSync(sqlite, normalizeTrainingSlug(definition.title, "exercise")) || findTrainingExerciseByTitleExactSync(sqlite, definition.title);
+    const exercise = exerciseRow ? normalizeExerciseRecord(ctx, exerciseRow) : null;
+    const conceptPayload = buildTrainingStarterExerciseConceptPayload(
+      definition,
+      exercise?.id || `starter:${definition.templateKey}`
+    );
+    const expectedRelativePath = getTrainingExerciseConceptPreferredRelativePath({
+      title: definition.title,
+      slug: normalizeTrainingSlug(definition.title, "exercise")
+    });
+    const currentDoc = exercise?.doc || findTrainingDocRecordByRelativePathSync(
+      ctx,
+      expectedRelativePath,
+      definition.title,
+      definition.summary
+    );
+    managedDocs.push({
+      id: getTrainingStarterExerciseManagedDocId(definition.templateKey),
+      kind: "starter-exercise",
+      group: "Ejercicios",
+      label: definition.title,
+      description: definition.summary,
+      status: exercise ? resolveManagedTrainingDocStatus(
+        currentDoc,
+        expectedRelativePath,
+        buildTrainingConceptMarkdownContent(
+          definition.title,
+          exercise.slug || normalizeTrainingSlug(definition.title, "exercise"),
+          conceptPayload
+        )
+      ) : "missing",
+      relativePath: expectedRelativePath,
+      currentRelativePath: currentDoc?.relativePath || null,
+      itemId: currentDoc?.itemId || null,
+      itemPath: currentDoc?.itemPath || null,
+      conceptId: getRealTrainingConceptId(currentDoc?.conceptId),
+      exerciseId: exercise?.id || null,
+      exerciseTemplateKey: definition.templateKey,
+      muscleId: null
+    });
+  }
+  for (const muscle of TRAINING_MUSCLE_CATALOG) {
+    const payload = buildTrainingMuscleConceptPayload(muscle);
+    const expectedRelativePath = getTrainingMuscleConceptPreferredRelativePath(muscle);
+    const existingBinding = findTrainingMuscleConceptBindingSync(sqlite, muscle.id);
+    const currentDoc = getRealTrainingConceptId(existingBinding?.concept_id) ? getTrainingDocRecordByConceptIdSync(ctx, existingBinding?.concept_id) : findTrainingExistingMuscleDocRecordSync(ctx, muscle);
+    managedDocs.push({
+      id: getTrainingMuscleManagedDocId(muscle.id),
+      kind: "muscle",
+      group: "Musculos",
+      label: muscle.title,
+      description: buildTrainingMuscleConceptSummary(muscle),
+      status: resolveManagedTrainingDocStatus(
+        currentDoc,
+        expectedRelativePath,
+        buildTrainingConceptMarkdownContent(muscle.title, muscle.id, payload)
+      ),
+      relativePath: expectedRelativePath,
+      currentRelativePath: currentDoc?.relativePath || null,
+      itemId: currentDoc?.itemId || null,
+      itemPath: currentDoc?.itemPath || null,
+      conceptId: getRealTrainingConceptId(existingBinding?.concept_id) || getRealTrainingConceptId(currentDoc?.conceptId),
+      exerciseId: null,
+      exerciseTemplateKey: null,
+      muscleId: muscle.id
+    });
+  }
+  return managedDocs;
+}
+async function restoreTrainingManagedDoc(ctx, managedDocId) {
+  const normalizedManagedDocId = normalizeOptionalText3(managedDocId);
+  if (!normalizedManagedDocId) {
+    throw new Error("Falta el id de la nota gestionada.");
+  }
+  if (normalizedManagedDocId.startsWith("starter-exercise:")) {
+    const templateKey = normalizedManagedDocId.slice("starter-exercise:".length);
+    const restored = await restoreTrainingStarterExerciseManagedDoc(ctx, templateKey);
+    return {
+      restoredId: normalizedManagedDocId,
+      ...restored,
+      managedDocs: await listTrainingManagedDocs(ctx)
+    };
+  }
+  if (normalizedManagedDocId.startsWith("muscle:")) {
+    const muscleId = normalizedManagedDocId.slice("muscle:".length);
+    const doc = await restoreTrainingMuscleManagedDoc(ctx, muscleId);
+    return {
+      restoredId: normalizedManagedDocId,
+      doc,
+      managedDocs: await listTrainingManagedDocs(ctx)
+    };
+  }
+  throw new Error("No encontramos esa nota gestionada.");
 }
 async function ensureTrainingExerciseEntityRef(ctx, existingRow) {
   const repositories = getRepositories(ctx);
@@ -7141,18 +9911,43 @@ async function ensureTrainingRoutineEntityRef(ctx, existingRow) {
     kind: TRAINING_ROUTINE_KIND
   });
 }
+function sumTrainingMusclePercentages(muscleLoads) {
+  return muscleLoads.reduce((sum, entry) => sum + Number(entry?.percentage || 0), 0);
+}
+function assertTrainingMusclePercentagesTotal(muscleLoads) {
+  if (!muscleLoads.length) {
+    return;
+  }
+  const total = sumTrainingMusclePercentages(muscleLoads);
+  if (total !== 100) {
+    throw new Error(`Los porcentajes musculares deben sumar 100. Total actual: ${total}.`);
+  }
+}
 function normalizeExerciseInput(payload) {
   const title = assertNonEmptyString(payload?.title, "title");
   const summary = normalizeOptionalText3(payload?.summary);
   const notes = normalizeOptionalText3(payload?.notes);
+  const exerciseType = normalizeTrainingExerciseType(payload?.exerciseType);
+  const measurementCategory = normalizeTrainingMeasurementCategory(payload?.measurementCategory);
+  const tags = normalizeTrainingExerciseTags(Array.isArray(payload?.tags) ? payload.tags : [], {
+    measurementCategory
+  });
   const measurement = normalizeTrainingMeasurement(payload?.measurement);
   const muscleLoads = normalizeTrainingMuscleLoads(Array.isArray(payload?.muscleLoads) ? payload.muscleLoads : []);
+  const templateKey = normalizeOptionalText3(payload?.templateKey);
+  const personalDifficultyScore = normalizeOptionalNumber(payload?.personalDifficultyScore);
+  assertTrainingMusclePercentagesTotal(muscleLoads);
   return {
     title,
     summary,
     notes,
+    exerciseType,
+    measurementCategory,
+    tags,
     measurement,
     muscleLoads,
+    templateKey,
+    personalDifficultyScore,
     slug: normalizeTrainingSlug(payload?.slug || title, "exercise")
   };
 }
@@ -7170,6 +9965,179 @@ function normalizeRoutineInput(payload, exerciseLookup) {
     slug: normalizeTrainingSlug(payload?.slug || title, "routine")
   };
 }
+function normalizeTrainingTransferEnvelopePayload(payload) {
+  const payloadRecord = isPlainObject2(payload) ? payload : null;
+  const source = typeof payload === "string" ? JSON.parse(payload) : typeof payloadRecord?.text === "string" ? JSON.parse(String(payloadRecord.text)) : payload;
+  if (!isPlainObject2(source)) {
+    throw new Error("El import/export de entrenamiento espera un objeto JSON.");
+  }
+  const version = Math.round(Number(source.version || TRAINING_TRANSFER_SCHEMA_VERSION)) || TRAINING_TRANSFER_SCHEMA_VERSION;
+  if (version < 1 || version > TRAINING_TRANSFER_SCHEMA_VERSION) {
+    throw new Error(`Version de entrenamiento no soportada: ${version}.`);
+  }
+  return {
+    version,
+    muscles: Array.isArray(source.muscles) ? source.muscles : [],
+    exercises: Array.isArray(source.exercises) ? source.exercises : [],
+    routines: Array.isArray(source.routines) ? source.routines : []
+  };
+}
+function resolveTrainingImportMuscleLoads(rawMuscleLoads, warnings, label) {
+  const source = Array.isArray(rawMuscleLoads) ? rawMuscleLoads : [];
+  const resolvedLoads = [];
+  for (const entry of source) {
+    const muscleTitle = normalizeOptionalText3(entry?.["muscleTitle"]);
+    const muscleId = normalizeOptionalText3(entry?.["muscleId"]);
+    const muscle = muscleTitle ? findTrainingMuscleByTitleSync(muscleTitle) : muscleId ? getTrainingMuscleById(muscleId) || null : null;
+    if (!muscle) {
+      warnings.push(`"${label}": no se reconocio el musculo "${muscleTitle || muscleId || "sin nombre"}".`);
+      continue;
+    }
+    resolvedLoads.push({
+      muscleId: muscle.id,
+      percentage: Number(entry?.["percentage"] || 0)
+    });
+  }
+  return resolvedLoads;
+}
+function resolveTrainingImportRoutineStructure(rawStructure, exerciseTitleLookup, warnings, routineTitle) {
+  const source = Array.isArray(rawStructure) ? rawStructure : [];
+  let hasResolutionError = false;
+  function resolveSegment(segment) {
+    if (segment?.type === "block") {
+      const steps = Array.isArray(segment.steps) ? segment.steps.map((step) => resolveSegment(step)).filter(Boolean) : [];
+      return {
+        type: "block",
+        title: normalizeOptionalText3(segment.title) || "Bloque",
+        repeatCount: Math.max(1, Math.round(Number(segment.repeatCount || 1)) || 1),
+        steps
+      };
+    }
+    const stepKind = String(segment?.stepKind || segment?.kind || "exercise").trim().toLowerCase() === "rest" ? "rest" : "exercise";
+    if (stepKind === "rest") {
+      return {
+        type: "step",
+        stepKind: "rest",
+        prescription: normalizeTrainingPrescription(segment?.prescription)
+      };
+    }
+    const exerciseTitle = normalizeOptionalText3(segment?.exerciseTitle || segment?.title || segment?.exerciseName);
+    const exerciseKey = normalizeTrainingSlug(exerciseTitle || "", "exercise");
+    const resolvedExercise = exerciseTitle ? exerciseTitleLookup.get(exerciseKey) || null : null;
+    if (!resolvedExercise?.id) {
+      hasResolutionError = true;
+      warnings.push(`La rutina "${routineTitle}" referencia el ejercicio "${exerciseTitle || "sin nombre"}" y no se pudo resolver.`);
+      return null;
+    }
+    return {
+      type: "step",
+      stepKind: "exercise",
+      exerciseId: resolvedExercise.id,
+      prescription: normalizeTrainingPrescription(segment?.prescription)
+    };
+  }
+  const resolvedStructure = source.map((segment) => resolveSegment(segment)).filter(Boolean);
+  if (hasResolutionError) {
+    return null;
+  }
+  return resolvedStructure;
+}
+async function importTrainingTransferEnvelope(ctx, payload) {
+  await ensureTrainingConceptCoverage(ctx);
+  const envelope = normalizeTrainingTransferEnvelopePayload(payload);
+  const warnings = [];
+  const summary = {
+    muscles: { created: 0, updated: 0, skipped: 0 },
+    exercises: { created: 0, updated: 0, skipped: 0 },
+    routines: { created: 0, updated: 0, skipped: 0 }
+  };
+  const exerciseTitleLookup = new Map(
+    listTrainingExercisesSync(ctx).map((exercise) => [normalizeTrainingSlug(exercise.title, "exercise"), exercise])
+  );
+  for (const entry of envelope.muscles) {
+    const title = normalizeOptionalText3(entry?.title);
+    const muscle = findTrainingMuscleByTitleSync(title);
+    if (!title || !muscle) {
+      summary.muscles.skipped += 1;
+      warnings.push(`No se reconocio el musculo "${title || "sin nombre"}".`);
+      continue;
+    }
+    const existingDoc = findTrainingExistingMuscleDocRecordSync(ctx, muscle);
+    try {
+      await saveTrainingMuscleDocMarkdown(
+        ctx,
+        muscle.id,
+        typeof entry?.markdown === "string" && entry.markdown.length ? entry.markdown : buildTrainingMuscleMarkdownFallback(muscle)
+      );
+      summary.muscles[existingDoc ? "updated" : "created"] += 1;
+    } catch (error) {
+      summary.muscles.skipped += 1;
+      warnings.push(`No se pudo importar el musculo "${title}": ${error instanceof Error ? error.message : "error desconocido"}.`);
+    }
+  }
+  for (const entry of envelope.exercises) {
+    const title = normalizeOptionalText3(entry?.title);
+    if (!title) {
+      summary.exercises.skipped += 1;
+      warnings.push("Se omitio un ejercicio sin titulo.");
+      continue;
+    }
+    try {
+      const exerciseKey = normalizeTrainingSlug(title, "exercise");
+      const existingExercise = exerciseTitleLookup.get(exerciseKey) || null;
+      const savedExercise = await saveTrainingExercise(ctx, {
+        id: existingExercise?.id || null,
+        title,
+        summary: normalizeOptionalText3(entry?.summary),
+        exerciseType: entry?.exerciseType,
+        measurementCategory: entry?.measurementCategory,
+        tags: Array.isArray(entry?.tags) ? entry.tags : [],
+        measurement: entry?.measurement,
+        muscleLoads: resolveTrainingImportMuscleLoads(entry?.muscleLoads, warnings, title),
+        templateKey: normalizeOptionalText3(entry?.templateKey),
+        personalDifficultyScore: entry?.personalDifficultyScore,
+        docMarkdown: typeof entry?.markdown === "string" && entry.markdown.length ? entry.markdown : null
+      });
+      exerciseTitleLookup.set(exerciseKey, savedExercise);
+      summary.exercises[existingExercise ? "updated" : "created"] += 1;
+    } catch (error) {
+      summary.exercises.skipped += 1;
+      warnings.push(`No se pudo importar el ejercicio "${title}": ${error instanceof Error ? error.message : "error desconocido"}.`);
+    }
+  }
+  for (const entry of envelope.routines) {
+    const title = normalizeOptionalText3(entry?.title);
+    if (!title) {
+      summary.routines.skipped += 1;
+      warnings.push("Se omitio una rutina sin titulo.");
+      continue;
+    }
+    const structure = resolveTrainingImportRoutineStructure(entry?.structure, exerciseTitleLookup, warnings, title);
+    if (!structure) {
+      summary.routines.skipped += 1;
+      continue;
+    }
+    try {
+      const existingRoutine = findTrainingRoutineRecordByTitleSync(ctx, title);
+      await saveTrainingRoutine(ctx, {
+        id: existingRoutine?.id || null,
+        title,
+        summary: normalizeOptionalText3(entry?.summary),
+        notes: normalizeOptionalText3(entry?.notes),
+        structure
+      });
+      summary.routines[existingRoutine ? "updated" : "created"] += 1;
+    } catch (error) {
+      summary.routines.skipped += 1;
+      warnings.push(`No se pudo importar la rutina "${title}": ${error instanceof Error ? error.message : "error desconocido"}.`);
+    }
+  }
+  return {
+    version: envelope.version,
+    summary,
+    warnings
+  };
+}
 async function saveTrainingExercise(ctx, payload) {
   const repositories = getRepositories(ctx);
   const sqlite = repositories.sqlite;
@@ -7181,6 +10149,12 @@ async function saveTrainingExercise(ctx, payload) {
         LIMIT 1
       `).get(requestedId) : null;
   const input = normalizeExerciseInput(payload);
+  const rawPayload = payload && typeof payload === "object" ? payload : {};
+  const hasSummaryField = Object.prototype.hasOwnProperty.call(rawPayload, "summary");
+  const hasNotesField = Object.prototype.hasOwnProperty.call(rawPayload, "notes");
+  const hasTemplateKeyField = Object.prototype.hasOwnProperty.call(rawPayload, "templateKey");
+  const hasDifficultyField = Object.prototype.hasOwnProperty.call(rawPayload, "personalDifficultyScore");
+  const hasDocMarkdownField = Object.prototype.hasOwnProperty.call(rawPayload, "docMarkdown");
   const entityRef = await ensureTrainingExerciseEntityRef(ctx, existing);
   const slug = await allocateUniqueSlug(
     input.slug,
@@ -7191,35 +10165,45 @@ async function saveTrainingExercise(ctx, payload) {
   const timestamp2 = nowIso3();
   sqlite.prepare(`
     INSERT INTO training_exercises (
-      id, entity_ref_id, concept_id, title, slug, summary, notes, measurement_json, muscle_loads_json,
-      legacy_muscle_warnings_json, status, created_at, updated_at
+      id, entity_ref_id, concept_id, template_key, title, slug, summary, notes, exercise_type, measurement_category, tags_json,
+      measurement_json, muscle_loads_json, legacy_muscle_warnings_json, personal_difficulty_score, status, created_at, updated_at
     ) VALUES (
-      @id, @entity_ref_id, @concept_id, @title, @slug, @summary, @notes, @measurement_json, @muscle_loads_json,
-      @legacy_muscle_warnings_json, @status, @created_at, @updated_at
+      @id, @entity_ref_id, @concept_id, @template_key, @title, @slug, @summary, @notes, @exercise_type, @measurement_category, @tags_json,
+      @measurement_json, @muscle_loads_json, @legacy_muscle_warnings_json, @personal_difficulty_score, @status, @created_at, @updated_at
     )
     ON CONFLICT(id) DO UPDATE SET
       entity_ref_id = excluded.entity_ref_id,
       concept_id = excluded.concept_id,
+      template_key = excluded.template_key,
       title = excluded.title,
       slug = excluded.slug,
       summary = excluded.summary,
       notes = excluded.notes,
+      exercise_type = excluded.exercise_type,
+      measurement_category = excluded.measurement_category,
+      tags_json = excluded.tags_json,
       measurement_json = excluded.measurement_json,
       muscle_loads_json = excluded.muscle_loads_json,
       legacy_muscle_warnings_json = excluded.legacy_muscle_warnings_json,
+      personal_difficulty_score = excluded.personal_difficulty_score,
       status = excluded.status,
       updated_at = excluded.updated_at
   `).run({
     id: exerciseId,
     entity_ref_id: String(entityRef.id),
     concept_id: existing?.concept_id ?? null,
+    template_key: hasTemplateKeyField ? input.templateKey : normalizeOptionalText3(existing?.template_key),
     title: input.title,
     slug,
-    summary: input.summary,
-    notes: input.notes,
+    summary: hasSummaryField ? input.summary : normalizeOptionalText3(existing?.summary),
+    notes: hasNotesField ? input.notes : normalizeOptionalText3(existing?.notes),
+    exercise_type: input.exerciseType,
+    measurement_category: input.measurementCategory,
+    tags_json: JSON.stringify(input.tags || []),
     measurement_json: JSON.stringify(input.measurement || {}),
     muscle_loads_json: JSON.stringify(input.muscleLoads || []),
     legacy_muscle_warnings_json: JSON.stringify([]),
+    personal_difficulty_score: hasDifficultyField ? input.personalDifficultyScore : normalizeOptionalNumber(existing?.personal_difficulty_score),
     status: "active",
     created_at: existing?.created_at || timestamp2,
     updated_at: timestamp2
@@ -7241,27 +10225,14 @@ async function saveTrainingExercise(ctx, payload) {
     WHERE id = ?
     LIMIT 1
   `).get(exerciseId);
-  const savedExerciseWithDoc = refreshedRow ? normalizeExerciseRecord(ctx, refreshedRow) : savedExercise;
-  upsertTrainingSearchDocument(sqlite, {
-    id: getTrainingSearchDocumentId("exercise", savedExerciseWithDoc.id),
-    entityRefId: savedExerciseWithDoc.entityRefId,
-    kind: "concept",
-    title: savedExerciseWithDoc.title,
-    subtitle: savedExerciseWithDoc.searchSummary || savedExerciseWithDoc.summary,
-    body: [
-      savedExerciseWithDoc.summary,
-      savedExerciseWithDoc.notes,
-      savedExerciseWithDoc.searchSummary ? `Musculos: ${savedExerciseWithDoc.searchSummary}` : null
-    ].filter(Boolean).join("\n\n"),
-    metadata: {
-      pluginId: TRAINING_PLUGIN_ID,
-      domain: "training",
-      type: "exercise",
-      exerciseId: savedExerciseWithDoc.id,
-      measurement: savedExerciseWithDoc.measurement,
-      muscleLoads: savedExerciseWithDoc.muscleLoads
+  let savedExerciseWithDoc = refreshedRow ? normalizeExerciseRecord(ctx, refreshedRow) : savedExercise;
+  if (hasDocMarkdownField && typeof rawPayload.docMarkdown === "string") {
+    const exerciseWithImportedDoc = await saveTrainingExerciseDocMarkdown(ctx, exerciseId, rawPayload.docMarkdown);
+    if (exerciseWithImportedDoc) {
+      savedExerciseWithDoc = exerciseWithImportedDoc;
     }
-  });
+  }
+  upsertTrainingExerciseSearchDocument(sqlite, savedExerciseWithDoc);
   return savedExerciseWithDoc;
 }
 async function saveTrainingRoutine(ctx, payload) {
@@ -7663,19 +10634,23 @@ async function saveTrainingOccurrenceResult(ctx, payload) {
     occurrence: listTrainingOccurrencesSync(sqlite).find((entry) => entry.id === occurrenceId) || null
   };
 }
-function migrateLegacyExerciseMusclesSync(sqlite) {
+function migrateLegacyExerciseMusclesSync(ctx) {
+  const sqlite = getSqlite(ctx);
   const rows = sqlite.prepare(`
     SELECT id, entity_ref_id, muscle_loads_json, legacy_muscle_warnings_json
     FROM training_exercises
   `).all();
   for (const row of rows) {
-    const currentLoads = parseRowJson(row.muscle_loads_json, []);
-    const currentWarnings = parseRowJson(row.legacy_muscle_warnings_json, []);
-    if (currentLoads.length || currentWarnings.length) {
+    const parsedLoads = parseRowJson(row.muscle_loads_json, []);
+    const parsedWarnings = parseRowJson(row.legacy_muscle_warnings_json, []);
+    const currentLoads = Array.isArray(parsedLoads) ? parsedLoads : [];
+    const currentWarnings = Array.isArray(parsedWarnings) ? parsedWarnings : [];
+    const needsLegacyLoadMigration = currentLoads.some((entry) => entry && typeof entry === "object" && ("load" in entry || entry.percentage == null));
+    if ((currentLoads.length || currentWarnings.length) && !needsLegacyLoadMigration) {
       continue;
     }
-    const legacyMuscles = listLegacyExerciseMusclesSync(sqlite, String(row.entity_ref_id));
-    if (!legacyMuscles.length) {
+    const legacyMuscles = currentLoads.length ? currentLoads : listLegacyExerciseMusclesSync(sqlite, String(row.entity_ref_id));
+    if (!legacyMuscles.length && !currentWarnings.length) {
       continue;
     }
     const migrated = normalizeTrainingMuscleLoads(legacyMuscles, { includeWarnings: true });
@@ -7689,6 +10664,16 @@ function migrateLegacyExerciseMusclesSync(sqlite) {
       JSON.stringify(migrated.warnings || []),
       String(row.id)
     );
+    const refreshedRow = sqlite.prepare(`
+      SELECT *
+      FROM training_exercises
+      WHERE id = ?
+      LIMIT 1
+    `).get(String(row.id));
+    const refreshedExercise = refreshedRow ? normalizeExerciseRecord(ctx, refreshedRow) : null;
+    if (refreshedExercise) {
+      upsertTrainingExerciseSearchDocument(sqlite, refreshedExercise);
+    }
   }
 }
 function migrateLegacyRoutineStructuresSync(ctx) {
@@ -7724,13 +10709,18 @@ function registerTrainingSchema(ctx) {
       id TEXT PRIMARY KEY NOT NULL,
       entity_ref_id TEXT NOT NULL UNIQUE REFERENCES entity_refs(id) ON DELETE CASCADE,
       concept_id TEXT UNIQUE REFERENCES concepts(id) ON DELETE SET NULL,
+      template_key TEXT UNIQUE,
       title TEXT NOT NULL,
       slug TEXT NOT NULL UNIQUE,
       summary TEXT,
       notes TEXT,
+      exercise_type TEXT NOT NULL DEFAULT 'exercise',
+      measurement_category TEXT NOT NULL DEFAULT 'strength',
+      tags_json TEXT NOT NULL DEFAULT '[]',
       measurement_json TEXT NOT NULL DEFAULT '{}',
       muscle_loads_json TEXT NOT NULL DEFAULT '[]',
       legacy_muscle_warnings_json TEXT NOT NULL DEFAULT '[]',
+      personal_difficulty_score REAL,
       status TEXT NOT NULL DEFAULT 'active',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -7742,6 +10732,13 @@ function registerTrainingSchema(ctx) {
     CREATE TABLE IF NOT EXISTS training_muscle_concepts (
       muscle_id TEXT PRIMARY KEY NOT NULL,
       concept_id TEXT NOT NULL UNIQUE REFERENCES concepts(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS training_system_state (
+      state_key TEXT PRIMARY KEY NOT NULL,
+      state_value TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -7818,10 +10815,18 @@ function registerTrainingSchema(ctx) {
   ensureTableColumn2(sqlite, "training_exercises", "muscle_loads_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureTableColumn2(sqlite, "training_exercises", "legacy_muscle_warnings_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureTableColumn2(sqlite, "training_exercises", "concept_id", "TEXT REFERENCES concepts(id) ON DELETE SET NULL");
+  ensureTableColumn2(sqlite, "training_exercises", "template_key", "TEXT");
+  ensureTableColumn2(sqlite, "training_exercises", "personal_difficulty_score", "REAL");
+  ensureTableColumn2(sqlite, "training_exercises", "exercise_type", "TEXT NOT NULL DEFAULT 'exercise'");
+  ensureTableColumn2(sqlite, "training_exercises", "measurement_category", "TEXT NOT NULL DEFAULT 'strength'");
+  ensureTableColumn2(sqlite, "training_exercises", "tags_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureTableColumn2(sqlite, "training_routines", "structure_json", "TEXT NOT NULL DEFAULT '[]'");
   sqlite.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_training_exercises_concept_id
       ON training_exercises (concept_id);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_training_exercises_template_key
+      ON training_exercises (template_key);
 
     CREATE TABLE IF NOT EXISTS training_muscle_concepts (
       muscle_id TEXT PRIMARY KEY NOT NULL,
@@ -7833,11 +10838,22 @@ function registerTrainingSchema(ctx) {
   sqlite.prepare(`
     UPDATE training_exercises
     SET muscle_loads_json = COALESCE(NULLIF(TRIM(muscle_loads_json), ''), '[]'),
-        legacy_muscle_warnings_json = COALESCE(NULLIF(TRIM(legacy_muscle_warnings_json), ''), '[]')
+        legacy_muscle_warnings_json = COALESCE(NULLIF(TRIM(legacy_muscle_warnings_json), ''), '[]'),
+        exercise_type = COALESCE(NULLIF(TRIM(exercise_type), ''), 'exercise'),
+        measurement_category = COALESCE(NULLIF(TRIM(measurement_category), ''), 'strength'),
+        tags_json = COALESCE(NULLIF(TRIM(tags_json), ''), '[]'),
+        template_key = NULLIF(TRIM(template_key), '')
     WHERE muscle_loads_json IS NULL
        OR TRIM(muscle_loads_json) = ''
        OR legacy_muscle_warnings_json IS NULL
        OR TRIM(legacy_muscle_warnings_json) = ''
+       OR exercise_type IS NULL
+       OR TRIM(exercise_type) = ''
+       OR measurement_category IS NULL
+       OR TRIM(measurement_category) = ''
+       OR tags_json IS NULL
+       OR TRIM(tags_json) = ''
+       OR template_key IS NOT NULL
   `).run();
   sqlite.prepare(`
     UPDATE training_routines
@@ -7846,7 +10862,7 @@ function registerTrainingSchema(ctx) {
        OR TRIM(structure_json) = ''
   `).run();
   migrateLegacySearchExercisesSync(ctx);
-  migrateLegacyExerciseMusclesSync(sqlite);
+  migrateLegacyExerciseMusclesSync(ctx);
   migrateLegacyRoutineStructuresSync(ctx);
 }
 var trainingPlugin = {
@@ -7937,6 +10953,54 @@ var trainingPlugin = {
         });
       } catch (error) {
         return createError2(error, "No se pudo crear la base de notas musculares.");
+      }
+    });
+    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:list-managed-docs`, async () => {
+      try {
+        return createSuccess2({
+          managedDocs: await listTrainingManagedDocs(ctx)
+        });
+      } catch (error) {
+        return createError2(error, "No se pudo cargar el estado de las notas de entrenamiento.");
+      }
+    });
+    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:restore-managed-doc`, async (_event, payload) => {
+      try {
+        const managedDocId = normalizeOptionalText3(typeof payload === "string" ? payload : payload?.id || payload?.managedDocId);
+        if (!managedDocId) {
+          throw new Error("Falta el id de la nota gestionada.");
+        }
+        return createSuccess2(await restoreTrainingManagedDoc(ctx, managedDocId));
+      } catch (error) {
+        return createError2(error, "No se pudo restaurar la nota gestionada.");
+      }
+    });
+    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:export`, async (_event, payload) => {
+      try {
+        await ensureTrainingConceptCoverage(ctx);
+        return createSuccess2(buildTrainingTransferEnvelope(ctx, isPlainObject2(payload) ? payload : {}));
+      } catch (error) {
+        return createError2(error, "No se pudo exportar entrenamiento.");
+      }
+    });
+    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:import`, async (_event, payload) => {
+      try {
+        return createSuccess2(await importTrainingTransferEnvelope(ctx, payload));
+      } catch (error) {
+        return createError2(error, "No se pudo importar entrenamiento.");
+      }
+    });
+    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:save-muscle-doc`, async (_event, payload) => {
+      try {
+        const muscleId = normalizeOptionalText3(typeof payload === "string" ? payload : payload?.id || payload?.muscleId);
+        if (!muscleId) {
+          throw new Error("Falta el id del musculo.");
+        }
+        return createSuccess2({
+          muscle: await saveTrainingMuscleDocMarkdown(ctx, muscleId, typeof payload?.markdown === "string" ? payload.markdown : "")
+        });
+      } catch (error) {
+        return createError2(error, "No se pudo guardar la nota del musculo.");
       }
     });
     ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:get-exercise`, async (_event, payload) => {
@@ -8140,6 +11204,22 @@ var lifeTrackerBackendPlugin = {
         return createSuccess3(buildHome(sqlite, payload?.date));
       } catch (error) {
         return createError3(error, "No se pudo actualizar la tarea.");
+      }
+    });
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:toggle-task-subitem`, async (_event, payload) => {
+      try {
+        const sqlite = getSqlite2(ctx);
+        toggleTaskSubitemSync(
+          sqlite,
+          String(payload?.taskId || ""),
+          String(payload?.subitemId || ""),
+          {
+            now: nowIso()
+          }
+        );
+        return createSuccess3(buildHome(sqlite, payload?.date));
+      } catch (error) {
+        return createError3(error, "No se pudo actualizar el sub-item de la tarea.");
       }
     });
     ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:delete-task`, async (_event, payload) => {

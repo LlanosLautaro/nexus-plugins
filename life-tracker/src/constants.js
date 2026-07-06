@@ -77,16 +77,12 @@ export const HABIT_QUANTITY_MODE_OPTIONS = [
   { value: "no-target", label: "Sin objetivo" },
 ];
 
-export const HABIT_EDIT_WIZARD_STEPS = [
-  { value: 0, label: "Identidad" },
-  { value: 1, label: "Frecuencia" },
-  { value: 2, label: "Operativa" },
-];
-
-export const HABIT_WIZARD_STEPS = [
+export const HABIT_EDITOR_STEPS = [
   { value: 0, label: "Categoria" },
   { value: 1, label: "Evaluacion" },
-  { value: 2, label: "Configuracion" },
-  { value: 3, label: "Frecuencia" },
-  { value: 4, label: "Cuando quieres hacerlo?" },
+  { value: 2, label: "Frecuencia" },
+  { value: 3, label: "Operativa" },
 ];
+
+export const HABIT_EDIT_WIZARD_STEPS = HABIT_EDITOR_STEPS;
+export const HABIT_WIZARD_STEPS = HABIT_EDITOR_STEPS;

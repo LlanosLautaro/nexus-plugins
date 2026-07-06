@@ -406,6 +406,152 @@
   white-space: nowrap;
 }
 
+.trainingPlugin__muscleLoadSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 88%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--shell-panel-soft) 76%, transparent);
+
+  strong {
+    color: var(--color-text);
+    font-size: 0.82rem;
+  }
+
+  span {
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+  }
+
+  &.is-valid {
+    border-color: color-mix(in srgb, var(--color-success) 34%, var(--color-line));
+    background: color-mix(in srgb, var(--color-success) 10%, var(--shell-panel-soft));
+  }
+
+  &.is-under {
+    border-color: color-mix(in srgb, var(--color-warning) 28%, var(--color-line));
+  }
+
+  &.is-over {
+    border-color: color-mix(in srgb, var(--color-danger) 28%, var(--color-line));
+    background: color-mix(in srgb, var(--color-danger) 8%, var(--shell-panel-soft));
+  }
+}
+
+.trainingPlugin__chipGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.trainingPlugin__tagToggleGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.trainingPlugin__tagToggle {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--shell-panel-soft) 78%, transparent);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-line));
+    background: color-mix(in srgb, var(--shell-panel-highlight) 80%, transparent);
+    color: var(--color-text);
+    transform: translateY(-1px);
+  }
+
+  span {
+    min-width: 0;
+    text-align: left;
+  }
+
+  strong {
+    color: inherit;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+}
+
+.trainingPlugin__tagToggle.is-active {
+  border-color: color-mix(in srgb, var(--color-accent) 36%, var(--color-line));
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--shell-panel-soft));
+  color: var(--color-text);
+}
+
+.trainingPlugin__tagToggle.is-locked {
+  cursor: default;
+}
+
+.trainingPlugin__tagToggle:disabled {
+  opacity: 1;
+}
+
+.trainingPlugin__muscleChip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--shell-panel-soft) 80%, transparent);
+}
+
+.trainingPlugin__muscleChipCopy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+
+  strong {
+    color: var(--color-text);
+    font-size: 0.84rem;
+  }
+
+  span {
+    color: var(--color-text-muted);
+    font-size: 0.76rem;
+  }
+}
+
+.trainingPlugin__muscleChipControls {
+  display: inline-grid;
+  grid-template-columns: 58px auto auto;
+  gap: 6px;
+  align-items: center;
+
+  input {
+    width: 58px;
+    min-width: 58px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.trainingPlugin__muscleChipSuffix {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .trainingPlugin__chipRemove {
   width: 18px;
   height: 18px;
@@ -602,12 +748,262 @@
   }
 }
 
+.trainingPlugin__content--compact {
+  min-height: 0;
+}
+
+.trainingPlugin__rail,
+.trainingPlugin__railPanel,
+.trainingPlugin__detailStack,
+.trainingPlugin__detailMain,
+.trainingPlugin__detailAside,
+.trainingPlugin__structurePreview {
+  min-height: 0;
+}
+
+.trainingPlugin__rail {
+  width: 232px;
+  min-width: 232px;
+}
+
+.trainingPlugin__railPanel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--workspace-rail-bg) 94%, transparent),
+      color-mix(in srgb, var(--workspace-rail-bg) 80%, var(--shell-panel-soft))
+    );
+}
+
+.trainingPlugin__railList {
+  display: grid;
+  gap: 8px;
+}
+
+.trainingPlugin__railFooter {
+  margin-top: auto;
+}
+
+.trainingPlugin__railButton,
+.trainingPlugin__galleryCard {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: calc(var(--radius-m) + 2px);
+  background: color-mix(in srgb, var(--shell-panel-soft) 82%, transparent);
+  color: var(--color-text);
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--color-line-strong);
+    background: color-mix(in srgb, var(--shell-panel-highlight) 82%, transparent);
+    transform: translateY(-1px);
+  }
+}
+
+.trainingPlugin__railButton {
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+
+  strong {
+    font-size: 0.84rem;
+  }
+
+  span {
+    color: var(--color-text-muted);
+    font-size: 0.76rem;
+  }
+}
+
+.trainingPlugin__railButton.is-active,
+.trainingPlugin__galleryCard.is-active {
+  @include interactive-active();
+}
+
+.trainingPlugin__galleryHeader {
+  gap: var(--space-3);
+  position: relative;
+  z-index: 2;
+  isolation: isolate;
+  overflow: visible;
+}
+
+.trainingPlugin__galleryToolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 2;
+
+  .nexus-ui-inline-field {
+    flex: 0 1 168px;
+  }
+
+  .nexus-ui-inline-field--grow {
+    flex: 1 1 260px;
+  }
+}
+
+.trainingPlugin__gallerySearch {
+  min-width: min(320px, 100%);
+}
+
+.trainingPlugin__galleryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  position: relative;
+  z-index: 0;
+}
+
+.trainingPlugin__galleryCard {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  position: relative;
+  z-index: 0;
+
+  strong {
+    color: var(--color-text);
+    font-size: 0.86rem;
+    line-height: 1.3;
+  }
+}
+
+.trainingPlugin__galleryCardSummary,
+.trainingPlugin__galleryCardMeta {
+  color: var(--color-text-muted);
+  font-size: 0.77rem;
+  line-height: 1.35;
+}
+
+.trainingPlugin__galleryCardMeta {
+  color: var(--color-text-subtle);
+}
+
+.trainingPlugin__detailStack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.trainingPlugin__detailColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.trainingPlugin__detailMain,
+.trainingPlugin__detailAside {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.trainingPlugin__metaPanel {
+  height: fit-content;
+}
+
+.trainingPlugin__metaList {
+  display: grid;
+  gap: 8px;
+}
+
+.trainingPlugin__metaListRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--shell-panel-soft) 74%, transparent);
+
+  span {
+    color: var(--color-text-muted);
+    font-size: 0.76rem;
+  }
+
+  strong {
+    color: var(--color-text);
+    font-size: 0.8rem;
+    text-align: right;
+  }
+}
+
+.trainingPlugin__documentPreview {
+  min-height: 360px;
+  max-height: none;
+}
+
+.trainingPlugin__documentPreview.is-edit {
+  min-height: 460px;
+  overflow: hidden;
+}
+
+.trainingPlugin__documentPreview.is-edit .markdown-engine-liveEditor {
+  height: 100%;
+  min-height: 460px;
+}
+
+.trainingPlugin__documentPreview .markdown-engine-document {
+  padding: 0;
+}
+
+.trainingPlugin__structurePreview {
+  display: grid;
+  gap: 8px;
+}
+
+.trainingPlugin__structureRow {
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 92%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--shell-panel-soft) 76%, transparent);
+
+  strong {
+    color: var(--color-text);
+    font-size: 0.84rem;
+    line-height: 1.35;
+  }
+
+  span {
+    color: var(--color-text-muted);
+    font-size: 0.76rem;
+    line-height: 1.35;
+  }
+}
+
+.trainingPlugin__structureRow.is-block {
+  background: color-mix(in srgb, var(--shell-panel-highlight) 72%, transparent);
+}
+
+.trainingPlugin__muscleChip.is-static .trainingPlugin__muscleChipControls {
+  grid-template-columns: auto;
+}
+
 .trainingPlugin__empty {
   min-height: 160px;
 }
 
 @media (max-width: 1180px) {
   .trainingPlugin__exerciseLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .trainingPlugin__detailColumns {
     grid-template-columns: 1fr;
   }
 
@@ -620,6 +1016,20 @@
   .trainingPlugin__measureRow,
   .trainingPlugin__inputActionRow {
     grid-template-columns: 1fr;
+  }
+
+  .trainingPlugin__galleryToolbar {
+    align-items: stretch;
+  }
+
+  .trainingPlugin__gallerySearch {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .trainingPlugin__rail {
+    width: 100%;
+    min-width: 0;
   }
 }
 
@@ -642,5 +1052,9 @@
   .trainingPlugin__selectorItemActions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .trainingPlugin__galleryGrid {
+    grid-template-columns: 1fr;
   }
 }

@@ -19,6 +19,7 @@ import {
   setOccurrenceQuantitySync,
   toggleOccurrenceSync,
   toggleOccurrenceChecklistItemSync,
+  toggleTaskSubitemSync,
   toggleTaskSync,
   todayLocalDate,
 } from "./habitos-core.js";
@@ -123,6 +124,23 @@ const lifeTrackerBackendPlugin: NexusBackendPluginModule = {
         return createSuccess(buildHome(sqlite, payload?.date));
       } catch (error) {
         return createError(error, "No se pudo actualizar la tarea.");
+      }
+    });
+
+    ctx.registerIpc(`${LIFE_TRACKER_HABITS_CHANNEL_PREFIX}:toggle-task-subitem`, async (_event, payload: any) => {
+      try {
+        const sqlite = getSqlite(ctx);
+        toggleTaskSubitemSync(
+          sqlite,
+          String(payload?.taskId || ""),
+          String(payload?.subitemId || ""),
+          {
+            now: nowIso(),
+          },
+        );
+        return createSuccess(buildHome(sqlite, payload?.date));
+      } catch (error) {
+        return createError(error, "No se pudo actualizar el sub-item de la tarea.");
       }
     });
 

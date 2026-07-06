@@ -1,15 +1,27 @@
-import {
+﻿import {
+  buildTrainingExerciseTagSummary,
+  buildTrainingExerciseTypeSummary,
+  buildTrainingExerciseSummary,
+  buildTrainingMeasurementCategorySummary,
   buildTrainingMeasurementUnitSummary,
   buildTrainingMetricSummary,
   buildTrainingRoutineSummary,
+  buildTrainingRoutineStepSummary,
+  buildTrainingStructureSummary,
   flattenTrainingStructureSteps,
   isComparableTextMatch,
   normalizeOptionalText,
   normalizeTrainingAssignmentInput,
   normalizeTrainingCompletionMode,
+  normalizeTrainingExerciseTags,
   normalizeTrainingMeasurement,
   normalizeTrainingPrescription,
   normalizeTrainingStructure,
+  resolveTrainingExerciseTags,
+  TRAINING_EXERCISE_TAG_LABELS,
+  TRAINING_EXERCISE_TAG_ORDER,
+  TRAINING_EXERCISE_TYPE_LABELS,
+  TRAINING_MEASUREMENT_CATEGORY_LABELS,
 } from "./training-utils.js";
 import {
   ArrowDownIcon,
@@ -23,12 +35,13 @@ import {
   Field,
   FieldGrid,
   IconButton,
+  InlineField,
   Notice,
   PanelHeader,
+  PanelStack,
   PanelTitle,
   ScrollRegion,
   SectionPanel,
-  SegmentedControl,
   SplitDetail,
   SplitLayout,
   SplitSidebar,
@@ -39,8 +52,10 @@ import {
   WorkspaceTitle,
   WorkspaceTopbar,
 } from "../../../../nexus-frontend/src/ui/index.js";
-import { renderMarkdown } from "../../../../nexus-frontend/src/editors/Markdown/markdownRenderer.js";
-import { extractMarkdownMetadata } from "../../../../nexus-frontend/src/editors/Markdown/metadata.js";
+import {
+  EmbeddedMarkdownLiveEditor as MarkdownLiveEditor,
+  EmbeddedMarkdownReadSurface as MarkdownReadSurface,
+} from "../../../../nexus-frontend/src/editors/Markdown/embeddedSurface.jsx";
 
 const LIFE_TRACKER_TRAINING_CHANNEL_PREFIX = "life-tracker:training";
 
@@ -55,6 +70,21 @@ const TRAINING_METRIC_MODE_OPTIONS = [
   { value: "distance", label: "Distancia" },
   { value: "weight", label: "Peso" },
 ];
+
+const TRAINING_EXERCISE_TYPE_OPTIONS = Object.entries(TRAINING_EXERCISE_TYPE_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+
+const TRAINING_MEASUREMENT_CATEGORY_OPTIONS = Object.entries(TRAINING_MEASUREMENT_CATEGORY_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+
+const TRAINING_EXERCISE_TAG_OPTIONS = TRAINING_EXERCISE_TAG_ORDER.map((value) => ({
+  value,
+  label: TRAINING_EXERCISE_TAG_LABELS[value],
+}));
 
 const ASSIGNMENT_STATUS_OPTIONS = [
   { value: "active", label: "Activa" },
@@ -190,10 +220,19 @@ function createExerciseDraft() {
   return {
     id: null,
     title: "",
+    exerciseType: "exercise",
+    measurementCategory: "strength",
+    tags: [],
     measurement: createExerciseMeasurementDraft(),
     muscleLoads: [],
     legacyWarnings: [],
+    templateKey: null,
+    personalDifficultyScore: "",
   };
+}
+
+function sumDraftMusclePercentages(muscleLoads = []) {
+  return muscleLoads.reduce((sum, entry) => sum + Math.max(0, Number(entry?.percentage || 0)), 0);
 }
 
 function createStructureStepDraft(kind = "exercise") {
@@ -250,6 +289,9 @@ function exerciseRecordToDraft(exercise) {
   return {
     id: exercise.id,
     title: exercise.title || "",
+    exerciseType: exercise.exerciseType || "exercise",
+    measurementCategory: exercise.measurementCategory || "strength",
+    tags: Array.isArray(exercise.tags) ? [...exercise.tags] : [],
     measurement: createExerciseMeasurementDraft(exercise.measurement),
     muscleLoads: Array.isArray(exercise.muscleLoads)
       ? exercise.muscleLoads.map((entry) => ({
@@ -259,11 +301,70 @@ function exerciseRecordToDraft(exercise) {
           regionTitle: entry.regionTitle,
           groupId: entry.groupId,
           groupTitle: entry.groupTitle,
-          load: Number(entry.load || 5),
+          percentage: Number(entry.percentage || 0),
         }))
       : [],
     legacyWarnings: Array.isArray(exercise.legacyWarnings) ? exercise.legacyWarnings : [],
+    templateKey: exercise.templateKey || null,
+    personalDifficultyScore: exercise.personalDifficultyScore == null ? "" : String(exercise.personalDifficultyScore),
   };
+}
+
+function getExerciseEffectiveTags(exercise) {
+  return resolveTrainingExerciseTags(exercise?.tags || [], exercise?.measurementCategory);
+}
+
+function buildExerciseTypeAndDifficultyMeta(exercise) {
+  const parts = [];
+  if (exercise?.exerciseType && exercise.exerciseType !== "exercise") {
+    parts.push(buildTrainingExerciseTypeSummary(exercise.exerciseType));
+  }
+  if (exercise?.personalDifficultyScore != null) {
+    parts.push(`Dificultad ${exercise.personalDifficultyScore}`);
+  }
+  return parts.join(" · ");
+}
+
+function buildExerciseTaxonomyMetaItems(exercise) {
+  return [
+    { label: "Tipo", value: buildTrainingExerciseTypeSummary(exercise?.exerciseType) || "Ejercicio" },
+    { label: "Perfil", value: buildTrainingMeasurementCategorySummary(exercise?.measurementCategory) || "Fuerza" },
+    {
+      label: "Tags",
+      value: buildTrainingExerciseTagSummary(exercise?.tags || [], {
+        measurementCategory: exercise?.measurementCategory,
+      }) || "Sin tags",
+    },
+  ];
+}
+
+function buildMuscleMaxLoadLookup(exercises = []) {
+  const nextLookup = new Map();
+
+  for (const exercise of Array.isArray(exercises) ? exercises : []) {
+    for (const entry of Array.isArray(exercise?.muscleLoads) ? exercise.muscleLoads : []) {
+      const muscleId = normalizeOptionalText(entry?.muscleId);
+      const percentage = Math.max(0, Number(entry?.percentage || 0));
+      if (!muscleId) {
+        continue;
+      }
+
+      const currentMax = nextLookup.get(muscleId) || 0;
+      if (percentage > currentMax) {
+        nextLookup.set(muscleId, percentage);
+      }
+    }
+  }
+
+  return nextLookup;
+}
+
+function buildMuscleMaxLoadSummary(muscleId, maxLoadLookup) {
+  const maxLoad = Math.max(0, Number(maxLoadLookup?.get?.(muscleId) || 0));
+  if (maxLoad <= 0) {
+    return "Foco max. sin registro";
+  }
+  return `Foco max. ${maxLoad}%`;
 }
 
 function structureSegmentToDraft(segment) {
@@ -324,6 +425,96 @@ function readTrainingMarkdownFile(filePath) {
   }
 }
 
+function quoteYamlScalar(value) {
+  return JSON.stringify(String(value || ""));
+}
+
+function buildTrainingMarkdownFrontmatter({
+  title,
+  summary,
+  kind,
+}) {
+  return [
+    "---",
+    "nexus:",
+    "  defaultView: read",
+    "  card:",
+    `    title: ${quoteYamlScalar(title)}`,
+    `    summary: ${quoteYamlScalar(summary || "")}`,
+    "fitness:",
+    "  domain: training",
+    `  kind: ${kind}`,
+    "---",
+    "",
+  ].join("\n");
+}
+
+function buildExerciseMarkdownTemplate({
+  title = "Nuevo ejercicio",
+  summary = "",
+} = {}) {
+  const resolvedTitle = normalizeOptionalText(title) || "Nuevo ejercicio";
+  const resolvedSummary = normalizeOptionalText(summary)
+    || "Describe el patron general, la tecnica y cualquier referencia util para ejecutar este ejercicio.";
+
+  return [
+    buildTrainingMarkdownFrontmatter({
+      title: resolvedTitle,
+      summary: normalizeOptionalText(summary) || "",
+      kind: "exercise",
+    }),
+    `# ${resolvedTitle}`,
+    "",
+    resolvedSummary,
+    "",
+    "## Tecnica",
+    "",
+    "## Videos / embeds",
+    "",
+    "## Relacionados",
+    "",
+    "## Notas",
+    "",
+  ].join("\n");
+}
+
+function buildMuscleMarkdownTemplate(muscle) {
+  const title = normalizeOptionalText(muscle?.title) || "Musculo";
+  const summary = [muscle?.groupTitle, muscle?.regionTitle].filter(Boolean).join(" - ");
+
+  return [
+    buildTrainingMarkdownFrontmatter({
+      title,
+      summary,
+      kind: "muscle",
+    }),
+    `# ${title}`,
+    "",
+    summary || "Describe la funcion principal de este musculo y como se siente cuando trabaja.",
+    "",
+    "## Funcion",
+    "",
+    "## Tecnica / ubicacion",
+    "",
+    "## Videos / embeds",
+    "",
+    "## Relacionados",
+    "",
+    "## Notas",
+    "",
+  ].join("\n");
+}
+
+function readTrainingDocMarkdown(doc, fallbackContent = "") {
+  const source = readTrainingMarkdownFile(doc?.itemPath);
+  return source || fallbackContent;
+}
+
+function formatTrainingCount(count, singular, plural = `${singular}s`) {
+  const safeCount = Math.max(0, Number(count) || 0);
+  return `${safeCount} ${safeCount === 1 ? singular : plural}`;
+}
+
 async function resolveTrainingDocItem(ctx, doc) {
   if (!doc?.itemId) {
     return null;
@@ -368,20 +559,6 @@ async function openTrainingDoc(ctx, doc) {
   });
 }
 
-function TrainingMarkdownPreview({ filePath }) {
-  const source = useMemo(() => readTrainingMarkdownFile(filePath), [filePath]);
-  const { body } = useMemo(() => extractMarkdownMetadata(source), [source]);
-  const html = useMemo(() => renderMarkdown(body), [body]);
-
-  return (
-    <div className="markdown-engine-read markdown-engine-read--compact">
-      <div className="markdown-engine-document">
-        <article className="markdown-engine-richContent" dangerouslySetInnerHTML={{ __html: html }} />
-      </div>
-    </div>
-  );
-}
-
 function buildExerciseEditorDescription(exercise) {
   return exercise?.searchSummary || "Define el nombre corto, la unidad base y que musculos trabaja.";
 }
@@ -399,42 +576,33 @@ function findRoutineById(routines, routineId) {
 }
 
 function TrainingDocumentCard({
-  doc,
-  isPersisted = false,
-  onOpen,
+  title = "Nota",
+  description = "",
+  markdown = "",
+  mode = "preview",
+  editorKey = "",
+  onChange = null,
+  headerActions = null,
 }) {
   return (
     <SectionPanel className="trainingPlugin__card trainingPlugin__documentCard">
-      <PanelHeader
-        actions={doc ? (
-          <div className="trainingPlugin__documentActions">
-            <Button type="button" tone="secondary" onClick={() => void onOpen?.(doc)}>
-              Abrir nota
-            </Button>
-          </div>
-        ) : null}
-      >
-        <PanelTitle
-          title="Documento"
-          description={doc
-            ? "Preview en lectura de la nota de apoyo."
-            : isPersisted
-              ? "La nota se genera automaticamente en segundo plano."
-              : "La nota se crea automaticamente al guardar el ejercicio."}
-        />
+      <PanelHeader actions={headerActions}>
+        <PanelTitle title={title} description={description} />
       </PanelHeader>
 
-      {doc ? (
-        <div className="trainingPlugin__documentPreview">
-          <TrainingMarkdownPreview filePath={doc.itemPath} />
-        </div>
-      ) : (
-        <div className="trainingPlugin__mutedBlock">
-          {isPersisted
-            ? "Estamos preparando la nota asociada."
-            : "Este ejercicio aun no existe en la biblioteca."}
-        </div>
-      )}
+      <div className={["trainingPlugin__documentPreview", mode === "edit" ? "is-edit" : "is-preview"].join(" ")}>
+        {mode === "edit" ? (
+          <MarkdownLiveEditor
+            key={editorKey}
+            filePath=""
+            value={markdown}
+            onChange={(nextMarkdown) => onChange?.(nextMarkdown)}
+            persistToDisk={false}
+          />
+        ) : (
+          <MarkdownReadSurface value={markdown} compact />
+        )}
+      </div>
     </SectionPanel>
   );
 }
@@ -446,6 +614,379 @@ function StructureSummary({ structure, exercises }) {
   );
   const summary = buildTrainingRoutineSummary({ structure: normalizeTrainingStructure(structure || []) }, exerciseLookup);
   return <span>{summary || "Sin pasos definidos"}</span>;
+}
+
+const TRAINING_SECTION_OPTIONS = [
+  { value: "exercises", label: "Ejercicios", countKey: "exercises" },
+  { value: "muscles", label: "Musculos", countKey: "muscles" },
+  { value: "routines", label: "Rutinas", countKey: "routines" },
+  { value: "assignments", label: "Programadas", countKey: "assignments" },
+];
+
+function TrainingSectionRail({
+  mode,
+  catalog,
+  onChange,
+  onRefresh,
+  showRefresh = true,
+}) {
+  return (
+    <SectionPanel className="trainingPlugin__railPanel" padding="tight">
+      <div className="trainingPlugin__railList">
+        {TRAINING_SECTION_OPTIONS.map((option) => {
+          const count = Array.isArray(catalog?.[option.countKey]) ? catalog[option.countKey].length : 0;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              className={["trainingPlugin__railButton", mode === option.value ? "is-active" : ""].filter(Boolean).join(" ")}
+              onClick={() => onChange(option.value)}
+            >
+              <strong>{option.label}</strong>
+              <span>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {showRefresh ? (
+        <div className="trainingPlugin__railFooter">
+          <Button type="button" tone="secondary" onClick={() => void onRefresh?.()}>
+            <RefreshIcon size={16} />
+            <span>Refrescar</span>
+          </Button>
+        </div>
+      ) : null}
+    </SectionPanel>
+  );
+}
+
+function TrainingGalleryHeader({
+  eyebrow = "",
+  title,
+  countLabel,
+  searchValue = "",
+  searchPlaceholder = "Buscar",
+  onSearchChange,
+  actions = null,
+  filters = null,
+}) {
+  return (
+    <SectionPanel className="trainingPlugin__galleryHeader" tone="highlight" padding="tight">
+      <PanelHeader actions={actions}>
+        <PanelTitle eyebrow={eyebrow} title={title} description={countLabel} />
+      </PanelHeader>
+
+      <div className="trainingPlugin__galleryToolbar">
+        {typeof onSearchChange === "function" ? (
+          <InlineField className="trainingPlugin__gallerySearch" label="Buscar" grow>
+            <input
+              type="search"
+              value={searchValue}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder={searchPlaceholder}
+            />
+          </InlineField>
+        ) : null}
+        {filters}
+      </div>
+    </SectionPanel>
+  );
+}
+
+function TrainingGalleryCard({
+  title,
+  summary,
+  meta = "",
+  active = false,
+  onClick,
+}) {
+  return (
+    <button
+      type="button"
+      className={["trainingPlugin__galleryCard", active ? "is-active" : ""].filter(Boolean).join(" ")}
+      onClick={onClick}
+    >
+      <strong>{title}</strong>
+      {summary ? <span className="trainingPlugin__galleryCardSummary">{summary}</span> : null}
+      {meta ? <span className="trainingPlugin__galleryCardMeta">{meta}</span> : null}
+    </button>
+  );
+}
+
+function TrainingMetaPanel({
+  title,
+  items = [],
+  className = "",
+}) {
+  const visibleItems = items.filter((entry) => normalizeOptionalText(entry?.value));
+
+  return (
+    <SectionPanel className={["trainingPlugin__card", "trainingPlugin__metaPanel", className].filter(Boolean).join(" ")}>
+      <PanelHeader>
+        <PanelTitle title={title} />
+      </PanelHeader>
+
+      {visibleItems.length ? (
+        <div className="trainingPlugin__metaList">
+          {visibleItems.map((entry) => (
+            <div key={entry.label} className="trainingPlugin__metaListRow">
+              <span>{entry.label}</span>
+              <strong>{entry.value}</strong>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="trainingPlugin__mutedBlock">Sin datos.</div>
+      )}
+    </SectionPanel>
+  );
+}
+
+function ExercisePreview({
+  exercise,
+  markdown,
+  onBack,
+  onEdit,
+  onOpenDoc,
+}) {
+  if (!exercise) {
+    return (
+      <StateBlock
+        eyebrow="Ejercicios"
+        title="No encontramos ese ejercicio."
+      />
+    );
+  }
+
+  return (
+    <PanelStack className="trainingPlugin__detailStack">
+      <SectionPanel className="trainingPlugin__detailHeader" tone="highlight" padding="tight">
+        <PanelHeader
+          actions={(
+            <div className="trainingPlugin__headerActions">
+              <Button type="button" tone="secondary" onClick={onBack}>Volver</Button>
+              {exercise.doc ? (
+                <Button type="button" tone="secondary" onClick={() => void onOpenDoc?.(exercise.doc)}>
+                  Abrir nota
+                </Button>
+              ) : null}
+              <Button type="button" tone="primary" onClick={onEdit}>Editar</Button>
+            </div>
+          )}
+        >
+          <PanelTitle
+            eyebrow="Ejercicio"
+            title={exercise.title}
+            description={buildTrainingExerciseSummary(exercise) || buildExerciseEditorDescription(exercise)}
+          />
+        </PanelHeader>
+      </SectionPanel>
+
+      <div className="trainingPlugin__detailColumns">
+        <div className="trainingPlugin__detailMain">
+          <TrainingDocumentCard
+            title="Nota"
+            markdown={markdown}
+            mode="preview"
+          />
+        </div>
+
+        <div className="trainingPlugin__detailAside">
+          <TrainingMetaPanel
+            title="Taxonomia"
+            items={buildExerciseTaxonomyMetaItems(exercise)}
+          />
+
+          <TrainingMetaPanel
+            title="Medida"
+            items={[
+              { label: "Unidad", value: buildTrainingMeasurementUnitSummary(exercise.measurement) || "Sin definir" },
+              { label: "Dificultad", value: exercise.personalDifficultyScore == null ? "" : String(exercise.personalDifficultyScore) },
+            ]}
+          />
+
+          <SectionPanel className="trainingPlugin__card trainingPlugin__metaPanel">
+            <PanelHeader>
+              <PanelTitle title="Musculos" />
+            </PanelHeader>
+
+            {Array.isArray(exercise.muscleLoads) && exercise.muscleLoads.length ? (
+              <div className="trainingPlugin__chipGrid">
+                {exercise.muscleLoads.map((entry) => (
+                  <div key={entry.muscleId} className="trainingPlugin__muscleChip is-static">
+                    <div className="trainingPlugin__muscleChipCopy">
+                      <strong>{entry.title}</strong>
+                      <span>{entry.groupTitle}</span>
+                    </div>
+                    <div className="trainingPlugin__muscleChipControls">
+                      <strong>{`${entry.percentage}%`}</strong>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="trainingPlugin__mutedBlock">Sin musculos vinculados.</div>
+            )}
+          </SectionPanel>
+        </div>
+      </div>
+    </PanelStack>
+  );
+}
+
+function MusclePreview({
+  muscle,
+  markdown,
+  onBack,
+  onEdit,
+  onOpenDoc,
+}) {
+  if (!muscle) {
+    return (
+      <StateBlock
+        eyebrow="Musculos"
+        title="No encontramos ese musculo."
+      />
+    );
+  }
+
+  return (
+    <PanelStack className="trainingPlugin__detailStack">
+      <SectionPanel className="trainingPlugin__detailHeader" tone="highlight" padding="tight">
+        <PanelHeader
+          actions={(
+            <div className="trainingPlugin__headerActions">
+              <Button type="button" tone="secondary" onClick={onBack}>Volver</Button>
+              {muscle.doc ? (
+                <Button type="button" tone="secondary" onClick={() => void onOpenDoc?.(muscle.doc)}>
+                  Abrir nota
+                </Button>
+              ) : null}
+              <Button type="button" tone="primary" onClick={onEdit}>Editar</Button>
+            </div>
+          )}
+        >
+          <PanelTitle
+            eyebrow="Musculo"
+            title={muscle.title}
+            description={[muscle.groupTitle, muscle.regionTitle].filter(Boolean).join(" - ")}
+          />
+        </PanelHeader>
+      </SectionPanel>
+
+      <div className="trainingPlugin__detailColumns trainingPlugin__detailColumns--muscle">
+        <div className="trainingPlugin__detailMain">
+          <TrainingDocumentCard
+            title="Nota"
+            markdown={markdown}
+            mode="preview"
+          />
+        </div>
+
+        <div className="trainingPlugin__detailAside">
+          <TrainingMetaPanel
+            title="Catalogo"
+            items={[
+              { label: "Region", value: muscle.regionTitle },
+              { label: "Grupo", value: muscle.groupTitle },
+              { label: "Id", value: muscle.id },
+            ]}
+          />
+        </div>
+      </div>
+    </PanelStack>
+  );
+}
+
+function RoutinePreview({
+  routine,
+  exercises,
+  onBack,
+  onEdit,
+  onAssign,
+}) {
+  const exerciseLookup = useMemo(
+    () => Object.fromEntries((exercises || []).map((exercise) => [exercise.id, exercise])),
+    [exercises],
+  );
+  const flattenedSteps = useMemo(
+    () => flattenTrainingStructureSteps(normalizeTrainingStructure(routine?.structure || []), { includeBlocks: true }),
+    [routine?.structure],
+  );
+
+  if (!routine) {
+    return (
+      <StateBlock
+        eyebrow="Rutinas"
+        title="No encontramos esa rutina."
+      />
+    );
+  }
+
+  return (
+    <PanelStack className="trainingPlugin__detailStack">
+      <SectionPanel className="trainingPlugin__detailHeader" tone="highlight" padding="tight">
+        <PanelHeader
+          actions={(
+            <div className="trainingPlugin__headerActions">
+              <Button type="button" tone="secondary" onClick={onBack}>Volver</Button>
+              <Button type="button" tone="secondary" onClick={() => onAssign?.(routine)}>Asignar</Button>
+              <Button type="button" tone="primary" onClick={onEdit}>Editar</Button>
+            </div>
+          )}
+        >
+          <PanelTitle
+            eyebrow="Rutina"
+            title={routine.title}
+            description={routine.searchSummary || routine.summary || buildTrainingStructureSummary(routine.structure, exerciseLookup)}
+          />
+        </PanelHeader>
+      </SectionPanel>
+
+      <div className="trainingPlugin__detailColumns">
+        <div className="trainingPlugin__detailMain">
+          <SectionPanel className="trainingPlugin__card">
+            <PanelHeader>
+              <PanelTitle title="Estructura" description={buildTrainingRoutineSummary(routine, exerciseLookup)} />
+            </PanelHeader>
+
+            {flattenedSteps.length ? (
+              <div className="trainingPlugin__structurePreview">
+                {flattenedSteps.map((entry, index) => (
+                  entry.type === "block" ? (
+                    <div key={entry.id || `block-${index + 1}`} className="trainingPlugin__structureRow is-block">
+                      <strong>{entry.title || `Bloque ${index + 1}`}</strong>
+                      <span>{`${entry.repeatCount || 1} vueltas`}</span>
+                    </div>
+                  ) : (
+                    <div key={entry.id || `step-${index + 1}`} className="trainingPlugin__structureRow">
+                      <strong>{`${index + 1}. ${buildTrainingRoutineStepSummary(entry, exerciseLookup) || "Paso"}`}</strong>
+                      {entry.parentBlockTitle ? (
+                        <span>{`${entry.parentBlockTitle} x${entry.parentBlockRepeatCount || 1}`}</span>
+                      ) : null}
+                    </div>
+                  )
+                ))}
+              </div>
+            ) : (
+              <StateBlock centered title="Sin estructura" />
+            )}
+          </SectionPanel>
+        </div>
+
+        <div className="trainingPlugin__detailAside">
+          <TrainingMetaPanel
+            title="Resumen"
+            items={[
+              { label: "Titulo corto", value: routine.title },
+              { label: "Descripcion", value: routine.summary || "" },
+            ]}
+          />
+        </div>
+      </div>
+    </PanelStack>
+  );
 }
 
 function TrainingMeasurementUnitEditor({
@@ -592,6 +1133,8 @@ function MuscleLoadEditor({
   onOpenDoc,
 }) {
   const selectedById = new Map((draft.muscleLoads || []).map((entry) => [String(entry.muscleId), entry]));
+  const totalPercentage = sumDraftMusclePercentages(draft.muscleLoads || []);
+  const remainingPercentage = 100 - totalPercentage;
   const filteredMuscles = useMemo(() => {
     return (catalog.muscles || []).filter((muscle) => {
       if (regionFilter && muscle.regionId !== regionFilter) {
@@ -613,6 +1156,11 @@ function MuscleLoadEditor({
         return current;
       }
 
+      const currentTotal = sumDraftMusclePercentages(current.muscleLoads || []);
+      const defaultPercentage = currentTotal >= 100
+        ? 1
+        : Math.min(25, Math.max(1, 100 - currentTotal));
+
       return {
         ...current,
         muscleLoads: [
@@ -624,7 +1172,7 @@ function MuscleLoadEditor({
             regionTitle: muscle.regionTitle,
             groupId: muscle.groupId,
             groupTitle: muscle.groupTitle,
-            load: 5,
+            percentage: defaultPercentage,
           },
         ],
       };
@@ -638,7 +1186,7 @@ function MuscleLoadEditor({
     }));
   }
 
-  function updateLoad(muscleId, nextLoad) {
+  function updatePercentage(muscleId, nextPercentage) {
     setDraft((current) => ({
       ...current,
       muscleLoads: current.muscleLoads.map((entry) => (
@@ -646,7 +1194,7 @@ function MuscleLoadEditor({
           ? entry
           : {
               ...entry,
-              load: Math.min(10, Math.max(1, Number(nextLoad) || 1)),
+              percentage: Math.min(100, Math.max(1, Number(nextPercentage) || 1)),
             }
       )),
     }));
@@ -657,7 +1205,7 @@ function MuscleLoadEditor({
       <PanelHeader>
         <PanelTitle
           title="Musculos"
-          description="Seleccion plana, estructura interna anatomica y acceso directo a notas sembradas automaticamente."
+          
         />
       </PanelHeader>
 
@@ -666,6 +1214,23 @@ function MuscleLoadEditor({
           {`Quedaron musculos legacy sin mapear: ${draft.legacyWarnings.map((entry) => entry.sourceTitle).join(", ")}.`}
         </Notice>
       ) : null}
+
+      <div
+        className={[
+          "trainingPlugin__muscleLoadSummary",
+          totalPercentage === 100 ? "is-valid" : "",
+          totalPercentage > 100 ? "is-over" : totalPercentage < 100 ? "is-under" : "",
+        ].filter(Boolean).join(" ")}
+      >
+        <strong>{`Total ${totalPercentage}%`}</strong>
+        <span>
+          {remainingPercentage === 0
+            ? "Listo para guardar."
+            : remainingPercentage > 0
+              ? `Faltan ${remainingPercentage}%.`
+              : `Sobran ${Math.abs(remainingPercentage)}%.`}
+        </span>
+      </div>
 
       <FieldGrid>
         <Field label="Buscar" wide>
@@ -701,12 +1266,13 @@ function MuscleLoadEditor({
                 <input
                   type="number"
                   min="1"
-                  max="10"
-                  value={String(entry.load)}
-                  onChange={(event) => updateLoad(entry.muscleId, event.target.value)}
+                  max="100"
+                  value={String(entry.percentage ?? 0)}
+                  onChange={(event) => updatePercentage(entry.muscleId, event.target.value)}
                 />
+                <span className="trainingPlugin__muscleChipSuffix">%</span>
                 <button type="button" className="trainingPlugin__chipRemove" onClick={() => removeMuscle(entry.muscleId)} aria-label={`Quitar ${entry.title}`}>
-                  ×
+                  x
                 </button>
               </div>
             </div>
@@ -724,7 +1290,7 @@ function MuscleLoadEditor({
               <div className="trainingPlugin__selectorItemMeta">
                 <span>{`${muscle.regionTitle} / ${muscle.groupTitle}`}</span>
               </div>
-              <span>{muscle.regionTitle} · {muscle.groupTitle}</span>
+              <span>{muscle.regionTitle} - {muscle.groupTitle}</span>
             </div>
             <div className="trainingPlugin__selectorItemActions">
               <Button
@@ -755,9 +1321,13 @@ function ExerciseEditor(props) {
     selectedExercise,
     exerciseDraft,
     setExerciseDraft,
+    exerciseMarkdown,
+    setExerciseMarkdown,
+    editorKey,
     handleSaveExercise,
     handleDeleteExercise,
     handleOpenDoc,
+    onCancel,
     catalog,
     muscleSearch,
     setMuscleSearch,
@@ -766,13 +1336,53 @@ function ExerciseEditor(props) {
     groupFilter,
     setGroupFilter,
   } = props;
+  const effectiveTags = getExerciseEffectiveTags(exerciseDraft);
+
+  function handleExerciseTypeChange(nextType) {
+    setExerciseDraft((current) => ({
+      ...current,
+      exerciseType: nextType || "exercise",
+    }));
+  }
+
+  function handleMeasurementCategoryChange(nextCategory) {
+    setExerciseDraft((current) => ({
+      ...current,
+      measurementCategory: nextCategory || "strength",
+      tags: normalizeTrainingExerciseTags(current.tags || [], {
+        measurementCategory: nextCategory || "strength",
+      }),
+    }));
+  }
+
+  function toggleExerciseTag(tagId) {
+    if (!tagId || tagId === exerciseDraft.measurementCategory) {
+      return;
+    }
+
+    setExerciseDraft((current) => {
+      const nextTags = Array.isArray(current.tags) && current.tags.includes(tagId)
+        ? current.tags.filter((entry) => entry !== tagId)
+        : [...(Array.isArray(current.tags) ? current.tags : []), tagId];
+
+      return {
+        ...current,
+        tags: normalizeTrainingExerciseTags(nextTags, {
+          measurementCategory: current.measurementCategory,
+        }),
+      };
+    });
+  }
 
   return (
-    <div className="trainingPlugin__editor trainingPlugin__editor--exercise">
+    <PanelStack className="trainingPlugin__detailStack trainingPlugin__editor trainingPlugin__editor--exercise">
       <SectionPanel className="trainingPlugin__detailHeader" tone="highlight" padding="tight">
         <PanelHeader
           actions={(
             <div className="trainingPlugin__headerActions">
+              <Button type="button" tone="secondary" onClick={onCancel}>
+                {selectedExercise?.id ? "Cancelar" : "Volver"}
+              </Button>
               <Button type="button" tone="primary" onClick={() => void handleSaveExercise()}>
                 Guardar ejercicio
               </Button>
@@ -786,23 +1396,81 @@ function ExerciseEditor(props) {
           <PanelTitle
             eyebrow="Ejercicio"
             title={selectedExercise?.title || "Nuevo ejercicio"}
-            description={buildExerciseEditorDescription(selectedExercise)}
+            description={selectedExercise?.id
+              ? buildExerciseEditorDescription(selectedExercise)
+              : "Crea el ejercicio, define su taxonomia y prepara la nota antes de persistirla."}
           />
         </PanelHeader>
       </SectionPanel>
 
-      <div className="trainingPlugin__exerciseLayout">
-        <div className="trainingPlugin__exerciseMain">
+      <div className="trainingPlugin__detailColumns">
+        <div className="trainingPlugin__detailMain">
           <SectionPanel className="trainingPlugin__card trainingPlugin__card--main">
             <PanelHeader>
-              <PanelTitle title="Base" description="Nombre corto y unidad base." />
+              <PanelTitle title="Base" description="Nombre corto, taxonomia, unidad base y dificultad." />
             </PanelHeader>
 
             <FieldGrid className="trainingPlugin__singleColumnGrid">
               <Field label="Titulo" wide>
                 <input type="text" value={exerciseDraft.title} onChange={(event) => setExerciseDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Nombre del ejercicio" />
               </Field>
+              <Field label="Tipo">
+                <select value={exerciseDraft.exerciseType} onChange={(event) => handleExerciseTypeChange(event.target.value)}>
+                  {TRAINING_EXERCISE_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Perfil principal">
+                <select value={exerciseDraft.measurementCategory} onChange={(event) => handleMeasurementCategoryChange(event.target.value)}>
+                  {TRAINING_MEASUREMENT_CATEGORY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Dificultad personal" wide>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={exerciseDraft.personalDifficultyScore}
+                  onChange={(event) => setExerciseDraft((current) => ({ ...current, personalDifficultyScore: event.target.value }))}
+                  placeholder="Opcional, 0 a 100"
+                />
+              </Field>
+              <Field label="Tags" wide>
+                <div className="trainingPlugin__tagToggleGrid">
+                  {TRAINING_EXERCISE_TAG_OPTIONS.map((option) => {
+                    const active = effectiveTags.includes(option.value);
+                    const locked = exerciseDraft.measurementCategory === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={[
+                          "trainingPlugin__tagToggle",
+                          active ? "is-active" : "",
+                          locked ? "is-locked" : "",
+                        ].filter(Boolean).join(" ")}
+                        onClick={() => toggleExerciseTag(option.value)}
+                        disabled={locked}
+                        aria-pressed={active}
+                      >
+                        <span>{option.label}</span>
+                        {locked ? <strong>Perfil</strong> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
             </FieldGrid>
+
+            <div className="trainingPlugin__sectionIntro trainingPlugin__sectionIntro--compact">
+              <span>
+                {`${buildTrainingMeasurementCategorySummary(exerciseDraft.measurementCategory) || "Fuerza"} tambien se aplica como tag principal.`}
+              </span>
+              <span>Valor personal opcional. La unidad base del ejercicio sigue definiendose por separado.</span>
+            </div>
 
             <TrainingMeasurementUnitEditor
               value={exerciseDraft.measurement}
@@ -814,9 +1482,14 @@ function ExerciseEditor(props) {
           </SectionPanel>
 
           <TrainingDocumentCard
-            doc={selectedExercise?.doc || null}
-            isPersisted={Boolean(selectedExercise?.id || exerciseDraft.id)}
-            onOpen={handleOpenDoc}
+            title="Nota"
+            description={selectedExercise?.id
+              ? "Editor embebido"
+              : "La nota real del vault se crea cuando guardas el ejercicio."}
+            markdown={exerciseMarkdown}
+            mode="edit"
+            editorKey={editorKey}
+            onChange={setExerciseMarkdown}
           />
         </div>
 
@@ -833,7 +1506,69 @@ function ExerciseEditor(props) {
           onOpenDoc={handleOpenDoc}
         />
       </div>
-    </div>
+    </PanelStack>
+  );
+}
+
+function MuscleEditor({
+  muscle,
+  markdown,
+  editorKey,
+  onChangeMarkdown,
+  onCancel,
+  onSave,
+  onOpenDoc,
+}) {
+  return (
+    <PanelStack className="trainingPlugin__detailStack trainingPlugin__editor">
+      <SectionPanel className="trainingPlugin__detailHeader" tone="highlight" padding="tight">
+        <PanelHeader
+          actions={(
+            <div className="trainingPlugin__headerActions">
+              <Button type="button" tone="secondary" onClick={onCancel}>Cancelar</Button>
+              {muscle?.doc ? (
+                <Button type="button" tone="secondary" onClick={() => void onOpenDoc?.(muscle.doc)}>
+                  Abrir nota
+                </Button>
+              ) : null}
+              <Button type="button" tone="primary" onClick={() => void onSave?.()}>
+                Guardar nota
+              </Button>
+            </div>
+          )}
+        >
+          <PanelTitle
+            eyebrow="Musculo"
+            title={muscle?.title || "Musculo"}
+            description={[muscle?.groupTitle, muscle?.regionTitle].filter(Boolean).join(" - ")}
+          />
+        </PanelHeader>
+      </SectionPanel>
+
+      <div className="trainingPlugin__detailColumns trainingPlugin__detailColumns--muscle">
+        <div className="trainingPlugin__detailMain">
+          <TrainingDocumentCard
+            title="Nota"
+            description="Editor embebido"
+            markdown={markdown}
+            mode="edit"
+            editorKey={editorKey}
+            onChange={onChangeMarkdown}
+          />
+        </div>
+
+        <div className="trainingPlugin__detailAside">
+          <TrainingMetaPanel
+            title="Catalogo"
+            items={[
+              { label: "Region", value: muscle?.regionTitle },
+              { label: "Grupo", value: muscle?.groupTitle },
+              { label: "Id", value: muscle?.id },
+            ]}
+          />
+        </div>
+      </div>
+    </PanelStack>
   );
 }
 
@@ -1013,6 +1748,7 @@ function RoutineEditor({
   handleSaveRoutine,
   handleDeleteRoutine,
   openAssignmentFromRoutine,
+  onCancel,
 }) {
   const exerciseLookup = useMemo(
     () => Object.fromEntries((catalog.exercises || []).map((exercise) => [exercise.id, exercise])),
@@ -1045,11 +1781,14 @@ function RoutineEditor({
   const routineSummary = buildTrainingRoutineSummary({ structure: normalizedStructure }, exerciseLookup);
 
   return (
-    <div className="trainingPlugin__editor trainingPlugin__editor--routine">
+    <PanelStack className="trainingPlugin__detailStack trainingPlugin__editor trainingPlugin__editor--routine">
       <SectionPanel className="trainingPlugin__detailHeader" tone="highlight" padding="tight">
         <PanelHeader
           actions={(
             <div className="trainingPlugin__headerActions">
+              <Button type="button" tone="secondary" onClick={onCancel}>
+                {selectedRoutine?.id ? "Cancelar" : "Volver"}
+              </Button>
               <Button type="button" tone="primary" onClick={() => void handleSaveRoutine()}>
                 Guardar rutina
               </Button>
@@ -1066,7 +1805,9 @@ function RoutineEditor({
           <PanelTitle
             eyebrow="Rutina"
             title={selectedRoutine?.title || "Nueva rutina"}
-            description={buildRoutineEditorDescription(selectedRoutine)}
+            description={selectedRoutine?.id
+              ? buildRoutineEditorDescription(selectedRoutine)
+              : "Crea la rutina y define su estructura dentro del mismo detalle."}
           />
         </PanelHeader>
       </SectionPanel>
@@ -1142,7 +1883,7 @@ function RoutineEditor({
           ) : null}
         </div>
       </SectionPanel>
-    </div>
+    </PanelStack>
   );
 }
 
@@ -1153,15 +1894,19 @@ function AssignmentEditor({
   routines,
   handleSaveAssignment,
   handleDeleteAssignment,
+  onCancel,
 }) {
   const selectedRoutine = findRoutineById(routines, assignmentDraft.routineId);
 
   return (
-    <div className="trainingPlugin__editor trainingPlugin__editor--assignment">
+    <PanelStack className="trainingPlugin__detailStack trainingPlugin__editor trainingPlugin__editor--assignment">
       <SectionPanel className="trainingPlugin__detailHeader" tone="highlight" padding="tight">
         <PanelHeader
           actions={(
             <div className="trainingPlugin__headerActions">
+              <Button type="button" tone="secondary" onClick={onCancel}>
+                {selectedAssignment?.id ? "Cancelar" : "Volver"}
+              </Button>
               <Button type="button" tone="primary" onClick={() => void handleSaveAssignment()}>
                 Guardar programacion
               </Button>
@@ -1259,7 +2004,7 @@ function AssignmentEditor({
           {selectedRoutine ? selectedRoutine.searchSummary || "Rutina lista para programar." : "Selecciona una rutina para continuar."}
         </div>
       </SectionPanel>
-    </div>
+    </PanelStack>
   );
 }
 
@@ -1280,41 +2025,81 @@ function TrainingView({
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
+  const [exerciseSearch, setExerciseSearch] = useState("");
+  const [routineSearch, setRoutineSearch] = useState("");
+  const [assignmentSearch, setAssignmentSearch] = useState("");
   const [muscleSearch, setMuscleSearch] = useState("");
+  const [exerciseTypeFilter, setExerciseTypeFilter] = useState("");
+  const [exerciseCategoryFilter, setExerciseCategoryFilter] = useState("");
+  const [exerciseTagFilter, setExerciseTagFilter] = useState("");
   const [regionFilter, setRegionFilter] = useState("");
   const [groupFilter, setGroupFilter] = useState("");
   const [selectedExerciseId, setSelectedExerciseId] = useState(null);
+  const [selectedMuscleId, setSelectedMuscleId] = useState(null);
   const [selectedRoutineId, setSelectedRoutineId] = useState(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState(null);
+  const [exerciseView, setExerciseView] = useState("gallery");
+  const [muscleView, setMuscleView] = useState("gallery");
+  const [routineView, setRoutineView] = useState("gallery");
+  const [assignmentView, setAssignmentView] = useState("gallery");
   const [exerciseDraft, setExerciseDraft] = useState(createExerciseDraft);
   const [routineDraft, setRoutineDraft] = useState(createRoutineDraft);
   const [assignmentDraft, setAssignmentDraft] = useState(createAssignmentDraft);
+  const [exerciseMarkdown, setExerciseMarkdown] = useState(() => buildExerciseMarkdownTemplate());
+  const [muscleMarkdown, setMuscleMarkdown] = useState("");
+  const [exerciseEditorKey, setExerciseEditorKey] = useState(() => createId("exercise-editor"));
+  const [muscleEditorKey, setMuscleEditorKey] = useState(() => createId("muscle-editor"));
 
   const filteredExercises = useMemo(() => {
-    return catalog.exercises.filter((exercise) => isComparableTextMatch(
-      [exercise.title, exercise.searchSummary].filter(Boolean).join(" "),
-      search,
-    ));
-  }, [catalog.exercises, search]);
+    return catalog.exercises.filter((exercise) => {
+      if (exerciseTypeFilter && (exercise.exerciseType || "exercise") !== exerciseTypeFilter) {
+        return false;
+      }
+      if (exerciseCategoryFilter && (exercise.measurementCategory || "strength") !== exerciseCategoryFilter) {
+        return false;
+      }
+      if (exerciseTagFilter && !getExerciseEffectiveTags(exercise).includes(exerciseTagFilter)) {
+        return false;
+      }
+      return isComparableTextMatch(
+        [exercise.title, exercise.searchSummary].filter(Boolean).join(" "),
+        exerciseSearch,
+      );
+    });
+  }, [catalog.exercises, exerciseCategoryFilter, exerciseSearch, exerciseTagFilter, exerciseTypeFilter]);
 
   const filteredRoutines = useMemo(() => {
     return catalog.routines.filter((routine) => isComparableTextMatch(
       [routine.title, routine.summary, routine.searchSummary].filter(Boolean).join(" "),
-      search,
+      routineSearch,
     ));
-  }, [catalog.routines, search]);
+  }, [catalog.routines, routineSearch]);
 
   const filteredAssignments = useMemo(() => {
     return catalog.assignments.filter((assignment) => isComparableTextMatch(
       [assignment.routine?.title, assignment.searchSummary, assignment.status].filter(Boolean).join(" "),
-      search,
+      assignmentSearch,
     ));
-  }, [catalog.assignments, search]);
+  }, [catalog.assignments, assignmentSearch]);
+  const filteredMuscles = useMemo(() => {
+    return catalog.muscles.filter((muscle) => {
+      if (regionFilter && muscle.regionId !== regionFilter) {
+        return false;
+      }
+      if (groupFilter && muscle.groupId !== groupFilter) {
+        return false;
+      }
+      return isComparableTextMatch(muscle.searchText, muscleSearch);
+    });
+  }, [catalog.muscles, groupFilter, muscleSearch, regionFilter]);
 
   const selectedExercise = useMemo(
     () => findExerciseById(catalog.exercises, selectedExerciseId),
     [catalog.exercises, selectedExerciseId],
+  );
+  const selectedMuscle = useMemo(
+    () => catalog.muscles.find((muscle) => muscle.id === selectedMuscleId) || null,
+    [catalog.muscles, selectedMuscleId],
   );
   const selectedRoutine = useMemo(
     () => findRoutineById(catalog.routines, selectedRoutineId),
@@ -1323,6 +2108,14 @@ function TrainingView({
   const selectedAssignment = useMemo(
     () => catalog.assignments.find((assignment) => assignment.id === selectedAssignmentId) || null,
     [catalog.assignments, selectedAssignmentId],
+  );
+  const visibleGroupOptions = useMemo(
+    () => (catalog.groups || []).filter((group) => !regionFilter || group.regionId === regionFilter),
+    [catalog.groups, regionFilter],
+  );
+  const muscleMaxLoadLookup = useMemo(
+    () => buildMuscleMaxLoadLookup(catalog.exercises),
+    [catalog.exercises],
   );
 
   async function loadLibrary(preferred = {}) {
@@ -1339,12 +2132,22 @@ function TrainingView({
         regions: Array.isArray(library?.regions) ? library.regions : [],
         groups: Array.isArray(library?.groups) ? library.groups : [],
       };
+
+      const hasOwnPreferred = (key) => Object.prototype.hasOwnProperty.call(preferred, key);
+      const nextExerciseId = hasOwnPreferred("exerciseId") ? preferred.exerciseId : selectedExerciseId;
+      const nextMuscleId = hasOwnPreferred("muscleId") ? preferred.muscleId : selectedMuscleId;
+      const nextRoutineId = hasOwnPreferred("routineId") ? preferred.routineId : selectedRoutineId;
+      const nextAssignmentId = hasOwnPreferred("assignmentId") ? preferred.assignmentId : selectedAssignmentId;
+
       setCatalog(nextCatalog);
-      setSelectedExerciseId(preferred.exerciseId ?? selectedExerciseId ?? nextCatalog.exercises[0]?.id ?? null);
-      setSelectedRoutineId(preferred.routineId ?? selectedRoutineId ?? nextCatalog.routines[0]?.id ?? null);
-      setSelectedAssignmentId(preferred.assignmentId ?? selectedAssignmentId ?? nextCatalog.assignments[0]?.id ?? null);
+      setSelectedExerciseId(nextExerciseId && nextCatalog.exercises.some((exercise) => exercise.id === nextExerciseId) ? nextExerciseId : null);
+      setSelectedMuscleId(nextMuscleId && nextCatalog.muscles.some((muscle) => muscle.id === nextMuscleId) ? nextMuscleId : null);
+      setSelectedRoutineId(nextRoutineId && nextCatalog.routines.some((routine) => routine.id === nextRoutineId) ? nextRoutineId : null);
+      setSelectedAssignmentId(nextAssignmentId && nextCatalog.assignments.some((assignment) => assignment.id === nextAssignmentId) ? nextAssignmentId : null);
+      return nextCatalog;
     } catch (loadError) {
       setError(loadError?.message || "No se pudo cargar el modulo de entrenamiento.");
+      return null;
     } finally {
       setLoading(false);
     }
@@ -1356,52 +2159,136 @@ function TrainingView({
   }, []);
 
   useEffect(() => {
-    if (mode !== "exercises") {
-      return;
+    if (selectedExerciseId && !catalog.exercises.some((exercise) => exercise.id === selectedExerciseId)) {
+      setSelectedExerciseId(null);
+      setExerciseView("gallery");
     }
-    const fallbackId = filteredExercises[0]?.id || null;
-    const nextSelected = selectedExerciseId && catalog.exercises.some((exercise) => exercise.id === selectedExerciseId)
-      ? selectedExerciseId
-      : fallbackId;
-    if (nextSelected !== selectedExerciseId) {
-      setSelectedExerciseId(nextSelected);
-      return;
-    }
-
-    setExerciseDraft(selectedExercise ? exerciseRecordToDraft(selectedExercise) : createExerciseDraft());
-  }, [catalog.exercises, filteredExercises, mode, selectedExercise, selectedExerciseId]);
+  }, [catalog.exercises, selectedExerciseId]);
 
   useEffect(() => {
-    if (mode !== "routines") {
-      return;
+    if (selectedMuscleId && !catalog.muscles.some((muscle) => muscle.id === selectedMuscleId)) {
+      setSelectedMuscleId(null);
+      setMuscleView("gallery");
     }
-    const fallbackId = filteredRoutines[0]?.id || null;
-    const nextSelected = selectedRoutineId && catalog.routines.some((routine) => routine.id === selectedRoutineId)
-      ? selectedRoutineId
-      : fallbackId;
-    if (nextSelected !== selectedRoutineId) {
-      setSelectedRoutineId(nextSelected);
-      return;
-    }
-
-    setRoutineDraft(selectedRoutine ? routineRecordToDraft(selectedRoutine) : createRoutineDraft());
-  }, [catalog.routines, filteredRoutines, mode, selectedRoutine, selectedRoutineId]);
+  }, [catalog.muscles, selectedMuscleId]);
 
   useEffect(() => {
-    if (mode !== "assignments") {
-      return;
+    if (selectedRoutineId && !catalog.routines.some((routine) => routine.id === selectedRoutineId)) {
+      setSelectedRoutineId(null);
+      setRoutineView("gallery");
     }
-    const fallbackId = filteredAssignments[0]?.id || null;
-    const nextSelected = selectedAssignmentId && catalog.assignments.some((assignment) => assignment.id === selectedAssignmentId)
-      ? selectedAssignmentId
-      : fallbackId;
-    if (nextSelected !== selectedAssignmentId) {
-      setSelectedAssignmentId(nextSelected);
+  }, [catalog.routines, selectedRoutineId]);
+
+  useEffect(() => {
+    if (selectedAssignmentId && !catalog.assignments.some((assignment) => assignment.id === selectedAssignmentId)) {
+      setSelectedAssignmentId(null);
+      setAssignmentView("gallery");
+    }
+  }, [catalog.assignments, selectedAssignmentId]);
+
+  function hydrateExerciseDetail(exercise, nextView = "preview") {
+    if (!exercise) {
+      setSelectedExerciseId(null);
+      setExerciseDraft(createExerciseDraft());
+      setExerciseMarkdown(buildExerciseMarkdownTemplate());
+      setExerciseView("gallery");
       return;
     }
 
-    setAssignmentDraft(selectedAssignment ? createAssignmentDraft(selectedAssignment) : createAssignmentDraft());
-  }, [catalog.assignments, filteredAssignments, mode, selectedAssignment, selectedAssignmentId]);
+    setSelectedExerciseId(exercise.id);
+    setExerciseDraft(exerciseRecordToDraft(exercise));
+    setExerciseMarkdown(readTrainingDocMarkdown(
+      exercise.doc,
+      buildExerciseMarkdownTemplate({
+        title: exercise.title,
+        summary: exercise.summary || exercise.searchSummary || "",
+      }),
+    ));
+    setExerciseView(nextView);
+  }
+
+  function hydrateMuscleDetail(muscle, nextView = "preview") {
+    if (!muscle) {
+      setSelectedMuscleId(null);
+      setMuscleMarkdown("");
+      setMuscleView("gallery");
+      return;
+    }
+
+    setSelectedMuscleId(muscle.id);
+    setMuscleMarkdown(readTrainingDocMarkdown(muscle.doc, buildMuscleMarkdownTemplate(muscle)));
+    setMuscleView(nextView);
+  }
+
+  function hydrateRoutineDetail(routine, nextView = "preview") {
+    if (!routine) {
+      setSelectedRoutineId(null);
+      setRoutineDraft(createRoutineDraft());
+      setRoutineView("gallery");
+      return;
+    }
+
+    setSelectedRoutineId(routine.id);
+    setRoutineDraft(routineRecordToDraft(routine));
+    setRoutineView(nextView);
+  }
+
+  function hydrateAssignmentDetail(assignment, nextView = "edit") {
+    if (!assignment) {
+      setSelectedAssignmentId(null);
+      setAssignmentDraft(createAssignmentDraft());
+      setAssignmentView("gallery");
+      return;
+    }
+
+    setSelectedAssignmentId(assignment.id);
+    setAssignmentDraft(createAssignmentDraft(assignment));
+    setAssignmentView(nextView);
+  }
+
+  function openExercisePreviewByRecord(exercise) {
+    setMode("exercises");
+    setError("");
+    hydrateExerciseDetail(exercise, "preview");
+  }
+
+  function openExerciseEditByRecord(exercise) {
+    setMode("exercises");
+    setError("");
+    setExerciseEditorKey(createId("exercise-editor"));
+    hydrateExerciseDetail(exercise, "edit");
+  }
+
+  function openMusclePreviewByRecord(muscle) {
+    setMode("muscles");
+    setError("");
+    hydrateMuscleDetail(muscle, "preview");
+  }
+
+  function openMuscleEditByRecord(muscle) {
+    setMode("muscles");
+    setError("");
+    setMuscleEditorKey(createId("muscle-editor"));
+    hydrateMuscleDetail(muscle, "edit");
+  }
+
+  function openRoutinePreviewByRecord(routine) {
+    setMode("routines");
+    setError("");
+    hydrateRoutineDetail(routine, "preview");
+  }
+
+  function openRoutineEditByRecord(routine) {
+    setMode("routines");
+    setError("");
+    hydrateRoutineDetail(routine, "edit");
+  }
+
+  function openAssignmentEditByRecord(assignment) {
+    setMode("assignments");
+    setError("");
+    hydrateAssignmentDetail(assignment, "edit");
+  }
 
   async function handleSaveExercise() {
     const title = normalizeOptionalText(exerciseDraft.title);
@@ -1410,23 +2297,38 @@ function TrainingView({
       return;
     }
 
+    const totalPercentage = sumDraftMusclePercentages(exerciseDraft.muscleLoads || []);
+    if (totalPercentage !== 100) {
+      setError(`La distribucion muscular debe sumar 100%. Ahora suma ${totalPercentage}%.`);
+      return;
+    }
+
     try {
       const response = await invoke(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:save-exercise`, {
         id: exerciseDraft.id,
         title,
+        exerciseType: exerciseDraft.exerciseType,
+        measurementCategory: exerciseDraft.measurementCategory,
+        tags: exerciseDraft.tags,
         measurement: draftMetricToPayload(exerciseDraft.measurement, "measurement"),
         muscleLoads: exerciseDraft.muscleLoads.map((entry) => ({
           muscleId: entry.muscleId,
-          load: entry.load,
+          percentage: entry.percentage,
         })),
+        templateKey: exerciseDraft.templateKey,
+        personalDifficultyScore: normalizeOptionalText(exerciseDraft.personalDifficultyScore) == null
+          ? null
+          : Number(exerciseDraft.personalDifficultyScore),
+        docMarkdown: exerciseMarkdown,
       });
       const savedExercise = response?.exercise || null;
-      setSelectedExerciseId(savedExercise?.id || null);
-      await loadLibrary({
+      const nextCatalog = await loadLibrary({
         exerciseId: savedExercise?.id || null,
+        muscleId: selectedMuscleId,
         routineId: selectedRoutineId,
         assignmentId: selectedAssignmentId,
       });
+      openExercisePreviewByRecord(findExerciseById(nextCatalog?.exercises || [], savedExercise?.id || null));
     } catch (saveError) {
       setError(saveError?.message || "No se pudo guardar el ejercicio.");
     }
@@ -1445,8 +2347,11 @@ function TrainingView({
       await invoke(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:delete-exercise`, { id: exerciseDraft.id });
       setSelectedExerciseId(null);
       setExerciseDraft(createExerciseDraft());
+      setExerciseMarkdown(buildExerciseMarkdownTemplate());
+      setExerciseView("gallery");
       await loadLibrary({
         exerciseId: null,
+        muscleId: selectedMuscleId,
         routineId: selectedRoutineId,
         assignmentId: selectedAssignmentId,
       });
@@ -1460,6 +2365,28 @@ function TrainingView({
       await openTrainingDoc(ctx, doc);
     } catch (openError) {
       setError(openError?.message || "No se pudo abrir la nota asociada.");
+    }
+  }
+
+  async function handleSaveMuscle() {
+    if (!selectedMuscleId) {
+      return;
+    }
+
+    try {
+      await invoke(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:save-muscle-doc`, {
+        muscleId: selectedMuscleId,
+        markdown: muscleMarkdown,
+      });
+      const nextCatalog = await loadLibrary({
+        exerciseId: selectedExerciseId,
+        muscleId: selectedMuscleId,
+        routineId: selectedRoutineId,
+        assignmentId: selectedAssignmentId,
+      });
+      openMusclePreviewByRecord((nextCatalog?.muscles || []).find((muscle) => muscle.id === selectedMuscleId) || null);
+    } catch (saveError) {
+      setError(saveError?.message || "No se pudo guardar la nota del musculo.");
     }
   }
 
@@ -1500,12 +2427,13 @@ function TrainingView({
         )),
       });
       const savedRoutine = response?.routine || null;
-      setSelectedRoutineId(savedRoutine?.id || null);
-      await loadLibrary({
+      const nextCatalog = await loadLibrary({
         exerciseId: selectedExerciseId,
+        muscleId: selectedMuscleId,
         routineId: savedRoutine?.id || null,
         assignmentId: selectedAssignmentId,
       });
+      openRoutinePreviewByRecord(findRoutineById(nextCatalog?.routines || [], savedRoutine?.id || null));
     } catch (saveError) {
       setError(saveError?.message || "No se pudo guardar la rutina.");
     }
@@ -1524,8 +2452,10 @@ function TrainingView({
       await invoke(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:delete-routine`, { id: routineDraft.id });
       setSelectedRoutineId(null);
       setRoutineDraft(createRoutineDraft());
+      setRoutineView("gallery");
       await loadLibrary({
         exerciseId: selectedExerciseId,
+        muscleId: selectedMuscleId,
         routineId: null,
         assignmentId: selectedAssignmentId,
       });
@@ -1556,12 +2486,15 @@ function TrainingView({
         ...payload,
       });
       const savedAssignment = response?.assignment || null;
-      setSelectedAssignmentId(savedAssignment?.id || null);
-      await loadLibrary({
+      const nextCatalog = await loadLibrary({
         exerciseId: selectedExerciseId,
+        muscleId: selectedMuscleId,
         routineId: selectedRoutineId,
         assignmentId: savedAssignment?.id || null,
       });
+      openAssignmentEditByRecord(
+        (nextCatalog?.assignments || []).find((assignment) => assignment.id === savedAssignment?.id) || null,
+      );
     } catch (saveError) {
       setError(saveError?.message || "No se pudo guardar la rutina programada.");
     }
@@ -1580,8 +2513,10 @@ function TrainingView({
       await invoke(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:delete-assignment`, { id: assignmentDraft.id });
       setSelectedAssignmentId(null);
       setAssignmentDraft(createAssignmentDraft());
+      setAssignmentView("gallery");
       await loadLibrary({
         exerciseId: selectedExerciseId,
+        muscleId: selectedMuscleId,
         routineId: selectedRoutineId,
         assignmentId: null,
       });
@@ -1594,18 +2529,26 @@ function TrainingView({
     setMode("exercises");
     setSelectedExerciseId(null);
     setExerciseDraft(createExerciseDraft());
+    setExerciseMarkdown(buildExerciseMarkdownTemplate());
+    setExerciseEditorKey(createId("exercise-editor"));
+    setExerciseView("edit");
+    setError("");
   }
 
   function createRoutine() {
     setMode("routines");
     setSelectedRoutineId(null);
     setRoutineDraft(createRoutineDraft());
+    setRoutineView("edit");
+    setError("");
   }
 
   function createAssignment(prefill = null) {
     setMode("assignments");
     setSelectedAssignmentId(null);
     setAssignmentDraft(createAssignmentDraft(prefill));
+    setAssignmentView("edit");
+    setError("");
   }
 
   function openAssignmentFromRoutine(routine) {
@@ -1617,53 +2560,344 @@ function TrainingView({
   function activateMode(nextMode) {
     setMode(nextMode);
     setError("");
+    if (nextMode === "exercises") {
+      setExerciseView("gallery");
+    } else if (nextMode === "muscles") {
+      setMuscleView("gallery");
+    } else if (nextMode === "routines") {
+      setRoutineView("gallery");
+    } else {
+      setAssignmentView("gallery");
+    }
   }
 
-  function createItemForMode(targetMode) {
-    if (targetMode === "exercises") {
-      createExercise();
-      return;
-    }
+  function renderExerciseGallery() {
+    return (
+      <PanelStack className="trainingPlugin__detailStack">
+        <TrainingGalleryHeader
+          eyebrow="Entrenamiento"
+          title="Ejercicios"
+          countLabel={formatTrainingCount(filteredExercises.length, "ejercicio")}
+          searchValue={exerciseSearch}
+          searchPlaceholder="Buscar ejercicios"
+          onSearchChange={setExerciseSearch}
+          filters={(
+            <>
+              <InlineField label="Tipo">
+                <select value={exerciseTypeFilter} onChange={(event) => setExerciseTypeFilter(event.target.value)}>
+                  <option value="">Todos</option>
+                  {TRAINING_EXERCISE_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </InlineField>
+              <InlineField label="Perfil">
+                <select value={exerciseCategoryFilter} onChange={(event) => setExerciseCategoryFilter(event.target.value)}>
+                  <option value="">Todos</option>
+                  {TRAINING_MEASUREMENT_CATEGORY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </InlineField>
+              <InlineField label="Tag">
+                <select value={exerciseTagFilter} onChange={(event) => setExerciseTagFilter(event.target.value)}>
+                  <option value="">Todos</option>
+                  {TRAINING_EXERCISE_TAG_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </InlineField>
+            </>
+          )}
+          actions={(
+            <Button type="button" tone="primary" onClick={createExercise}>
+              <PlusIcon size={16} />
+              <span>Nuevo</span>
+            </Button>
+          )}
+        />
 
-    if (targetMode === "routines") {
-      createRoutine();
-      return;
-    }
-
-    createAssignment();
+        {filteredExercises.length ? (
+          <div className="trainingPlugin__galleryGrid">
+            {filteredExercises.map((exercise) => (
+              <TrainingGalleryCard
+                key={exercise.id}
+                title={exercise.title}
+                summary={buildTrainingExerciseSummary(exercise) || "Sin resumen"}
+                meta={buildExerciseTypeAndDifficultyMeta(exercise)}
+                active={selectedExerciseId === exercise.id}
+                onClick={() => openExercisePreviewByRecord(exercise)}
+              />
+            ))}
+          </div>
+        ) : (
+          <StateBlock centered title="Sin ejercicios" description="Crea el primero desde el boton +." />
+        )}
+      </PanelStack>
+    );
   }
 
-  const currentList = mode === "exercises"
-    ? filteredExercises
-    : mode === "routines"
-      ? filteredRoutines
-      : filteredAssignments;
-  const modeMeta = {
-    exercises: {
-      label: "Ejercicios",
-      placeholder: "Buscar ejercicios",
-      createLabel: "Nuevo ejercicio",
-      emptyTitle: "Todavia no hay ejercicios",
-    },
-    routines: {
-      label: "Rutinas",
-      placeholder: "Buscar rutinas",
-      createLabel: "Nueva rutina",
-      emptyTitle: "Todavia no hay rutinas",
-    },
-    assignments: {
-      label: "Programadas",
-      placeholder: "Buscar programadas",
-      createLabel: "Nueva programada",
-      emptyTitle: "Todavia no hay programaciones",
-    },
-  };
-  const currentModeMeta = modeMeta[mode] || modeMeta.exercises;
-  const emptyDescription = mode === "assignments" && !catalog.routines.length
-    ? "Primero crea una rutina y despues asignala."
-    : showTopbar
-      ? "Usa la accion principal para crear el primero."
-      : "Crea el primero desde este panel.";
+  function renderMuscleGallery() {
+    return (
+      <PanelStack className="trainingPlugin__detailStack">
+        <TrainingGalleryHeader
+          eyebrow="Entrenamiento"
+          title="Musculos"
+          countLabel={formatTrainingCount(filteredMuscles.length, "musculo", "musculos")}
+          searchValue={muscleSearch}
+          searchPlaceholder="Buscar musculos"
+          onSearchChange={setMuscleSearch}
+          filters={(
+            <>
+              <InlineField label="Region">
+                <select value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)}>
+                  <option value="">Todas</option>
+                  {(catalog.regions || []).map((region) => (
+                    <option key={region.id} value={region.id}>{region.title}</option>
+                  ))}
+                </select>
+              </InlineField>
+              <InlineField label="Grupo">
+                <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
+                  <option value="">Todos</option>
+                  {visibleGroupOptions.map((group) => (
+                    <option key={group.id} value={group.id}>{group.title}</option>
+                  ))}
+                </select>
+              </InlineField>
+            </>
+          )}
+        />
+
+        {filteredMuscles.length ? (
+          <div className="trainingPlugin__galleryGrid">
+            {filteredMuscles.map((muscle) => (
+              <TrainingGalleryCard
+                key={muscle.id}
+                title={muscle.title}
+                summary={[muscle.groupTitle, muscle.regionTitle].filter(Boolean).join(" - ")}
+                meta={buildMuscleMaxLoadSummary(muscle.id, muscleMaxLoadLookup)}
+                active={selectedMuscleId === muscle.id}
+                onClick={() => openMusclePreviewByRecord(muscle)}
+              />
+            ))}
+          </div>
+        ) : (
+          <StateBlock centered title="Sin musculos" description="Ajusta la busqueda o los filtros." />
+        )}
+      </PanelStack>
+    );
+  }
+
+  function renderRoutineGallery() {
+    return (
+      <PanelStack className="trainingPlugin__detailStack">
+        <TrainingGalleryHeader
+          eyebrow="Entrenamiento"
+          title="Rutinas"
+          countLabel={formatTrainingCount(filteredRoutines.length, "rutina")}
+          searchValue={routineSearch}
+          searchPlaceholder="Buscar rutinas"
+          onSearchChange={setRoutineSearch}
+          actions={(
+            <Button type="button" tone="primary" onClick={createRoutine}>
+              <PlusIcon size={16} />
+              <span>Nuevo</span>
+            </Button>
+          )}
+        />
+
+        {filteredRoutines.length ? (
+          <div className="trainingPlugin__galleryGrid">
+            {filteredRoutines.map((routine) => (
+              <TrainingGalleryCard
+                key={routine.id}
+                title={routine.title}
+                summary={routine.searchSummary || routine.summary || buildTrainingRoutineSummary(routine)}
+                active={selectedRoutineId === routine.id}
+                onClick={() => openRoutinePreviewByRecord(routine)}
+              />
+            ))}
+          </div>
+        ) : (
+          <StateBlock centered title="Sin rutinas" description="Crea la primera desde el boton +." />
+        )}
+      </PanelStack>
+    );
+  }
+
+  function renderAssignmentGallery() {
+    return (
+      <PanelStack className="trainingPlugin__detailStack">
+        <TrainingGalleryHeader
+          eyebrow="Entrenamiento"
+          title="Programadas"
+          countLabel={formatTrainingCount(filteredAssignments.length, "programada")}
+          searchValue={assignmentSearch}
+          searchPlaceholder="Buscar programadas"
+          onSearchChange={setAssignmentSearch}
+          actions={(
+            <Button type="button" tone="primary" onClick={() => createAssignment()}>
+              <PlusIcon size={16} />
+              <span>Nueva</span>
+            </Button>
+          )}
+        />
+
+        {filteredAssignments.length ? (
+          <div className="trainingPlugin__galleryGrid">
+            {filteredAssignments.map((assignment) => (
+              <TrainingGalleryCard
+                key={assignment.id}
+                title={assignment.routine?.title || "Rutina programada"}
+                summary={assignment.searchSummary || assignment.status || "Sin resumen"}
+                meta={assignment.status === "archived" ? "Archivada" : "Activa"}
+                active={selectedAssignmentId === assignment.id}
+                onClick={() => openAssignmentEditByRecord(assignment)}
+              />
+            ))}
+          </div>
+        ) : (
+          <StateBlock
+            centered
+            title="Sin programadas"
+            description={catalog.routines.length ? "Crea una programacion nueva cuando la necesites." : "Primero crea una rutina."}
+          />
+        )}
+      </PanelStack>
+    );
+  }
+
+  function renderModeContent() {
+    if (mode === "exercises") {
+      if (exerciseView === "preview") {
+        return (
+          <ExercisePreview
+            exercise={selectedExercise}
+            markdown={exerciseMarkdown}
+            onBack={() => setExerciseView("gallery")}
+            onEdit={() => openExerciseEditByRecord(selectedExercise)}
+            onOpenDoc={handleOpenDoc}
+          />
+        );
+      }
+
+      if (exerciseView === "edit") {
+        return (
+          <ExerciseEditor
+            selectedExercise={selectedExercise}
+            exerciseDraft={exerciseDraft}
+            setExerciseDraft={setExerciseDraft}
+            exerciseMarkdown={exerciseMarkdown}
+            setExerciseMarkdown={setExerciseMarkdown}
+            editorKey={exerciseEditorKey}
+            handleSaveExercise={handleSaveExercise}
+            handleDeleteExercise={handleDeleteExercise}
+            handleOpenDoc={handleOpenDoc}
+            onCancel={() => {
+              if (selectedExercise?.id) {
+                openExercisePreviewByRecord(selectedExercise);
+                return;
+              }
+              setExerciseView("gallery");
+            }}
+            catalog={catalog}
+            muscleSearch={muscleSearch}
+            setMuscleSearch={setMuscleSearch}
+            regionFilter={regionFilter}
+            setRegionFilter={setRegionFilter}
+            groupFilter={groupFilter}
+            setGroupFilter={setGroupFilter}
+          />
+        );
+      }
+
+      return renderExerciseGallery();
+    }
+
+    if (mode === "muscles") {
+      if (muscleView === "preview") {
+        return (
+          <MusclePreview
+            muscle={selectedMuscle}
+            markdown={muscleMarkdown}
+            onBack={() => setMuscleView("gallery")}
+            onEdit={() => openMuscleEditByRecord(selectedMuscle)}
+            onOpenDoc={handleOpenDoc}
+          />
+        );
+      }
+
+      if (muscleView === "edit") {
+        return (
+          <MuscleEditor
+            muscle={selectedMuscle}
+            markdown={muscleMarkdown}
+            editorKey={muscleEditorKey}
+            onChangeMarkdown={setMuscleMarkdown}
+            onCancel={() => openMusclePreviewByRecord(selectedMuscle)}
+            onSave={handleSaveMuscle}
+            onOpenDoc={handleOpenDoc}
+          />
+        );
+      }
+
+      return renderMuscleGallery();
+    }
+
+    if (mode === "routines") {
+      if (routineView === "preview") {
+        return (
+          <RoutinePreview
+            routine={selectedRoutine}
+            exercises={catalog.exercises}
+            onBack={() => setRoutineView("gallery")}
+            onEdit={() => openRoutineEditByRecord(selectedRoutine)}
+            onAssign={openAssignmentFromRoutine}
+          />
+        );
+      }
+
+      if (routineView === "edit") {
+        return (
+          <RoutineEditor
+            selectedRoutine={selectedRoutine}
+            routineDraft={routineDraft}
+            setRoutineDraft={setRoutineDraft}
+            catalog={catalog}
+            handleSaveRoutine={handleSaveRoutine}
+            handleDeleteRoutine={handleDeleteRoutine}
+            openAssignmentFromRoutine={openAssignmentFromRoutine}
+            onCancel={() => {
+              if (selectedRoutine?.id) {
+                openRoutinePreviewByRecord(selectedRoutine);
+                return;
+              }
+              setRoutineView("gallery");
+            }}
+          />
+        );
+      }
+
+      return renderRoutineGallery();
+    }
+
+    if (assignmentView === "edit") {
+      return (
+        <AssignmentEditor
+          selectedAssignment={selectedAssignment}
+          assignmentDraft={assignmentDraft}
+          setAssignmentDraft={setAssignmentDraft}
+          routines={catalog.routines}
+          handleSaveAssignment={handleSaveAssignment}
+          handleDeleteAssignment={handleDeleteAssignment}
+          onCancel={() => setAssignmentView("gallery")}
+        />
+      );
+    }
+
+    return renderAssignmentGallery();
+  }
 
   const pageContent = (
     <>
@@ -1672,172 +2906,28 @@ function TrainingView({
           <WorkspaceTitle
             eyebrow="Life Tracker"
             title="Entrenamientos"
-            description="Catalogo anatomico interno, rutinas con bloques y programacion compacta."
+            
           />
 
           <ToolbarActions>
-            <SegmentedControl
-              className="trainingPlugin__modeTabs"
-              ariaLabel="Modo de entrenamientos"
-              options={[
-                { value: "exercises", label: "Ejercicios" },
-                { value: "routines", label: "Rutinas" },
-                { value: "assignments", label: "Programadas" },
-              ]}
-              value={mode}
-              onChange={setMode}
-            />
-            <Button type="button" onClick={() => loadLibrary()}>
+            <Button type="button" onClick={() => void loadLibrary()}>
               <RefreshIcon size={16} />
               <span>Refrescar</span>
-            </Button>
-            <Button
-              type="button"
-              tone="primary"
-              onClick={() => {
-                if (mode === "exercises") {
-                  createExercise();
-                } else if (mode === "routines") {
-                  createRoutine();
-                } else {
-                  createAssignment();
-                }
-              }}
-            >
-              <PlusIcon size={16} />
-              <span>{mode === "exercises" ? "Nuevo ejercicio" : mode === "routines" ? "Nueva rutina" : "Nueva programacion"}</span>
             </Button>
           </ToolbarActions>
         </WorkspaceTopbar>
       ) : null}
 
       <WorkspaceBody className="trainingPlugin__body">
-        <SplitLayout className="trainingPlugin__content" variant="sidebar-detail">
-          <SplitSidebar className="trainingPlugin__sidebar">
-            <SectionPanel className="trainingPlugin__sidebarPanel">
-              <Field label="Buscar" wide>
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={currentModeMeta.placeholder}
-                />
-              </Field>
-
-              {isEmbedded ? (
-                <div className="trainingPlugin__sidebarFolders">
-                  <button
-                    type="button"
-                    className={`trainingPlugin__folderCard ${mode === "exercises" ? "is-active" : ""}`}
-                    onClick={() => activateMode("exercises")}
-                  >
-                    <span className="trainingPlugin__folderEyebrow">Carpeta</span>
-                    <strong>Ejercicios</strong>
-                    <span>{catalog.exercises.length} registros</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`trainingPlugin__folderCard ${mode === "routines" ? "is-active" : ""}`}
-                    onClick={() => activateMode("routines")}
-                  >
-                    <span className="trainingPlugin__folderEyebrow">Carpeta</span>
-                    <strong>Rutinas</strong>
-                    <span>{catalog.routines.length} registros</span>
-                  </button>
-                  <div className="trainingPlugin__folderAux">
-                    <button
-                      type="button"
-                      className={`trainingPlugin__folderLink ${mode === "assignments" ? "is-active" : ""}`}
-                      onClick={() => activateMode("assignments")}
-                    >
-                      <span>Programadas</span>
-                      <strong>{catalog.assignments.length}</strong>
-                    </button>
-                    <button
-                      type="button"
-                      className="trainingPlugin__folderGhostButton"
-                      onClick={() => loadLibrary()}
-                    >
-                      Refrescar
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="trainingPlugin__list">
-                <div className="trainingPlugin__listHeader">
-                  <div className="trainingPlugin__listHeaderCopy">
-                    <strong>{currentModeMeta.label}</strong>
-                    <span>{currentList.length} registros</span>
-                  </div>
-                  {!showTopbar ? (
-                    <button
-                      type="button"
-                      className="trainingPlugin__listAction"
-                      onClick={() => createItemForMode(mode)}
-                    >
-                      <PlusIcon size={14} />
-                      <span>{currentModeMeta.createLabel}</span>
-                    </button>
-                  ) : null}
-                </div>
-
-                {mode === "exercises" ? filteredExercises.map((exercise) => (
-                  <button
-                    key={exercise.id}
-                    type="button"
-                    className={`trainingPlugin__listCard ${selectedExerciseId === exercise.id ? "is-active" : ""}`}
-                    onClick={() => {
-                      activateMode("exercises");
-                      setSelectedExerciseId(exercise.id);
-                    }}
-                  >
-                    <span className="trainingPlugin__listCardTitle">{exercise.title}</span>
-                    <span className="trainingPlugin__listCardSummary">{exercise.searchSummary || "Sin unidad definida"}</span>
-                  </button>
-                )) : null}
-
-                {mode === "routines" ? filteredRoutines.map((routine) => (
-                  <button
-                    key={routine.id}
-                    type="button"
-                    className={`trainingPlugin__listCard ${selectedRoutineId === routine.id ? "is-active" : ""}`}
-                    onClick={() => {
-                      activateMode("routines");
-                      setSelectedRoutineId(routine.id);
-                    }}
-                  >
-                    <span className="trainingPlugin__listCardTitle">{routine.title}</span>
-                    <span className="trainingPlugin__listCardSummary">{routine.searchSummary || routine.summary || "Sin pasos definidos"}</span>
-                  </button>
-                )) : null}
-
-                {mode === "assignments" ? filteredAssignments.map((assignment) => (
-                  <button
-                    key={assignment.id}
-                    type="button"
-                    className={`trainingPlugin__listCard ${selectedAssignmentId === assignment.id ? "is-active" : ""}`}
-                    onClick={() => {
-                      activateMode("assignments");
-                      setSelectedAssignmentId(assignment.id);
-                    }}
-                  >
-                    <span className="trainingPlugin__listCardTitle">{assignment.routine?.title || "Rutina programada"}</span>
-                    <span className="trainingPlugin__listCardSummary">{assignment.searchSummary}</span>
-                  </button>
-                )) : null}
-
-                {!currentList.length ? (
-                  <StateBlock
-                    className="trainingPlugin__empty"
-                    centered
-                    eyebrow="Sin datos"
-                    title={currentModeMeta.emptyTitle}
-                    description={emptyDescription}
-                  />
-                ) : null}
-              </div>
-            </SectionPanel>
+        <SplitLayout className="trainingPlugin__content trainingPlugin__content--compact" variant="sidebar-detail">
+          <SplitSidebar className="trainingPlugin__rail">
+            <TrainingSectionRail
+              mode={mode}
+              catalog={catalog}
+              onChange={activateMode}
+              onRefresh={() => loadLibrary()}
+              showRefresh={!showTopbar || isEmbedded}
+            />
           </SplitSidebar>
 
           <SplitDetail className="trainingPlugin__detail">
@@ -1847,51 +2937,9 @@ function TrainingView({
               {loading ? (
                 <StateBlock
                   eyebrow="Cargando"
-                  title="Estamos leyendo entrenamiento"
-                  description="Enseguida veras ejercicios, rutinas y programaciones."
+                  title="Cargando entrenamiento"
                 />
-              ) : null}
-
-              {!loading && mode === "exercises" ? (
-                <ExerciseEditor
-                  selectedExercise={selectedExercise}
-                  exerciseDraft={exerciseDraft}
-                  setExerciseDraft={setExerciseDraft}
-                  handleSaveExercise={handleSaveExercise}
-                  handleDeleteExercise={handleDeleteExercise}
-                  handleOpenDoc={handleOpenDoc}
-                  catalog={catalog}
-                  muscleSearch={muscleSearch}
-                  setMuscleSearch={setMuscleSearch}
-                  regionFilter={regionFilter}
-                  setRegionFilter={setRegionFilter}
-                  groupFilter={groupFilter}
-                  setGroupFilter={setGroupFilter}
-                />
-              ) : null}
-
-              {!loading && mode === "routines" ? (
-                <RoutineEditor
-                  selectedRoutine={selectedRoutine}
-                  routineDraft={routineDraft}
-                  setRoutineDraft={setRoutineDraft}
-                  catalog={catalog}
-                  handleSaveRoutine={handleSaveRoutine}
-                  handleDeleteRoutine={handleDeleteRoutine}
-                  openAssignmentFromRoutine={openAssignmentFromRoutine}
-                />
-              ) : null}
-
-              {!loading && mode === "assignments" ? (
-                <AssignmentEditor
-                  selectedAssignment={selectedAssignment}
-                  assignmentDraft={assignmentDraft}
-                  setAssignmentDraft={setAssignmentDraft}
-                  routines={catalog.routines}
-                  handleSaveAssignment={handleSaveAssignment}
-                  handleDeleteAssignment={handleDeleteAssignment}
-                />
-              ) : null}
+              ) : renderModeContent()}
             </ScrollRegion>
           </SplitDetail>
         </SplitLayout>
@@ -1911,3 +2959,4 @@ function TrainingView({
 }
 
 export default TrainingView;
+

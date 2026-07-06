@@ -27,6 +27,16 @@ export function HabitosIcon() {
   );
 }
 
+export function ClockIcon() {
+  return (
+    <BaseIcon>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 8v4.5" />
+      <path d="m12 12.5 3 1.75" />
+    </BaseIcon>
+  );
+}
+
 export function PlusIcon() {
   return (
     <BaseIcon>
