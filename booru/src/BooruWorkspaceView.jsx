@@ -32,6 +32,7 @@ import {
   WorkspaceBody,
   WorkspacePage,
 } from "../../../nexus-frontend/src/ui/index.js";
+import { parseBooruSearchSyntax } from "./booru-utils.js";
 
 const { clipboard, ipcRenderer, nativeImage, shell } = window.require("electron");
 const { pathToFileURL } = window.require("url");
@@ -74,19 +75,24 @@ const ENTITY_PROFILE_TAB_OPTIONS = [
   { value: "gallery", label: "Galeria" },
   { value: "data", label: "Datos" },
 ];
-const QUICK_FILTER_OPTIONS = [
+const CLASSIFICATION_SIDEBAR_SECTIONS = new Set(["media", "pending"]);
+const MEDIA_FILTER_OPTIONS = [
   { value: "all", label: "Todo" },
-  { value: "unclassified", label: "Sin clasificar" },
   { value: "image", label: "Image" },
   { value: "video", label: "Video" },
   { value: "gif", label: "GIF" },
 ];
-const QUICK_ASSIGN_KIND_OPTIONS = [
-  { value: "author", label: "Persona" },
-  { value: "character", label: "Characters" },
-  { value: "artist", label: "Artists" },
-  { value: "universe", label: "Universes" },
+const REALITY_FILTER_OPTIONS = [
+  { value: "all", label: "Cualquiera" },
+  { value: "real", label: "Real" },
+  { value: "ficticio", label: "Ficticio" },
 ];
+const PENDING_MODE_OPTIONS = [
+  { value: "essential", label: "Esencial" },
+  { value: "tags", label: "Tags" },
+];
+const RECOMMENDATION_PAGE_SIZE = 24;
+const NO_MISSING_FILTER = "none";
 const BOORU_RESOURCE_DND_TYPE = "nexus.booru.resource-card";
 const RESOURCE_PAGE_SIZE = 42;
 const RESOURCE_GRID_COLUMNS = 6;
@@ -100,6 +106,12 @@ const EMPTY_SELECTION_STATE = Object.freeze({
   ids: Object.freeze([]),
   activeId: "",
   mode: "single",
+});
+const DRAFT_ENTITY_FIELD_BY_KIND = Object.freeze({
+  author: "authors",
+  artist: "artists",
+  character: "characters",
+  universe: "universes",
 });
 const RESOURCE_PAGE_SECTIONS = {
   media: { page: 1, querySignature: "" },
@@ -587,6 +599,243 @@ function getEntityFilterChipLabel(filter) {
   const kindLabel = BOORU_ENTITY_KIND_LABELS[String(filter?.kind || "")] || "Entidad";
   const baseLabel = String(filter?.label || "").trim() || kindLabel;
   return `${kindLabel}: ${baseLabel}`;
+}
+
+function getSelectionChipKindClass(kind) {
+  const normalizedKind = String(kind || "").trim();
+  return normalizedKind ? `booruView__selectionChip--${normalizedKind}` : "";
+}
+
+function getMissingFilterChipClass(value) {
+  if (value === "author") {
+    return getSelectionChipKindClass("author");
+  }
+
+  if (value === "artist") {
+    return getSelectionChipKindClass("artist");
+  }
+
+  if (value === "character") {
+    return getSelectionChipKindClass("character");
+  }
+
+  if (value === "universe") {
+    return getSelectionChipKindClass("universe");
+  }
+
+  if (value === "type") {
+    return "booruView__selectionChip--reality";
+  }
+
+  return "";
+}
+
+function buildResourceQueryTokenLabel(token) {
+  if (!token) {
+    return "";
+  }
+
+  if (token.type === "entity") {
+    const kindLabel = BOORU_ENTITY_KIND_LABELS[String(token.kind || "")] || "Entidad";
+    return `${token.negative ? "No " : ""}${kindLabel}: ${token.value}`;
+  }
+
+  if (token.type === "tag") {
+    return `${token.negative ? "No " : ""}Tag: ${token.value}`;
+  }
+
+  if (token.type === "reality") {
+    return `Tipo: ${BOORU_REALITY_LABELS[token.value] || token.value}`;
+  }
+
+  if (token.type === "media-kind") {
+    return `Media: ${BOORU_MEDIA_KIND_LABELS[token.value] || token.value}`;
+  }
+
+  if (token.type === "classification-state") {
+    return token.value === "unclassified" ? "Sin clasificar" : String(token.value || "");
+  }
+
+  if (token.type === "missing") {
+    if (token.value === "type") {
+      return "Sin tipo";
+    }
+
+    if (token.value === "author") {
+      return "Sin persona";
+    }
+
+    if (token.value === "artist") {
+      return "Sin artist";
+    }
+
+    if (token.value === "character") {
+      return "Sin char";
+    }
+
+    return "Sin universe";
+  }
+
+  return String(token.value || token.raw || "").trim();
+}
+
+function removeStructuredQueryToken(value, tokenRaw) {
+  const normalizedTokenRaw = String(tokenRaw || "").trim();
+
+  if (!normalizedTokenRaw) {
+    return String(value || "").trim();
+  }
+
+  const currentTokens = String(value || "")
+    .match(/"([^"\\]|\\.)*"|[^\s]+/g) || [];
+  let removed = false;
+
+  return currentTokens
+    .filter((token) => {
+      if (!removed && token === normalizedTokenRaw) {
+        removed = true;
+        return false;
+      }
+
+      return true;
+    })
+    .join(" ")
+    .trim();
+}
+
+function buildResourceQuery({
+  parsedSearch,
+  pinnedEntityFilters = [],
+  mediaKindFilter = "all",
+  realityFilter = "all",
+  pendingMode = "essential",
+  missingFilter = NO_MISSING_FILTER,
+}) {
+  const searchQuery = parsedSearch?.query || {};
+  return {
+    text: searchQuery.text || null,
+    mediaKind: mediaKindFilter !== "all" ? mediaKindFilter : (searchQuery.mediaKind || null),
+    reality: realityFilter !== "all" ? realityFilter : (searchQuery.reality || null),
+    classificationState: searchQuery.classificationState || null,
+    pendingMode: pendingMode === "tags" ? "tags" : "essential",
+    includeEntities: [
+      ...(Array.isArray(searchQuery.includeEntities) ? searchQuery.includeEntities : []),
+      ...normalizeResourceEntityFilters(pinnedEntityFilters),
+    ],
+    excludeEntities: Array.isArray(searchQuery.excludeEntities) ? searchQuery.excludeEntities : [],
+    includeTags: Array.isArray(searchQuery.includeTags) ? searchQuery.includeTags : [],
+    excludeTags: Array.isArray(searchQuery.excludeTags) ? searchQuery.excludeTags : [],
+    missing: missingFilter !== NO_MISSING_FILTER ? missingFilter : (searchQuery.missing || null),
+  };
+}
+
+function getContextualMissingFilterOptions(realityValue) {
+  const options = [{ value: NO_MISSING_FILTER, label: "Ninguno" }];
+
+  if (realityValue === "real") {
+    options.push({ value: "author", label: "Sin persona" });
+    return options;
+  }
+
+  if (realityValue === "ficticio") {
+    options.push(
+      { value: "character", label: "Sin char" },
+      { value: "artist", label: "Sin artist" },
+      { value: "universe", label: "Sin universe" },
+    );
+    return options;
+  }
+
+  options.push({ value: "type", label: "Sin tipo" });
+  return options;
+}
+
+function getResourceQueryTokenClass(token) {
+  if (token?.type === "entity") {
+    return getSelectionChipKindClass(token.kind);
+  }
+
+  if (token?.type === "reality") {
+    return "booruView__selectionChip--reality";
+  }
+
+  if (token?.type === "missing") {
+    return getMissingFilterChipClass(token.value);
+  }
+
+  return "";
+}
+
+function getRecommendationItemKindClass(item) {
+  if (item?.type === "entity") {
+    return getSelectionChipKindClass(item.kind);
+  }
+
+  if (item?.type === "create-entity") {
+    return getSelectionChipKindClass(item.kind);
+  }
+
+  if (item?.type === "reality-action") {
+    return "booruView__selectionChip--reality";
+  }
+
+  return "";
+}
+
+function getRecommendationKindBadgeLabel(item) {
+  if (item?.type === "reality-action") {
+    return "R";
+  }
+
+  if (item?.type === "tag" || item?.type === "create-tag") {
+    return "T";
+  }
+
+  if (item?.kind === "author") {
+    return "P";
+  }
+
+  if (item?.kind === "artist") {
+    return "A";
+  }
+
+  if (item?.kind === "character") {
+    return "C";
+  }
+
+  if (item?.kind === "universe") {
+    return "U";
+  }
+
+  return "?";
+}
+
+function getRecommendationKindTooltip(item) {
+  if (item?.type === "reality-action") {
+    return "Realidad";
+  }
+
+  if (item?.type === "tag" || item?.type === "create-tag") {
+    return "Tag";
+  }
+
+  if (item?.kind === "author") {
+    return "Persona";
+  }
+
+  if (item?.kind === "artist") {
+    return "Artist";
+  }
+
+  if (item?.kind === "character") {
+    return "Character";
+  }
+
+  if (item?.kind === "universe") {
+    return "Universe";
+  }
+
+  return "";
 }
 
 function normalizeEntityProfileInput(value, sectionKind = null) {
@@ -2257,7 +2506,7 @@ function TagAutocompleteField({
   );
 }
 
-function QuickAssignDropTarget({
+function RecommendationEntityDropTarget({
   item,
   kind,
   manualAssignResourceIds = [],
@@ -2265,7 +2514,9 @@ function QuickAssignDropTarget({
   dropDisabled = false,
   manualAssignDisabled = false,
   assigning = false,
+  actionLabel = "Aplicar",
   onAssign,
+  onApply,
 }) {
   const normalizedManualAssignResourceIds = useMemo(
     () => uniqueIds(manualAssignResourceIds),
@@ -2346,19 +2597,23 @@ function QuickAssignDropTarget({
     dropRef(node);
   }, [dropRef]);
 
+  const kindTooltip = getRecommendationKindTooltip(item);
+
   return (
     <div
       ref={handleDropRef}
       className={[
         "booruView__suggestion",
+        "booruView__recommendationCard",
+        "booruView__recommendationCard--entity",
         "booruView__suggestion--dropTarget",
         isOver && canDrop ? "is-drop-target" : "",
         customDragMatch ? "is-drop-target" : "",
       ].filter(Boolean).join(" ")}
       data-booru-quick-assign-target="true"
       data-booru-kind={kind}
-      data-booru-entity-id={item.id}
-      data-booru-label={item.displayName}
+      data-booru-entity-id={item.entityId || item.id}
+      data-booru-label={item.label || item.displayName}
       onDragEnterCapture={() => {
         booruViewLogger.debug(
           "booru.dnd.native.enter",
@@ -2397,196 +2652,255 @@ function QuickAssignDropTarget({
         );
       }}
     >
-      <div className="booruView__quickAssignCopy">
-        <span>{item.displayName}</span>
-        <small>{item.resourceCount} recursos</small>
+      <div className="booruView__recommendationCopy">
+        <span>{item.label || item.displayName}</span>
+        <small>{item.detail || `${item.resourceCount || 0} recursos`}</small>
       </div>
-      <Button
-        type="button"
-        onClick={() => void onAssign?.({
-          resourceIds: normalizedManualAssignResourceIds,
-          kind,
-          entityId: item.id,
-        })}
-        disabled={manualAssignDisabled || assigning || !normalizedManualAssignResourceIds.length}
-      >
-        Asignar
-      </Button>
+      <div className="booruView__recommendationActions">
+        <RecommendationKindBadge
+          item={item}
+          className={getRecommendationItemKindClass(item)}
+          tooltip={kindTooltip}
+        />
+        <Button
+          type="button"
+          onClick={() => void onApply?.(item)}
+          disabled={manualAssignDisabled || assigning || !normalizedManualAssignResourceIds.length}
+        >
+          {actionLabel}
+        </Button>
+      </div>
     </div>
   );
 }
 
-function QuickAssignPanel({
+function RecommendationKindBadge({
+  item,
+  tooltip = "",
+  className = "",
+}) {
+  const [visible, setVisible] = useState(false);
+  const hoverTimerRef = useRef(null);
+  const clearHoverTimer = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  }, []);
+  const startTooltipTimer = useCallback(() => {
+    clearHoverTimer();
+
+    if (!tooltip) {
+      return;
+    }
+
+    hoverTimerRef.current = setTimeout(() => {
+      setVisible(true);
+    }, 1000);
+  }, [clearHoverTimer, tooltip]);
+  const stopTooltip = useCallback(() => {
+    clearHoverTimer();
+    setVisible(false);
+  }, [clearHoverTimer]);
+
+  useEffect(() => () => {
+    clearHoverTimer();
+  }, [clearHoverTimer]);
+
+  return (
+    <span
+      className={[
+        "booruView__selectionChip",
+        "booruView__selectionChip--kindBadge",
+        className,
+      ].filter(Boolean).join(" ")}
+      aria-label={tooltip || undefined}
+      onMouseEnter={startTooltipTimer}
+      onMouseLeave={stopTooltip}
+    >
+      <span>{getRecommendationKindBadgeLabel(item)}</span>
+      {visible && tooltip ? (
+        <span className="booruView__kindTooltip" role="tooltip">
+          {tooltip}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function RecommendationPanel({
   selectedResourceIds = [],
   customDragState = null,
   manualAssignDisabledReason = "",
   assigning = false,
   revisionKey = 0,
-  onAssign,
+  resourceQuery = null,
+  draft = null,
+  onAssignEntity,
+  onApplyRecommendation,
 }) {
-  const [kind, setKind] = useState("author");
   const [query, setQuery] = useState("");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const normalizedSelectedResourceIds = Array.isArray(selectedResourceIds) ? selectedResourceIds.filter(Boolean) : [];
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const selectedResourceIdsSignature = JSON.stringify(Array.isArray(selectedResourceIds) ? selectedResourceIds.filter(Boolean) : []);
+  const normalizedSelectedResourceIds = useMemo(
+    () => uniqueIds(selectedResourceIds),
+    [selectedResourceIdsSignature],
+  );
   const selectionCount = normalizedSelectedResourceIds.length;
   const manualAssignDisabled = Boolean(manualAssignDisabledReason) || assigning || !selectionCount;
   const searchDisabled = assigning;
   const showBlockingLoading = loading && items.length === 0;
+  const listRef = useRef(null);
+  const requestVersionRef = useRef(0);
+  const deferredQuery = useDeferredValue(query);
+  const draftSignature = JSON.stringify({
+    reality: draft?.reality || null,
+    authors: summarizeIdsForLog(draft?.authors),
+    artists: summarizeIdsForLog(draft?.artists),
+    characters: summarizeIdsForLog(draft?.characters),
+    universes: summarizeIdsForLog(draft?.universes),
+    manualTags: summarizeIdsForLog(draft?.manualTags),
+  });
+  const resourceQuerySignature = JSON.stringify(resourceQuery || {});
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadRecommendations = useCallback(async ({
+    append = false,
+    requestedOffset = 0,
+  } = {}) => {
     const startedAt = performance.now();
+    requestVersionRef.current += 1;
+    const requestVersion = requestVersionRef.current;
     setLoading(true);
+
     booruViewLogger.debug(
-      "booru.quick-assign.targets.start",
-      "Booru inicio la carga de destinos rapidos.",
+      "booru.recommendations.start",
+      "Booru inicio la carga del recomendador unificado.",
       {
-        kind,
-        query: String(query || "").trim() || null,
+        append,
+        query: String(deferredQuery || "").trim() || null,
+        requestedOffset,
         revisionKey,
         selectedResourceIds: normalizedSelectedResourceIds.slice(0, 12),
         selectedCount: selectionCount,
       },
     );
 
-    void invoke("booru:list-entities", {
-      kind,
-      query: String(query || "").trim() || null,
-    })
-      .then((data) => {
-        if (cancelled) {
-          return;
-        }
-
-        setItems(Array.isArray(data?.items) ? data.items.slice(0, 12) : []);
-        setError("");
-        logRendererDuration(
-          "booru.quick-assign.targets.done",
-          "Booru resolvio los destinos rapidos.",
-          performance.now() - startedAt,
-          {
-            kind,
-            query: String(query || "").trim() || null,
-            revisionKey,
-            selectedResourceIds: normalizedSelectedResourceIds.slice(0, 12),
-            selectedCount: selectionCount,
-            itemCount: Array.isArray(data?.items) ? data.items.length : 0,
-            sampleIds: summarizeIdsForLog(data?.items),
-          },
-        );
-      })
-      .catch((loadError) => {
-        if (cancelled) {
-          return;
-        }
-
-        setItems([]);
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "No se pudieron cargar los destinos rapidos.",
-        );
-        booruViewLogger.info(
-          "booru.quick-assign.targets.error",
-          "Booru no pudo cargar los destinos rapidos.",
-          {
-            kind,
-            query: String(query || "").trim() || null,
-            revisionKey,
-            selectedResourceIds: normalizedSelectedResourceIds.slice(0, 12),
-            selectedCount: selectionCount,
-            durationMs: Number((performance.now() - startedAt).toFixed(2)),
-            error: loadError instanceof Error ? loadError.message : String(loadError || ""),
-          },
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
+    try {
+      const data = await invoke("booru:list-recommendations", {
+        query: String(deferredQuery || "").trim() || null,
+        resourceQuery,
+        selectedResourceIds: normalizedSelectedResourceIds,
+        draft,
+        offset: requestedOffset,
+        limit: RECOMMENDATION_PAGE_SIZE,
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [kind, query, revisionKey]);
+      if (requestVersionRef.current !== requestVersion) {
+        return;
+      }
+
+      const nextItems = Array.isArray(data?.items) ? data.items : [];
+      setItems((currentValue) => (append ? [...currentValue, ...nextItems] : nextItems));
+      setTotalCount(Number(data?.totalCount || 0));
+      setHasMore(Boolean(data?.hasMore));
+      setError("");
+      logRendererDuration(
+        "booru.recommendations.done",
+        "Booru resolvio la carga del recomendador.",
+        performance.now() - startedAt,
+        {
+          append,
+          query: String(deferredQuery || "").trim() || null,
+          requestedOffset,
+          itemCount: nextItems.length,
+          totalCount: Number(data?.totalCount || 0),
+          hasMore: Boolean(data?.hasMore),
+          sampleIds: summarizeIdsForLog(nextItems),
+        },
+      );
+    } catch (loadError) {
+      if (requestVersionRef.current !== requestVersion) {
+        return;
+      }
+
+      if (!append) {
+        setItems([]);
+      }
+      setTotalCount(0);
+      setHasMore(false);
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "No se pudieron cargar las recomendaciones.",
+      );
+      booruViewLogger.info(
+        "booru.recommendations.error",
+        "Booru no pudo cargar el recomendador unificado.",
+        {
+          query: String(deferredQuery || "").trim() || null,
+          requestedOffset,
+          durationMs: Number((performance.now() - startedAt).toFixed(2)),
+          error: loadError instanceof Error ? loadError.message : String(loadError || ""),
+        },
+      );
+    } finally {
+      if (requestVersionRef.current === requestVersion) {
+        setLoading(false);
+      }
+    }
+  }, [deferredQuery, draft, normalizedSelectedResourceIds, resourceQuery, revisionKey, selectionCount]);
+
+  useEffect(() => {
+    void loadRecommendations({ append: false, requestedOffset: 0 });
+  }, [draftSignature, loadRecommendations, resourceQuerySignature]);
 
   useEffect(() => {
     setHighlightedIndex(items.length ? 0 : -1);
   }, [items, query]);
 
-  const handleAssignEntity = async (resourceIds, entityId) => {
-    const nextResourceIds = Array.isArray(resourceIds) ? resourceIds.filter(Boolean) : [];
-
-    if (!nextResourceIds.length || !entityId || manualAssignDisabled) {
+  const handleTriggerItem = async (item) => {
+    if (!item || manualAssignDisabled) {
       return;
     }
-
-    await onAssign?.({
-      resourceIds: nextResourceIds,
-      kind,
-      entityId,
-    });
-  };
-
-  const handleEnsureEntity = async () => {
-    const trimmedQuery = String(query || "").trim();
-
-    if (!trimmedQuery || manualAssignDisabled) {
-      return;
-    }
-
-    const exactExisting = findExactEntityMatch(items, trimmedQuery);
-
-    if (exactExisting) {
-      await handleAssignEntity(normalizedSelectedResourceIds, exactExisting.id);
-      setQuery("");
-      return;
-    }
-
-    setLoading(true);
 
     try {
-      const result = await invoke("booru:ensure-entity", { kind, name: trimmedQuery });
-      await handleAssignEntity(normalizedSelectedResourceIds, result?.entity?.id);
+      await onApplyRecommendation?.(item);
       setQuery("");
       setError("");
-    } catch (ensureError) {
+    } catch (applyError) {
       setError(
-        ensureError instanceof Error
-          ? ensureError.message
-          : "No se pudo asegurar el destino rapido.",
+        applyError instanceof Error
+          ? applyError.message
+          : "No se pudo aplicar la recomendacion.",
       );
-    } finally {
-      setLoading(false);
     }
   };
+
+  const handleListScroll = useCallback((event) => {
+    const target = event.currentTarget;
+
+    if (!target || loading || !hasMore) {
+      return;
+    }
+
+    const remainingScroll = target.scrollHeight - target.scrollTop - target.clientHeight;
+
+    if (remainingScroll <= 72) {
+      void loadRecommendations({
+        append: true,
+        requestedOffset: items.length,
+      });
+    }
+  }, [hasMore, items.length, loadRecommendations, loading]);
 
   return (
     <div className="booruView__quickAssign">
-      <span className="booruView__groupLabel">Asignacion rapida</span>
-
-      <div className="booruView__quickAssignKinds" role="tablist" aria-label="Asignacion rapida por entidad">
-        {QUICK_ASSIGN_KIND_OPTIONS.map((option) => (
-          <Button
-            key={option.value}
-            type="button"
-            tone={kind === option.value ? "primary" : "secondary"}
-            className="booruView__quickAssignKindButton"
-            onClick={() => {
-              setKind(option.value);
-              setQuery("");
-              setItems([]);
-              setHighlightedIndex(-1);
-            }}
-          >
-            {option.label}
-          </Button>
-        ))}
-      </div>
+      <span className="booruView__groupLabel">Recomendaciones</span>
 
       <div className="booruView__entityInputRow">
         <input
@@ -2614,46 +2928,35 @@ function QuickAssignPanel({
             }
 
             if (event.key === "Enter" || event.key === "Tab") {
-              if (manualAssignDisabled) {
-                return;
-              }
-
               event.preventDefault();
 
               if (highlightedIndex >= 0 && items[highlightedIndex]) {
-                void handleAssignEntity(normalizedSelectedResourceIds, items[highlightedIndex].id);
-                setQuery("");
-                return;
+                void handleTriggerItem(items[highlightedIndex]);
               }
-
-              void handleEnsureEntity();
             }
           }}
-          placeholder={`Buscar ${BOORU_ENTITY_KIND_LABELS[kind]?.toLowerCase() || "entidad"} o crear`}
+          placeholder="Buscar tags o usar persona:, char:, artist:, universe:, tag:"
           disabled={searchDisabled}
         />
-        <Button
-          type="button"
-          onClick={() => void handleEnsureEntity()}
-          disabled={!String(query || "").trim() || manualAssignDisabled}
-        >
-          Asignar
-        </Button>
       </div>
 
       <span className="booruView__suggestionsHint">
         {manualAssignDisabledReason || (
           selectionCount > 1
-            ? `Asignara la entidad elegida a ${selectionCount} recursos seleccionados.`
-            : "Arrastra una card al destino o usa el boton explicito para asignarla."
+            ? `Aplicara la recomendacion elegida a ${selectionCount} recursos seleccionados cuando corresponda.`
+            : "Click aplica sobre el draft actual. Drag/drop conserva la asignacion rapida directa para entidades."
         )}
       </span>
 
       {error ? <p className="booruView__fieldError">{error}</p> : null}
 
-      <div className="booruView__quickAssignList">
+      <div
+        ref={listRef}
+        className="booruView__quickAssignList"
+        onScroll={handleListScroll}
+      >
         {showBlockingLoading ? (
-          <span className="booruView__suggestionsHint">Cargando destinos...</span>
+          <span className="booruView__suggestionsHint">Cargando recomendaciones...</span>
         ) : items.length ? (
           <>
             {items.map((item, index) => (
@@ -2661,29 +2964,57 @@ function QuickAssignPanel({
                 key={item.id}
                 className={highlightedIndex === index ? "booruView__quickAssignRow is-highlighted" : "booruView__quickAssignRow"}
               >
-                <QuickAssignDropTarget
-                  item={item}
-                  kind={kind}
-                  manualAssignResourceIds={normalizedSelectedResourceIds}
-                  customDragMatch={Boolean(
-                    customDragState?.active
-                    && customDragState?.overTarget?.kind === kind
-                    && customDragState?.overTarget?.entityId === item.id,
-                  )}
-                  dropDisabled={assigning}
-                  manualAssignDisabled={manualAssignDisabled}
-                  assigning={assigning}
-                  onAssign={onAssign}
-                />
+                {item.type === "entity" ? (
+                  <RecommendationEntityDropTarget
+                    item={item}
+                    kind={item.kind}
+                    actionLabel={item.actionLabel || "Aplicar"}
+                    manualAssignResourceIds={normalizedSelectedResourceIds}
+                    customDragMatch={Boolean(
+                      customDragState?.active
+                      && customDragState?.overTarget?.kind === item.kind
+                      && customDragState?.overTarget?.entityId === item.entityId,
+                    )}
+                    dropDisabled={assigning}
+                    manualAssignDisabled={manualAssignDisabled}
+                    assigning={assigning}
+                    onAssign={onAssignEntity}
+                    onApply={handleTriggerItem}
+                  />
+                ) : (
+                  <div className={["booruView__suggestion", "booruView__recommendationCard"].join(" ")}>
+                    <div className="booruView__recommendationCopy">
+                      <span>{item.label}</span>
+                      <small>{item.detail || ""}</small>
+                    </div>
+                    <div className="booruView__recommendationActions">
+                      <RecommendationKindBadge
+                        item={item}
+                        className={getRecommendationItemKindClass(item)}
+                        tooltip={getRecommendationKindTooltip(item)}
+                      />
+                      <Button
+                        type="button"
+                        onClick={() => void handleTriggerItem(item)}
+                        disabled={manualAssignDisabled || assigning}
+                      >
+                        {item.actionLabel || "Aplicar"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             {loading ? (
-              <span className="booruView__suggestionsHint">Actualizando destinos...</span>
+              <span className="booruView__suggestionsHint">Actualizando recomendaciones...</span>
+            ) : null}
+            {!loading && hasMore ? (
+              <span className="booruView__suggestionsHint">Scroll para seguir cargando. {items.length} de {totalCount} visibles.</span>
             ) : null}
           </>
         ) : (
           <span className="booruView__suggestionsHint">
-            Sin destinos todavia. Empieza a escribir para encontrar o crear el primero.
+            Sin recomendaciones por ahora. Ajusta el contexto o escribe una busqueda.
           </span>
         )}
       </div>
@@ -3515,6 +3846,29 @@ function MetricsSection({
             </div>
           </div>
         </SectionPanel>
+
+        <SectionPanel className="booruView__panel">
+          <div className="booruView__statusStack booruView__syntaxGuide">
+            <span className="booruView__groupLabel">Sintaxis de busqueda</span>
+            <p className="booruView__syntaxGuideCopy">
+              Soporta texto libre, prefijos tipados, negativos y faltantes solo para clasificacion.
+            </p>
+            <div className="booruView__syntaxExamples">
+              {[
+                "persona:ana",
+                "-artist:foo",
+                "reality:ficticio missing:universe",
+                "universe:\"Blue Archive\"",
+                "tag:\"fan art\"",
+                "char:\"Hatsune Miku\"",
+              ].map((example) => (
+                <span key={example} className="booruView__selectionChip booruView__selectionChip--syntax">
+                  {example}
+                </span>
+              ))}
+            </div>
+          </div>
+        </SectionPanel>
       </div>
     </div>
   );
@@ -3531,7 +3885,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const [entitySearchValue, setEntitySearchValue] = useState("");
   const [entityCreateValue, setEntityCreateValue] = useState("");
   const [entityCreateUniverse, setEntityCreateUniverse] = useState(null);
-  const [quickFilter, setQuickFilter] = useState("all");
+  const [resourceMediaKindFilter, setResourceMediaKindFilter] = useState("all");
+  const [resourceRealityFilter, setResourceRealityFilter] = useState("all");
+  const [resourcePendingMode, setResourcePendingMode] = useState("essential");
+  const [resourceMissingFilter, setResourceMissingFilter] = useState(NO_MISSING_FILTER);
   const [resourceEntityFilters, setResourceEntityFilters] = useState(
     normalizeResourceEntityFilters(input?.entityFilters),
   );
@@ -3559,15 +3916,38 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const activeEntityKind = ENTITY_SECTION_KIND_MAP[activeSection] || null;
   const activeEntityProfile = normalizeEntityProfileInput(input?.entityProfile, activeEntityKind);
   const showResourceWorkspace = RESOURCE_SECTIONS.has(activeSection);
+  const showClassificationSidebar = CLASSIFICATION_SIDEBAR_SECTIONS.has(activeSection);
   const showEntityProfile = Boolean(activeEntityKind && activeEntityProfile?.id);
   const resourceItems = Array.isArray(resourceState?.items) ? resourceState.items : [];
   const entityProfileGalleryItems = Array.isArray(entityProfileGalleryState?.items) ? entityProfileGalleryState.items : [];
-  const resourceFilterSignature = getEntityFilterSignature(resourceEntityFilters);
-  const resourceQuerySignature = JSON.stringify({
-    search: String(deferredResourceSearchValue || "").trim(),
-    quickFilter,
-    entityFilters: resourceFilterSignature,
-  });
+  const parsedResourceSearch = useMemo(
+    () => parseBooruSearchSyntax(deferredResourceSearchValue),
+    [deferredResourceSearchValue],
+  );
+  const resourceQuery = useMemo(() => buildResourceQuery({
+    parsedSearch: parsedResourceSearch,
+    pinnedEntityFilters: resourceEntityFilters,
+    mediaKindFilter: showClassificationSidebar ? resourceMediaKindFilter : "all",
+    realityFilter: showClassificationSidebar ? resourceRealityFilter : "all",
+    pendingMode: activeSection === "pending" ? resourcePendingMode : "essential",
+    missingFilter: showClassificationSidebar ? resourceMissingFilter : NO_MISSING_FILTER,
+  }), [
+    parsedResourceSearch,
+    resourceEntityFilters,
+    resourceMediaKindFilter,
+    resourceMissingFilter,
+    resourcePendingMode,
+    resourceRealityFilter,
+    activeSection,
+    showClassificationSidebar,
+  ]);
+  const resourceSearchTokens = Array.isArray(parsedResourceSearch?.tokens) ? parsedResourceSearch.tokens : [];
+  const activeRealityFilter = resourceQuery?.reality || null;
+  const contextualMissingFilterOptions = useMemo(
+    () => getContextualMissingFilterOptions(activeRealityFilter),
+    [activeRealityFilter],
+  );
+  const resourceQuerySignature = JSON.stringify(resourceQuery || {});
   const entityProfileKey = getEntityProfileKey(activeEntityProfile);
   const entityThumbnailPrimingEnabled = showEntityProfile && activeEntityProfile?.tab !== "data";
   const thumbnailPrimingItems = showResourceWorkspace ? resourceItems : (entityThumbnailPrimingEnabled ? entityProfileGalleryItems : []);
@@ -3867,9 +4247,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     const normalizedRequestedPage = clampPageNumber(requestedPage, Number.MAX_SAFE_INTEGER);
     const nextQuery = {
       section: activeSection,
-      search: String(deferredResourceSearchValue || "").trim() || null,
-      quickFilter,
-      entityFilters: resourceEntityFilters,
+      query: resourceQuery,
       offset: (normalizedRequestedPage - 1) * RESOURCE_PAGE_SIZE,
       limit: RESOURCE_PAGE_SIZE,
     };
@@ -3881,15 +4259,13 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     booruViewLogger.debug(
       "booru.resources.start",
       "Booru inicio una carga de recursos.",
-      {
-        requestVersion,
-        section: activeSection,
-        requestedPage: normalizedRequestedPage,
-        search: nextQuery.search,
-        quickFilter,
-        entityFilters: summarizeEntityFiltersForLog(resourceEntityFilters),
-      },
-    );
+        {
+          requestVersion,
+          section: activeSection,
+          requestedPage: normalizedRequestedPage,
+          query: resourceQuery,
+        },
+      );
 
     try {
       const nextResources = await invoke("booru:list-resources", nextQuery);
@@ -3912,9 +4288,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           requestVersion,
           section: activeSection,
           requestedPage: normalizedRequestedPage,
-          search: nextQuery.search,
-          quickFilter,
-          entityFilters: summarizeEntityFiltersForLog(resourceEntityFilters),
+          query: resourceQuery,
           totalCount: Number(nextResources?.totalCount || 0),
           hasMore: Boolean(nextResources?.hasMore),
           ...summarizeResourcesForLog(nextResources?.items),
@@ -3933,9 +4307,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           requestVersion,
           section: activeSection,
           requestedPage: normalizedRequestedPage,
-          search: nextQuery.search,
-          quickFilter,
-          entityFilters: summarizeEntityFiltersForLog(resourceEntityFilters),
+          query: resourceQuery,
           durationMs: Number((performance.now() - startedAt).toFixed(2)),
           error: loadError instanceof Error ? loadError.message : String(loadError || ""),
         },
@@ -4042,13 +4414,13 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     try {
       const nextResources = await invoke("booru:list-resources", {
         section: "media",
-        search: null,
-        quickFilter: "all",
-        entityFilters: [{
-          kind: activeEntityKind,
-          id: activeEntityProfile.id,
-          label: getEntityProfileLabel(activeEntityProfile, entityProfile) || null,
-        }],
+        query: {
+          includeEntities: [{
+            kind: activeEntityKind,
+            id: activeEntityProfile.id,
+            label: getEntityProfileLabel(activeEntityProfile, entityProfile) || null,
+          }],
+        },
         offset: (normalizedRequestedPage - 1) * RESOURCE_PAGE_SIZE,
         limit: RESOURCE_PAGE_SIZE,
       });
@@ -4120,9 +4492,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   }, [
     activeSection,
     currentResourcePage,
-    deferredResourceSearchValue,
-    quickFilter,
-    resourceFilterSignature,
+    resourceQuerySignature,
     showResourceWorkspace,
   ]);
 
@@ -4254,9 +4624,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     currentEntityProfilePage,
     currentResourcePage,
     ctx,
-    deferredResourceSearchValue,
-    quickFilter,
-    resourceFilterSignature,
+    resourceQuerySignature,
     showEntityProfile,
     showResourceWorkspace,
   ]);
@@ -4479,6 +4847,17 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   );
   const selectedResourceIdsSignature = selectedResources.map((resource) => resource.id).join("|");
   const showInspector = showResourceWorkspace && selectedResources.length > 0;
+
+  useEffect(() => {
+    if (!showClassificationSidebar) {
+      return;
+    }
+
+    const allowedFilterValues = new Set(contextualMissingFilterOptions.map((option) => option.value));
+    setResourceMissingFilter((currentValue) => (
+      allowedFilterValues.has(currentValue) ? currentValue : NO_MISSING_FILTER
+    ));
+  }, [contextualMissingFilterOptions, showClassificationSidebar]);
 
   const consumeSuppressedResourceClick = useCallback(() => {
     if (!suppressNextResourceClickRef.current) {
@@ -4972,9 +5351,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       section: activeSection,
       mode: showResourceWorkspace ? "resource-section" : (entityThumbnailPrimingEnabled ? "entity-profile" : "idle"),
       page: showResourceWorkspace ? currentResourcePage : currentEntityProfilePage,
-      search: showResourceWorkspace ? String(deferredResourceSearchValue || "").trim() : "",
-      quickFilter: showResourceWorkspace ? quickFilter : "all",
-      entityFilters: showResourceWorkspace ? resourceFilterSignature : entityProfileKey,
+      querySignature: showResourceWorkspace ? resourceQuerySignature : entityProfileKey,
       ids: thumbnailPrimingItems.map((item) => item.id),
     });
 
@@ -5025,11 +5402,9 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     activeSection,
     currentEntityProfilePage,
     currentResourcePage,
-    deferredResourceSearchValue,
     entityProfileKey,
     entityThumbnailPrimingEnabled,
-    quickFilter,
-    resourceFilterSignature,
+    resourceQuerySignature,
     thumbnailPrimingItems,
     showResourceWorkspace,
     snapshot?.derivatives,
@@ -5600,6 +5975,173 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   };
   handleQuickAssignEntityRef.current = handleQuickAssignEntity;
 
+  const handleApplyRecommendation = async (item) => {
+    if (!item || !selectedResources.length) {
+      return;
+    }
+
+    const selectedResourceIds = selectedResources.map((resource) => resource.id);
+    const startedAt = performance.now();
+    const usesCreationFlow = item.type === "create-tag" || item.type === "create-entity";
+    const resolveDraftForSelection = (currentDraft) => (
+      arraysEqual(
+        Array.isArray(currentDraft?.resourceIds) ? currentDraft.resourceIds : [],
+        selectedResourceIds,
+      )
+        ? currentDraft
+        : buildClassificationDraft(selectedResources)
+    );
+    const applyEntityToDraft = (currentDraft, kind, entity) => {
+      const draftField = DRAFT_ENTITY_FIELD_BY_KIND[kind];
+
+      if (!draftField || !entity?.id) {
+        return currentDraft;
+      }
+
+      const currentItems = Array.isArray(currentDraft?.[draftField]) ? currentDraft[draftField] : [];
+      const nextItems = normalizeSelectedEntities([...currentItems, entity]);
+      const nextDraft = {
+        ...currentDraft,
+        [draftField]: nextItems,
+      };
+
+      if (draftField === "characters") {
+        nextDraft.characterUniverses = pruneCharacterUniverseAssignments(
+          currentDraft.characterUniverses,
+          nextItems,
+        );
+      }
+
+      if (!nextDraft.reality && kind === "author") {
+        nextDraft.reality = "real";
+      }
+
+      if (!nextDraft.reality && (kind === "character" || kind === "universe")) {
+        nextDraft.reality = "ficticio";
+      }
+
+      return markDraftDirty(nextDraft, draftField);
+    };
+
+    booruViewLogger.debug(
+      "booru.recommendation.apply.start",
+      "Booru inicio la aplicacion de una recomendacion sobre el draft.",
+      {
+        itemId: item.id || null,
+        itemType: item.type || null,
+        itemKind: item.kind || null,
+        selectedResourceIds: selectedResourceIds.slice(0, 16),
+      },
+    );
+
+    if (usesCreationFlow) {
+      setBusyAction("recommendation-apply");
+    }
+
+    try {
+      if (item.type === "reality-action") {
+        setClassificationDraft((currentDraft) => markDraftDirty({
+          ...resolveDraftForSelection(currentDraft),
+          reality: item.reality || null,
+        }, "reality"));
+      } else if (item.type === "entity") {
+        const nextEntity = item.entity || {
+          id: item.entityId,
+          displayName: item.label,
+        };
+        setClassificationDraft((currentDraft) => applyEntityToDraft(
+          resolveDraftForSelection(currentDraft),
+          item.kind,
+          nextEntity,
+        ));
+      } else if (item.type === "tag") {
+        const nextTag = item.tag || {
+          id: item.tagId,
+          name: item.label,
+        };
+        setClassificationDraft((currentDraft) => {
+          const baseDraft = resolveDraftForSelection(currentDraft);
+          return markDraftDirty({
+            ...baseDraft,
+            manualTags: normalizeSelectedTags([
+              ...(Array.isArray(baseDraft.manualTags) ? baseDraft.manualTags : []),
+              nextTag,
+            ]),
+          }, "manualTags");
+        });
+      } else if (item.type === "create-tag") {
+        const result = await invoke("booru:ensure-tag", { name: item.createName || item.label });
+        const nextTag = result?.tag;
+
+        if (!nextTag?.id) {
+          throw new Error("Booru no devolvio la tag creada.");
+        }
+
+        setClassificationDraft((currentDraft) => {
+          const baseDraft = resolveDraftForSelection(currentDraft);
+          return markDraftDirty({
+            ...baseDraft,
+            manualTags: normalizeSelectedTags([
+              ...(Array.isArray(baseDraft.manualTags) ? baseDraft.manualTags : []),
+              nextTag,
+            ]),
+          }, "manualTags");
+        });
+      } else if (item.type === "create-entity") {
+        const result = await invoke("booru:ensure-entity", {
+          kind: item.kind,
+          name: item.createName || item.label,
+        });
+        const nextEntity = result?.entity;
+
+        if (!nextEntity?.id) {
+          throw new Error("Booru no devolvio la entidad creada.");
+        }
+
+        setClassificationDraft((currentDraft) => applyEntityToDraft(
+          resolveDraftForSelection(currentDraft),
+          item.kind,
+          nextEntity,
+        ));
+        setEntityRevision((currentValue) => currentValue + 1);
+      }
+
+      setError("");
+      logRendererDuration(
+        "booru.recommendation.apply.done",
+        "Booru aplico una recomendacion sobre el draft actual.",
+        performance.now() - startedAt,
+        {
+          itemId: item.id || null,
+          itemType: item.type || null,
+          itemKind: item.kind || null,
+          selectedResourceIds: selectedResourceIds.slice(0, 16),
+        },
+      );
+    } catch (applyError) {
+      setError(
+        applyError instanceof Error
+          ? applyError.message
+          : "No se pudo aplicar la recomendacion.",
+      );
+      booruViewLogger.info(
+        "booru.recommendation.apply.error",
+        "Booru no pudo aplicar una recomendacion sobre el draft.",
+        {
+          itemId: item.id || null,
+          itemType: item.type || null,
+          itemKind: item.kind || null,
+          durationMs: Number((performance.now() - startedAt).toFixed(2)),
+          error: applyError instanceof Error ? applyError.message : String(applyError || ""),
+        },
+      );
+    } finally {
+      if (usesCreationFlow) {
+        setBusyAction("");
+      }
+    }
+  };
+
   const handleSetCharacterUniverse = async (nextUniverse) => {
     if (activeEntityKind !== "character" || !activeEntityProfile?.id) {
       return;
@@ -5867,7 +6409,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           <SplitSidebar className="booruView__sidebar">
             <ScrollRegion className="booruView__sidebarScroll">
               <PanelStack className="booruView__sidebarStack">
-                <SectionPanel className="booruView__panel booruView__panel--compact">
+                <SectionPanel className="booruView__panel booruView__panel--compact booruView__panel--fill">
                   {showResourceWorkspace ? (
                     <>
                       <InlineField label="Buscar" grow className="booruView__inlineField">
@@ -5875,58 +6417,123 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                           type="text"
                           value={resourceSearchValue}
                           onChange={(event) => setResourceSearchValue(event.target.value)}
-                          placeholder="Buscar media, persona, artist, character, universe o tag"
+                          placeholder="Texto libre o persona:, char:, artist:, universe:, tag:, -artist:, missing:universe"
                         />
                       </InlineField>
 
-                      <div className="booruView__quickFilters booruView__quickFilters--compact">
-                        {QUICK_FILTER_OPTIONS.map((option) => (
-                          <Button
-                            key={option.value}
-                            type="button"
-                            tone={quickFilter === option.value ? "primary" : "secondary"}
-                            className="booruView__quickFilterButton"
-                            onClick={() => setQuickFilter(option.value)}
-                          >
-                            {option.label}
-                          </Button>
-                        ))}
-                      </div>
-
-                      {resourceEntityFilters.length ? (
-                        <div className="booruView__entitySelection">
-                          {resourceEntityFilters.map((filter) => (
-                            <span key={`${filter.kind}:${filter.id}`} className="booruView__selectionChip">
-                              <span>{getEntityFilterChipLabel(filter)}</span>
-                              <button
-                                type="button"
-                                className="booruView__selectionChipRemove"
-                                onClick={() => {
-                                  setResourceEntityFilters((currentValue) => currentValue.filter((entry) => !(
-                                    entry.kind === filter.kind && entry.id === filter.id
-                                  )));
-                                }}
-                                aria-label={`Quitar filtro ${getEntityFilterChipLabel(filter)}`}
+                      {resourceSearchTokens.length || resourceEntityFilters.length ? (
+                        <div className="booruView__filterGroup">
+                          <span className="booruView__groupLabel">Consulta activa</span>
+                          <div className="booruView__entitySelection">
+                            {resourceSearchTokens.map((token) => (
+                              <span
+                                key={`token:${token.raw}`}
+                                className={["booruView__selectionChip", getResourceQueryTokenClass(token)].filter(Boolean).join(" ")}
                               >
-                                x
-                              </button>
-                            </span>
-                          ))}
+                                <span>{buildResourceQueryTokenLabel(token)}</span>
+                                <button
+                                  type="button"
+                                  className="booruView__selectionChipRemove"
+                                  onClick={() => setResourceSearchValue((currentValue) => removeStructuredQueryToken(currentValue, token.raw))}
+                                  aria-label={`Quitar token ${buildResourceQueryTokenLabel(token)}`}
+                                >
+                                  x
+                                </button>
+                              </span>
+                            ))}
+                            {resourceEntityFilters.map((filter) => (
+                              <span
+                                key={`${filter.kind}:${filter.id}`}
+                                className={["booruView__selectionChip", getSelectionChipKindClass(filter.kind)].filter(Boolean).join(" ")}
+                              >
+                                <span>{getEntityFilterChipLabel(filter)}</span>
+                                <button
+                                  type="button"
+                                  className="booruView__selectionChipRemove"
+                                  onClick={() => {
+                                    setResourceEntityFilters((currentValue) => currentValue.filter((entry) => !(
+                                      entry.kind === filter.kind && entry.id === filter.id
+                                    )));
+                                  }}
+                                  aria-label={`Quitar filtro ${getEntityFilterChipLabel(filter)}`}
+                                >
+                                  x
+                                </button>
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       ) : null}
 
-                      {activeSection !== "trash" ? (
-                        <QuickAssignPanel
+                      {showClassificationSidebar ? (
+                        <div className="booruView__filterStack">
+                          {activeSection === "pending" ? (
+                            <div className="booruView__filterGroup">
+                              <span className="booruView__groupLabel">Pendientes</span>
+                              <SegmentedControl
+                                className="booruView__filterSegmented"
+                                variant="compact"
+                                options={PENDING_MODE_OPTIONS}
+                                value={resourcePendingMode}
+                                onChange={(value) => setResourcePendingMode(value === "tags" ? "tags" : "essential")}
+                                ariaLabel="Modo de pendientes"
+                              />
+                            </div>
+                          ) : null}
+
+                          <div className="booruView__filterGroup">
+                            <span className="booruView__groupLabel">Media</span>
+                            <SegmentedControl
+                              className="booruView__filterSegmented"
+                              variant="compact"
+                              options={MEDIA_FILTER_OPTIONS}
+                              value={resourceMediaKindFilter}
+                              onChange={(value) => setResourceMediaKindFilter(value || "all")}
+                              ariaLabel="Filtro de media"
+                            />
+                          </div>
+
+                          <div className="booruView__filterGroup">
+                            <span className="booruView__groupLabel">Tipo</span>
+                            <SegmentedControl
+                              className="booruView__filterSegmented"
+                              variant="compact"
+                              options={REALITY_FILTER_OPTIONS}
+                              value={resourceRealityFilter}
+                              onChange={(value) => setResourceRealityFilter(value || "all")}
+                              ariaLabel="Filtro de tipo"
+                            />
+                          </div>
+
+                          <div className="booruView__filterGroup">
+                            <span className="booruView__groupLabel">Faltantes</span>
+                            <SegmentedControl
+                              className="booruView__filterSegmented"
+                              variant="compact"
+                              options={contextualMissingFilterOptions}
+                              value={resourceMissingFilter}
+                              onChange={(value) => setResourceMissingFilter(value || NO_MISSING_FILTER)}
+                              ariaLabel="Filtro de faltantes"
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {showClassificationSidebar ? (
+                        <RecommendationPanel
                           selectedResourceIds={selectedResources.map((resource) => resource.id)}
                           customDragState={customDragState}
                           manualAssignDisabledReason={
                             selectedResources.length === 0
-                              ? "Puedes arrastrar una card al destino o seleccionar recursos para usar el boton."
-                                : ""
+                              ? "Selecciona recursos para aplicar sugerencias o arrastra una card sobre una entidad."
+                              : ""
                           }
-                          assigning={busyAction === "quick-assign"}
+                          assigning={busyAction === "quick-assign" || busyAction === "recommendation-apply"}
                           revisionKey={entityRevision}
-                          onAssign={handleQuickAssignEntity}
+                          resourceQuery={resourceQuery}
+                          draft={classificationDraft}
+                          onAssignEntity={handleQuickAssignEntity}
+                          onApplyRecommendation={handleApplyRecommendation}
                         />
                       ) : null}
                     </>

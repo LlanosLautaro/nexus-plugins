@@ -63,17 +63,67 @@
 }
 
 .booruView__panel--compact {
-  gap: 8px;
+  gap: 6px;
 }
 
 .booruView__sidebar .nexus-ui-panel {
-  position: sticky;
-  top: 0;
+  height: 100%;
+}
+
+.booruView__sidebar {
+  --booru-rail-radius: 10px;
+  --booru-rail-pill-radius: 8px;
+}
+
+.booruView__sidebarScroll,
+.booruView__sidebarStack,
+.booruView__sidebarStack > .booruView__panel {
+  height: 100%;
+}
+
+.booruView__sidebarScroll,
+.booruView__sidebarStack,
+.booruView__sidebarStack > .booruView__panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.booruView__sidebarScroll,
+.booruView__sidebarStack {
+  flex: 1 1 auto;
+}
+
+.booruView__sidebarStack {
+  min-height: 100%;
+  justify-content: flex-start;
+}
+
+.booruView__sidebarStack > .booruView__panel {
+  flex: 1 1 auto;
+  min-height: 100%;
+  justify-content: flex-start;
+}
+
+.booruView__sidebar .booruView__panel,
+.booruView__sidebar .nexus-ui-panel,
+.booruView__sidebar .booruView__suggestion,
+ .booruView__sidebar .booruView__quickAssignList,
+ .booruView__sidebar .nexus-ui-segmented--compact {
+  border-radius: var(--booru-rail-radius);
+}
+
+.booruView__sidebar .booruView__selectionChip {
+  border-radius: var(--booru-rail-pill-radius);
 }
 
 .booruView__inlineField,
 .booruView__field {
   width: 100%;
+}
+
+.booruView__sidebar .booruView__inlineField,
+.booruView__sidebar .nexus-ui-inline-field--grow.booruView__inlineField {
+  flex: 0 0 auto;
 }
 
 .booruView__inlineField :where(input[type="text"]),
@@ -95,9 +145,30 @@
   gap: 6px;
 }
 
+.booruView__filterSegmented {
+  width: 100%;
+}
+
+.booruView__sidebar .nexus-ui-segmented--compact .nexus-ui-segmented__button {
+  min-height: 24px;
+  font-size: 0.7rem;
+}
+
+.booruView__sidebar .nexus-ui-segmented--compact .nexus-ui-segmented__label {
+  text-align: center;
+}
+
 .booruView__quickFilterButton {
   min-height: 28px;
   padding-inline: 8px;
+}
+
+.booruView__filterStack,
+.booruView__filterGroup,
+.booruView__syntaxGuide {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .booruView__workspaceGrid {
@@ -430,15 +501,58 @@
 .booruView__selectionChip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 24px;
-  padding: 0 10px;
+  gap: 5px;
+  min-height: 22px;
+  padding: 0 8px;
   border: 1px solid var(--color-line);
-  border-radius: var(--radius-pill);
+  border-radius: 9px;
   background: var(--surface-pill);
   color: var(--color-text-soft);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 700;
+}
+
+.booruView__selectionChip--author {
+  border-color: color-mix(in srgb, var(--color-accent) 26%, var(--color-line));
+  background: color-mix(in srgb, var(--surface-pill) 90%, var(--color-accent) 10%);
+  color: var(--color-text);
+}
+
+.booruView__selectionChip--character {
+  border-color: color-mix(in srgb, var(--color-warning) 28%, var(--color-line));
+  background: color-mix(in srgb, var(--surface-pill) 90%, var(--color-warning) 10%);
+  color: var(--color-text);
+}
+
+.booruView__selectionChip--artist {
+  border-color: color-mix(in srgb, var(--color-success) 26%, var(--color-line));
+  background: color-mix(in srgb, var(--surface-pill) 90%, var(--color-success) 10%);
+  color: var(--color-text);
+}
+
+.booruView__selectionChip--universe {
+  border-color: color-mix(in srgb, var(--color-danger) 24%, var(--color-line));
+  background: color-mix(in srgb, var(--surface-pill) 91%, var(--color-danger) 9%);
+  color: var(--color-text);
+}
+
+.booruView__selectionChip--reality {
+  border-color: color-mix(in srgb, var(--color-accent) 22%, var(--color-line));
+  background: color-mix(in srgb, var(--surface-pill) 93%, var(--color-accent) 7%);
+  color: var(--color-text-soft);
+}
+
+.booruView__selectionChip--syntax {
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.booruView__selectionChip--kindBadge {
+  position: relative;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 6px;
 }
 
 .booruView__tagRow,
@@ -462,36 +576,67 @@
 .booruView__quickAssign {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.booruView__quickAssignKinds {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.booruView__quickAssignKindButton {
-  width: 100%;
-  min-height: 30px;
-  padding-inline: 8px;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .booruView__quickAssignList {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
-.booruView__quickAssignCopy {
+.booruView__recommendationCopy {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
-.booruView__quickAssignCopy span {
+.booruView__recommendationCopy span,
+.booruView__recommendationCopy small {
   @include truncate;
+}
+
+.booruView__recommendationCard {
+  width: 100%;
+  min-width: 0;
+  justify-content: space-between;
+}
+
+.booruView__recommendationActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.booruView__recommendationActions .booruView__selectionChip {
+  min-height: 20px;
+}
+
+.booruView__kindTooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  padding: 4px 6px;
+  border: 1px solid var(--color-line);
+  border-radius: 7px;
+  background: var(--shell-panel-bg);
+  color: var(--color-text);
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.16);
+  pointer-events: none;
+  z-index: 2;
 }
 
 .booruView__characterUniverseHeader {
@@ -515,7 +660,7 @@
 
 .booruView__groupLabel {
   color: var(--color-text-soft);
-  font-size: 0.77rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -543,13 +688,13 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 30px;
-  padding: 6px 8px;
+  min-height: 28px;
+  padding: 5px 7px;
   border: 1px solid var(--color-line);
-  border-radius: var(--radius-m);
+  border-radius: 9px;
   background: var(--shell-panel-soft);
   color: var(--color-text-soft);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
 }
 
 .booruView__suggestion.is-highlighted,
@@ -561,6 +706,7 @@
 
 .booruView__quickAssignRow {
   display: flex;
+  min-width: 0;
 }
 
 .booruView__suggestion--dropTarget {
@@ -737,6 +883,19 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.booruView__syntaxGuideCopy {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.79rem;
+  line-height: 1.45;
+}
+
+.booruView__syntaxExamples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .booruView__resourceLoadMore {
@@ -922,7 +1081,6 @@
     grid-template-columns: 1fr;
   }
 
-  .booruView__quickAssignKinds,
   .booruView__mediaGrid--paged {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

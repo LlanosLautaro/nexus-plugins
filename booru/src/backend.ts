@@ -10,7 +10,7 @@ import type {
   NexusBackendPluginModule,
 } from "../../../nexus-backend/src/plugins/types.ts";
 import { createDevLogger } from "../../../nexus-backend/src/shared/dev-log.js";
-import { BOORU_PLUGIN_ID } from "./constants.js";
+import { BOORU_ENTITY_KIND_LABELS, BOORU_PLUGIN_ID } from "./constants.js";
 import {
   normalizeBooruSettings,
   readBooruPythonExecutable,
@@ -18,10 +18,13 @@ import {
 } from "./plugin-settings.js";
 import {
   normalizeBooruComparableText,
+  normalizeBooruEntityPrefix,
+  normalizeBooruMissingFilter,
   normalizeBooruOptionalText,
   normalizeBooruReality,
   normalizeBooruSlug,
   normalizeBooruText,
+  parseBooruSearchSyntax,
   uniqueBooruIds,
 } from "./booru-utils.js";
 
@@ -34,6 +37,8 @@ type PythonStatus = {
 
 type BooruEntityKind = "author" | "artist" | "character" | "universe";
 type BooruEntityVisualRole = "avatar" | "banner";
+type BooruMissingFilter = "type" | "author" | "artist" | "character" | "universe";
+type BooruPendingMode = "essential" | "tags";
 
 type BooruLinkedEntityRecord = {
   id: string;
@@ -63,9 +68,7 @@ type BooruAssignmentPatchPayload = {
 
 type ListResourcesPayload = {
   section?: unknown;
-  search?: unknown;
-  quickFilter?: unknown;
-  entityFilters?: unknown;
+  query?: unknown;
   offset?: unknown;
   limit?: unknown;
 };
@@ -73,7 +76,45 @@ type ListResourcesPayload = {
 type ResourceEntityFilterPayload = {
   kind?: unknown;
   id?: unknown;
+  value?: unknown;
   label?: unknown;
+};
+
+type ResourceTagFilterPayload = {
+  id?: unknown;
+  value?: unknown;
+  label?: unknown;
+};
+
+type ResourceQueryPayload = {
+  text?: unknown;
+  mediaKind?: unknown;
+  reality?: unknown;
+  classificationState?: unknown;
+  pendingMode?: unknown;
+  includeEntities?: unknown;
+  excludeEntities?: unknown;
+  includeTags?: unknown;
+  excludeTags?: unknown;
+  missing?: unknown;
+};
+
+type RecommendationDraftPayload = {
+  reality?: unknown;
+  authors?: unknown;
+  artists?: unknown;
+  characters?: unknown;
+  universes?: unknown;
+  manualTags?: unknown;
+};
+
+type ListRecommendationsPayload = {
+  query?: unknown;
+  resourceQuery?: unknown;
+  selectedResourceIds?: unknown;
+  draft?: unknown;
+  offset?: unknown;
+  limit?: unknown;
 };
 
 type PrimeVisibleThumbnailsPayload = {
@@ -124,8 +165,37 @@ type RuntimeInvalidationKey =
 
 type NormalizedResourceEntityFilter = {
   kind: BooruEntityKind;
-  id: string;
+  id: string | null;
+  value: string | null;
   label: string | null;
+};
+
+type NormalizedResourceTagFilter = {
+  id: string | null;
+  value: string | null;
+  label: string | null;
+};
+
+type NormalizedResourceQuery = {
+  text: string | null;
+  mediaKind: "image" | "video" | "gif" | null;
+  reality: "real" | "ficticio" | null;
+  classificationState: "unclassified" | null;
+  pendingMode: BooruPendingMode | null;
+  includeEntities: NormalizedResourceEntityFilter[];
+  excludeEntities: NormalizedResourceEntityFilter[];
+  includeTags: NormalizedResourceTagFilter[];
+  excludeTags: NormalizedResourceTagFilter[];
+  missing: BooruMissingFilter | null;
+};
+
+type NormalizedRecommendationDraft = {
+  reality: "real" | "ficticio" | null;
+  authors: string[];
+  artists: string[];
+  characters: string[];
+  universes: string[];
+  manualTags: string[];
 };
 
 type SaveBasicClassificationPayload = {
@@ -251,7 +321,8 @@ const RESOURCE_RELATION_ENTITY_ID_COLUMNS: Partial<Record<BooruEntityKind, strin
   character: "character_id",
 };
 const BOORU_RESOURCE_SECTIONS = new Set<BooruResourceSection>(["media", "pending", "duplicates", "trash"]);
-const BOORU_RESOURCE_QUICK_FILTERS = new Set(["all", "unclassified", "image", "video", "gif"]);
+const BOORU_RESOURCE_MEDIA_KINDS = new Set<NormalizedResourceQuery["mediaKind"]>(["image", "video", "gif"]);
+const BOORU_RECOMMENDATION_PAGE_SIZE = 24;
 const DEFAULT_RESOURCE_PAGE_SIZE = 120;
 const MAX_RESOURCE_PAGE_SIZE = 5000;
 const BRAVE_PROFILE_DIRECTORY = "Plugins";
@@ -849,6 +920,10 @@ function getPendingReasons(resource: {
 
   const reasons: string[] = [];
   let pendingScore = 0;
+  const hasUniverseContext = Boolean(
+    resource.universes.some((universe) => universe?.id)
+    || resource.characters.some((character) => character?.universe?.id),
+  );
 
   if (!resource.reality) {
     reasons.push("missing-reality");
@@ -860,8 +935,8 @@ function getPendingReasons(resource: {
     pendingScore += 60;
   }
 
-  if (resource.reality === "ficticio" && !resource.characters.length && !resource.universes.length) {
-    reasons.push("missing-fiction-subject");
+  if (resource.reality === "ficticio" && !resource.characters.length) {
+    reasons.push("missing-character");
     pendingScore += 60;
   }
 
@@ -871,17 +946,10 @@ function getPendingReasons(resource: {
       pendingScore += 15;
     }
 
-    const charactersMissingUniverse = resource.characters.filter((character) => !character?.universe?.id).length;
-
-    if (charactersMissingUniverse > 0) {
-      reasons.push("missing-character-universe");
-      pendingScore += 40 * charactersMissingUniverse;
+    if (!hasUniverseContext) {
+      reasons.push("missing-universe");
+      pendingScore += 40;
     }
-  }
-
-  if (!resource.manualTags.length) {
-    reasons.push("missing-manual-tags");
-    pendingScore += 10;
   }
 
   if (!reasons.length) {
@@ -1015,25 +1083,25 @@ function normalizeResourceSection(value: unknown): BooruResourceSection {
   return BOORU_RESOURCE_SECTIONS.has(normalized) ? normalized : "media";
 }
 
-function normalizeQuickFilter(value: unknown) {
-  const normalized = normalizeBooruText(value).toLowerCase();
-  return BOORU_RESOURCE_QUICK_FILTERS.has(normalized) ? normalized : "all";
-}
-
 function normalizeResourceEntityFilters(value: unknown): NormalizedResourceEntityFilter[] {
   const seenKeys = new Set<string>();
   const normalizedFilters: NormalizedResourceEntityFilter[] = [];
 
   for (const rawValue of Array.isArray(value) ? value : []) {
     const rawFilter = rawValue as ResourceEntityFilterPayload;
-    const kind = normalizeBooruText(rawFilter?.kind) as BooruEntityKind;
+    const rawKind = normalizeBooruText(rawFilter?.kind);
+    const kind = (ENTITY_TABLES[rawKind as BooruEntityKind]
+      ? rawKind
+      : normalizeBooruEntityPrefix(rawKind)) as BooruEntityKind | null;
     const id = normalizeBooruOptionalText(rawFilter?.id);
+    const filterValue = normalizeBooruOptionalText(rawFilter?.value);
+    const comparableValue = normalizeBooruComparableText(filterValue);
 
-    if (!ENTITY_TABLES[kind] || !id) {
+    if (!ENTITY_TABLES[kind as BooruEntityKind] || (!id && !comparableValue)) {
       continue;
     }
 
-    const dedupeKey = `${kind}:${id}`;
+    const dedupeKey = `${kind}:${id || ""}:${comparableValue || ""}`;
 
     if (seenKeys.has(dedupeKey)) {
       continue;
@@ -1041,13 +1109,92 @@ function normalizeResourceEntityFilters(value: unknown): NormalizedResourceEntit
 
     seenKeys.add(dedupeKey);
     normalizedFilters.push({
-      kind,
+      kind: kind as BooruEntityKind,
       id,
-      label: normalizeBooruOptionalText(rawFilter?.label),
+      value: filterValue,
+      label: normalizeBooruOptionalText(rawFilter?.label) || filterValue,
     });
   }
 
   return normalizedFilters;
+}
+
+function normalizeResourceTagFilters(value: unknown): NormalizedResourceTagFilter[] {
+  const seenKeys = new Set<string>();
+  const normalizedFilters: NormalizedResourceTagFilter[] = [];
+
+  for (const rawValue of Array.isArray(value) ? value : []) {
+    const rawFilter = rawValue as ResourceTagFilterPayload;
+    const id = normalizeBooruOptionalText(rawFilter?.id);
+    const filterValue = normalizeBooruOptionalText(rawFilter?.value);
+    const comparableValue = normalizeBooruComparableText(filterValue);
+
+    if (!id && !comparableValue) {
+      continue;
+    }
+
+    const dedupeKey = `${id || ""}:${comparableValue || ""}`;
+
+    if (seenKeys.has(dedupeKey)) {
+      continue;
+    }
+
+    seenKeys.add(dedupeKey);
+    normalizedFilters.push({
+      id,
+      value: filterValue,
+      label: normalizeBooruOptionalText(rawFilter?.label) || filterValue,
+    });
+  }
+
+  return normalizedFilters;
+}
+
+function normalizeResourceMissingFilter(value: unknown): BooruMissingFilter | null {
+  if (Array.isArray(value)) {
+    for (let index = value.length - 1; index >= 0; index -= 1) {
+      const normalizedMissing = normalizeBooruMissingFilter(value[index]);
+
+      if (normalizedMissing) {
+        return normalizedMissing;
+      }
+    }
+
+    return null;
+  }
+
+  return normalizeBooruMissingFilter(value);
+}
+
+function normalizePendingMode(value: unknown): BooruPendingMode | null {
+  const normalizedValue = normalizeBooruComparableText(value);
+
+  if (normalizedValue === "essential" || normalizedValue === "tags") {
+    return normalizedValue;
+  }
+
+  return null;
+}
+
+function normalizeResourceQuery(value: unknown): NormalizedResourceQuery {
+  const rawQuery = (value && typeof value === "object" ? value : {}) as ResourceQueryPayload;
+  const mediaKind = normalizeBooruComparableText(rawQuery?.mediaKind);
+  const classificationState = normalizeBooruComparableText(rawQuery?.classificationState);
+
+  return {
+    text: normalizeBooruOptionalText(rawQuery?.text),
+    mediaKind: BOORU_RESOURCE_MEDIA_KINDS.has(mediaKind as NormalizedResourceQuery["mediaKind"])
+      ? mediaKind as NormalizedResourceQuery["mediaKind"]
+      : null,
+    reality: normalizeBooruReality(rawQuery?.reality),
+    classificationState: classificationState === "unclassified" ? "unclassified" : null,
+    pendingMode: normalizePendingMode(rawQuery?.pendingMode),
+    includeEntities: normalizeResourceEntityFilters(rawQuery?.includeEntities),
+    excludeEntities: normalizeResourceEntityFilters(rawQuery?.excludeEntities),
+    includeTags: normalizeResourceTagFilters(rawQuery?.includeTags),
+    excludeTags: normalizeResourceTagFilters(rawQuery?.excludeTags),
+    missing: normalizeResourceMissingFilter(rawQuery?.missing),
+  };
 }
 
 function normalizePagingNumber(value: unknown, fallback: number, maxValue: number) {
@@ -1068,31 +1215,35 @@ function buildPendingSqlExpressions(alias = "r") {
   const missingArtist = `(CASE WHEN ${alias}.reality = 'ficticio' AND NOT EXISTS (
     SELECT 1 FROM booru_resource_artists rel WHERE rel.resource_id = ${alias}.id
   ) THEN 1 ELSE 0 END)`;
-  const missingFictionSubject = `(CASE WHEN ${alias}.reality = 'ficticio'
+  const missingCharacter = `(CASE WHEN ${alias}.reality = 'ficticio'
     AND NOT EXISTS (SELECT 1 FROM booru_resource_characters rel WHERE rel.resource_id = ${alias}.id)
-    AND NOT EXISTS (SELECT 1 FROM booru_resource_universes rel WHERE rel.resource_id = ${alias}.id)
   THEN 1 ELSE 0 END)`;
-  const missingCharacterUniverseCount = `(
-    SELECT COUNT(*)
-    FROM booru_resource_characters rel
-    LEFT JOIN booru_character_universes cu ON cu.character_id = rel.character_id
-    WHERE rel.resource_id = ${alias}.id
-      AND cu.universe_id IS NULL
-  )`;
-  const missingManualTags = `(CASE WHEN NOT EXISTS (
-    SELECT 1
+  const missingUniverse = `(CASE WHEN ${alias}.reality = 'ficticio'
+    AND NOT EXISTS (
+      SELECT 1
+      FROM booru_resource_universes rel
+      WHERE rel.resource_id = ${alias}.id
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM booru_resource_characters rel
+      INNER JOIN booru_character_universes cu ON cu.character_id = rel.character_id
+      WHERE rel.resource_id = ${alias}.id
+    )
+  THEN 1 ELSE 0 END)`;
+  const manualTagCount = `(
+    SELECT COUNT(DISTINCT rel.tag_id)
     FROM booru_resource_tags rel
     INNER JOIN booru_tags t ON t.id = rel.tag_id
     WHERE rel.resource_id = ${alias}.id
       AND t.source = 'manual'
-  ) THEN 1 ELSE 0 END)`;
+  )`;
   const rawScore = `(
     (${missingReality} * 100) +
     (${missingAuthor} * 60) +
     (${missingArtist} * 15) +
-    (${missingFictionSubject} * 60) +
-    (${missingCharacterUniverseCount} * 40) +
-    (${missingManualTags} * 10)
+    (${missingCharacter} * 60) +
+    (${missingUniverse} * 40)
   )`;
   const isPending = `(CASE
     WHEN ${alias}.classification_state = 'duplicate-review' OR ${alias}.trashed_at IS NOT NULL THEN 0
@@ -1107,18 +1258,163 @@ function buildPendingSqlExpressions(alias = "r") {
   return {
     isPending,
     pendingScore,
+    manualTagCount,
+  };
+}
+
+function buildEntityFilterSql(
+  alias: string,
+  filter: NormalizedResourceEntityFilter,
+  negate = false,
+) {
+  const parameters: unknown[] = [];
+
+  if (filter.kind === "universe") {
+    if (filter.id) {
+      const directClause = `EXISTS (
+        SELECT 1
+        FROM booru_resource_universes rel
+        WHERE rel.resource_id = ${alias}.id
+          AND rel.universe_id = ?
+      )`;
+      const inheritedClause = `EXISTS (
+        SELECT 1
+        FROM booru_resource_characters rel
+        INNER JOIN booru_character_universes cu ON cu.character_id = rel.character_id
+        WHERE rel.resource_id = ${alias}.id
+          AND cu.universe_id = ?
+      )`;
+      parameters.push(filter.id, filter.id);
+      return {
+        clause: negate
+          ? `(NOT ${directClause} AND NOT ${inheritedClause})`
+          : `(${directClause} OR ${inheritedClause})`,
+        parameters,
+      };
+    }
+
+    const pattern = toSqlLikePattern(filter.value);
+
+    if (!pattern) {
+      return null;
+    }
+
+    const directClause = `EXISTS (
+      SELECT 1
+      FROM booru_resource_universes rel
+      INNER JOIN booru_universes e ON e.id = rel.universe_id
+      WHERE rel.resource_id = ${alias}.id
+        AND (
+          LOWER(COALESCE(e.display_name, '')) LIKE ? ESCAPE '\\'
+          OR LOWER(COALESCE(e.slug, '')) LIKE ? ESCAPE '\\'
+        )
+    )`;
+    const inheritedClause = `EXISTS (
+      SELECT 1
+      FROM booru_resource_characters rel
+      INNER JOIN booru_character_universes cu ON cu.character_id = rel.character_id
+      INNER JOIN booru_universes e ON e.id = cu.universe_id
+      WHERE rel.resource_id = ${alias}.id
+        AND (
+          LOWER(COALESCE(e.display_name, '')) LIKE ? ESCAPE '\\'
+          OR LOWER(COALESCE(e.slug, '')) LIKE ? ESCAPE '\\'
+        )
+    )`;
+    parameters.push(pattern, pattern, pattern, pattern);
+    return {
+      clause: negate
+        ? `(NOT ${directClause} AND NOT ${inheritedClause})`
+        : `(${directClause} OR ${inheritedClause})`,
+      parameters,
+    };
+  }
+
+  const relationTable = getResourceRelationTable(filter.kind);
+  const relationEntityIdColumn = getResourceRelationEntityIdColumn(filter.kind);
+  const entityTable = getEntityTable(filter.kind);
+
+  if (!relationTable || !relationEntityIdColumn || !entityTable) {
+    return null;
+  }
+
+  if (filter.id) {
+    return {
+      clause: `${negate ? "NOT " : ""}EXISTS (
+        SELECT 1
+        FROM ${relationTable} rel
+        WHERE rel.resource_id = ${alias}.id
+          AND rel.${relationEntityIdColumn} = ?
+      )`,
+      parameters: [filter.id],
+    };
+  }
+
+  const pattern = toSqlLikePattern(filter.value);
+
+  if (!pattern) {
+    return null;
+  }
+
+  return {
+    clause: `${negate ? "NOT " : ""}EXISTS (
+      SELECT 1
+      FROM ${relationTable} rel
+      INNER JOIN ${entityTable} e ON e.id = rel.${relationEntityIdColumn}
+      WHERE rel.resource_id = ${alias}.id
+        AND (
+          LOWER(COALESCE(e.display_name, '')) LIKE ? ESCAPE '\\'
+          OR LOWER(COALESCE(e.slug, '')) LIKE ? ESCAPE '\\'
+        )
+    )`,
+    parameters: [pattern, pattern],
+  };
+}
+
+function buildTagFilterSql(
+  alias: string,
+  filter: NormalizedResourceTagFilter,
+  negate = false,
+) {
+  if (filter.id) {
+    return {
+      clause: `${negate ? "NOT " : ""}EXISTS (
+        SELECT 1
+        FROM booru_resource_tags rel
+        WHERE rel.resource_id = ${alias}.id
+          AND rel.tag_id = ?
+      )`,
+      parameters: [filter.id],
+    };
+  }
+
+  const pattern = toSqlLikePattern(filter.value);
+
+  if (!pattern) {
+    return null;
+  }
+
+  return {
+    clause: `${negate ? "NOT " : ""}EXISTS (
+      SELECT 1
+      FROM booru_resource_tags rel
+      INNER JOIN booru_tags t ON t.id = rel.tag_id
+      WHERE rel.resource_id = ${alias}.id
+        AND LOWER(COALESCE(t.name, '')) LIKE ? ESCAPE '\\'
+    )`,
+    parameters: [pattern],
   };
 }
 
 function buildResourceListSqlParts(
   section: BooruResourceSection,
-  quickFilter: string,
-  searchValue: string | null,
-  entityFilters: NormalizedResourceEntityFilter[] = [],
+  query: NormalizedResourceQuery,
 ) {
   const whereClauses: string[] = [];
   const parameters: unknown[] = [];
   const pendingSql = buildPendingSqlExpressions("r");
+  const pendingMode = section === "pending" && query.pendingMode === "tags"
+    ? "tags"
+    : "essential";
 
   if (section === "duplicates") {
     whereClauses.push(`r.classification_state = 'duplicate-review'`);
@@ -1129,19 +1425,59 @@ function buildResourceListSqlParts(
     whereClauses.push(`r.classification_state != 'duplicate-review'`);
     whereClauses.push(`r.trashed_at IS NULL`);
 
-    if (section === "pending") {
+    if (section === "pending" && pendingMode === "essential") {
       whereClauses.push(`${pendingSql.isPending} = 1`);
     }
   }
 
-  if (quickFilter === "unclassified") {
+  if (query.classificationState === "unclassified") {
     whereClauses.push(`r.classification_state = 'unclassified'`);
-  } else if (quickFilter === "image" || quickFilter === "video" || quickFilter === "gif") {
-    whereClauses.push(`r.media_kind = ?`);
-    parameters.push(quickFilter);
   }
 
-  const likePattern = toSqlLikePattern(searchValue);
+  if (query.mediaKind === "image" || query.mediaKind === "video" || query.mediaKind === "gif") {
+    whereClauses.push(`r.media_kind = ?`);
+    parameters.push(query.mediaKind);
+  }
+
+  if (query.reality === "real" || query.reality === "ficticio") {
+    whereClauses.push(`r.reality = ?`);
+    parameters.push(query.reality);
+  }
+
+  if (query.missing === "type") {
+    whereClauses.push(`(r.reality IS NULL OR TRIM(r.reality) = '')`);
+  } else if (query.missing === "author") {
+    whereClauses.push(`NOT EXISTS (
+      SELECT 1
+      FROM booru_resource_authors rel
+      WHERE rel.resource_id = r.id
+    )`);
+  } else if (query.missing === "artist") {
+    whereClauses.push(`NOT EXISTS (
+      SELECT 1
+      FROM booru_resource_artists rel
+      WHERE rel.resource_id = r.id
+    )`);
+  } else if (query.missing === "character") {
+    whereClauses.push(`NOT EXISTS (
+      SELECT 1
+      FROM booru_resource_characters rel
+      WHERE rel.resource_id = r.id
+    )`);
+  } else if (query.missing === "universe") {
+    whereClauses.push(`NOT EXISTS (
+      SELECT 1
+      FROM booru_resource_universes rel
+      WHERE rel.resource_id = r.id
+    ) AND NOT EXISTS (
+      SELECT 1
+      FROM booru_resource_characters rel
+      INNER JOIN booru_character_universes cu ON cu.character_id = rel.character_id
+      WHERE rel.resource_id = r.id
+    )`);
+  }
+
+  const likePattern = toSqlLikePattern(query.text);
 
   if (likePattern) {
     const escapedPattern = likePattern;
@@ -1212,61 +1548,55 @@ function buildResourceListSqlParts(
     );
   }
 
-  for (const entityFilter of entityFilters) {
-    if (entityFilter.kind === "author") {
-      whereClauses.push(`EXISTS (
-        SELECT 1
-        FROM booru_resource_authors rel
-        WHERE rel.resource_id = r.id
-          AND rel.author_id = ?
-      )`);
-      parameters.push(entityFilter.id);
+  for (const entityFilter of query.includeEntities) {
+    const filterSql = buildEntityFilterSql("r", entityFilter, false);
+
+    if (!filterSql) {
       continue;
     }
 
-    if (entityFilter.kind === "artist") {
-      whereClauses.push(`EXISTS (
-        SELECT 1
-        FROM booru_resource_artists rel
-        WHERE rel.resource_id = r.id
-          AND rel.artist_id = ?
-      )`);
-      parameters.push(entityFilter.id);
+    whereClauses.push(filterSql.clause);
+    parameters.push(...filterSql.parameters);
+  }
+
+  for (const entityFilter of query.excludeEntities) {
+    const filterSql = buildEntityFilterSql("r", entityFilter, true);
+
+    if (!filterSql) {
       continue;
     }
 
-    if (entityFilter.kind === "character") {
-      whereClauses.push(`EXISTS (
-        SELECT 1
-        FROM booru_resource_characters rel
-        WHERE rel.resource_id = r.id
-          AND rel.character_id = ?
-      )`);
-      parameters.push(entityFilter.id);
+    whereClauses.push(filterSql.clause);
+    parameters.push(...filterSql.parameters);
+  }
+
+  for (const tagFilter of query.includeTags) {
+    const filterSql = buildTagFilterSql("r", tagFilter, false);
+
+    if (!filterSql) {
       continue;
     }
 
-    whereClauses.push(`(
-      EXISTS (
-        SELECT 1
-        FROM booru_resource_universes rel
-        WHERE rel.resource_id = r.id
-          AND rel.universe_id = ?
-      )
-      OR EXISTS (
-        SELECT 1
-        FROM booru_resource_characters rel
-        INNER JOIN booru_character_universes cu ON cu.character_id = rel.character_id
-        WHERE rel.resource_id = r.id
-          AND cu.universe_id = ?
-      )
-    )`);
-    parameters.push(entityFilter.id, entityFilter.id);
+    whereClauses.push(filterSql.clause);
+    parameters.push(...filterSql.parameters);
+  }
+
+  for (const tagFilter of query.excludeTags) {
+    const filterSql = buildTagFilterSql("r", tagFilter, true);
+
+    if (!filterSql) {
+      continue;
+    }
+
+    whereClauses.push(filterSql.clause);
+    parameters.push(...filterSql.parameters);
   }
 
   const whereSql = whereClauses.length ? `WHERE ${whereClauses.join("\n      AND ")}` : "";
   const orderBySql = section === "pending"
-    ? `ORDER BY ${pendingSql.pendingScore} DESC, r.imported_at DESC, r.id ASC`
+    ? pendingMode === "tags"
+      ? `ORDER BY ${pendingSql.manualTagCount} ASC, r.imported_at DESC, r.id ASC`
+      : `ORDER BY ${pendingSql.pendingScore} DESC, r.imported_at DESC, r.id ASC`
     : section === "trash"
       ? `ORDER BY r.trashed_at DESC, r.imported_at DESC, r.id ASC`
       : `ORDER BY r.imported_at DESC, r.id ASC`;
@@ -1313,11 +1643,9 @@ function getResourceRowsByIdsSync(db: DatabaseSync, resourceIds: string[]) {
 function countResourcesSync(
   db: DatabaseSync,
   section: BooruResourceSection,
-  quickFilter: string,
-  searchValue: string | null,
-  entityFilters: NormalizedResourceEntityFilter[] = [],
+  query: NormalizedResourceQuery,
 ) {
-  const sqlParts = buildResourceListSqlParts(section, quickFilter, searchValue, entityFilters);
+  const sqlParts = buildResourceListSqlParts(section, query);
   const row = db.prepare(`
     SELECT COUNT(*) AS total_count
     FROM booru_resources r
@@ -1332,13 +1660,11 @@ function listResourcesSync(
   payload: ListResourcesPayload = {},
 ) {
   const section = normalizeResourceSection(payload?.section);
-  const quickFilter = normalizeQuickFilter(payload?.quickFilter);
-  const search = normalizeBooruOptionalText(payload?.search);
-  const entityFilters = normalizeResourceEntityFilters(payload?.entityFilters);
+  const query = normalizeResourceQuery(payload?.query);
   const offset = normalizePagingNumber(payload?.offset, 0, Number.MAX_SAFE_INTEGER);
   const limit = Math.max(1, normalizePagingNumber(payload?.limit, DEFAULT_RESOURCE_PAGE_SIZE, MAX_RESOURCE_PAGE_SIZE));
-  const sqlParts = buildResourceListSqlParts(section, quickFilter, search, entityFilters);
-  const totalCount = countResourcesSync(db, section, quickFilter, search, entityFilters);
+  const sqlParts = buildResourceListSqlParts(section, query);
+  const totalCount = countResourcesSync(db, section, query);
   const resourceIds = db.prepare(`
     SELECT r.id
     FROM booru_resources r
@@ -1351,7 +1677,7 @@ function listResourcesSync(
 
   return {
     section,
-    entityFilters,
+    query,
     items,
     totalCount,
     hasMore: offset + items.length < totalCount,
@@ -1359,13 +1685,14 @@ function listResourcesSync(
 }
 
 function listAllResourcesForSectionSync(db: DatabaseSync, section: BooruResourceSection) {
-  const totalCount = countResourcesSync(db, section, "all", null);
+  const emptyQuery = normalizeResourceQuery({});
+  const totalCount = countResourcesSync(db, section, emptyQuery);
 
   if (!totalCount) {
     return [];
   }
 
-  const sqlParts = buildResourceListSqlParts(section, "all", null);
+  const sqlParts = buildResourceListSqlParts(section, emptyQuery);
   const resourceIds = db.prepare(`
     SELECT r.id
     FROM booru_resources r
@@ -1425,7 +1752,7 @@ function readStats(db: DatabaseSync) {
   return {
     totalCount: totalResourceCount,
     duplicateCount: Number(totalRow.duplicateCount || 0),
-    pendingCount: countResourcesSync(db, "pending", "all", null),
+    pendingCount: countResourcesSync(db, "pending", normalizeResourceQuery({})),
     unclassifiedCount: Number(totalRow.unclassifiedCount || 0),
     classifiedBasicCount: Number(totalRow.classifiedBasicCount || 0),
     trashCount: Number(totalRow.trashCount || 0),
@@ -2676,8 +3003,7 @@ function listEntitiesSync(
 
         return String(left?.display_name || "").localeCompare(String(right?.display_name || ""), "es-AR");
       })
-      .slice(0, 24)
-    : rows.slice(0, 240);
+    : rows;
 
   return filteredRows.map((row) => normalizeEntityRow(db, kind, row));
 }
@@ -2730,8 +3056,7 @@ function listTagsSync(db: DatabaseSync, query: string | null = null) {
 
         return String(left?.name || "").localeCompare(String(right?.name || ""), "es-AR");
       })
-      .slice(0, 24)
-    : rows.slice(0, 240);
+    : rows;
 
   return filteredRows.map((row: any) => ({
     ...normalizeTagRow(row),
@@ -2931,6 +3256,346 @@ function ensureTypedEntitySync(db: DatabaseSync, kind: BooruEntityKind, name: st
       created_at: createdAt,
       resource_count: 0,
     }),
+  };
+}
+
+function normalizeRecommendationDraftIds(value: unknown) {
+  return uniqueBooruIds(
+    (Array.isArray(value) ? value : []).map((item) => (
+      typeof item === "string"
+        ? item
+        : (item && typeof item === "object" ? (item as any).id : null)
+    )),
+  );
+}
+
+function normalizeRecommendationDraft(value: unknown): NormalizedRecommendationDraft {
+  const rawDraft = (value && typeof value === "object" ? value : {}) as RecommendationDraftPayload;
+  return {
+    reality: normalizeBooruReality(rawDraft?.reality),
+    authors: normalizeRecommendationDraftIds(rawDraft?.authors),
+    artists: normalizeRecommendationDraftIds(rawDraft?.artists),
+    characters: normalizeRecommendationDraftIds(rawDraft?.characters),
+    universes: normalizeRecommendationDraftIds(rawDraft?.universes),
+    manualTags: normalizeRecommendationDraftIds(rawDraft?.manualTags),
+  };
+}
+
+function normalizeRecommendationSearch(value: unknown) {
+  const parsed = parseBooruSearchSyntax(value);
+  const explicitToken = parsed.tokens.find((token: any) => !token?.negative && (
+    token?.type === "entity" || token?.type === "tag"
+  )) || null;
+  const searchText = normalizeBooruOptionalText(
+    explicitToken?.value || parsed.query.text || parsed.raw,
+  );
+  return {
+    raw: parsed.raw,
+    explicitToken,
+    searchText,
+  };
+}
+
+function resolveEntityIdsFromFiltersSync(
+  db: DatabaseSync,
+  kind: BooruEntityKind,
+  filters: NormalizedResourceEntityFilter[] = [],
+) {
+  const resolvedIds = new Set<string>();
+
+  for (const filter of filters) {
+    if (filter.kind !== kind) {
+      continue;
+    }
+
+    if (filter.id) {
+      resolvedIds.add(filter.id);
+      continue;
+    }
+
+    if (!filter.value) {
+      continue;
+    }
+
+    const comparableFilterValue = normalizeBooruComparableText(filter.value);
+    const matchedRows = listEntitiesSync(db, kind, filter.value)
+      .filter((row: any) => normalizeBooruComparableText(row?.displayName) === comparableFilterValue
+        || normalizeBooruComparableText(row?.slug) === comparableFilterValue)
+      .slice(0, 6);
+
+    for (const row of matchedRows) {
+      if (row?.id) {
+        resolvedIds.add(row.id);
+      }
+    }
+  }
+
+  return Array.from(resolvedIds);
+}
+
+function listRelatedArtistCountsByCharacterIdsSync(db: DatabaseSync, characterIds: string[]) {
+  if (!characterIds.length) {
+    return new Map<string, number>();
+  }
+
+  const placeholders = characterIds.map(() => "?").join(", ");
+  const rows = db.prepare(`
+    SELECT rel.artist_id AS artist_id, COUNT(DISTINCT rel.resource_id) AS relation_count
+    FROM booru_resource_artists rel
+    INNER JOIN booru_resource_characters rchar ON rchar.resource_id = rel.resource_id
+    INNER JOIN booru_resources r ON r.id = rel.resource_id
+    WHERE rchar.character_id IN (${placeholders})
+      AND r.classification_state != 'duplicate-review'
+      AND r.trashed_at IS NULL
+    GROUP BY rel.artist_id
+    ORDER BY relation_count DESC, artist_id ASC
+  `).all(...characterIds);
+
+  return new Map(
+    rows.map((row: any) => [String(row?.artist_id || ""), Number(row?.relation_count || 0)]),
+  );
+}
+
+function compareRecommendationItems(left: Record<string, any>, right: Record<string, any>) {
+  const labelCompare = String(left?.label || "").localeCompare(String(right?.label || ""), "es-AR");
+
+  if (labelCompare !== 0) {
+    return labelCompare;
+  }
+
+  const leftCreates = String(left?.type || "").startsWith("create-");
+  const rightCreates = String(right?.type || "").startsWith("create-");
+
+  if (leftCreates !== rightCreates) {
+    return leftCreates ? 1 : -1;
+  }
+
+  return String(left?.id || "").localeCompare(String(right?.id || ""), "es-AR");
+}
+
+function buildRecommendationItemsSync(
+  db: DatabaseSync,
+  payload: ListRecommendationsPayload = {},
+) {
+  const recommendationSearch = normalizeRecommendationSearch(payload?.query);
+  const resourceQuery = normalizeResourceQuery(payload?.resourceQuery);
+  const draft = normalizeRecommendationDraft(payload?.draft);
+  const selectedResourceIds = uniqueBooruIds(payload?.selectedResourceIds);
+  const selectedResources = getResourceRowsByIdsSync(db, selectedResourceIds);
+  const comparableSearchText = normalizeBooruComparableText(recommendationSearch.searchText);
+  const explicitKind = recommendationSearch.explicitToken?.type === "entity"
+    ? recommendationSearch.explicitToken.kind as BooruEntityKind
+    : null;
+  const explicitTagMode = recommendationSearch.explicitToken?.type === "tag";
+  const searchText = recommendationSearch.searchText;
+  const selectedRealityValues = Array.from(new Set(
+    selectedResources
+      .map((resource: any) => resource?.reality || null)
+      .filter((value) => value === "real" || value === "ficticio"),
+  ));
+  const selectedReality = selectedRealityValues.length === 1
+    ? selectedRealityValues[0] as "real" | "ficticio"
+    : null;
+  const resourceFilterKinds = Array.from(new Set(resourceQuery.includeEntities.map((filter) => filter.kind)));
+  const singleResourceFilterKind = resourceFilterKinds.length === 1 ? resourceFilterKinds[0] : null;
+  const selectedUniverseIds = uniqueBooruIds(selectedResources.flatMap((resource: any) => ([
+    ...(Array.isArray(resource?.universes) ? resource.universes.map((item: any) => item?.id) : []),
+    ...(Array.isArray(resource?.characters) ? resource.characters.map((item: any) => item?.universe?.id) : []),
+  ])));
+  const selectedCharacterIds = uniqueBooruIds(
+    selectedResources.flatMap((resource: any) => (
+      Array.isArray(resource?.characters) ? resource.characters.map((item: any) => item?.id) : []
+    )),
+  );
+  const universeContextIds = uniqueBooruIds([
+    ...draft.universes,
+    ...resolveEntityIdsFromFiltersSync(db, "universe", resourceQuery.includeEntities),
+    ...selectedUniverseIds,
+  ]);
+  const characterContextIds = uniqueBooruIds([
+    ...draft.characters,
+    ...resolveEntityIdsFromFiltersSync(db, "character", resourceQuery.includeEntities),
+    ...selectedCharacterIds,
+  ]);
+  const relatedArtistCounts = listRelatedArtistCountsByCharacterIdsSync(db, characterContextIds);
+  const effectiveReality = resourceQuery.reality || draft.reality || selectedReality || null;
+  const activeMissingFilter = resourceQuery.missing;
+  const needsRealityChoice = !effectiveReality && !explicitKind && !explicitTagMode;
+  let narrowKind: BooruEntityKind | null = null;
+  let includeTags = !explicitKind;
+
+  if (explicitKind) {
+    narrowKind = explicitKind;
+    includeTags = false;
+  } else if (explicitTagMode) {
+    narrowKind = null;
+    includeTags = true;
+  } else if (!needsRealityChoice) {
+    if (activeMissingFilter === "author") {
+      narrowKind = "author";
+      includeTags = false;
+    } else if (activeMissingFilter === "character") {
+      narrowKind = "character";
+      includeTags = false;
+    } else if (activeMissingFilter === "artist") {
+      narrowKind = "artist";
+      includeTags = false;
+    } else if (activeMissingFilter === "universe") {
+      narrowKind = "universe";
+      includeTags = false;
+    } else if (universeContextIds.length) {
+      narrowKind = "character";
+      includeTags = false;
+    } else if (characterContextIds.length) {
+      narrowKind = "artist";
+      includeTags = false;
+    } else if (singleResourceFilterKind === "author") {
+      narrowKind = "author";
+      includeTags = false;
+    } else if (effectiveReality === "real") {
+      narrowKind = "author";
+      includeTags = false;
+    }
+  }
+
+  const candidateKinds = explicitTagMode
+    ? []
+    : narrowKind
+    ? [narrowKind]
+    : effectiveReality === "ficticio"
+      ? (["character", "artist", "universe"] as BooruEntityKind[])
+      : (["author", "artist", "character", "universe"] as BooruEntityKind[]);
+  const contextualCreateKind = explicitKind
+    || (!includeTags && candidateKinds.length === 1 ? candidateKinds[0] : null);
+  const seenItemIds = new Set<string>();
+  const items: Array<Record<string, any>> = [];
+
+  const pushItem = (item: Record<string, any>) => {
+    if (!item?.id || seenItemIds.has(item.id)) {
+      return;
+    }
+
+    seenItemIds.add(item.id);
+    items.push(item);
+  };
+
+  if (needsRealityChoice) {
+    for (const realityOption of ["real", "ficticio"] as const) {
+      const label = realityOption === "real" ? "Real" : "Ficticio";
+
+      if (
+        comparableSearchText
+        && !normalizeBooruComparableText(label).includes(comparableSearchText)
+      ) {
+        continue;
+      }
+
+      pushItem({
+        id: `reality:${realityOption}`,
+        type: "reality-action",
+        label,
+        detail: "Clasificacion base",
+        actionLabel: "Aplicar",
+        reality: realityOption,
+      });
+    }
+
+    return items.sort(compareRecommendationItems);
+  }
+
+  for (const kind of candidateKinds) {
+    listEntitiesSync(db, kind, searchText)
+      .filter((row: any) => {
+        if (kind === "character" && universeContextIds.length) {
+          return universeContextIds.includes(String(row?.universe?.id || ""));
+        }
+
+        if (kind === "artist" && characterContextIds.length) {
+          return relatedArtistCounts.has(String(row?.id || ""));
+        }
+
+        return true;
+      })
+      .forEach((row: any) => {
+        pushItem({
+          id: `entity:${kind}:${row.id}`,
+          type: "entity",
+          kind,
+          entityId: row.id,
+          label: row.displayName,
+          detail: row?.universe?.displayName
+            ? `${BOORU_ENTITY_KIND_LABELS[kind]} · ${row.universe.displayName} · ${row.resourceCount} recursos`
+            : `${BOORU_ENTITY_KIND_LABELS[kind]} · ${row.resourceCount} recursos`,
+          actionLabel: "Aplicar",
+          resourceCount: Number(row?.resourceCount || 0),
+          entity: row,
+          dropEnabled: true,
+        });
+      });
+  }
+
+  if (includeTags) {
+    listTagsSync(db, searchText).forEach((tag: any) => {
+      pushItem({
+        id: `tag:${tag.id}`,
+        type: "tag",
+        kind: "tag",
+        tagId: tag.id,
+        label: tag.name,
+        detail: `Tag · ${tag.resourceCount} recursos`,
+        actionLabel: "Aplicar",
+        resourceCount: Number(tag?.resourceCount || 0),
+        tag,
+      });
+    });
+  }
+
+  if (searchText) {
+    if (contextualCreateKind) {
+      const exactEntity = findEntityByExactNameSync(db, contextualCreateKind, searchText);
+
+      if (!exactEntity) {
+        pushItem({
+          id: `create-entity:${contextualCreateKind}:${normalizeBooruComparableText(searchText)}`,
+          type: "create-entity",
+          kind: contextualCreateKind,
+          label: searchText,
+          detail: `Crear ${BOORU_ENTITY_KIND_LABELS[contextualCreateKind]}`,
+          actionLabel: "Crear",
+          createName: searchText,
+        });
+      }
+    } else {
+      const exactTag = findTagByExactNameSync(db, searchText);
+
+      if (!exactTag) {
+        pushItem({
+          id: `create-tag:${normalizeBooruComparableText(searchText)}`,
+          type: "create-tag",
+          kind: "tag",
+          label: searchText,
+          detail: "Crear tag plana",
+          actionLabel: "Crear",
+          createName: searchText,
+        });
+      }
+    }
+  }
+
+  return items.sort(compareRecommendationItems);
+}
+
+function listRecommendationsSync(
+  db: DatabaseSync,
+  payload: ListRecommendationsPayload = {},
+) {
+  const offset = normalizePagingNumber(payload?.offset, 0, Number.MAX_SAFE_INTEGER);
+  const limit = Math.max(1, normalizePagingNumber(payload?.limit, BOORU_RECOMMENDATION_PAGE_SIZE, MAX_RESOURCE_PAGE_SIZE));
+  const items = buildRecommendationItemsSync(db, payload);
+  return {
+    items: items.slice(offset, offset + limit),
+    totalCount: items.length,
+    hasMore: offset + limit < items.length,
   };
 }
 
@@ -4140,14 +4805,7 @@ const booruPlugin: NexusBackendPluginModule = {
           performance.now() - startedAt,
           {
             section: result.section,
-            search: normalizeBooruOptionalText(payload?.search),
-            quickFilter: normalizeQuickFilter(payload?.quickFilter),
-            entityFilterCount: result.entityFilters.length,
-            entityFilters: result.entityFilters.map((filter) => ({
-              kind: filter.kind,
-              id: filter.id,
-              label: filter.label,
-            })),
+            query: result.query,
             offset: normalizePagingNumber(payload?.offset, 0, Number.MAX_SAFE_INTEGER),
             limit: Math.max(1, normalizePagingNumber(payload?.limit, DEFAULT_RESOURCE_PAGE_SIZE, MAX_RESOURCE_PAGE_SIZE)),
             itemCount: result.items.length,
@@ -4269,6 +4927,31 @@ const booruPlugin: NexusBackendPluginModule = {
         });
       } catch (error) {
         return createError(error, "No se pudo listar tags de Booru.");
+      }
+    });
+
+    ctx.registerIpc("booru:list-recommendations", async (_event, payload: ListRecommendationsPayload) => {
+      const startedAt = performance.now();
+      try {
+        const db = assertRuntimeDb();
+        const result = listRecommendationsSync(db, payload);
+        logBackendDuration(
+          "booru.recommendations.list.done",
+          "Booru resolvio una pagina de recomendaciones.",
+          performance.now() - startedAt,
+          {
+            query: normalizeBooruOptionalText(payload?.query),
+            offset: normalizePagingNumber(payload?.offset, 0, Number.MAX_SAFE_INTEGER),
+            limit: Math.max(1, normalizePagingNumber(payload?.limit, BOORU_RECOMMENDATION_PAGE_SIZE, MAX_RESOURCE_PAGE_SIZE)),
+            itemCount: result.items.length,
+            totalCount: result.totalCount,
+            hasMore: result.hasMore,
+            sampleIds: summarizeIdsForLog(result.items),
+          },
+        );
+        return createSuccess(result);
+      } catch (error) {
+        return createError(error, "No se pudieron listar recomendaciones de Booru.");
       }
     });
 
