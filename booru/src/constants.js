@@ -5,13 +5,11 @@ export const BOORU_DEFAULT_SECTION = "media";
 export const BOORU_SECTION_OPTIONS = [
   { value: "media", label: "Media" },
   { value: "pending", label: "Pendientes" },
-  { value: "duplicates", label: "Duplicados" },
-  { value: "trash", label: "Papelera" },
-  { value: "metrics", label: "Metricas" },
   { value: "authors", label: "Persona" },
   { value: "characters", label: "Characters" },
   { value: "artists", label: "Artists" },
   { value: "universes", label: "Universes" },
+  { value: "settings", label: "Ajustes" },
 ];
 
 export const BOORU_CLASSIFICATION_LABELS = Object.freeze({

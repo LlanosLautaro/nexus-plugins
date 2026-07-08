@@ -148,7 +148,6 @@ export function parseBooruSearchSyntax(value) {
   const includeTags = [];
   const excludeTags = [];
   let missing = null;
-  const plainTextTokens = [];
   const rawTokens = tokenizeBooruQuery(value);
   let mediaKind = null;
   let reality = null;
@@ -161,12 +160,36 @@ export function parseBooruSearchSyntax(value) {
       continue;
     }
 
-    const negative = trimmedToken.startsWith("-") && trimmedToken.includes(":");
+    const negative = trimmedToken.startsWith("-") && trimmedToken.length > 1;
     const normalizedToken = negative ? trimmedToken.slice(1) : trimmedToken;
     const separatorIndex = normalizedToken.indexOf(":");
 
     if (separatorIndex <= 0) {
-      plainTextTokens.push(unquoteBooruQueryValue(trimmedToken));
+      const tokenValue = unquoteBooruQueryValue(normalizedToken);
+
+      if (!tokenValue) {
+        continue;
+      }
+
+      const item = {
+        id: null,
+        value: tokenValue,
+        label: tokenValue,
+      };
+
+      tokens.push({
+        raw: trimmedToken,
+        type: "tag",
+        negative,
+        id: null,
+        value: tokenValue,
+      });
+
+      if (negative) {
+        excludeTags.push(item);
+      } else {
+        includeTags.push(item);
+      }
       continue;
     }
 
@@ -183,6 +206,7 @@ export function parseBooruSearchSyntax(value) {
     if (entityKind) {
       const item = {
         kind: entityKind,
+        id: null,
         value: tokenValue,
         label: tokenValue,
       };
@@ -192,6 +216,7 @@ export function parseBooruSearchSyntax(value) {
         type: "entity",
         kind: entityKind,
         negative,
+        id: null,
         value: tokenValue,
       });
 
@@ -207,6 +232,7 @@ export function parseBooruSearchSyntax(value) {
 
     if (normalizedPrefix === "tag") {
       const item = {
+        id: null,
         value: tokenValue,
         label: tokenValue,
       };
@@ -215,6 +241,7 @@ export function parseBooruSearchSyntax(value) {
         raw: trimmedToken,
         type: "tag",
         negative,
+        id: null,
         value: tokenValue,
       });
 
@@ -230,7 +257,31 @@ export function parseBooruSearchSyntax(value) {
       const nextReality = normalizeBooruReality(tokenValue);
 
       if (!nextReality) {
-        plainTextTokens.push(unquoteBooruQueryValue(trimmedToken));
+        const fallbackTagValue = unquoteBooruQueryValue(normalizedToken);
+
+        if (!fallbackTagValue) {
+          continue;
+        }
+
+        const item = {
+          id: null,
+          value: fallbackTagValue,
+          label: fallbackTagValue,
+        };
+
+        tokens.push({
+          raw: trimmedToken,
+          type: "tag",
+          negative,
+          id: null,
+          value: fallbackTagValue,
+        });
+
+        if (negative) {
+          excludeTags.push(item);
+        } else {
+          includeTags.push(item);
+        }
         continue;
       }
 
@@ -248,7 +299,31 @@ export function parseBooruSearchSyntax(value) {
       const nextMediaKind = normalizeBooruComparableText(tokenValue);
 
       if (!BOORU_MEDIA_KIND_SET.has(nextMediaKind)) {
-        plainTextTokens.push(unquoteBooruQueryValue(trimmedToken));
+        const fallbackTagValue = unquoteBooruQueryValue(normalizedToken);
+
+        if (!fallbackTagValue) {
+          continue;
+        }
+
+        const item = {
+          id: null,
+          value: fallbackTagValue,
+          label: fallbackTagValue,
+        };
+
+        tokens.push({
+          raw: trimmedToken,
+          type: "tag",
+          negative,
+          id: null,
+          value: fallbackTagValue,
+        });
+
+        if (negative) {
+          excludeTags.push(item);
+        } else {
+          includeTags.push(item);
+        }
         continue;
       }
 
@@ -266,7 +341,31 @@ export function parseBooruSearchSyntax(value) {
       const nextStatus = normalizeBooruComparableText(tokenValue);
 
       if (nextStatus !== "unclassified") {
-        plainTextTokens.push(unquoteBooruQueryValue(trimmedToken));
+        const fallbackTagValue = unquoteBooruQueryValue(normalizedToken);
+
+        if (!fallbackTagValue) {
+          continue;
+        }
+
+        const item = {
+          id: null,
+          value: fallbackTagValue,
+          label: fallbackTagValue,
+        };
+
+        tokens.push({
+          raw: trimmedToken,
+          type: "tag",
+          negative,
+          id: null,
+          value: fallbackTagValue,
+        });
+
+        if (negative) {
+          excludeTags.push(item);
+        } else {
+          includeTags.push(item);
+        }
         continue;
       }
 
@@ -284,7 +383,31 @@ export function parseBooruSearchSyntax(value) {
       const normalizedMissing = normalizeBooruMissingFilter(tokenValue);
 
       if (!normalizedMissing) {
-        plainTextTokens.push(unquoteBooruQueryValue(trimmedToken));
+        const fallbackTagValue = unquoteBooruQueryValue(normalizedToken);
+
+        if (!fallbackTagValue) {
+          continue;
+        }
+
+        const item = {
+          id: null,
+          value: fallbackTagValue,
+          label: fallbackTagValue,
+        };
+
+        tokens.push({
+          raw: trimmedToken,
+          type: "tag",
+          negative,
+          id: null,
+          value: fallbackTagValue,
+        });
+
+        if (negative) {
+          excludeTags.push(item);
+        } else {
+          includeTags.push(item);
+        }
         continue;
       }
 
@@ -298,14 +421,37 @@ export function parseBooruSearchSyntax(value) {
       continue;
     }
 
-    plainTextTokens.push(unquoteBooruQueryValue(trimmedToken));
+    const fallbackTagValue = unquoteBooruQueryValue(normalizedToken);
+
+    if (!fallbackTagValue) {
+      continue;
+    }
+
+    const item = {
+      id: null,
+      value: fallbackTagValue,
+      label: fallbackTagValue,
+    };
+
+    tokens.push({
+      raw: trimmedToken,
+      type: "tag",
+      negative,
+      id: null,
+      value: fallbackTagValue,
+    });
+
+    if (negative) {
+      excludeTags.push(item);
+    } else {
+      includeTags.push(item);
+    }
   }
 
   return {
     raw: normalizeBooruText(value),
     tokens,
     query: {
-      text: normalizeBooruOptionalText(plainTextTokens.join(" ")),
       mediaKind,
       reality,
       classificationState,
