@@ -35,6 +35,7 @@ __export(backend_exports, {
 module.exports = __toCommonJS(backend_exports);
 var import_node_fs3 = __toESM(require("node:fs"));
 var import_promises4 = __toESM(require("node:fs/promises"));
+var import_node_os2 = __toESM(require("node:os"));
 var import_node_path2 = __toESM(require("node:path"));
 var import_node_crypto = __toESM(require("node:crypto"));
 var import_node_child_process = require("node:child_process");
@@ -2315,6 +2316,7 @@ function parseBooruSearchSyntax(value) {
 }
 
 // ../nexus-plugins/booru/src/backend.ts
+var CLIPBOARD_IMAGE_TEMP_ROOT = import_node_path2.default.join(import_node_os2.default.tmpdir(), "new-nexus", "clipboard-images");
 var IMAGE_EXTENSIONS = /* @__PURE__ */ new Set([
   ".jpg",
   ".jpeg",
@@ -3006,6 +3008,7 @@ function getCanonicalResourceByHash(db, contentHash) {
     FROM booru_resources
     WHERE content_hash = ?
       AND classification_state != 'duplicate-review'
+      AND trashed_at IS NULL
     ORDER BY imported_at ASC
     LIMIT 1
   `);
@@ -3534,6 +3537,30 @@ async function moveFile(sourcePath, targetPath) {
   }
   await import_promises4.default.copyFile(sourcePath, targetPath);
   await import_promises4.default.unlink(sourcePath);
+}
+function isPathInsideDirectory(parentPath, candidatePath) {
+  const normalizedParent = import_node_path2.default.resolve(parentPath);
+  const normalizedCandidate = import_node_path2.default.resolve(candidatePath);
+  const relativePath = import_node_path2.default.relative(normalizedParent, normalizedCandidate);
+  if (!relativePath) {
+    return true;
+  }
+  return !relativePath.startsWith("..") && !import_node_path2.default.isAbsolute(relativePath);
+}
+function assertClipboardTempFilePath(tempFilePath) {
+  const rawPath = String(tempFilePath || "").trim();
+  if (!rawPath) {
+    throw new Error("No se encontro una imagen temporal valida para Booru.");
+  }
+  const normalizedPath = import_node_path2.default.resolve(rawPath);
+  if (!isPathInsideDirectory(CLIPBOARD_IMAGE_TEMP_ROOT, normalizedPath)) {
+    throw new Error("La imagen temporal del portapapeles no pertenece al staging autorizado.");
+  }
+  return normalizedPath;
+}
+function buildClipboardImportedFilename() {
+  const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+  return `clipboard-${timestamp}.png`;
 }
 function probePythonCommand(command) {
   const result = (0, import_node_child_process.spawnSync)(
@@ -5713,6 +5740,48 @@ function quickAssignEntitySync(db, payload) {
   }).flatMap((resourceValue) => Array.isArray(resourceValue) ? resourceValue : [resourceValue]);
   return updatedResources.length === 1 ? updatedResources[0] : updatedResources;
 }
+async function pasteClipboardImageToEntitySync(ctx, db, payload) {
+  const kind = normalizeBooruText(payload?.kind);
+  const entityId = normalizeBooruText(payload?.entityId);
+  const tempFilePath = assertClipboardTempFilePath(payload?.tempFilePath);
+  if (!ENTITY_TABLES[kind]) {
+    throw new Error("El tipo de entidad solicitado no existe en Booru.");
+  }
+  if (!entityId) {
+    throw new Error("La entidad solicitada no es valida.");
+  }
+  if (!findEntityByIdSync(db, kind, entityId)) {
+    throw new Error("La entidad objetivo ya no existe.");
+  }
+  try {
+    const ingestResult = await ingestFile(ctx, tempFilePath, {
+      duplicateMode: "reuse-canonical",
+      updateWatcherState: false,
+      sourcePathOverride: "clipboard://image",
+      originalFilenameOverride: buildClipboardImportedFilename()
+    });
+    if (!ingestResult?.resource?.id) {
+      throw new Error("No se pudo importar la imagen del portapapeles a Booru.");
+    }
+    const resource = quickAssignEntitySync(db, {
+      resourceId: ingestResult.resource.id,
+      kind,
+      entityId
+    });
+    const profile = getEntityProfileSync(db, kind, entityId);
+    if (!profile) {
+      throw new Error("No se pudo reconstruir el perfil despues del pegado.");
+    }
+    return {
+      profile,
+      resource,
+      reusedCanonical: ingestResult.reusedCanonical,
+      createdResourceId: ingestResult.createdResourceId
+    };
+  } finally {
+    await removeFileIfExists(tempFilePath);
+  }
+}
 function normalizeRequestedResourceIds(value, fallbackResourceId = null) {
   return uniqueBooruIds([
     normalizeBooruOptionalText(fallbackResourceId),
@@ -5874,27 +5943,44 @@ async function openResourceInBraveSync(db, payload) {
     `No se pudo abrir Brave con el perfil ${BRAVE_PROFILE_DIRECTORY}. ${spawnErrors.join(" | ")}`.trim()
   );
 }
-async function ingestFile(ctx, filePath) {
+async function ingestFile(ctx, filePath, options = {}) {
   const state = runtimeState;
   if (!state || !state.db) {
-    return;
+    return null;
   }
   const absoluteFilePath = import_node_path2.default.resolve(filePath);
   const mediaDescriptor = resolveMediaDescriptor(absoluteFilePath);
+  const duplicateMode = options.duplicateMode || "create-review";
+  const updateWatcherState = options.updateWatcherState !== false;
   if (!mediaDescriptor) {
-    return;
+    return null;
   }
   if (!import_node_fs3.default.existsSync(absoluteFilePath)) {
-    return;
+    return null;
   }
   const contentHash = await computeFileHash(absoluteFilePath);
   const canonicalResource = getCanonicalResourceByHash(state.db, contentHash);
+  if (canonicalResource && duplicateMode === "reuse-canonical") {
+    const reusedResource = getResourceByIdSync(state.db, String(canonicalResource.id || ""));
+    if (!reusedResource) {
+      throw new Error("No se pudo reutilizar el recurso canonico detectado en Booru.");
+    }
+    queueThumbnailGeneration([reusedResource.id], "high");
+    return {
+      resource: reusedResource,
+      createdResourceId: null,
+      reusedCanonical: true
+    };
+  }
   const importedAt = nowIso();
   const resourceId = import_node_crypto.default.randomUUID();
-  const originalFilename = import_node_path2.default.basename(absoluteFilePath);
+  const originalFilename = String(
+    options.originalFilenameOverride || import_node_path2.default.basename(absoluteFilePath)
+  ).trim() || import_node_path2.default.basename(absoluteFilePath);
   const targetRoot = canonicalResource ? state.duplicatesRoot : state.mediaRoot;
   const storageFilename = `${resourceId}${mediaDescriptor.extension}`;
   const storagePath = import_node_path2.default.join(targetRoot, storageFilename);
+  const sourcePath = options.sourcePathOverride === void 0 ? absoluteFilePath : options.sourcePathOverride || null;
   await moveFile(absoluteFilePath, storagePath);
   const fileStat = await import_promises4.default.stat(storagePath);
   state.db.prepare(`
@@ -5938,7 +6024,7 @@ async function ingestFile(ctx, filePath) {
     null,
     canonicalResource ? "duplicate-review" : "unclassified",
     canonicalResource ? String(canonicalResource.id || "") : null,
-    absoluteFilePath,
+    sourcePath,
     "pending",
     null,
     importedAt,
@@ -5946,11 +6032,18 @@ async function ingestFile(ctx, filePath) {
   );
   ensureThumbnailPendingRowSync(state.db, resourceId, contentHash);
   queueThumbnailGeneration([resourceId], "high");
-  state.watcherState.lastIngestedAt = importedAt;
-  state.watcherState.lastIngestedOriginalFilename = originalFilename;
-  state.watcherState.lastIngestedStoragePath = storagePath;
-  state.watcherState.lastError = "";
+  if (updateWatcherState) {
+    state.watcherState.lastIngestedAt = importedAt;
+    state.watcherState.lastIngestedOriginalFilename = originalFilename;
+    state.watcherState.lastIngestedStoragePath = storagePath;
+    state.watcherState.lastError = "";
+  }
   scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion", "watcherVersion");
+  return {
+    resource: getResourceByIdSync(state.db, resourceId),
+    createdResourceId: resourceId,
+    reusedCanonical: false
+  };
 }
 function queueIngest(ctx, filePath) {
   const state = runtimeState;
@@ -6405,6 +6498,32 @@ var booruPlugin = {
         });
       } catch (error) {
         return createError(error, "No se pudo aplicar la asignacion rapida en Booru.");
+      }
+    });
+    ctx.registerIpc("booru:paste-clipboard-image-to-entity", async (_event, payload) => {
+      const startedAt = performance.now();
+      try {
+        const db = assertRuntimeDb();
+        const result = await pasteClipboardImageToEntitySync(ctx, db, payload);
+        scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion");
+        logBackendDuration(
+          "booru.clipboard-paste.done",
+          "Booru importo una imagen del portapapeles y la asigno a una entidad.",
+          performance.now() - startedAt,
+          {
+            kind: normalizeBooruOptionalText(payload?.kind),
+            entityId: normalizeBooruOptionalText(payload?.entityId),
+            createdResourceId: normalizeBooruOptionalText(result?.createdResourceId),
+            reusedCanonical: Boolean(result?.reusedCanonical),
+            resultResourceIds: summarizeIdsForLog(Array.isArray(result?.resource) ? result.resource : [result?.resource])
+          }
+        );
+        return createSuccess({
+          ...result,
+          snapshot: buildResourcesSnapshot(ctx, await ctx.settings.get())
+        });
+      } catch (error) {
+        return createError(error, "No se pudo pegar la imagen del portapapeles en Booru.");
       }
     });
     ctx.registerIpc("booru:trash-resources", async (_event, payload) => {

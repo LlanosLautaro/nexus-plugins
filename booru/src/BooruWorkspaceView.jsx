@@ -279,6 +279,14 @@ function isFormControlElement(target) {
   return Boolean(interactiveNode);
 }
 
+function isTextEntryElement(target) {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+}
+
 function summarizeIdsForLog(items, maxCount = 8) {
   return (Array.isArray(items) ? items : [])
     .map((item) => String(item?.id || item || "").trim())
@@ -4255,7 +4263,7 @@ function EntityProfileGalleryGrid({
       <StateBlock
         centered
         title="Sin recursos todavia"
-        description="Cuando esta entidad consuma media real, aparecera aqui."
+        description="Cuando esta entidad consuma media real, aparecera aqui. Ctrl/Cmd+V pega una imagen del portapapeles y la asigna a este perfil."
       />
     );
   }
@@ -4582,8 +4590,10 @@ function EntityProfileView({
   onVisualContextMenu,
   onGalleryResourceContextMenu,
   onGalleryResourceOpen,
+  onPasteClipboardImage,
   onProfileChange,
 }) {
+  const entityProfileRootRef = useRef(null);
   const bannerSource = profile?.banner?.sampleStoragePath
     ? {
       pathValue: profile.banner.sampleStoragePath,
@@ -4616,9 +4626,36 @@ function EntityProfileView({
     profileMeta.push(profile.universe.displayName);
   }
 
+  useEffect(() => {
+    entityProfileRootRef.current?.focus();
+  }, [kind, profile?.id]);
+
+  const handleKeyDownCapture = (event) => {
+    if (
+      event.defaultPrevented
+      || !(event.ctrlKey || event.metaKey)
+      || event.altKey
+      || String(event.key || "").toLowerCase() !== "v"
+      || isTextEntryElement(event.target)
+      || typeof onPasteClipboardImage !== "function"
+      || entityMutationBusy
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    void onPasteClipboardImage();
+  };
+
   return (
     <SectionPanel className="booruView__panel booruView__panel--fill booruView__entityProfile">
-      <div className="booruView__resourcePanelBody">
+      <div
+        ref={entityProfileRootRef}
+        className="booruView__resourcePanelBody"
+        tabIndex={-1}
+        onKeyDownCapture={handleKeyDownCapture}
+      >
         <div className="booruView__resourcePanelContent booruView__entityProfileContent">
           <div className="booruView__entityProfileToolbar">
             <Button type="button" onClick={() => onBack?.()}>
@@ -7464,6 +7501,44 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     }
   };
 
+  const handlePasteClipboardImageToEntity = async () => {
+    if (!showEntityProfile || !activeEntityKind || !activeEntityProfile?.id || entityBusy) {
+      return;
+    }
+
+    setEntityBusy(true);
+
+    try {
+      const tempFilePath = await window.nexus.clipboard.exportImageToTempFile("booru-entity");
+      const result = await invoke("booru:paste-clipboard-image-to-entity", {
+        kind: activeEntityKind,
+        entityId: activeEntityProfile.id,
+        tempFilePath,
+      });
+
+      setSnapshot(result?.snapshot || snapshot);
+      if (result?.profile) {
+        setEntityProfile(result.profile);
+      }
+      setEntityError("");
+      setEntityProfileError("");
+      setEntityRevision((currentValue) => currentValue + 1);
+      setEntityProfilePageForSection(activeSection, 1);
+
+      if (activeEntityProfile?.tab !== "data" && currentEntityProfilePage === 1) {
+        await loadEntityProfileGallery({ requestedPage: 1 });
+      }
+    } catch (pasteError) {
+      setEntityProfileError(
+        pasteError instanceof Error
+          ? pasteError.message
+          : "No se pudo pegar la imagen del portapapeles en esta entidad.",
+      );
+    } finally {
+      setEntityBusy(false);
+    }
+  };
+
   const handleEnsureSectionEntity = async () => {
     const trimmedName = String(entityCreateValue || "").trim();
 
@@ -7960,6 +8035,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                           onVisualContextMenu={openEntityProfileVisualContextMenu}
                           onGalleryResourceContextMenu={openEntityProfileResourceContextMenu}
                           onGalleryResourceOpen={openResourceHero}
+                          onPasteClipboardImage={handlePasteClipboardImageToEntity}
                           onProfileChange={setEntityProfile}
                         />
                       ) : (

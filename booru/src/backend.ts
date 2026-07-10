@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
@@ -249,6 +250,12 @@ type QuickAssignEntityPayload = {
   entityId?: unknown;
 };
 
+type PasteClipboardImageToEntityPayload = {
+  kind?: unknown;
+  entityId?: unknown;
+  tempFilePath?: unknown;
+};
+
 type SetCharacterUniversePayload = {
   characterId?: unknown;
   universeId?: unknown;
@@ -299,6 +306,21 @@ type SpawnedJsonExecutionResult = {
   stderr: string;
   stdout: string;
 };
+
+type IngestFileOptions = {
+  duplicateMode?: "create-review" | "reuse-canonical";
+  updateWatcherState?: boolean;
+  sourcePathOverride?: string | null;
+  originalFilenameOverride?: string | null;
+};
+
+type IngestFileResult = {
+  resource: any;
+  createdResourceId: string | null;
+  reusedCanonical: boolean;
+};
+
+const CLIPBOARD_IMAGE_TEMP_ROOT = path.join(os.tmpdir(), "new-nexus", "clipboard-images");
 
 const IMAGE_EXTENSIONS = new Set([
   ".jpg",
@@ -1121,6 +1143,7 @@ function getCanonicalResourceByHash(db: DatabaseSync, contentHash: string) {
     FROM booru_resources
     WHERE content_hash = ?
       AND classification_state != 'duplicate-review'
+      AND trashed_at IS NULL
     ORDER BY imported_at ASC
     LIMIT 1
   `);
@@ -1776,6 +1799,42 @@ async function moveFile(sourcePath: string, targetPath: string) {
 
   await fsp.copyFile(sourcePath, targetPath);
   await fsp.unlink(sourcePath);
+}
+
+function isPathInsideDirectory(parentPath: string, candidatePath: string) {
+  const normalizedParent = path.resolve(parentPath);
+  const normalizedCandidate = path.resolve(candidatePath);
+  const relativePath = path.relative(normalizedParent, normalizedCandidate);
+
+  if (!relativePath) {
+    return true;
+  }
+
+  return !relativePath.startsWith("..") && !path.isAbsolute(relativePath);
+}
+
+function assertClipboardTempFilePath(tempFilePath: unknown) {
+  const rawPath = String(tempFilePath || "").trim();
+
+  if (!rawPath) {
+    throw new Error("No se encontro una imagen temporal valida para Booru.");
+  }
+
+  const normalizedPath = path.resolve(rawPath);
+
+  if (!isPathInsideDirectory(CLIPBOARD_IMAGE_TEMP_ROOT, normalizedPath)) {
+    throw new Error("La imagen temporal del portapapeles no pertenece al staging autorizado.");
+  }
+
+  return normalizedPath;
+}
+
+function buildClipboardImportedFilename() {
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[:.]/g, "-");
+
+  return `clipboard-${timestamp}.png`;
 }
 
 function probePythonCommand(command: string): PythonStatus {
@@ -4619,6 +4678,61 @@ function quickAssignEntitySync(db: DatabaseSync, payload: QuickAssignEntityPaylo
   return updatedResources.length === 1 ? updatedResources[0] : updatedResources;
 }
 
+async function pasteClipboardImageToEntitySync(
+  ctx: NexusBackendPluginContext,
+  db: DatabaseSync,
+  payload: PasteClipboardImageToEntityPayload,
+) {
+  const kind = normalizeBooruText(payload?.kind) as BooruEntityKind;
+  const entityId = normalizeBooruText(payload?.entityId);
+  const tempFilePath = assertClipboardTempFilePath(payload?.tempFilePath);
+
+  if (!ENTITY_TABLES[kind]) {
+    throw new Error("El tipo de entidad solicitado no existe en Booru.");
+  }
+
+  if (!entityId) {
+    throw new Error("La entidad solicitada no es valida.");
+  }
+
+  if (!findEntityByIdSync(db, kind, entityId)) {
+    throw new Error("La entidad objetivo ya no existe.");
+  }
+
+  try {
+    const ingestResult = await ingestFile(ctx, tempFilePath, {
+      duplicateMode: "reuse-canonical",
+      updateWatcherState: false,
+      sourcePathOverride: "clipboard://image",
+      originalFilenameOverride: buildClipboardImportedFilename(),
+    });
+
+    if (!ingestResult?.resource?.id) {
+      throw new Error("No se pudo importar la imagen del portapapeles a Booru.");
+    }
+
+    const resource = quickAssignEntitySync(db, {
+      resourceId: ingestResult.resource.id,
+      kind,
+      entityId,
+    });
+    const profile = getEntityProfileSync(db, kind, entityId);
+
+    if (!profile) {
+      throw new Error("No se pudo reconstruir el perfil despues del pegado.");
+    }
+
+    return {
+      profile,
+      resource,
+      reusedCanonical: ingestResult.reusedCanonical,
+      createdResourceId: ingestResult.createdResourceId,
+    };
+  } finally {
+    await removeFileIfExists(tempFilePath);
+  }
+}
+
 function normalizeRequestedResourceIds(value: unknown, fallbackResourceId: unknown = null) {
   return uniqueBooruIds([
     normalizeBooruOptionalText(fallbackResourceId),
@@ -4831,32 +4945,60 @@ async function openResourceInBraveSync(db: DatabaseSync, payload: OpenInBravePay
   );
 }
 
-async function ingestFile(ctx: NexusBackendPluginContext, filePath: string) {
+async function ingestFile(
+  ctx: NexusBackendPluginContext,
+  filePath: string,
+  options: IngestFileOptions = {},
+): Promise<IngestFileResult | null> {
   const state = runtimeState;
 
   if (!state || !state.db) {
-    return;
+    return null;
   }
 
   const absoluteFilePath = path.resolve(filePath);
   const mediaDescriptor = resolveMediaDescriptor(absoluteFilePath);
+  const duplicateMode = options.duplicateMode || "create-review";
+  const updateWatcherState = options.updateWatcherState !== false;
 
   if (!mediaDescriptor) {
-    return;
+    return null;
   }
 
   if (!fs.existsSync(absoluteFilePath)) {
-    return;
+    return null;
   }
 
   const contentHash = await computeFileHash(absoluteFilePath);
   const canonicalResource = getCanonicalResourceByHash(state.db, contentHash);
+
+  if (canonicalResource && duplicateMode === "reuse-canonical") {
+    const reusedResource = getResourceByIdSync(state.db, String(canonicalResource.id || ""));
+
+    if (!reusedResource) {
+      throw new Error("No se pudo reutilizar el recurso canonico detectado en Booru.");
+    }
+
+    queueThumbnailGeneration([reusedResource.id], "high");
+    return {
+      resource: reusedResource,
+      createdResourceId: null,
+      reusedCanonical: true,
+    };
+  }
+
   const importedAt = nowIso();
   const resourceId = crypto.randomUUID();
-  const originalFilename = path.basename(absoluteFilePath);
+  const originalFilename = String(
+    options.originalFilenameOverride
+    || path.basename(absoluteFilePath),
+  ).trim() || path.basename(absoluteFilePath);
   const targetRoot = canonicalResource ? state.duplicatesRoot : state.mediaRoot;
   const storageFilename = `${resourceId}${mediaDescriptor.extension}`;
   const storagePath = path.join(targetRoot, storageFilename);
+  const sourcePath = options.sourcePathOverride === undefined
+    ? absoluteFilePath
+    : (options.sourcePathOverride || null);
 
   await moveFile(absoluteFilePath, storagePath);
 
@@ -4902,7 +5044,7 @@ async function ingestFile(ctx: NexusBackendPluginContext, filePath: string) {
     null,
     canonicalResource ? "duplicate-review" : "unclassified",
     canonicalResource ? String(canonicalResource.id || "") : null,
-    absoluteFilePath,
+    sourcePath,
     "pending",
     null,
     importedAt,
@@ -4911,11 +5053,20 @@ async function ingestFile(ctx: NexusBackendPluginContext, filePath: string) {
   ensureThumbnailPendingRowSync(state.db, resourceId, contentHash);
   queueThumbnailGeneration([resourceId], "high");
 
-  state.watcherState.lastIngestedAt = importedAt;
-  state.watcherState.lastIngestedOriginalFilename = originalFilename;
-  state.watcherState.lastIngestedStoragePath = storagePath;
-  state.watcherState.lastError = "";
+  if (updateWatcherState) {
+    state.watcherState.lastIngestedAt = importedAt;
+    state.watcherState.lastIngestedOriginalFilename = originalFilename;
+    state.watcherState.lastIngestedStoragePath = storagePath;
+    state.watcherState.lastError = "";
+  }
+
   scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion", "watcherVersion");
+
+  return {
+    resource: getResourceByIdSync(state.db, resourceId),
+    createdResourceId: resourceId,
+    reusedCanonical: false,
+  };
 }
 
 function queueIngest(ctx: NexusBackendPluginContext, filePath: string) {
@@ -5438,6 +5589,33 @@ const booruPlugin: NexusBackendPluginModule = {
         });
       } catch (error) {
         return createError(error, "No se pudo aplicar la asignacion rapida en Booru.");
+      }
+    });
+
+    ctx.registerIpc("booru:paste-clipboard-image-to-entity", async (_event, payload: PasteClipboardImageToEntityPayload) => {
+      const startedAt = performance.now();
+      try {
+        const db = assertRuntimeDb();
+        const result = await pasteClipboardImageToEntitySync(ctx, db, payload);
+        scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion");
+        logBackendDuration(
+          "booru.clipboard-paste.done",
+          "Booru importo una imagen del portapapeles y la asigno a una entidad.",
+          performance.now() - startedAt,
+          {
+            kind: normalizeBooruOptionalText(payload?.kind),
+            entityId: normalizeBooruOptionalText(payload?.entityId),
+            createdResourceId: normalizeBooruOptionalText(result?.createdResourceId),
+            reusedCanonical: Boolean(result?.reusedCanonical),
+            resultResourceIds: summarizeIdsForLog(Array.isArray(result?.resource) ? result.resource : [result?.resource]),
+          },
+        );
+        return createSuccess({
+          ...result,
+          snapshot: buildResourcesSnapshot(ctx, await ctx.settings.get()),
+        });
+      } catch (error) {
+        return createError(error, "No se pudo pegar la imagen del portapapeles en Booru.");
       }
     });
 
