@@ -1,6 +1,6 @@
 const { useEffect, useMemo, useState } = window.React;
 
-const { ipcRenderer } = window.require("electron");
+const ipcRenderer = window.nexus.ipc;
 
 function normalizeFieldValue(field, value) {
   if (field.type === "boolean") {

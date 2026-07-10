@@ -45,7 +45,7 @@ import {
   StateBlock,
 } from "../../../../nexus-frontend/src/ui/index.js";
 
-const { ipcRenderer } = window.require("electron");
+const ipcRenderer = window.nexus.ipc;
 const LIFE_TRACKER_FINANCE_CHANNEL_PREFIX = "life-tracker:finance";
 
 const CURRENCY_FORMATTER = new Intl.NumberFormat("es-AR", {

@@ -11,9 +11,7 @@ import {
 } from "./plugin-settings.js";
 import { resolveItemLocationFromItemsState } from "../../../nexus-frontend/src/store/items/location.mjs";
 
-const path = window.require("node:path");
-const fs = window.require("node:fs");
-const { Buffer } = window.require("node:buffer");
+const path = window.nexus.paths;
 
 export {
   BOOKS_ENGINE_ID,
@@ -24,30 +22,13 @@ export {
 };
 
 const SUPPORTED_BOOK_EXTENSIONS = new Set(["pdf"]);
-const MOJIBAKE_HINT_RE = /[ÂÃâ]/;
 
-function repairLikelyMojibakePath(candidatePath) {
-  const normalizedCandidatePath = path.normalize(String(candidatePath || ""));
+function getCurrentVaultInfo() {
+  return window.nexus.vault.getCurrent() || null;
+}
 
-  if (!normalizedCandidatePath || fs.existsSync(normalizedCandidatePath)) {
-    return normalizedCandidatePath;
-  }
-
-  if (!MOJIBAKE_HINT_RE.test(normalizedCandidatePath)) {
-    return normalizedCandidatePath;
-  }
-
-  try {
-    const repairedPath = path.normalize(
-      Buffer.from(normalizedCandidatePath, "latin1").toString("utf8"),
-    );
-
-    if (repairedPath && repairedPath !== normalizedCandidatePath && fs.existsSync(repairedPath)) {
-      return repairedPath;
-    }
-  } catch {}
-
-  return normalizedCandidatePath;
+function normalizeCandidatePath(candidatePath) {
+  return path.normalize(String(candidatePath || ""));
 }
 
 export function getFileExtension(filePath) {
@@ -74,7 +55,9 @@ export function isSupportedBookItem(item) {
 
 export function getContentRelativePath(filePath) {
   const normalizedPath = String(filePath || "").replace(/\\/g, "/");
-  const vaultPath = String(window?.vault?.path || "").replace(/\\/g, "/").replace(/\/$/, "");
+  const vaultPath = String(getCurrentVaultInfo()?.basePath || "")
+    .replace(/\\/g, "/")
+    .replace(/\/$/, "");
 
   if (!normalizedPath) {
     return "";
@@ -100,25 +83,25 @@ export function resolveVaultFilePath(filePath) {
   }
 
   if (path.isAbsolute(rawPath)) {
-    return repairLikelyMojibakePath(rawPath);
+    return normalizeCandidatePath(rawPath);
   }
 
   const normalizedRelativePath = normalizeRelativePath(rawPath);
-  const vaultContentPath = String(window?.vault?.contentPath || "").trim();
+  const vaultContentPath = String(getCurrentVaultInfo()?.contentPath || "").trim();
 
   if (vaultContentPath) {
-    return repairLikelyMojibakePath(path.join(vaultContentPath, normalizedRelativePath));
+    return normalizeCandidatePath(path.join(vaultContentPath, normalizedRelativePath));
   }
 
-  const vaultBasePath = String(window?.vault?.path || "").trim();
+  const vaultBasePath = String(getCurrentVaultInfo()?.basePath || "").trim();
 
   if (vaultBasePath) {
-    return repairLikelyMojibakePath(
+    return normalizeCandidatePath(
       path.join(vaultBasePath, "content", normalizedRelativePath),
     );
   }
 
-  return repairLikelyMojibakePath(rawPath);
+  return normalizeCandidatePath(rawPath);
 }
 
 export function buildFolderOptions(byId = {}, rootId = null) {

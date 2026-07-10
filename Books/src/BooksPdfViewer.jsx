@@ -3,8 +3,6 @@ import { BookIcon } from "./icons.jsx";
 import { loadBooksPdfJsRuntime } from "./pdfjs-runtime.js";
 import { queueBooksEditorLogEvent } from "./renderer-helpers.js";
 
-const { readFile } = window.require("node:fs/promises");
-
 const PAGE_OBSERVER_ROOT_MARGIN = "1200px 0px";
 const DEFAULT_PAGE_ASPECT_RATIO = 1.414;
 const VIEWER_HORIZONTAL_PADDING = 32;
@@ -327,7 +325,7 @@ export default function BooksPdfViewer({
       try {
         const [pdfJsRuntime, fileBuffer] = await Promise.all([
           loadBooksPdfJsRuntime(),
-          readFile(filePath),
+          window.nexus.files.readBinary(filePath),
         ]);
 
         if (cancelled) {

@@ -2,7 +2,7 @@ const { startTransition, useEffect, useLayoutEffect, useRef, useState } = window
 
 import { ChatIcon, ClearIcon, RefreshIcon, SendIcon } from "./icons.jsx";
 
-const { ipcRenderer } = window.require("electron");
+const ipcRenderer = window.nexus.ipc;
 
 function createMessage(role, content, meta = null) {
   return {

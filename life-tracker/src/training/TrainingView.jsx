@@ -59,10 +59,9 @@ import {
 
 const LIFE_TRACKER_TRAINING_CHANNEL_PREFIX = "life-tracker:training";
 
-const { ipcRenderer } = window.require("electron");
-const fs = window.require("fs");
+const ipcRenderer = window.nexus.ipc;
 const React = window.React;
-const { useEffect, useMemo, useState } = React;
+const { useEffect, useMemo, useRef, useState } = React;
 
 const TRAINING_METRIC_MODE_OPTIONS = [
   { value: "reps", label: "Repeticiones" },
@@ -412,13 +411,13 @@ function invoke(channel, payload) {
   });
 }
 
-function readTrainingMarkdownFile(filePath) {
+async function readTrainingMarkdownFile(filePath) {
   if (!filePath) {
     return "";
   }
 
   try {
-    return fs.readFileSync(filePath, "utf8");
+    return await window.nexus.files.readText(filePath);
   } catch (error) {
     console.error("[training] No se pudo leer la nota asociada:", error);
     return "";
@@ -505,8 +504,8 @@ function buildMuscleMarkdownTemplate(muscle) {
   ].join("\n");
 }
 
-function readTrainingDocMarkdown(doc, fallbackContent = "") {
-  const source = readTrainingMarkdownFile(doc?.itemPath);
+async function readTrainingDocMarkdown(doc, fallbackContent = "") {
+  const source = await readTrainingMarkdownFile(doc?.itemPath);
   return source || fallbackContent;
 }
 
@@ -2049,6 +2048,8 @@ function TrainingView({
   const [muscleMarkdown, setMuscleMarkdown] = useState("");
   const [exerciseEditorKey, setExerciseEditorKey] = useState(() => createId("exercise-editor"));
   const [muscleEditorKey, setMuscleEditorKey] = useState(() => createId("muscle-editor"));
+  const exerciseMarkdownLoadIdRef = useRef(0);
+  const muscleMarkdownLoadIdRef = useRef(0);
 
   const filteredExercises = useMemo(() => {
     return catalog.exercises.filter((exercise) => {
@@ -2186,7 +2187,7 @@ function TrainingView({
     }
   }, [catalog.assignments, selectedAssignmentId]);
 
-  function hydrateExerciseDetail(exercise, nextView = "preview") {
+  async function hydrateExerciseDetail(exercise, nextView = "preview") {
     if (!exercise) {
       setSelectedExerciseId(null);
       setExerciseDraft(createExerciseDraft());
@@ -2197,17 +2198,28 @@ function TrainingView({
 
     setSelectedExerciseId(exercise.id);
     setExerciseDraft(exerciseRecordToDraft(exercise));
-    setExerciseMarkdown(readTrainingDocMarkdown(
-      exercise.doc,
-      buildExerciseMarkdownTemplate({
-        title: exercise.title,
-        summary: exercise.summary || exercise.searchSummary || "",
-      }),
-    ));
+    const fallbackMarkdown = buildExerciseMarkdownTemplate({
+      title: exercise.title,
+      summary: exercise.summary || exercise.searchSummary || "",
+    });
+    const loadId = exerciseMarkdownLoadIdRef.current + 1;
+    exerciseMarkdownLoadIdRef.current = loadId;
+    setExerciseMarkdown(fallbackMarkdown);
     setExerciseView(nextView);
+
+    const nextMarkdown = await readTrainingDocMarkdown(
+      exercise.doc,
+      fallbackMarkdown,
+    );
+
+    if (exerciseMarkdownLoadIdRef.current !== loadId) {
+      return;
+    }
+
+    setExerciseMarkdown(nextMarkdown);
   }
 
-  function hydrateMuscleDetail(muscle, nextView = "preview") {
+  async function hydrateMuscleDetail(muscle, nextView = "preview") {
     if (!muscle) {
       setSelectedMuscleId(null);
       setMuscleMarkdown("");
@@ -2216,8 +2228,19 @@ function TrainingView({
     }
 
     setSelectedMuscleId(muscle.id);
-    setMuscleMarkdown(readTrainingDocMarkdown(muscle.doc, buildMuscleMarkdownTemplate(muscle)));
+    const fallbackMarkdown = buildMuscleMarkdownTemplate(muscle);
+    const loadId = muscleMarkdownLoadIdRef.current + 1;
+    muscleMarkdownLoadIdRef.current = loadId;
+    setMuscleMarkdown(fallbackMarkdown);
     setMuscleView(nextView);
+
+    const nextMarkdown = await readTrainingDocMarkdown(muscle.doc, fallbackMarkdown);
+
+    if (muscleMarkdownLoadIdRef.current !== loadId) {
+      return;
+    }
+
+    setMuscleMarkdown(nextMarkdown);
   }
 
   function hydrateRoutineDetail(routine, nextView = "preview") {
@@ -2249,27 +2272,27 @@ function TrainingView({
   function openExercisePreviewByRecord(exercise) {
     setMode("exercises");
     setError("");
-    hydrateExerciseDetail(exercise, "preview");
+    void hydrateExerciseDetail(exercise, "preview");
   }
 
   function openExerciseEditByRecord(exercise) {
     setMode("exercises");
     setError("");
     setExerciseEditorKey(createId("exercise-editor"));
-    hydrateExerciseDetail(exercise, "edit");
+    void hydrateExerciseDetail(exercise, "edit");
   }
 
   function openMusclePreviewByRecord(muscle) {
     setMode("muscles");
     setError("");
-    hydrateMuscleDetail(muscle, "preview");
+    void hydrateMuscleDetail(muscle, "preview");
   }
 
   function openMuscleEditByRecord(muscle) {
     setMode("muscles");
     setError("");
     setMuscleEditorKey(createId("muscle-editor"));
-    hydrateMuscleDetail(muscle, "edit");
+    void hydrateMuscleDetail(muscle, "edit");
   }
 
   function openRoutinePreviewByRecord(routine) {

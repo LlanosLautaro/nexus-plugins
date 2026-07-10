@@ -21916,22 +21916,22 @@ function plainID(node2) {
 }
 function pathFor(doc2, id3) {
   if (id3.name == "CompositeIdentifier") {
-    let path = [];
+    let path2 = [];
     for (let ch2 = id3.firstChild; ch2; ch2 = ch2.nextSibling)
       if (plainID(ch2))
-        path.push(idName(doc2, ch2));
-    return path;
+        path2.push(idName(doc2, ch2));
+    return path2;
   }
   return [idName(doc2, id3)];
 }
 function parentsFor(doc2, node2) {
-  for (let path = []; ; ) {
+  for (let path2 = []; ; ) {
     if (!node2 || node2.name != ".")
-      return path;
+      return path2;
     let name2 = tokenBefore(node2);
     if (!plainID(name2))
-      return path;
-    path.unshift(idName(doc2, name2));
+      return path2;
+    path2.unshift(idName(doc2, name2));
     node2 = tokenBefore(name2);
   }
 }
@@ -24598,14 +24598,14 @@ function localCompletionSource2(context) {
 }
 function pathFor2(read, member, name2) {
   var _a3;
-  let path = [];
+  let path2 = [];
   for (; ; ) {
     let obj = member.firstChild, prop;
     if ((obj === null || obj === void 0 ? void 0 : obj.name) == "VariableName") {
-      path.push(read(obj));
-      return { path: path.reverse(), name: name2 };
+      path2.push(read(obj));
+      return { path: path2.reverse(), name: name2 };
     } else if ((obj === null || obj === void 0 ? void 0 : obj.name) == "MemberExpression" && ((_a3 = prop = obj.lastChild) === null || _a3 === void 0 ? void 0 : _a3.name) == "PropertyName") {
-      path.push(read(prop));
+      path2.push(read(prop));
       member = obj;
     } else {
       return null;
@@ -24658,20 +24658,20 @@ function enumeratePropertyCompletions(obj, top3) {
 function scopeCompletionSource(scope) {
   let cache4 = /* @__PURE__ */ new Map();
   return (context) => {
-    let path = completionPath(context);
-    if (!path)
+    let path2 = completionPath(context);
+    if (!path2)
       return null;
     let target = scope;
-    for (let step of path.path) {
+    for (let step of path2.path) {
       target = target[step];
       if (!target)
         return null;
     }
     let options = cache4.get(target);
     if (!options)
-      cache4.set(target, options = enumeratePropertyCompletions(target, !path.path.length));
+      cache4.set(target, options = enumeratePropertyCompletions(target, !path2.path.length));
     return {
-      from: context.pos - path.name.length,
+      from: context.pos - path2.name.length,
       options,
       validFor: Identifier3
     };
@@ -25937,24 +25937,24 @@ function findContext(context) {
   return null;
 }
 function resolveProperties(state, node2, context, properties3) {
-  let path = [];
+  let path2 = [];
   for (; ; ) {
     let obj = node2.getChild("Expression");
     if (!obj)
       return [];
     if (obj.name == "VariableName") {
-      path.unshift(state.sliceDoc(obj.from, obj.to));
+      path2.unshift(state.sliceDoc(obj.from, obj.to));
       break;
     } else if (obj.name == "MemberExpression") {
       let name2 = obj.getChild("PropertyName");
       if (name2)
-        path.unshift(state.sliceDoc(name2.from, name2.to));
+        path2.unshift(state.sliceDoc(name2.from, name2.to));
       node2 = obj;
     } else {
       return [];
     }
   }
-  return properties3(path, state, context);
+  return properties3(path2, state, context);
 }
 function jinjaCompletionSource(config2 = {}) {
   let tags3 = config2.tags ? config2.tags.concat(Tags2) : Tags2;
@@ -26502,7 +26502,7 @@ function findContext2(context) {
   return null;
 }
 function resolveProperties2(state, node2, context, properties3) {
-  let path = [];
+  let path2 = [];
   for (; ; ) {
     let obj = node2.getChild("Expression");
     if (!obj)
@@ -26510,25 +26510,25 @@ function resolveProperties2(state, node2, context, properties3) {
     if (obj.name == "VariableName" || obj.name == "forloop" || obj.name == "tablerowloop") {
       let text7 = state.sliceDoc(obj.from, obj.to);
       if (text7 == "forloop")
-        return path.length ? [] : forloop;
+        return path2.length ? [] : forloop;
       if (text7 == "tablerowloop")
-        return path.length ? [] : tablerowloop;
-      path.unshift(text7);
+        return path2.length ? [] : tablerowloop;
+      path2.unshift(text7);
       break;
     } else if (obj.name == "MemberExpression") {
       let name2 = obj.getChild("PropertyName");
       if (name2)
-        path.unshift(state.sliceDoc(name2.from, name2.to));
+        path2.unshift(state.sliceDoc(name2.from, name2.to));
       node2 = obj;
     } else if (obj.name == "SubscriptExpression") {
       let expr = obj.getChildren("Expression")[1];
-      path.unshift((expr === null || expr === void 0 ? void 0 : expr.name) == "StringLiteral" ? state.sliceDoc(expr.from + 1, expr.to - 1) : "[]");
+      path2.unshift((expr === null || expr === void 0 ? void 0 : expr.name) == "StringLiteral" ? state.sliceDoc(expr.from + 1, expr.to - 1) : "[]");
       node2 = obj;
     } else {
       return [];
     }
   }
-  return properties3 ? properties3(path, state, context) : [];
+  return properties3 ? properties3(path2, state, context) : [];
 }
 function liquidCompletionSource(config2 = {}) {
   let filters = config2.filters ? config2.filters.concat(Filters2) : Filters2;
@@ -66254,15 +66254,15 @@ function _getInterpolationMethod(options) {
   return _pointInLine;
 }
 function strokePathWithCache(ctx, line, start2, count2) {
-  let path = line._path;
-  if (!path) {
-    path = line._path = new Path2D();
-    if (line.path(path, start2, count2)) {
-      path.closePath();
+  let path2 = line._path;
+  if (!path2) {
+    path2 = line._path = new Path2D();
+    if (line.path(path2, start2, count2)) {
+      path2.closePath();
     }
   }
   setStyle(ctx, line.options);
-  ctx.stroke(path);
+  ctx.stroke(path2);
 }
 function strokePathDirect(ctx, line, start2, count2) {
   const { segments, options } = line;
@@ -68196,25 +68196,57 @@ function SegmentedControl({
   options = [],
   value,
   onChange,
-  ariaLabel = "Selector"
+  ariaLabel = "Selector",
+  variant = "default"
 }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-segmented", className2), role: "tablist", "aria-label": ariaLabel }, options.map((option) => {
-    const optionValue = option.value;
-    const active = optionValue === value;
-    return /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        key: optionValue,
-        type: "button",
-        role: "tab",
-        "aria-selected": active,
-        className: cx("nexus-ui-segmented__button", active && "is-active"),
-        onClick: () => onChange?.(optionValue)
-      },
-      option.icon ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__icon" }, option.icon) : null,
-      /* @__PURE__ */ React.createElement("span", null, option.label)
-    );
-  }));
+  const normalizedOptions = Array.isArray(options) ? options.filter(Boolean) : [];
+  const activeIndex = normalizedOptions.findIndex((option) => option.value === value);
+  const style2 = variant === "compact" ? {
+    "--segment-count": Math.max(1, normalizedOptions.length),
+    "--active-index": Math.max(0, activeIndex)
+  } : void 0;
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: cx(
+        "nexus-ui-segmented",
+        variant !== "default" && `nexus-ui-segmented--${variant}`,
+        activeIndex >= 0 && "has-active",
+        className2
+      ),
+      role: "tablist",
+      "aria-label": ariaLabel,
+      style: style2
+    },
+    normalizedOptions.map((option) => {
+      const optionValue = option.value;
+      const active = optionValue === value;
+      const disabled = Boolean(option.disabled);
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: optionValue,
+          type: "button",
+          role: "tab",
+          "aria-selected": active,
+          "aria-disabled": disabled,
+          disabled,
+          className: cx(
+            "nexus-ui-segmented__button",
+            active && "is-active",
+            disabled && "is-disabled"
+          ),
+          onClick: () => {
+            if (!disabled) {
+              onChange?.(optionValue);
+            }
+          }
+        },
+        option.icon ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__icon" }, option.icon) : null,
+        /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__label" }, option.label)
+      );
+    })
+  );
 }
 
 // ../nexus-frontend/src/ui/Fields.jsx
@@ -68281,7 +68313,7 @@ function MetricCard({
 
 // ../nexus-frontend/src/utils/devLog.js
 var DEV_LOG_BATCH_CHANNEL = "dev-log:append-batch";
-var { ipcRenderer } = window.require("electron");
+var ipcRenderer = window.nexus.ipc;
 var devLogRawConsole = {
   debug: console.debug.bind(console),
   log: console.log.bind(console),
@@ -68457,7 +68489,7 @@ function createRendererDevLogger(scope) {
 }
 
 // ../nexus-frontend/src/components/icons/iconCatalogClient.js
-var { ipcRenderer: ipcRenderer2 } = window.require("electron");
+var ipcRenderer2 = window.nexus.ipc;
 var explorerIconsLogger = createRendererDevLogger("renderer.explorer.icons");
 var iconServerInfoPromise = null;
 var unifiedIconCatalogPromise = null;
@@ -72684,7 +72716,7 @@ var {
   useRef: useRef4,
   useState: useState4
 } = window.React;
-var { ipcRenderer: ipcRenderer3 } = window.require("electron");
+var ipcRenderer3 = window.nexus.ipc;
 var LIFE_TRACKER_FINANCE_CHANNEL_PREFIX = "life-tracker:finance";
 var CURRENCY_FORMATTER = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -83398,9 +83430,9 @@ var Id = class {
 };
 var import_tag = __toESM2(require_tag());
 var Variable = class {
-  constructor(path = []) {
+  constructor(path2 = []) {
     this.$$mdtype = "Variable";
-    this.path = path;
+    this.path = path2;
   }
   resolve({ variables } = {}) {
     return variables instanceof Function ? variables(this.path) : this.path.reduce((obj = {}, key) => obj[key], variables);
@@ -85390,8 +85422,7 @@ var tokenHidden = [
   "EmphasisMark",
   "StrikethroughMark",
   "CodeMark",
-  "CodeInfo",
-  "URL"
+  "CodeInfo"
 ];
 var decorationHidden = Decoration.mark({ class: "cm-markdoc-hidden" });
 var decorationBullet = Decoration.mark({ class: "cm-markdoc-listMark cm-markdoc-listMark--bullet cm-markdoc-bullet" });
@@ -85440,6 +85471,20 @@ function collectUnsupportedReferenceLinkRanges(view, from4, to2) {
   });
   return ranges;
 }
+function urlNodeBelongsToMarkdownLink(tree, from4, to2) {
+  const probePosition = Math.max(from4, Math.min(from4 + 1, Math.max(from4, to2 - 1)));
+  let current = tree.resolveInner(probePosition, 1);
+  while (current) {
+    if (current.name === "Autolink") {
+      return false;
+    }
+    if (current.name === "Link") {
+      return current.from <= from4 && current.to >= to2;
+    }
+    current = current.parent;
+  }
+  return false;
+}
 var RichEditPlugin = class {
   constructor(view) {
     this.decorations = this.process(view);
@@ -85452,6 +85497,7 @@ var RichEditPlugin = class {
   process(view) {
     const widgets = [];
     const [cursor] = view.state.selection.ranges;
+    const tree = syntaxTree(view.state);
     for (const { from: from4, to: to2 } of view.visibleRanges) {
       const unsupportedWikiRanges = [];
       const unsupportedReferenceLinkRanges = collectUnsupportedReferenceLinkRanges(view, from4, to2);
@@ -85463,7 +85509,7 @@ var RichEditPlugin = class {
         unsupportedWikiRanges.push(...ranges.unsupported);
         lineNumber += 1;
       }
-      syntaxTree(view.state).iterate({
+      tree.iterate({
         from: from4,
         to: to2,
         enter(node2) {
@@ -85492,6 +85538,9 @@ var RichEditPlugin = class {
             if (isRangeWithinRanges(node2.from, node2.to, unsupportedWikiRanges) || isRangeWithinRanges(node2.from, node2.to, unsupportedReferenceLinkRanges)) {
               return void 0;
             }
+            widgets.push(decorationHidden.range(node2.from, node2.to));
+          }
+          if (node2.name === "URL" && urlNodeBelongsToMarkdownLink(tree, node2.from, node2.to)) {
             widgets.push(decorationHidden.range(node2.from, node2.to));
           }
           return void 0;
@@ -95256,20 +95305,7 @@ function getElementTarget(target) {
 }
 function resolveRenderedHtmlLink(target) {
   const element2 = getElementTarget(target);
-  const anchor = element2?.closest(".cm-markdoc-renderBlock a, .cm-markdoc-renderInlineHtml a") || null;
-  if (!anchor) {
-    return null;
-  }
-  const wikiTarget = anchor.dataset.nexusWikilink;
-  const href = anchor.getAttribute("href");
-  const resolvedTarget = wikiTarget || href;
-  if (!resolvedTarget || !isInternalTarget2(resolvedTarget)) {
-    return null;
-  }
-  return {
-    target: resolvedTarget,
-    isWikiLink: Boolean(wikiTarget)
-  };
+  return element2?.closest(".cm-markdoc-renderBlock a, .cm-markdoc-renderInlineHtml a") || null;
 }
 var taskLinePattern2 = /^(\s*[-*+]\s+)\[([ xX])\](\s+)/;
 function toggleRenderedBlockTaskCheckbox(view, target) {
@@ -95532,6 +95568,7 @@ function markdownLivePlugin(config2) {
           const link3 = resolveEditorLink(view, event);
           if (link3) {
             event.preventDefault();
+            event.stopPropagation();
             return true;
           }
         }
@@ -95539,7 +95576,7 @@ function markdownLivePlugin(config2) {
           const link3 = resolveEditorLink(view, event);
           if (link3) {
             event.preventDefault();
-            void config2.onOpenLink?.(link3);
+            event.stopPropagation();
             return true;
           }
         }
@@ -95566,27 +95603,38 @@ function markdownLivePlugin(config2) {
           return false;
         }
         event.preventDefault();
-        void config2.onOpenLink?.({
-          ...link3,
-          openInNewTab: true
-        });
+        event.stopPropagation();
+        return true;
+      },
+      click(event, view) {
+        const link3 = resolveEditorLink(view, event);
+        if (!link3) {
+          return false;
+        }
+        event.preventDefault();
+        event.stopPropagation();
         return true;
       }
     }
   });
 }
 
-// ../nexus-frontend/src/editors/Markdown/embeddedSurface.jsx
-var fs = window.require("fs");
-function readEmbeddedMarkdownFile(filePath) {
+// ../nexus-frontend/src/editors/Markdown/fileAccess.js
+var path = window.nexus.paths;
+async function readEmbeddedMarkdownFile(filePath) {
   if (!filePath) {
     return "";
   }
   try {
-    return fs.readFileSync(filePath, "utf8");
+    return await window.nexus.files.readText(filePath);
   } catch {
     return "";
   }
+}
+
+// ../nexus-frontend/src/editors/Markdown/embeddedSurface.jsx
+function eventTargetsAnchor(event) {
+  return event.target instanceof Element ? event.target.closest("a") : null;
 }
 function EmbeddedMarkdownReadSurface({
   filePath = "",
@@ -95596,58 +95644,93 @@ function EmbeddedMarkdownReadSurface({
   onMetadataCollapsedChange = null,
   defaultMetadataCollapsed = true
 }) {
-  const source = (0, import_react3.useMemo)(
-    () => typeof value === "string" && value.length ? value : readEmbeddedMarkdownFile(filePath),
-    [filePath, value]
-  );
+  const [fileState, setFileState] = (0, import_react3.useState)({
+    filePath: "",
+    source: ""
+  });
+  const source = typeof value === "string" && value.length ? value : fileState.filePath === filePath ? fileState.source : "";
+  (0, import_react3.useEffect)(() => {
+    if (typeof value === "string" && value.length) {
+      return void 0;
+    }
+    let cancelled = false;
+    void readEmbeddedMarkdownFile(filePath).then((nextSource) => {
+      if (!cancelled) {
+        setFileState({
+          filePath,
+          source: nextSource
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [filePath, value]);
   const {
     metadata,
     body: body2
   } = (0, import_react3.useMemo)(() => extractMarkdownMetadata(source), [source]);
   const html2 = (0, import_react3.useMemo)(() => renderMarkdown(body2), [body2]);
-  const [metadataCollapsedState, setMetadataCollapsedState] = (0, import_react3.useState)(Boolean(defaultMetadataCollapsed));
+  const [metadataCollapsedState, setMetadataCollapsedState] = (0, import_react3.useState)({
+    filePath,
+    collapsed: Boolean(defaultMetadataCollapsed)
+  });
   const metadataSummary = (0, import_react3.useMemo)(
     () => formatMarkdownMetadataSummary(metadata.length),
     [metadata.length]
   );
-  const isMetadataCollapsed = metadataCollapsedProp == null ? metadataCollapsedState : Boolean(metadataCollapsedProp);
-  (0, import_react3.useEffect)(() => {
-    if (metadataCollapsedProp == null) {
-      setMetadataCollapsedState(Boolean(defaultMetadataCollapsed));
-    }
-  }, [defaultMetadataCollapsed, filePath, metadataCollapsedProp]);
+  const uncontrolledMetadataCollapsed = metadataCollapsedState.filePath === filePath ? metadataCollapsedState.collapsed : Boolean(defaultMetadataCollapsed);
+  const isMetadataCollapsed = metadataCollapsedProp == null ? uncontrolledMetadataCollapsed : Boolean(metadataCollapsedProp);
   const handleMetadataToggle = () => {
     const nextValue = !isMetadataCollapsed;
     if (metadataCollapsedProp == null) {
-      setMetadataCollapsedState(nextValue);
+      setMetadataCollapsedState({
+        filePath,
+        collapsed: nextValue
+      });
     }
     onMetadataCollapsedChange?.(nextValue);
   };
-  return /* @__PURE__ */ import_react3.default.createElement("div", { className: ["markdown-engine-read", compact ? "markdown-engine-read--compact" : ""].filter(Boolean).join(" ") }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "markdown-engine-document" }, metadata.length ? /* @__PURE__ */ import_react3.default.createElement(
-    "section",
+  const handleAnchorInteraction = (event) => {
+    if (!eventTargetsAnchor(event)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  return /* @__PURE__ */ import_react3.default.createElement(
+    "div",
     {
-      className: [
-        "markdown-engine-metadata",
-        isMetadataCollapsed ? "is-collapsed" : "is-expanded"
-      ].join(" "),
-      "aria-label": "Propiedades"
+      className: ["markdown-engine-read", compact ? "markdown-engine-read--compact" : ""].filter(Boolean).join(" "),
+      onClick: handleAnchorInteraction,
+      onAuxClick: handleAnchorInteraction
     },
-    /* @__PURE__ */ import_react3.default.createElement(
-      "button",
+    /* @__PURE__ */ import_react3.default.createElement("div", { className: "markdown-engine-document" }, metadata.length ? /* @__PURE__ */ import_react3.default.createElement(
+      "section",
       {
-        type: "button",
         className: [
-          "markdown-engine-metadataToggleButton",
+          "markdown-engine-metadata",
           isMetadataCollapsed ? "is-collapsed" : "is-expanded"
         ].join(" "),
-        onClick: handleMetadataToggle,
-        "aria-expanded": !isMetadataCollapsed
+        "aria-label": "Propiedades"
       },
-      /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataToggleMain" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataDisclosure", "aria-hidden": "true" }), /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataLabel" }, "Propiedades")),
-      metadataSummary ? /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataSummary" }, metadataSummary) : null
-    ),
-    !isMetadataCollapsed ? /* @__PURE__ */ import_react3.default.createElement("div", { className: "markdown-engine-metadataBody" }, metadata.map((entry) => /* @__PURE__ */ import_react3.default.createElement("div", { key: `${entry.key}:${entry.value}`, className: "markdown-engine-metadataRow" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataKey" }, entry.key), /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataValue" }, entry.value)))) : null
-  ) : null, /* @__PURE__ */ import_react3.default.createElement("article", { className: "markdown-engine-richContent", dangerouslySetInnerHTML: { __html: html2 } })));
+      /* @__PURE__ */ import_react3.default.createElement(
+        "button",
+        {
+          type: "button",
+          className: [
+            "markdown-engine-metadataToggleButton",
+            isMetadataCollapsed ? "is-collapsed" : "is-expanded"
+          ].join(" "),
+          onClick: handleMetadataToggle,
+          "aria-expanded": !isMetadataCollapsed
+        },
+        /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataToggleMain" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataDisclosure", "aria-hidden": "true" }), /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataLabel" }, "Propiedades")),
+        metadataSummary ? /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataSummary" }, metadataSummary) : null
+      ),
+      !isMetadataCollapsed ? /* @__PURE__ */ import_react3.default.createElement("div", { className: "markdown-engine-metadataBody" }, metadata.map((entry) => /* @__PURE__ */ import_react3.default.createElement("div", { key: `${entry.key}:${entry.value}`, className: "markdown-engine-metadataRow" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataKey" }, entry.key), /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataValue" }, entry.value)))) : null
+    ) : null, /* @__PURE__ */ import_react3.default.createElement("article", { className: "markdown-engine-richContent", dangerouslySetInnerHTML: { __html: html2 } }))
+  );
 }
 function EmbeddedMarkdownLiveEditor({
   filePath = "",
@@ -95662,17 +95745,21 @@ function EmbeddedMarkdownLiveEditor({
   const viewRef = (0, import_react3.useRef)(null);
   const initialValueRef = (0, import_react3.useRef)(value);
   const onChangeRef = (0, import_react3.useRef)(onChange);
+  const applyingExternalValueRef = (0, import_react3.useRef)(false);
   const shouldPersistToDisk = persistToDisk == null ? Boolean(filePath) : Boolean(persistToDisk && filePath);
   (0, import_react3.useEffect)(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
+  (0, import_react3.useEffect)(() => {
+    initialValueRef.current = value;
+  }, [value]);
   (0, import_react3.useEffect)(() => {
     if (!mountRef.current) {
       return void 0;
     }
     let saveTimeout = null;
     const updateListener2 = EditorView.updateListener.of((update) => {
-      if (!update.docChanged) {
+      if (!update.docChanged || applyingExternalValueRef.current) {
         return;
       }
       if (saveTimeout) {
@@ -95681,7 +95768,9 @@ function EmbeddedMarkdownLiveEditor({
       saveTimeout = window.setTimeout(() => {
         const nextValue = update.state.doc.toString();
         if (shouldPersistToDisk && filePath) {
-          fs.writeFileSync(filePath, nextValue, "utf8");
+          void window.nexus.files.writeText(filePath, nextValue).catch((error3) => {
+            console.error("[markdown] No se pudo guardar markdown embebido:", error3);
+          });
         }
         onChangeRef.current(nextValue);
       }, 500);
@@ -95730,15 +95819,35 @@ function EmbeddedMarkdownLiveEditor({
       effects: setMetadataCollapsedEffect.of(Boolean(metadataCollapsed))
     });
   }, [metadataCollapsed]);
+  (0, import_react3.useEffect)(() => {
+    const view = viewRef.current;
+    const nextValue = typeof value === "string" ? value : "";
+    if (!view) {
+      initialValueRef.current = nextValue;
+      return;
+    }
+    const currentValue = view.state.doc.toString();
+    if (currentValue === nextValue) {
+      return;
+    }
+    applyingExternalValueRef.current = true;
+    view.dispatch({
+      changes: {
+        from: 0,
+        to: currentValue.length,
+        insert: nextValue
+      }
+    });
+    applyingExternalValueRef.current = false;
+  }, [value]);
   return /* @__PURE__ */ import_react3.default.createElement("div", { className: "markdown-engine-liveEditor", ref: mountRef });
 }
 
 // ../nexus-plugins/life-tracker/src/training/TrainingView.jsx
 var LIFE_TRACKER_TRAINING_CHANNEL_PREFIX = "life-tracker:training";
-var { ipcRenderer: ipcRenderer4 } = window.require("electron");
-var fs2 = window.require("fs");
+var ipcRenderer4 = window.nexus.ipc;
 var React8 = window.React;
-var { useEffect: useEffect6, useMemo: useMemo5, useState: useState6 } = React8;
+var { useEffect: useEffect6, useMemo: useMemo5, useRef: useRef6, useState: useState6 } = React8;
 var TRAINING_METRIC_MODE_OPTIONS = [
   { value: "reps", label: "Repeticiones" },
   { value: "time", label: "Tiempo" },
@@ -96043,12 +96152,12 @@ function invoke(channel, payload) {
     return response.data;
   });
 }
-function readTrainingMarkdownFile(filePath) {
+async function readTrainingMarkdownFile(filePath) {
   if (!filePath) {
     return "";
   }
   try {
-    return fs2.readFileSync(filePath, "utf8");
+    return await window.nexus.files.readText(filePath);
   } catch (error3) {
     console.error("[training] No se pudo leer la nota asociada:", error3);
     return "";
@@ -96127,8 +96236,8 @@ function buildMuscleMarkdownTemplate(muscle) {
     ""
   ].join("\n");
 }
-function readTrainingDocMarkdown(doc2, fallbackContent = "") {
-  const source = readTrainingMarkdownFile(doc2?.itemPath);
+async function readTrainingDocMarkdown(doc2, fallbackContent = "") {
+  const source = await readTrainingMarkdownFile(doc2?.itemPath);
   return source || fallbackContent;
 }
 function formatTrainingCount(count2, singular, plural = `${singular}s`) {
@@ -96996,6 +97105,8 @@ function TrainingView({
   const [muscleMarkdown, setMuscleMarkdown] = useState6("");
   const [exerciseEditorKey, setExerciseEditorKey] = useState6(() => createId("exercise-editor"));
   const [muscleEditorKey, setMuscleEditorKey] = useState6(() => createId("muscle-editor"));
+  const exerciseMarkdownLoadIdRef = useRef6(0);
+  const muscleMarkdownLoadIdRef = useRef6(0);
   const filteredExercises = useMemo5(() => {
     return catalog.exercises.filter((exercise) => {
       if (exerciseTypeFilter && (exercise.exerciseType || "exercise") !== exerciseTypeFilter) {
@@ -97118,7 +97229,7 @@ function TrainingView({
       setAssignmentView("gallery");
     }
   }, [catalog.assignments, selectedAssignmentId]);
-  function hydrateExerciseDetail(exercise, nextView = "preview") {
+  async function hydrateExerciseDetail(exercise, nextView = "preview") {
     if (!exercise) {
       setSelectedExerciseId(null);
       setExerciseDraft(createExerciseDraft());
@@ -97128,16 +97239,24 @@ function TrainingView({
     }
     setSelectedExerciseId(exercise.id);
     setExerciseDraft(exerciseRecordToDraft(exercise));
-    setExerciseMarkdown(readTrainingDocMarkdown(
-      exercise.doc,
-      buildExerciseMarkdownTemplate({
-        title: exercise.title,
-        summary: exercise.summary || exercise.searchSummary || ""
-      })
-    ));
+    const fallbackMarkdown = buildExerciseMarkdownTemplate({
+      title: exercise.title,
+      summary: exercise.summary || exercise.searchSummary || ""
+    });
+    const loadId = exerciseMarkdownLoadIdRef.current + 1;
+    exerciseMarkdownLoadIdRef.current = loadId;
+    setExerciseMarkdown(fallbackMarkdown);
     setExerciseView(nextView);
+    const nextMarkdown = await readTrainingDocMarkdown(
+      exercise.doc,
+      fallbackMarkdown
+    );
+    if (exerciseMarkdownLoadIdRef.current !== loadId) {
+      return;
+    }
+    setExerciseMarkdown(nextMarkdown);
   }
-  function hydrateMuscleDetail(muscle, nextView = "preview") {
+  async function hydrateMuscleDetail(muscle, nextView = "preview") {
     if (!muscle) {
       setSelectedMuscleId(null);
       setMuscleMarkdown("");
@@ -97145,8 +97264,16 @@ function TrainingView({
       return;
     }
     setSelectedMuscleId(muscle.id);
-    setMuscleMarkdown(readTrainingDocMarkdown(muscle.doc, buildMuscleMarkdownTemplate(muscle)));
+    const fallbackMarkdown = buildMuscleMarkdownTemplate(muscle);
+    const loadId = muscleMarkdownLoadIdRef.current + 1;
+    muscleMarkdownLoadIdRef.current = loadId;
+    setMuscleMarkdown(fallbackMarkdown);
     setMuscleView(nextView);
+    const nextMarkdown = await readTrainingDocMarkdown(muscle.doc, fallbackMarkdown);
+    if (muscleMarkdownLoadIdRef.current !== loadId) {
+      return;
+    }
+    setMuscleMarkdown(nextMarkdown);
   }
   function hydrateRoutineDetail(routine, nextView = "preview") {
     if (!routine) {
@@ -97173,24 +97300,24 @@ function TrainingView({
   function openExercisePreviewByRecord(exercise) {
     setMode("exercises");
     setError("");
-    hydrateExerciseDetail(exercise, "preview");
+    void hydrateExerciseDetail(exercise, "preview");
   }
   function openExerciseEditByRecord(exercise) {
     setMode("exercises");
     setError("");
     setExerciseEditorKey(createId("exercise-editor"));
-    hydrateExerciseDetail(exercise, "edit");
+    void hydrateExerciseDetail(exercise, "edit");
   }
   function openMusclePreviewByRecord(muscle) {
     setMode("muscles");
     setError("");
-    hydrateMuscleDetail(muscle, "preview");
+    void hydrateMuscleDetail(muscle, "preview");
   }
   function openMuscleEditByRecord(muscle) {
     setMode("muscles");
     setError("");
     setMuscleEditorKey(createId("muscle-editor"));
-    hydrateMuscleDetail(muscle, "edit");
+    void hydrateMuscleDetail(muscle, "edit");
   }
   function openRoutinePreviewByRecord(routine) {
     setMode("routines");
@@ -98318,7 +98445,7 @@ function buildHabitPayload(source = null, overrides3 = {}) {
 var React10 = window.React;
 var {
   useEffect: useEffect7,
-  useRef: useRef6,
+  useRef: useRef7,
   useState: useState7
 } = React10;
 function EditorSection({
@@ -98445,7 +98572,7 @@ function DateDraftInput({
 function useDragReorder(resetKey, onMoveItem) {
   const [draggedIndex, setDraggedIndex] = useState7(null);
   const [dropIndex, setDropIndex] = useState7(null);
-  const dragIntentRef = useRef6(null);
+  const dragIntentRef = useRef7(null);
   useEffect7(() => {
     dragIntentRef.current = null;
     setDraggedIndex(null);
@@ -99079,10 +99206,10 @@ var {
   startTransition: startTransition2,
   useEffect: useEffect8,
   useMemo: useMemo6,
-  useRef: useRef7,
+  useRef: useRef8,
   useState: useState8
 } = React11;
-var { ipcRenderer: ipcRenderer5 } = window.require("electron");
+var ipcRenderer5 = window.nexus.ipc;
 Chart.register(
   CategoryScale,
   LinearScale,
@@ -99757,8 +99884,8 @@ function HabitOutcomeLineChart({
   chartData,
   rangeValue = "7d"
 }) {
-  const canvasRef = useRef7(null);
-  const chartRef = useRef7(null);
+  const canvasRef = useRef8(null);
+  const chartRef = useRef8(null);
   const labels = Array.isArray(chartData?.labels) ? chartData.labels : [];
   const datasets = Array.isArray(chartData?.datasets) ? chartData.datasets : [];
   const completedDataset = datasets.find((entry) => entry.id === "completed") || datasets[0] || null;
@@ -100128,8 +100255,8 @@ function QuantityQueueInput({
 }) {
   const committedValue = getOccurrenceQuantityDraftValue(item2);
   const [draftValue, setDraftValue] = useState8(committedValue);
-  const isCommittingRef = useRef7(false);
-  const lastSubmittedValueRef = useRef7(committedValue);
+  const isCommittingRef = useRef8(false);
+  const lastSubmittedValueRef = useRef8(committedValue);
   useEffect8(() => {
     setDraftValue(committedValue);
     lastSubmittedValueRef.current = committedValue;
@@ -100891,7 +101018,7 @@ function SettingsDrawer({
 function LifeTrackerView({ ctx, input = null }) {
   const systemToday = todayLocalDate3();
   const pluginSettings = ctx.settings.useValue();
-  const pluginSettingsRef = useRef7(pluginSettings);
+  const pluginSettingsRef = useRef8(pluginSettings);
   const legacyHabitsSettingsApi = useMemo6(
     () => ctx.createPluginSettingsApi("nexus.habitos"),
     [ctx]
@@ -100978,7 +101105,7 @@ function LifeTrackerView({ ctx, input = null }) {
   const [expandedQueueSubitemIds, setExpandedQueueSubitemIds] = useState8([]);
   const [manualEditableOccurrenceIds, setManualEditableOccurrenceIds] = useState8([]);
   const [viewDate, setViewDate] = useState8(systemToday);
-  const viewDatePickerRef = useRef7(null);
+  const viewDatePickerRef = useRef8(null);
   const lastHabitStepIndex = HABIT_EDITOR_STEPS.length - 1;
   const managedCategories = useMemo6(
     () => buildManagedHabitCategories(home.categoryCatalog, presetCategoryOverrides),
@@ -102594,7 +102721,7 @@ function LifeTrackerView({ ctx, input = null }) {
 // ../nexus-plugins/life-tracker/src/training/TrainingHostSettingsSection.jsx
 var React12 = window.React;
 var { useEffect: useEffect9, useMemo: useMemo7, useState: useState9 } = React12;
-var { clipboard, ipcRenderer: ipcRenderer6 } = window.require("electron");
+var ipcRenderer6 = window.nexus.ipc;
 var LIFE_TRACKER_TRAINING_CHANNEL_PREFIX3 = "life-tracker:training";
 var TRAINING_MANAGED_DOC_GROUP_ORDER = ["Ejercicios", "Musculos"];
 function invoke3(channel, payload) {
@@ -102719,7 +102846,7 @@ function TrainingHostSettingsSection() {
     setWarnings([]);
     try {
       const data2 = await invoke3(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX3}:export`, { kind: "all" });
-      clipboard.writeText(JSON.stringify(data2, null, 2));
+      window.nexus.clipboard.writeText(JSON.stringify(data2, null, 2));
       setNotice("JSON copiado.");
     } catch (copyError) {
       setError(copyError instanceof Error ? copyError.message : "No se pudo copiar el export.");
@@ -102741,7 +102868,7 @@ function TrainingHostSettingsSection() {
         kind: singleKind,
         id: singleId
       });
-      clipboard.writeText(JSON.stringify(data2, null, 2));
+      window.nexus.clipboard.writeText(JSON.stringify(data2, null, 2));
       setNotice("JSON copiado.");
     } catch (copyError) {
       setError(copyError instanceof Error ? copyError.message : "No se pudo copiar el export.");
@@ -102750,7 +102877,7 @@ function TrainingHostSettingsSection() {
     }
   };
   const handlePasteClipboard = () => {
-    setImportText(clipboard.readText() || "");
+    setImportText(window.nexus.clipboard.readText() || "");
   };
   const handleImport = async () => {
     if (!importText.trim()) {

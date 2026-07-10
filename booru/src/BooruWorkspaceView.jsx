@@ -39,8 +39,8 @@ import {
   tokenizeBooruQuery,
 } from "./booru-utils.js";
 
-const { clipboard, ipcRenderer, nativeImage, shell } = window.require("electron");
-const { pathToFileURL } = window.require("url");
+const ipcRenderer = window.nexus.ipc;
+const { pathToFileUrl } = window.nexus.urls;
 const React = window.React;
 const { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } = React;
 const ReactDnd = window.__NEXUS_HOST_REACT_DND__ || {};
@@ -239,7 +239,7 @@ function openPath(pathValue) {
     return;
   }
 
-  void shell.showItemInFolder(normalizedPath);
+  window.nexus.desktop.showItemInFolder(normalizedPath);
 }
 
 function toFileUrl(pathValue) {
@@ -250,7 +250,7 @@ function toFileUrl(pathValue) {
   }
 
   try {
-    return pathToFileURL(normalizedPath).href;
+    return pathToFileUrl(normalizedPath);
   } catch {
     return "";
   }
@@ -6944,13 +6944,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   };
 
   const handleCopyToClipboard = async (resource) => {
-    const image = nativeImage.createFromPath(resource.storagePath);
-
-    if (image.isEmpty()) {
-      throw new Error("No se pudo copiar la imagen al portapapeles.");
-    }
-
-    clipboard.writeImage(image);
+    await window.nexus.clipboard.writeImageFromPath(resource.storagePath);
   };
 
   const handleContextMenuAction = async (actionId) => {

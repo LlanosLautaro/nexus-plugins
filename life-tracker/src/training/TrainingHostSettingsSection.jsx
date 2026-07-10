@@ -8,7 +8,7 @@ import {
 
 const React = window.React;
 const { useEffect, useMemo, useState } = React;
-const { clipboard, ipcRenderer } = window.require("electron");
+const ipcRenderer = window.nexus.ipc;
 
 const LIFE_TRACKER_TRAINING_CHANNEL_PREFIX = "life-tracker:training";
 const TRAINING_MANAGED_DOC_GROUP_ORDER = ["Ejercicios", "Musculos"];
@@ -160,7 +160,7 @@ export default function TrainingHostSettingsSection() {
 
     try {
       const data = await invoke(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:export`, { kind: "all" });
-      clipboard.writeText(JSON.stringify(data, null, 2));
+      window.nexus.clipboard.writeText(JSON.stringify(data, null, 2));
       setNotice("JSON copiado.");
     } catch (copyError) {
       setError(copyError instanceof Error ? copyError.message : "No se pudo copiar el export.");
@@ -185,7 +185,7 @@ export default function TrainingHostSettingsSection() {
         kind: singleKind,
         id: singleId,
       });
-      clipboard.writeText(JSON.stringify(data, null, 2));
+      window.nexus.clipboard.writeText(JSON.stringify(data, null, 2));
       setNotice("JSON copiado.");
     } catch (copyError) {
       setError(copyError instanceof Error ? copyError.message : "No se pudo copiar el export.");
@@ -195,7 +195,7 @@ export default function TrainingHostSettingsSection() {
   };
 
   const handlePasteClipboard = () => {
-    setImportText(clipboard.readText() || "");
+    setImportText(window.nexus.clipboard.readText() || "");
   };
 
   const handleImport = async () => {

@@ -40,7 +40,7 @@ var BOORU_ENTITY_KIND_LABELS = Object.freeze({
 
 // ../nexus-frontend/src/utils/devLog.js
 var DEV_LOG_BATCH_CHANNEL = "dev-log:append-batch";
-var { ipcRenderer } = window.require("electron");
+var ipcRenderer = window.nexus.ipc;
 var devLogRawConsole = {
   debug: console.debug.bind(console),
   log: console.log.bind(console),
@@ -780,8 +780,8 @@ function parseBooruSearchSyntax(value) {
 }
 
 // ../nexus-plugins/booru/src/BooruWorkspaceView.jsx
-var { clipboard, ipcRenderer: ipcRenderer2, nativeImage, shell } = window.require("electron");
-var { pathToFileURL } = window.require("url");
+var ipcRenderer2 = window.nexus.ipc;
+var { pathToFileUrl } = window.nexus.urls;
 var React2 = window.React;
 var { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } = React2;
 var ReactDnd = window.__NEXUS_HOST_REACT_DND__ || {};
@@ -938,7 +938,7 @@ function openPath(pathValue) {
   if (!normalizedPath) {
     return;
   }
-  void shell.showItemInFolder(normalizedPath);
+  window.nexus.desktop.showItemInFolder(normalizedPath);
 }
 function toFileUrl(pathValue) {
   const normalizedPath = String(pathValue || "").trim();
@@ -946,7 +946,7 @@ function toFileUrl(pathValue) {
     return "";
   }
   try {
-    return pathToFileURL(normalizedPath).href;
+    return pathToFileUrl(normalizedPath);
   } catch {
     return "";
   }
@@ -6210,11 +6210,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
     return ids.map((resourceId) => itemsById.get(resourceId)).filter(Boolean);
   };
   const handleCopyToClipboard = async (resource) => {
-    const image = nativeImage.createFromPath(resource.storagePath);
-    if (image.isEmpty()) {
-      throw new Error("No se pudo copiar la imagen al portapapeles.");
-    }
-    clipboard.writeImage(image);
+    await window.nexus.clipboard.writeImageFromPath(resource.storagePath);
   };
   const handleContextMenuAction = async (actionId) => {
     const contextResources = getContextSelectionResources();

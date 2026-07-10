@@ -108,7 +108,7 @@ import {
 } from "./home/drafts.js";
 import { QueueItemCard } from "./home/queue.jsx";
 
-const { ipcRenderer } = window.require("electron");
+const ipcRenderer = window.nexus.ipc;
 
 ChartJS.register(
   CategoryScale,

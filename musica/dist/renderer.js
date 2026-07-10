@@ -2,7 +2,7 @@ const React = window.React;
 
 // ../nexus-plugins/musica/src/PluginMetadataForm.jsx
 var { useEffect, useMemo, useState } = window.React;
-var { ipcRenderer } = window.require("electron");
+var ipcRenderer = window.nexus.ipc;
 function normalizeFieldValue(field, value) {
   if (field.type === "boolean") {
     return Boolean(value);
@@ -455,7 +455,7 @@ var writeEngineAssignments = writeMusicaEngineAssignments;
 
 // ../nexus-plugins/musica/src/MusicAudioEngine.jsx
 var { useEffect: useEffect2, useMemo: useMemo2, useRef, useState: useState2 } = window.React;
-var { ipcRenderer: ipcRenderer2 } = window.require("electron");
+var ipcRenderer2 = window.nexus.ipc;
 var DEFAULT_AUDIO_STATE = {
   audioFile: null,
   src: null,

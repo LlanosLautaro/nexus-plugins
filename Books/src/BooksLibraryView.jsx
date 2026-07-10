@@ -4,7 +4,7 @@ import { formatPercent, resolveVaultFilePath } from "./renderer-helpers.js";
 import { createRendererDevLogger } from "../../../nexus-frontend/src/utils/devLog.js";
 import { IconButton, InlineField, Notice, SectionPanel, StateBlock, ToolbarActions, WorkspaceBody, WorkspacePage, WorkspaceTitle, WorkspaceTopbar } from "../../../nexus-frontend/src/ui/index.js";
 
-const { ipcRenderer } = window.require("electron");
+const ipcRenderer = window.nexus.ipc;
 const booksLibraryLogger = createRendererDevLogger("renderer.plugins.books");
 
 const BOOK_GRID_ASPECT_RATIO = 0.72;

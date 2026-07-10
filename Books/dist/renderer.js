@@ -772,8 +772,8 @@ function wrapReason(ex) {
   return new UnknownErrorException(ex.message, ex.toString());
 }
 async function node_utils_fetchData(url) {
-  const fs2 = process.getBuiltinModule("fs/promises");
-  const data = await fs2.readFile(url);
+  const fs = process.getBuiltinModule("fs/promises");
+  const data = await fs.readFile(url);
   return new Uint8Array(data);
 }
 function initGPU() {
@@ -1482,11 +1482,11 @@ function network_getArrayBuffer(val) {
   return typeof val !== "string" ? val : stringToBytes(val).buffer;
 }
 function getReadableStream(url, opts = null) {
-  const fs2 = process.getBuiltinModule("fs");
+  const fs = process.getBuiltinModule("fs");
   const {
     Readable
   } = process.getBuiltinModule("stream");
-  const readStream = fs2.createReadStream(url, opts);
+  const readStream = fs.createReadStream(url, opts);
   return Readable.toWeb(readStream);
 }
 function getNetworkStream(url) {
@@ -18017,8 +18017,8 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
           url
         } = stream._source;
         this._isStreamingSupported = !disableStream;
-        const fs2 = process.getBuiltinModule("fs/promises");
-        fs2.lstat(url).then((stat) => {
+        const fs = process.getBuiltinModule("fs/promises");
+        fs.lstat(url).then((stat) => {
           const readableStream = getReadableStream(url);
           this._reader = readableStream.getReader();
           const {
@@ -31164,29 +31164,13 @@ function resolveItemLocationFromItemsState(itemsState, itemId, options = {}) {
 }
 
 // ../nexus-plugins/Books/src/renderer-helpers.js
-var path = window.require("node:path");
-var fs = window.require("node:fs");
-var { Buffer: Buffer2 } = window.require("node:buffer");
+var path = window.nexus.paths;
 var SUPPORTED_BOOK_EXTENSIONS = /* @__PURE__ */ new Set(["pdf"]);
-var MOJIBAKE_HINT_RE = /[ÂÃâ]/;
-function repairLikelyMojibakePath(candidatePath) {
-  const normalizedCandidatePath = path.normalize(String(candidatePath || ""));
-  if (!normalizedCandidatePath || fs.existsSync(normalizedCandidatePath)) {
-    return normalizedCandidatePath;
-  }
-  if (!MOJIBAKE_HINT_RE.test(normalizedCandidatePath)) {
-    return normalizedCandidatePath;
-  }
-  try {
-    const repairedPath = path.normalize(
-      Buffer2.from(normalizedCandidatePath, "latin1").toString("utf8")
-    );
-    if (repairedPath && repairedPath !== normalizedCandidatePath && fs.existsSync(repairedPath)) {
-      return repairedPath;
-    }
-  } catch {
-  }
-  return normalizedCandidatePath;
+function getCurrentVaultInfo() {
+  return window.nexus.vault.getCurrent() || null;
+}
+function normalizeCandidatePath(candidatePath) {
+  return path.normalize(String(candidatePath || ""));
 }
 function getFileExtension(filePath) {
   const fileName = String(filePath || "").split(/[\\/]/).pop();
@@ -31209,20 +31193,20 @@ function resolveVaultFilePath(filePath) {
     return "";
   }
   if (path.isAbsolute(rawPath)) {
-    return repairLikelyMojibakePath(rawPath);
+    return normalizeCandidatePath(rawPath);
   }
   const normalizedRelativePath = normalizeRelativePath(rawPath);
-  const vaultContentPath = String(window?.vault?.contentPath || "").trim();
+  const vaultContentPath = String(getCurrentVaultInfo()?.contentPath || "").trim();
   if (vaultContentPath) {
-    return repairLikelyMojibakePath(path.join(vaultContentPath, normalizedRelativePath));
+    return normalizeCandidatePath(path.join(vaultContentPath, normalizedRelativePath));
   }
-  const vaultBasePath = String(window?.vault?.path || "").trim();
+  const vaultBasePath = String(getCurrentVaultInfo()?.basePath || "").trim();
   if (vaultBasePath) {
-    return repairLikelyMojibakePath(
+    return normalizeCandidatePath(
       path.join(vaultBasePath, "content", normalizedRelativePath)
     );
   }
-  return repairLikelyMojibakePath(rawPath);
+  return normalizeCandidatePath(rawPath);
 }
 function buildFolderOptions(byId = {}, rootId = null) {
   return Object.values(byId).filter((item) => item?.type === "folder").map((item) => {
@@ -31310,7 +31294,6 @@ function queueBooksEditorLogEvent(event, message, data = null, level = "info") {
 
 // ../nexus-plugins/Books/src/BooksPdfViewer.jsx
 var { useEffect, useMemo, useRef, useState } = window.React;
-var { readFile } = window.require("node:fs/promises");
 var PAGE_OBSERVER_ROOT_MARGIN = "1200px 0px";
 var DEFAULT_PAGE_ASPECT_RATIO = 1.414;
 var VIEWER_HORIZONTAL_PADDING = 32;
@@ -31572,7 +31555,7 @@ function BooksPdfViewer({
       try {
         const [pdfJsRuntime, fileBuffer] = await Promise.all([
           loadBooksPdfJsRuntime(),
-          readFile(filePath)
+          window.nexus.files.readBinary(filePath)
         ]);
         if (cancelled) {
           return;
@@ -31705,7 +31688,7 @@ function BooksPdfViewer({
 
 // ../nexus-plugins/Books/src/BooksDocumentEngine.jsx
 var { useCallback, useEffect: useEffect2, useMemo: useMemo2, useRef: useRef2, useState: useState2 } = window.React;
-var { ipcRenderer, shell } = window.require("electron");
+var ipcRenderer = window.nexus.ipc;
 var PDF_VIEWER_CLOSE_SETTLE_MS = 32;
 function clampZoom(value) {
   return Math.max(50, Math.min(220, value));
@@ -31848,7 +31831,7 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
     if (!resolvedFilePath) {
       return;
     }
-    await shell.openPath(resolvedFilePath);
+    await window.nexus.desktop.openPath(resolvedFilePath);
   };
   return /* @__PURE__ */ React.createElement("section", { className: "booksEngine" }, /* @__PURE__ */ React.createElement("div", { className: "booksEngine__toolbar" }, /* @__PURE__ */ React.createElement("div", { className: "booksEngine__toolbarGroup" }, /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => setZoom((currentValue) => clampZoom(currentValue - 10)) }, /* @__PURE__ */ React.createElement(ZoomOutIcon, { size: 16 })), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => setZoom(100) }, zoom, "%"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => setZoom((currentValue) => clampZoom(currentValue + 10)) }, /* @__PURE__ */ React.createElement(ZoomInIcon, { size: 16 }))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__toolbarGroup" }, /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => setReloadToken((currentValue) => currentValue + 1) }, /* @__PURE__ */ React.createElement(RefreshIcon, { size: 16 })), /* @__PURE__ */ React.createElement(
     "button",
@@ -31914,7 +31897,7 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
 
 // ../nexus-frontend/src/utils/devLog.js
 var DEV_LOG_BATCH_CHANNEL = "dev-log:append-batch";
-var { ipcRenderer: ipcRenderer2 } = window.require("electron");
+var ipcRenderer2 = window.nexus.ipc;
 var devLogRawConsole = {
   debug: console.debug.bind(console),
   log: console.log.bind(console),
@@ -32217,7 +32200,7 @@ function StateBlock({
 
 // ../nexus-plugins/Books/src/BooksLibraryView.jsx
 var { startTransition, useDeferredValue, useEffect: useEffect3, useMemo: useMemo3, useRef: useRef3, useState: useState3 } = window.React;
-var { ipcRenderer: ipcRenderer3 } = window.require("electron");
+var ipcRenderer3 = window.nexus.ipc;
 var booksLibraryLogger = createRendererDevLogger("renderer.plugins.books");
 var BOOK_GRID_ASPECT_RATIO = 0.72;
 var BOOK_GRID_BODY_HEIGHT = 114;

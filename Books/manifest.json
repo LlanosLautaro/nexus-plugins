@@ -1,7 +1,7 @@
 {
   "id": "nexus.books",
   "displayName": "Books",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "apiVersion": 1,
   "schemaVersion": 1,
   "description": "Biblioteca local PDF-first con progreso simple, detalle por item y busqueda derivada.",
@@ -15,8 +15,12 @@
       {
         "id": "nexus.books.document",
         "displayName": "Books",
-        "extensions": ["pdf"],
-        "mimeTypes": ["application/pdf"],
+        "extensions": [
+          "pdf"
+        ],
+        "mimeTypes": [
+          "application/pdf"
+        ],
         "priority": 330,
         "supportsGlobalMatch": false,
         "supportsFolderAssignments": true

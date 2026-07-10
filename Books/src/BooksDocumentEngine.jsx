@@ -17,7 +17,7 @@ import {
   resolveVaultFilePath,
 } from "./renderer-helpers.js";
 
-const { ipcRenderer, shell } = window.require("electron");
+const ipcRenderer = window.nexus.ipc;
 
 const PDF_VIEWER_CLOSE_SETTLE_MS = 32;
 
@@ -195,7 +195,7 @@ export default function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }
       return;
     }
 
-    await shell.openPath(resolvedFilePath);
+    await window.nexus.desktop.openPath(resolvedFilePath);
   };
 
   return (

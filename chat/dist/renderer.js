@@ -34,7 +34,7 @@ function SendIcon(props) {
 
 // ../nexus-plugins/chat/src/ChatView.jsx
 var { startTransition, useEffect, useLayoutEffect, useRef, useState } = window.React;
-var { ipcRenderer } = window.require("electron");
+var ipcRenderer = window.nexus.ipc;
 function createMessage(role, content, meta = null) {
   return {
     id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,

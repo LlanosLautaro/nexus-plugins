@@ -73,6 +73,9 @@
 .booksEngine__toolbar button,
 .booksEngine__choiceButton,
 .booksEngine__secondaryButton {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
   min-height: var(--control-height-m);
   border-radius: var(--radius-pill);
   border: 1px solid var(--button-secondary-border);
@@ -385,6 +388,9 @@
 }
 
 .booksEngine__toolbar {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
   display: flex;
   align-items: center;
   justify-content: space-between;

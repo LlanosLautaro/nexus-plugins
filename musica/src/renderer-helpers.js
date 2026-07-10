@@ -7,6 +7,10 @@ import {
 } from "./plugin-settings.js";
 import { resolveItemLocationFromItemsState } from "../../../nexus-frontend/src/store/items/location.mjs";
 
+function getCurrentVaultInfo() {
+  return window.nexus.vault.getCurrent() || null;
+}
+
 const SUPPORTED_AUDIO_EXTENSIONS = new Set([
   "aac",
   "flac",
@@ -42,7 +46,7 @@ export function isSupportedAudioItem(item) {
 
 export function getContentRelativePath(filePath) {
   const normalizedPath = String(filePath || "").replace(/\\/g, "/");
-  const vaultPath = String(window?.vault?.path || "").replace(/\\/g, "/").replace(/\/$/, "");
+  const vaultPath = String(getCurrentVaultInfo()?.basePath || "").replace(/\\/g, "/").replace(/\/$/, "");
 
   if (!normalizedPath) {
     return "";
