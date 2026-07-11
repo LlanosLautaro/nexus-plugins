@@ -223,6 +223,16 @@
   gap: 8px;
 }
 
+.booruView__mediaGrid--infinite {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  position: relative;
+}
+
+.booruView__mediaGrid--infinite.is-virtualized .booruView__mediaCard {
+  position: absolute;
+}
+
 .booruView__resourcePanelBody,
 .booruView__inspectorBody {
   flex: 1 1 auto;
@@ -1071,6 +1081,21 @@
   padding: 10px 0 4px;
 }
 
+.booruView__resourceLoadSentinel {
+  height: 1px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.booruView__resourceLoadingMore {
+  align-self: center;
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  padding: 6px 0 2px;
+}
+
 .booruView__pagination {
   display: flex;
   align-items: center;
@@ -1157,6 +1182,9 @@
   .booruView__mediaGrid--paged {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
+  .booruView__mediaGrid--infinite {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 @media (max-width: 1080px) {
   .booruView__workspaceGrid,
@@ -1171,6 +1199,9 @@
     grid-template-columns: 1fr;
   }
   .booruView__mediaGrid--paged {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .booruView__mediaGrid--infinite {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
@@ -1202,6 +1233,9 @@
   .booruView__mediaGrid--paged {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  .booruView__mediaGrid--infinite {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .booruView__pagination {
     align-items: flex-start;
     flex-direction: column;
@@ -1228,6 +1262,9 @@
     grid-template-columns: 1fr;
   }
   .booruView__mediaGrid--paged {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .booruView__mediaGrid--infinite {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

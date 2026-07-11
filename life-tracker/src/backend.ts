@@ -24,7 +24,12 @@ import {
   todayLocalDate,
 } from "./habitos-core.js";
 import financeBackendPlugin from "./finance/backend.ts";
-import trainingBackendPlugin, { buildTrainingHomeContribution } from "./training/backend.ts";
+import trainingBackendPlugin, {
+  buildTrainingHomeContribution,
+  buildTrainingManagedDocAssets,
+} from "./training/backend.ts";
+
+export { buildTrainingManagedDocAssets };
 
 const LIFE_TRACKER_HABITS_CHANNEL_PREFIX = "life-tracker:habits";
 

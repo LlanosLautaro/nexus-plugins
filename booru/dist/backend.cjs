@@ -2365,6 +2365,7 @@ var THUMBNAIL_MAX_SIDE_PX = 384;
 var THUMBNAIL_CONCURRENCY = 2;
 var BOORU_RUNTIME_STATE_KEYS = {
   resourcesVersion: `plugins.runtimeState.${BOORU_PLUGIN_ID}.resourcesVersion`,
+  thumbnailsVersion: `plugins.runtimeState.${BOORU_PLUGIN_ID}.thumbnailsVersion`,
   entitiesVersion: `plugins.runtimeState.${BOORU_PLUGIN_ID}.entitiesVersion`,
   watcherVersion: `plugins.runtimeState.${BOORU_PLUGIN_ID}.watcherVersion`,
   metricsVersion: `plugins.runtimeState.${BOORU_PLUGIN_ID}.metricsVersion`
@@ -4006,7 +4007,7 @@ async function processThumbnailQueueEntry(state, resourceId) {
       workerFailurePayload
     );
   }
-  scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion");
+  scheduleRuntimeInvalidation("thumbnailsVersion");
 }
 async function pumpThumbnailQueue() {
   const state = runtimeState;
@@ -6232,6 +6233,27 @@ var booruPlugin = {
         return createSuccess(result);
       } catch (error) {
         return createError(error, "No se pudo listar la biblioteca de Booru.");
+      }
+    });
+    ctx.registerIpc("booru:get-resources-by-ids", async (_event, payload) => {
+      const startedAt = performance.now();
+      try {
+        const db = assertRuntimeDb();
+        const resourceIds = uniqueBooruIds(payload?.resourceIds);
+        const items = getResourceRowsByIdsSync(db, resourceIds);
+        logBackendDuration(
+          "booru.resources.visible-refresh.done",
+          "Booru actualizo recursos visibles despues de generar thumbnails.",
+          performance.now() - startedAt,
+          {
+            requestedCount: resourceIds.length,
+            itemCount: items.length,
+            sampleIds: summarizeIdsForLog(items)
+          }
+        );
+        return createSuccess({ items });
+      } catch (error) {
+        return createError(error, "No se pudieron actualizar los recursos visibles de Booru.");
       }
     });
     ctx.registerIpc("booru:prime-visible-thumbnails", async (_event, payload) => {

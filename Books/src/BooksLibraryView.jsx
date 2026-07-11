@@ -10,6 +10,7 @@ const booksLibraryLogger = createRendererDevLogger("renderer.plugins.books");
 const BOOK_GRID_ASPECT_RATIO = 0.72;
 const BOOK_GRID_BODY_HEIGHT = 114;
 const BOOK_GRID_OVERSCAN_ROWS = 1;
+const BOOK_VIEWPORT_PRESSURE_LOG_COOLDOWN_MS = 1000;
 const COVER_PREVIEW_BACKEND_RETRY_DELAYS_MS = [0, 320, 1400, 3200];
 const COVER_PREVIEW_RETRY_COOLDOWN_MS = 12_000;
 const sessionCoverPreviewCache = new Map();
@@ -134,6 +135,37 @@ function getGridMetrics(containerWidth) {
     cardWidth,
     cardHeight,
     rowHeight,
+  };
+}
+
+function getBookVirtualRange({
+  itemCount,
+  columns,
+  rowHeight,
+  scrollTop,
+  viewportHeight,
+}) {
+  if (!itemCount || !columns || !rowHeight) {
+    return {
+      startIndex: 0,
+      endIndex: 0,
+    };
+  }
+
+  const totalRows = Math.ceil(itemCount / columns);
+  const safeViewportHeight = Math.max(viewportHeight, rowHeight);
+  const startRow = Math.max(
+    0,
+    Math.floor(scrollTop / rowHeight) - BOOK_GRID_OVERSCAN_ROWS,
+  );
+  const endRow = Math.min(
+    totalRows,
+    Math.ceil((scrollTop + safeViewportHeight) / rowHeight) + BOOK_GRID_OVERSCAN_ROWS,
+  );
+
+  return {
+    startIndex: startRow * columns,
+    endIndex: Math.min(itemCount, endRow * columns),
   };
 }
 
@@ -356,9 +388,17 @@ export default function BooksLibraryView({ ctx }) {
   const [error, setError] = useState("");
   const [searchValue, setSearchValue] = useState("");
   const [sortBy, setSortBy] = useState("added");
-  const [gridViewportWidth, setGridViewportWidth] = useState(0);
-  const [scrollTop, setScrollTop] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(0);
+  const [virtualLayout, setVirtualLayout] = useState({
+    gridWidth: 0,
+    viewportHeight: 0,
+  });
+  const [virtualRange, setVirtualRange] = useState({
+    startIndex: 0,
+    endIndex: 0,
+  });
+  const viewportPressureLogRef = useRef({
+    lastLoggedAt: 0,
+  });
   const deferredSearchValue = useDeferredValue(searchValue);
 
   const loadBooks = async () => {
@@ -419,47 +459,6 @@ export default function BooksLibraryView({ ctx }) {
     };
   }, []);
 
-  useEffect(() => {
-    const contentNode = contentRef.current;
-    const measureNode = gridMeasureRef.current;
-
-    if (!contentNode || !measureNode) {
-      return undefined;
-    }
-
-    let frameId = 0;
-    const updateScrollState = () => {
-      frameId = 0;
-      setScrollTop(contentNode.scrollTop || 0);
-      setViewportHeight(contentNode.clientHeight || 0);
-    };
-    const handleScroll = () => {
-      if (!frameId) {
-        frameId = window.requestAnimationFrame(updateScrollState);
-      }
-    };
-    const resizeObserver = new ResizeObserver(() => {
-      setGridViewportWidth(measureNode.clientWidth || 0);
-      setViewportHeight(contentNode.clientHeight || 0);
-    });
-
-    resizeObserver.observe(measureNode);
-    resizeObserver.observe(contentNode);
-    contentNode.addEventListener("scroll", handleScroll, { passive: true });
-    setGridViewportWidth(measureNode.clientWidth || 0);
-    setViewportHeight(contentNode.clientHeight || 0);
-    setScrollTop(contentNode.scrollTop || 0);
-
-    return () => {
-      if (frameId) {
-        window.cancelAnimationFrame(frameId);
-      }
-
-      resizeObserver.disconnect();
-      contentNode.removeEventListener("scroll", handleScroll);
-    };
-  }, [books.length, deferredSearchValue, loading, sortBy]);
-
   const visibleBooks = useMemo(() => {
     const normalizedQuery = normalizeBooksSearchText(deferredSearchValue);
     const nextBooks = normalizedQuery
@@ -474,7 +473,10 @@ export default function BooksLibraryView({ ctx }) {
     return nextBooks.sort((left, right) => compareBooks(left, right, sortBy));
   }, [books, deferredSearchValue, sortBy]);
 
-  const gridMetrics = useMemo(() => getGridMetrics(gridViewportWidth), [gridViewportWidth]);
+  const gridMetrics = useMemo(
+    () => getGridMetrics(virtualLayout.gridWidth),
+    [virtualLayout.gridWidth],
+  );
   const totalRows = useMemo(
     () =>
       gridMetrics.columns > 0
@@ -489,36 +491,70 @@ export default function BooksLibraryView({ ctx }) {
 
     return totalRows * gridMetrics.rowHeight - gridMetrics.gap;
   }, [gridMetrics.gap, gridMetrics.rowHeight, totalRows]);
-  const virtualRange = useMemo(() => {
-    if (!visibleBooks.length || !gridMetrics.columns || !gridMetrics.rowHeight) {
-      return {
-        startIndex: 0,
-        endIndex: 0,
-      };
+  useEffect(() => {
+    const contentNode = contentRef.current;
+    const measureNode = gridMeasureRef.current;
+
+    if (!contentNode || !measureNode) {
+      return undefined;
     }
 
-    const safeViewportHeight = Math.max(viewportHeight, gridMetrics.rowHeight);
-    const startRow = Math.max(
-      0,
-      Math.floor(scrollTop / gridMetrics.rowHeight) - BOOK_GRID_OVERSCAN_ROWS,
-    );
-    const endRow = Math.min(
-      totalRows,
-      Math.ceil((scrollTop + safeViewportHeight) / gridMetrics.rowHeight) + BOOK_GRID_OVERSCAN_ROWS,
-    );
+    let frameId = 0;
+    const updateVirtualWindow = () => {
+      const nextLayout = {
+        gridWidth: measureNode.clientWidth || 0,
+        viewportHeight: contentNode.clientHeight || 0,
+      };
+      const nextMetrics = getGridMetrics(nextLayout.gridWidth);
+      const nextRange = getBookVirtualRange({
+        itemCount: visibleBooks.length,
+        columns: nextMetrics.columns,
+        rowHeight: nextMetrics.rowHeight,
+        scrollTop: contentNode.scrollTop || 0,
+        viewportHeight: nextLayout.viewportHeight,
+      });
 
-    return {
-      startIndex: startRow * gridMetrics.columns,
-      endIndex: Math.min(visibleBooks.length, endRow * gridMetrics.columns),
+      setVirtualLayout((currentValue) => (
+        currentValue.gridWidth === nextLayout.gridWidth
+        && currentValue.viewportHeight === nextLayout.viewportHeight
+          ? currentValue
+          : nextLayout
+      ));
+      setVirtualRange((currentValue) => (
+        currentValue.startIndex === nextRange.startIndex
+        && currentValue.endIndex === nextRange.endIndex
+          ? currentValue
+          : nextRange
+      ));
     };
-  }, [
-    gridMetrics.columns,
-    gridMetrics.rowHeight,
-    scrollTop,
-    totalRows,
-    viewportHeight,
-    visibleBooks.length,
-  ]);
+    const handleScroll = () => {
+      if (frameId) {
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        updateVirtualWindow();
+      });
+    };
+    const resizeObserver = typeof ResizeObserver === "function"
+      ? new ResizeObserver(updateVirtualWindow)
+      : null;
+
+    resizeObserver?.observe(measureNode);
+    resizeObserver?.observe(contentNode);
+    contentNode.addEventListener("scroll", handleScroll, { passive: true });
+    updateVirtualWindow();
+
+    return () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+
+      resizeObserver?.disconnect();
+      contentNode.removeEventListener("scroll", handleScroll);
+    };
+  }, [loading, visibleBooks.length]);
   const virtualizedBooks = useMemo(
     () =>
       visibleBooks.slice(virtualRange.startIndex, virtualRange.endIndex).map((book, index) => {
@@ -554,14 +590,23 @@ export default function BooksLibraryView({ ctx }) {
 
     const visiblePreviewMissCount = virtualizedBooks.filter(({ book }) => !book?.coverPreview).length;
 
-    if (visiblePreviewMissCount >= 12 || visibleBooks.length >= 300) {
-      booksLibraryLogger.warn("books.library.viewportPressure", "Viewport de Books con alta presion de previews.", {
-        totalBooks: books.length,
-        visibleBooks: visibleBooks.length,
-        renderedCards: virtualizedBooks.length,
-        visiblePreviewMissCount,
-      });
+    if (visiblePreviewMissCount < 12) {
+      return;
     }
+
+    const now = performance.now();
+
+    if (now - viewportPressureLogRef.current.lastLoggedAt < BOOK_VIEWPORT_PRESSURE_LOG_COOLDOWN_MS) {
+      return;
+    }
+
+    viewportPressureLogRef.current.lastLoggedAt = now;
+    booksLibraryLogger.warn("books.library.viewportPressure", "Viewport de Books con alta presion de previews.", {
+      totalBooks: books.length,
+      visibleBooks: visibleBooks.length,
+      renderedCards: virtualizedBooks.length,
+      visiblePreviewMissCount,
+    });
   }, [books.length, loading, visibleBooks.length, virtualizedBooks]);
 
   const handleOpenBook = async (book) => {

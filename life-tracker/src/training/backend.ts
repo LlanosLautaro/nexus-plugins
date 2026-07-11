@@ -68,8 +68,18 @@ const TRAINING_CONCEPTS_ROOT = "Concepts/Fitness";
 const TRAINING_MUSCLE_CONCEPTS_DIRECTORY = `${TRAINING_CONCEPTS_ROOT}/Muscles`;
 const TRAINING_EXERCISE_CONCEPTS_DIRECTORY = `${TRAINING_CONCEPTS_ROOT}/Exercises`;
 const TRAINING_LEGACY_FOLDER_NOTE_FILE_NAME = "_folder.md";
+const TRAINING_MANAGED_DOCS_ASSET_DIRECTORY = path.resolve(
+  __dirname,
+  "..",
+  "assets",
+  "training",
+  "managed-docs",
+);
+const TRAINING_STARTER_EXERCISE_ID_TOKEN = "__NEXUS_TRAINING_EXERCISE_ID__";
 const TRAINING_TRANSFER_SCHEMA_VERSION = 2;
 const trainingConceptCoverageInFlight = new Map<string, Promise<void>>();
+const trainingMarkdownLinkSyncInFlight = new Map<string, Promise<void>>();
+const trainingMarkdownLinksSynced = new Set<string>();
 const TRAINING_STARTER_LIBRARY_STATE_KEY = "starterLibraryVersion";
 
 type TrainingExerciseType = "exercise" | "stretch" | "warmup" | "coordination";
@@ -1853,6 +1863,72 @@ function buildTrainingFolderNoteContent({
   });
 }
 
+export function buildTrainingManagedDocAssets() {
+  const assets = [
+    {
+      relativePath: `${TRAINING_MUSCLE_CONCEPTS_DIRECTORY}/${getTrainingFolderNoteFileName(TRAINING_MUSCLE_CONCEPTS_DIRECTORY)}`,
+      content: buildTrainingFolderNoteContent({
+        title: "Musculos",
+        summary: "Galeria de notas anatomicas del catalogo canonico de entrenamiento.",
+        kind: "muscle",
+      }),
+    },
+    {
+      relativePath: `${TRAINING_EXERCISE_CONCEPTS_DIRECTORY}/${getTrainingFolderNoteFileName(TRAINING_EXERCISE_CONCEPTS_DIRECTORY)}`,
+      content: buildTrainingFolderNoteContent({
+        title: "Ejercicios",
+        summary: "Galeria de notas de ejercicios y tecnica de entrenamiento.",
+        kind: "exercise",
+      }),
+    },
+    ...TRAINING_MUSCLE_CATALOG.map((muscle) => ({
+      relativePath: getTrainingMuscleConceptPreferredRelativePath(muscle),
+      content: buildTrainingConceptMarkdownContent(
+        muscle.title,
+        muscle.id,
+        buildTrainingMuscleConceptPayload(muscle),
+      ),
+    })),
+    ...TRAINING_STARTER_EXERCISES.map((definition) => ({
+      relativePath: getTrainingExerciseConceptPreferredRelativePath({
+        title: definition.title,
+        slug: normalizeTrainingSlug(definition.title, "exercise"),
+      }),
+      content: buildTrainingConceptMarkdownContent(
+        definition.title,
+        definition.title,
+        buildTrainingStarterExerciseConceptPayload(
+          definition,
+          TRAINING_STARTER_EXERCISE_ID_TOKEN,
+        ),
+      ),
+    })),
+  ];
+
+  return assets.map((asset) => ({
+    relativePath: normalizeRelativeContentPath(asset.relativePath),
+    content: asset.content,
+  }));
+}
+
+async function copyTrainingManagedDocAssets(ctx: NexusBackendPluginContext) {
+  if (!existsSync(TRAINING_MANAGED_DOCS_ASSET_DIRECTORY)) {
+    return false;
+  }
+
+  const assetEntries = await fs.readdir(TRAINING_MANAGED_DOCS_ASSET_DIRECTORY, {
+    withFileTypes: true,
+  });
+
+  await Promise.all(assetEntries.map((entry) => fs.cp(
+    path.join(TRAINING_MANAGED_DOCS_ASSET_DIRECTORY, entry.name),
+    path.join(ctx.vault.contentPath, entry.name),
+    { recursive: entry.isDirectory(), force: true },
+  )));
+
+  return true;
+}
+
 function getTrainingFolderNoteLegacyFileNames(directoryRelativePath: string) {
   const normalizedDirectoryPath = normalizeRelativeContentPath(directoryRelativePath);
   const baseNames = [TRAINING_LEGACY_FOLDER_NOTE_FILE_NAME];
@@ -1908,6 +1984,7 @@ async function renameTrainingMarkdownItemPath(
   currentRelativePath: string,
   nextRelativePath: string,
   itemId: string | null = null,
+  { replaceExisting = false }: { replaceExisting?: boolean } = {},
 ) {
   const normalizedCurrentRelativePath = normalizeRelativeContentPath(currentRelativePath);
   const normalizedNextRelativePath = normalizeRelativeContentPath(nextRelativePath);
@@ -1930,7 +2007,7 @@ async function renameTrainingMarkdownItemPath(
     return ensureTrainingMarkdownItem(ctx, normalizedNextRelativePath);
   }
 
-  if (await doesTrainingPathExist(nextAbsolutePath)) {
+  if (await doesTrainingPathExist(nextAbsolutePath) && !replaceExisting) {
     return ensureTrainingMarkdownItem(ctx, normalizedCurrentRelativePath);
   }
 
@@ -1938,6 +2015,10 @@ async function renameTrainingMarkdownItemPath(
   const currentItem = normalizedItemId
     ? await repositories.items.findById(normalizedItemId)
     : await findTrainingItemByRelativePath(ctx, normalizedCurrentRelativePath, "file");
+
+  if (replaceExisting && await doesTrainingPathExist(nextAbsolutePath)) {
+    await fs.rm(nextAbsolutePath, { force: true });
+  }
 
   await fs.mkdir(path.dirname(nextAbsolutePath), { recursive: true });
   await fs.rename(currentAbsolutePath, nextAbsolutePath);
@@ -2364,7 +2445,11 @@ function upsertTrainingExerciseSearchDocument(sqlite: any, exercise: TrainingExe
   });
 }
 
-async function ensureTrainingMuscleConcept(ctx: NexusBackendPluginContext, muscleId: string) {
+async function ensureTrainingMuscleConcept(
+  ctx: NexusBackendPluginContext,
+  muscleId: string,
+  { ensureFolders = true }: { ensureFolders?: boolean } = {},
+) {
   const normalizedMuscleId = normalizeOptionalText(muscleId);
   if (!normalizedMuscleId) {
     throw new Error("Falta el id del musculo.");
@@ -2380,13 +2465,21 @@ async function ensureTrainingMuscleConcept(ctx: NexusBackendPluginContext, muscl
   const existingDoc = existingBinding?.concept_id
     ? getTrainingDocRecordByConceptIdSync(ctx, existingBinding.concept_id)
     : null;
-  await ensureTrainingConceptFolders(ctx);
+  if (ensureFolders) {
+    await ensureTrainingConceptFolders(ctx);
+  }
   const preferredRelativePath = getTrainingMuscleConceptPreferredRelativePath(muscle);
   const legacyRelativePath = getTrainingMuscleConceptLegacyRelativePaths(muscle)[0] || null;
 
   if (existingDoc?.relativePath) {
     if (existingDoc.relativePath !== preferredRelativePath) {
-      await renameTrainingMarkdownItemPath(ctx, existingDoc.relativePath, preferredRelativePath, existingDoc.itemId);
+      await renameTrainingMarkdownItemPath(
+        ctx,
+        existingDoc.relativePath,
+        preferredRelativePath,
+        existingDoc.itemId,
+        { replaceExisting: true },
+      );
       return getTrainingDocRecordByConceptIdSync(ctx, existingBinding?.concept_id);
     }
 
@@ -2429,7 +2522,7 @@ async function ensureAllTrainingMuscleConcepts(ctx: NexusBackendPluginContext) {
   const docs = [];
 
   for (const muscle of TRAINING_MUSCLE_CATALOG) {
-    const doc = await ensureTrainingMuscleConcept(ctx, muscle.id);
+    const doc = await ensureTrainingMuscleConcept(ctx, muscle.id, { ensureFolders: false });
     if (doc) {
       docs.push(doc);
     }
@@ -2854,6 +2947,47 @@ function getTrainingConceptCoverageKey(ctx: NexusBackendPluginContext) {
   return path.normalize(String(ctx?.vault?.contentPath || "__training__"));
 }
 
+function queueTrainingManagedMarkdownLinkSync(ctx: NexusBackendPluginContext) {
+  if (typeof ctx.syncMarkdownLinks !== "function") {
+    return;
+  }
+
+  const coverageKey = getTrainingConceptCoverageKey(ctx);
+  if (trainingMarkdownLinksSynced.has(coverageKey) || trainingMarkdownLinkSyncInFlight.has(coverageKey)) {
+    return;
+  }
+
+  const pendingRun = new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  }).then(async () => {
+    const repositories = getRepositories(ctx);
+    const markdownItems = (await repositories.items.findAll()).filter((item: any) => {
+      const relativePath = normalizeRelativeContentPath(item?.relative_path || item?.path);
+      return item?.type === "file" && (
+        relativePath.startsWith(`${TRAINING_MUSCLE_CONCEPTS_DIRECTORY}/`)
+        || relativePath.startsWith(`${TRAINING_EXERCISE_CONCEPTS_DIRECTORY}/`)
+      );
+    });
+
+    for (const item of markdownItems) {
+      await ctx.syncMarkdownLinks({
+        item,
+        reason: "content-updated",
+        structuralChanged: false,
+        contentChanged: true,
+      });
+    }
+
+    trainingMarkdownLinksSynced.add(coverageKey);
+  }).catch((error) => {
+    console.error("[life-tracker.training] No se pudieron indexar los enlaces de notas gestionadas.", error);
+  }).finally(() => {
+    trainingMarkdownLinkSyncInFlight.delete(coverageKey);
+  });
+
+  trainingMarkdownLinkSyncInFlight.set(coverageKey, pendingRun);
+}
+
 async function ensureTrainingStarterExerciseRecord(
   ctx: NexusBackendPluginContext,
   definition: (typeof TRAINING_STARTER_EXERCISES)[number],
@@ -3003,6 +3137,7 @@ async function upgradeTrainingLegacyMuscleManagedDocIfNeeded(
 async function restoreTrainingStarterExerciseManagedDoc(
   ctx: NexusBackendPluginContext,
   templateKey: string,
+  { ensureFolders = true }: { ensureFolders?: boolean } = {},
 ) {
   const definition = getTrainingStarterExerciseDefinition(templateKey);
   if (!definition) {
@@ -3010,7 +3145,9 @@ async function restoreTrainingStarterExerciseManagedDoc(
   }
 
   const sqlite = getSqlite(ctx);
-  await ensureTrainingConceptFolders(ctx);
+  if (ensureFolders) {
+    await ensureTrainingConceptFolders(ctx);
+  }
   const exercise = await ensureTrainingStarterExerciseRecord(ctx, definition);
   const currentRow = findTrainingExerciseByTemplateKeySync(sqlite, definition.templateKey);
   const currentDoc = getRealTrainingConceptId(currentRow?.concept_id)
@@ -3073,6 +3210,7 @@ async function ensureTrainingConceptCoverage(ctx: NexusBackendPluginContext) {
 
   const pendingRun = (async () => {
     try {
+      await copyTrainingManagedDocAssets(ctx);
       await ensureTrainingConceptFolders(ctx);
       await ensureAllTrainingMuscleConcepts(ctx);
       for (const muscle of TRAINING_MUSCLE_CATALOG) {
@@ -3080,9 +3218,12 @@ async function ensureTrainingConceptCoverage(ctx: NexusBackendPluginContext) {
       }
       for (const definition of TRAINING_STARTER_EXERCISES) {
         await ensureTrainingStarterExerciseRecord(ctx, definition);
-        await restoreTrainingStarterExerciseManagedDoc(ctx, definition.templateKey);
+        await restoreTrainingStarterExerciseManagedDoc(ctx, definition.templateKey, {
+          ensureFolders: false,
+        });
       }
       setTrainingSystemStateValueSync(sqlite, TRAINING_STARTER_LIBRARY_STATE_KEY, String(TRAINING_STARTER_LIBRARY_VERSION));
+      queueTrainingManagedMarkdownLinkSync(ctx);
     } finally {
       trainingConceptCoverageInFlight.delete(coverageKey);
     }
@@ -4415,13 +4556,16 @@ const trainingPlugin: NexusBackendPluginModule = {
   },
   activate(ctx) {
     registerTrainingSchema(ctx);
-    void ensureTrainingConceptCoverage(ctx).catch((error) => {
-      console.error("[life-tracker.training] No se pudo sembrar la documentacion fitness.", error);
-    });
+    void ensureTrainingConceptCoverage(ctx)
+      .then(() => queueTrainingManagedMarkdownLinkSync(ctx))
+      .catch((error) => {
+        console.error("[life-tracker.training] No se pudo sembrar la documentacion fitness.", error);
+      });
 
     ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:list`, async () => {
       try {
         await ensureTrainingConceptCoverage(ctx);
+        queueTrainingManagedMarkdownLinkSync(ctx);
         return createSuccess({
           exercises: listTrainingExercisesSync(ctx),
           routines: listTrainingRoutinesSync(ctx),

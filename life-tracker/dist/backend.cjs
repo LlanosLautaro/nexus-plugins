@@ -29,6 +29,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // ../nexus-plugins/life-tracker/src/backend.ts
 var backend_exports = {};
 __export(backend_exports, {
+  buildTrainingManagedDocAssets: () => buildTrainingManagedDocAssets,
   default: () => backend_default3
 });
 module.exports = __toCommonJS(backend_exports);
@@ -7617,8 +7618,18 @@ var TRAINING_CONCEPTS_ROOT = "Concepts/Fitness";
 var TRAINING_MUSCLE_CONCEPTS_DIRECTORY = `${TRAINING_CONCEPTS_ROOT}/Muscles`;
 var TRAINING_EXERCISE_CONCEPTS_DIRECTORY = `${TRAINING_CONCEPTS_ROOT}/Exercises`;
 var TRAINING_LEGACY_FOLDER_NOTE_FILE_NAME = "_folder.md";
+var TRAINING_MANAGED_DOCS_ASSET_DIRECTORY = import_node_path.default.resolve(
+  __dirname,
+  "..",
+  "assets",
+  "training",
+  "managed-docs"
+);
+var TRAINING_STARTER_EXERCISE_ID_TOKEN = "__NEXUS_TRAINING_EXERCISE_ID__";
 var TRAINING_TRANSFER_SCHEMA_VERSION = 2;
 var trainingConceptCoverageInFlight = /* @__PURE__ */ new Map();
+var trainingMarkdownLinkSyncInFlight = /* @__PURE__ */ new Map();
+var trainingMarkdownLinksSynced = /* @__PURE__ */ new Set();
 var TRAINING_STARTER_LIBRARY_STATE_KEY = "starterLibraryVersion";
 var TRAINING_CONCEPT_TEMPLATES = {
   "fitness-muscle": {
@@ -8833,6 +8844,66 @@ function buildTrainingFolderNoteContent({
 ${summary}`
   });
 }
+function buildTrainingManagedDocAssets() {
+  const assets = [
+    {
+      relativePath: `${TRAINING_MUSCLE_CONCEPTS_DIRECTORY}/${getTrainingFolderNoteFileName(TRAINING_MUSCLE_CONCEPTS_DIRECTORY)}`,
+      content: buildTrainingFolderNoteContent({
+        title: "Musculos",
+        summary: "Galeria de notas anatomicas del catalogo canonico de entrenamiento.",
+        kind: "muscle"
+      })
+    },
+    {
+      relativePath: `${TRAINING_EXERCISE_CONCEPTS_DIRECTORY}/${getTrainingFolderNoteFileName(TRAINING_EXERCISE_CONCEPTS_DIRECTORY)}`,
+      content: buildTrainingFolderNoteContent({
+        title: "Ejercicios",
+        summary: "Galeria de notas de ejercicios y tecnica de entrenamiento.",
+        kind: "exercise"
+      })
+    },
+    ...TRAINING_MUSCLE_CATALOG.map((muscle) => ({
+      relativePath: getTrainingMuscleConceptPreferredRelativePath(muscle),
+      content: buildTrainingConceptMarkdownContent(
+        muscle.title,
+        muscle.id,
+        buildTrainingMuscleConceptPayload(muscle)
+      )
+    })),
+    ...TRAINING_STARTER_EXERCISES.map((definition) => ({
+      relativePath: getTrainingExerciseConceptPreferredRelativePath({
+        title: definition.title,
+        slug: normalizeTrainingSlug(definition.title, "exercise")
+      }),
+      content: buildTrainingConceptMarkdownContent(
+        definition.title,
+        definition.title,
+        buildTrainingStarterExerciseConceptPayload(
+          definition,
+          TRAINING_STARTER_EXERCISE_ID_TOKEN
+        )
+      )
+    }))
+  ];
+  return assets.map((asset) => ({
+    relativePath: normalizeRelativeContentPath(asset.relativePath),
+    content: asset.content
+  }));
+}
+async function copyTrainingManagedDocAssets(ctx) {
+  if (!(0, import_node_fs.existsSync)(TRAINING_MANAGED_DOCS_ASSET_DIRECTORY)) {
+    return false;
+  }
+  const assetEntries = await import_promises.default.readdir(TRAINING_MANAGED_DOCS_ASSET_DIRECTORY, {
+    withFileTypes: true
+  });
+  await Promise.all(assetEntries.map((entry) => import_promises.default.cp(
+    import_node_path.default.join(TRAINING_MANAGED_DOCS_ASSET_DIRECTORY, entry.name),
+    import_node_path.default.join(ctx.vault.contentPath, entry.name),
+    { recursive: entry.isDirectory(), force: true }
+  )));
+  return true;
+}
 function getTrainingFolderNoteLegacyFileNames(directoryRelativePath) {
   const normalizedDirectoryPath = normalizeRelativeContentPath(directoryRelativePath);
   const baseNames = [TRAINING_LEGACY_FOLDER_NOTE_FILE_NAME];
@@ -8871,7 +8942,7 @@ async function ensureTrainingMarkdownItem(ctx, relativePath) {
   pruneTrainingItemRowsByPathSync(getSqlite(ctx), normalizedRelativePath, "file", String(item.id));
   return findTrainingItemByRelativePath(ctx, normalizedRelativePath, "file");
 }
-async function renameTrainingMarkdownItemPath(ctx, currentRelativePath, nextRelativePath, itemId = null) {
+async function renameTrainingMarkdownItemPath(ctx, currentRelativePath, nextRelativePath, itemId = null, { replaceExisting = false } = {}) {
   const normalizedCurrentRelativePath = normalizeRelativeContentPath(currentRelativePath);
   const normalizedNextRelativePath = normalizeRelativeContentPath(nextRelativePath);
   const normalizedItemId = normalizeOptionalText3(itemId);
@@ -8889,11 +8960,14 @@ async function renameTrainingMarkdownItemPath(ctx, currentRelativePath, nextRela
   if (!await doesTrainingPathExist(currentAbsolutePath)) {
     return ensureTrainingMarkdownItem(ctx, normalizedNextRelativePath);
   }
-  if (await doesTrainingPathExist(nextAbsolutePath)) {
+  if (await doesTrainingPathExist(nextAbsolutePath) && !replaceExisting) {
     return ensureTrainingMarkdownItem(ctx, normalizedCurrentRelativePath);
   }
   const repositories = getRepositories(ctx);
   const currentItem = normalizedItemId ? await repositories.items.findById(normalizedItemId) : await findTrainingItemByRelativePath(ctx, normalizedCurrentRelativePath, "file");
+  if (replaceExisting && await doesTrainingPathExist(nextAbsolutePath)) {
+    await import_promises.default.rm(nextAbsolutePath, { force: true });
+  }
   await import_promises.default.mkdir(import_node_path.default.dirname(nextAbsolutePath), { recursive: true });
   await import_promises.default.rename(currentAbsolutePath, nextAbsolutePath);
   if (currentItem?.id) {
@@ -9207,7 +9281,7 @@ function upsertTrainingExerciseSearchDocument(sqlite, exercise) {
     }
   });
 }
-async function ensureTrainingMuscleConcept(ctx, muscleId) {
+async function ensureTrainingMuscleConcept(ctx, muscleId, { ensureFolders = true } = {}) {
   const normalizedMuscleId = normalizeOptionalText3(muscleId);
   if (!normalizedMuscleId) {
     throw new Error("Falta el id del musculo.");
@@ -9219,12 +9293,20 @@ async function ensureTrainingMuscleConcept(ctx, muscleId) {
   }
   const existingBinding = findTrainingMuscleConceptBindingSync(sqlite, normalizedMuscleId);
   const existingDoc = existingBinding?.concept_id ? getTrainingDocRecordByConceptIdSync(ctx, existingBinding.concept_id) : null;
-  await ensureTrainingConceptFolders(ctx);
+  if (ensureFolders) {
+    await ensureTrainingConceptFolders(ctx);
+  }
   const preferredRelativePath = getTrainingMuscleConceptPreferredRelativePath(muscle);
   const legacyRelativePath = getTrainingMuscleConceptLegacyRelativePaths(muscle)[0] || null;
   if (existingDoc?.relativePath) {
     if (existingDoc.relativePath !== preferredRelativePath) {
-      await renameTrainingMarkdownItemPath(ctx, existingDoc.relativePath, preferredRelativePath, existingDoc.itemId);
+      await renameTrainingMarkdownItemPath(
+        ctx,
+        existingDoc.relativePath,
+        preferredRelativePath,
+        existingDoc.itemId,
+        { replaceExisting: true }
+      );
       return getTrainingDocRecordByConceptIdSync(ctx, existingBinding?.concept_id);
     }
     return existingDoc;
@@ -9258,7 +9340,7 @@ async function ensureAllTrainingMuscleConcepts(ctx) {
   await ensureTrainingConceptFolders(ctx);
   const docs = [];
   for (const muscle of TRAINING_MUSCLE_CATALOG) {
-    const doc = await ensureTrainingMuscleConcept(ctx, muscle.id);
+    const doc = await ensureTrainingMuscleConcept(ctx, muscle.id, { ensureFolders: false });
     if (doc) {
       docs.push(doc);
     }
@@ -9582,6 +9664,38 @@ async function saveTrainingMuscleDocMarkdown(ctx, muscleId, markdown) {
 function getTrainingConceptCoverageKey(ctx) {
   return import_node_path.default.normalize(String(ctx?.vault?.contentPath || "__training__"));
 }
+function queueTrainingManagedMarkdownLinkSync(ctx) {
+  if (typeof ctx.syncMarkdownLinks !== "function") {
+    return;
+  }
+  const coverageKey = getTrainingConceptCoverageKey(ctx);
+  if (trainingMarkdownLinksSynced.has(coverageKey) || trainingMarkdownLinkSyncInFlight.has(coverageKey)) {
+    return;
+  }
+  const pendingRun = new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  }).then(async () => {
+    const repositories = getRepositories(ctx);
+    const markdownItems = (await repositories.items.findAll()).filter((item) => {
+      const relativePath = normalizeRelativeContentPath(item?.relative_path || item?.path);
+      return item?.type === "file" && (relativePath.startsWith(`${TRAINING_MUSCLE_CONCEPTS_DIRECTORY}/`) || relativePath.startsWith(`${TRAINING_EXERCISE_CONCEPTS_DIRECTORY}/`));
+    });
+    for (const item of markdownItems) {
+      await ctx.syncMarkdownLinks({
+        item,
+        reason: "content-updated",
+        structuralChanged: false,
+        contentChanged: true
+      });
+    }
+    trainingMarkdownLinksSynced.add(coverageKey);
+  }).catch((error) => {
+    console.error("[life-tracker.training] No se pudieron indexar los enlaces de notas gestionadas.", error);
+  }).finally(() => {
+    trainingMarkdownLinkSyncInFlight.delete(coverageKey);
+  });
+  trainingMarkdownLinkSyncInFlight.set(coverageKey, pendingRun);
+}
 async function ensureTrainingStarterExerciseRecord(ctx, definition) {
   const sqlite = getSqlite(ctx);
   const canonicalSlug = normalizeTrainingSlug(definition.title, "exercise");
@@ -9701,13 +9815,15 @@ async function upgradeTrainingLegacyMuscleManagedDocIfNeeded(ctx, muscle) {
   }
   await restoreTrainingMuscleManagedDoc(ctx, muscle.id);
 }
-async function restoreTrainingStarterExerciseManagedDoc(ctx, templateKey) {
+async function restoreTrainingStarterExerciseManagedDoc(ctx, templateKey, { ensureFolders = true } = {}) {
   const definition = getTrainingStarterExerciseDefinition(templateKey);
   if (!definition) {
     throw new Error("No encontramos esa plantilla de ejercicio.");
   }
   const sqlite = getSqlite(ctx);
-  await ensureTrainingConceptFolders(ctx);
+  if (ensureFolders) {
+    await ensureTrainingConceptFolders(ctx);
+  }
   const exercise = await ensureTrainingStarterExerciseRecord(ctx, definition);
   const currentRow = findTrainingExerciseByTemplateKeySync(sqlite, definition.templateKey);
   const currentDoc = getRealTrainingConceptId(currentRow?.concept_id) ? getTrainingDocRecordByConceptIdSync(ctx, currentRow?.concept_id) : exercise.doc || findTrainingExistingExerciseDocRecordSync(ctx, exercise);
@@ -9761,6 +9877,7 @@ async function ensureTrainingConceptCoverage(ctx) {
   }
   const pendingRun = (async () => {
     try {
+      await copyTrainingManagedDocAssets(ctx);
       await ensureTrainingConceptFolders(ctx);
       await ensureAllTrainingMuscleConcepts(ctx);
       for (const muscle of TRAINING_MUSCLE_CATALOG) {
@@ -9768,9 +9885,12 @@ async function ensureTrainingConceptCoverage(ctx) {
       }
       for (const definition of TRAINING_STARTER_EXERCISES) {
         await ensureTrainingStarterExerciseRecord(ctx, definition);
-        await restoreTrainingStarterExerciseManagedDoc(ctx, definition.templateKey);
+        await restoreTrainingStarterExerciseManagedDoc(ctx, definition.templateKey, {
+          ensureFolders: false
+        });
       }
       setTrainingSystemStateValueSync(sqlite, TRAINING_STARTER_LIBRARY_STATE_KEY, String(TRAINING_STARTER_LIBRARY_VERSION));
+      queueTrainingManagedMarkdownLinkSync(ctx);
     } finally {
       trainingConceptCoverageInFlight.delete(coverageKey);
     }
@@ -10871,12 +10991,13 @@ var trainingPlugin = {
   },
   activate(ctx) {
     registerTrainingSchema(ctx);
-    void ensureTrainingConceptCoverage(ctx).catch((error) => {
+    void ensureTrainingConceptCoverage(ctx).then(() => queueTrainingManagedMarkdownLinkSync(ctx)).catch((error) => {
       console.error("[life-tracker.training] No se pudo sembrar la documentacion fitness.", error);
     });
     ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:list`, async () => {
       try {
         await ensureTrainingConceptCoverage(ctx);
+        queueTrainingManagedMarkdownLinkSync(ctx);
         return createSuccess2({
           exercises: listTrainingExercisesSync(ctx),
           routines: listTrainingRoutinesSync(ctx),
@@ -11345,6 +11466,10 @@ var lifeTrackerBackendPlugin = {
   }
 };
 var backend_default3 = lifeTrackerBackendPlugin;
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  buildTrainingManagedDocAssets
+});
 /*! Bundled license information:
 
 js-yaml/dist/js-yaml.mjs:

@@ -103,6 +103,7 @@ const NO_MISSING_FILTER = "none";
 const BOORU_RESOURCE_DND_TYPE = "nexus.booru.resource-card";
 const RESOURCE_PAGE_SIZE = 42;
 const RESOURCE_GRID_COLUMNS = 6;
+const RESOURCE_GRID_OVERSCAN_ROWS = 2;
 const NO_SETTINGS_SUBVIEW = "overview";
 const RESOURCE_SELECTION_SECTIONS = {
   media: { ids: [], activeId: "", mode: "single" },
@@ -612,6 +613,37 @@ function mergeResourcesIntoItems(items, nextResources) {
   }
 
   return (Array.isArray(items) ? items : []).map((item) => nextById.get(item.id) || item);
+}
+
+function appendResourcePageItems(items, nextResources) {
+  const nextItems = Array.isArray(nextResources) ? nextResources.filter(Boolean) : [];
+  const nextById = new Map(nextItems.map((item) => [item.id, item]));
+  const seenIds = new Set();
+  const mergedItems = [];
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const itemId = String(item?.id || "").trim();
+
+    if (!itemId || seenIds.has(itemId)) {
+      continue;
+    }
+
+    seenIds.add(itemId);
+    mergedItems.push(nextById.get(itemId) || item);
+  }
+
+  for (const item of nextItems) {
+    const itemId = String(item?.id || "").trim();
+
+    if (!itemId || seenIds.has(itemId)) {
+      continue;
+    }
+
+    seenIds.add(itemId);
+    mergedItems.push(item);
+  }
+
+  return mergedItems;
 }
 
 function normalizeResourceEntityFilters(items) {
@@ -1873,6 +1905,7 @@ function BooruDragPreviewLayer({ resourcesById, customDragState = null }) {
 function ResourceGridCard({
   item,
   absoluteIndex,
+  style = undefined,
   selected,
   multiSelected,
   dragResourceIds,
@@ -1983,6 +2016,7 @@ function ResourceGridCard({
         customDragActive ? "is-custom-dragging" : "",
         isDragging ? "is-dragging" : "",
       ].filter(Boolean).join(" ")}
+      style={style}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={(event) => onContextMenu?.(item, event)}
@@ -2135,6 +2169,36 @@ function ResourcePagination({
   );
 }
 
+function getResourceVirtualRange({
+  itemCount,
+  columns,
+  rowHeight,
+  scrollTop,
+  viewportHeight,
+}) {
+  if (!itemCount || !columns || !rowHeight) {
+    return {
+      startIndex: 0,
+      endIndex: itemCount,
+    };
+  }
+
+  const totalRows = Math.ceil(itemCount / columns);
+  const startRow = Math.max(
+    0,
+    Math.floor(scrollTop / rowHeight) - RESOURCE_GRID_OVERSCAN_ROWS,
+  );
+  const endRow = Math.min(
+    totalRows,
+    Math.ceil((scrollTop + Math.max(1, viewportHeight)) / rowHeight) + RESOURCE_GRID_OVERSCAN_ROWS,
+  );
+
+  return {
+    startIndex: startRow * columns,
+    endIndex: Math.min(itemCount, endRow * columns),
+  };
+}
+
 function ResourceGrid({
   items,
   selectedIds,
@@ -2145,6 +2209,10 @@ function ResourceGrid({
   totalCount,
   loading,
   scrollKey,
+  infinite = false,
+  hasMore = false,
+  onLoadMore,
+  onVisibleItemsChange,
   currentPage,
   pageSize,
   onPageChange,
@@ -2156,12 +2224,187 @@ function ResourceGrid({
   emptyDescription,
 }) {
   const contentRef = useRef(null);
+  const gridRef = useRef(null);
+  const loadMoreSentinelRef = useRef(null);
+  const loadMoreRef = useRef(onLoadMore);
+  const [virtualLayout, setVirtualLayout] = useState({
+    gridWidth: 0,
+    viewportHeight: 0,
+    columns: RESOURCE_GRID_COLUMNS,
+    gap: 8,
+  });
+  const [virtualRange, setVirtualRange] = useState({
+    startIndex: 0,
+    endIndex: 0,
+  });
+
+  loadMoreRef.current = onLoadMore;
 
   useEffect(() => {
     if (contentRef.current) {
       contentRef.current.scrollTop = 0;
     }
   }, [scrollKey]);
+
+  useEffect(() => {
+    if (!infinite) {
+      return undefined;
+    }
+
+    const contentNode = contentRef.current;
+    const gridNode = gridRef.current;
+
+    if (!contentNode || !gridNode) {
+      return undefined;
+    }
+
+    let frameId = 0;
+    const updateVirtualLayout = () => {
+      const computedStyle = window.getComputedStyle(gridNode);
+      const trackSizes = String(computedStyle.gridTemplateColumns || "")
+        .split(" ")
+        .map((value) => value.trim())
+        .filter((value) => /px$/.test(value));
+      const columns = Math.max(1, trackSizes.length || RESOURCE_GRID_COLUMNS);
+      const gap = Math.max(0, Number.parseFloat(computedStyle.columnGap) || 8);
+      const nextLayout = {
+        gridWidth: gridNode.clientWidth || 0,
+        viewportHeight: contentNode.clientHeight || 0,
+        columns,
+        gap,
+      };
+      const cardSize = Math.max(0, (
+        nextLayout.gridWidth - gap * Math.max(0, columns - 1)
+      ) / columns);
+      const nextRange = getResourceVirtualRange({
+        itemCount: items.length,
+        columns,
+        rowHeight: cardSize + gap,
+        scrollTop: contentNode.scrollTop || 0,
+        viewportHeight: nextLayout.viewportHeight,
+      });
+
+      setVirtualLayout((currentValue) => (
+        currentValue.gridWidth === nextLayout.gridWidth
+        && currentValue.viewportHeight === nextLayout.viewportHeight
+        && currentValue.columns === nextLayout.columns
+        && currentValue.gap === nextLayout.gap
+          ? currentValue
+          : nextLayout
+      ));
+      setVirtualRange((currentValue) => (
+        currentValue.startIndex === nextRange.startIndex
+        && currentValue.endIndex === nextRange.endIndex
+          ? currentValue
+          : nextRange
+      ));
+    };
+    const handleScroll = () => {
+      if (frameId) {
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        updateVirtualLayout();
+
+        if (
+          hasMore
+          && !loading
+          && contentNode.scrollTop + contentNode.clientHeight >= contentNode.scrollHeight - 640
+        ) {
+          loadMoreRef.current?.();
+        }
+      });
+    };
+    const resizeObserver = typeof ResizeObserver === "function"
+      ? new ResizeObserver(updateVirtualLayout)
+      : null;
+
+    resizeObserver?.observe(contentNode);
+    resizeObserver?.observe(gridNode);
+    contentNode.addEventListener("scroll", handleScroll, { passive: true });
+    updateVirtualLayout();
+
+    return () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+
+      resizeObserver?.disconnect();
+      contentNode.removeEventListener("scroll", handleScroll);
+    };
+  }, [hasMore, infinite, items.length, loading]);
+
+  const isVirtualized = infinite && virtualLayout.gridWidth > 0;
+  const gridMetrics = useMemo(() => {
+    const columns = Math.max(1, virtualLayout.columns || RESOURCE_GRID_COLUMNS);
+    const gap = Math.max(0, virtualLayout.gap || 0);
+    const cardSize = Math.max(0, (
+      virtualLayout.gridWidth - gap * Math.max(0, columns - 1)
+    ) / columns);
+    const rowHeight = cardSize + gap;
+
+    return {
+      columns,
+      gap,
+      cardSize,
+      rowHeight,
+    };
+  }, [virtualLayout.columns, virtualLayout.gap, virtualLayout.gridWidth]);
+  const totalRows = isVirtualized
+    ? Math.ceil(items.length / gridMetrics.columns)
+    : 0;
+  const totalGridHeight = isVirtualized && totalRows
+    ? totalRows * gridMetrics.cardSize + Math.max(0, totalRows - 1) * gridMetrics.gap
+    : 0;
+  const activeVirtualRange = isVirtualized
+    ? virtualRange
+    : {
+      startIndex: 0,
+      endIndex: items.length,
+    };
+  const renderedItems = useMemo(
+    () => items.slice(activeVirtualRange.startIndex, activeVirtualRange.endIndex),
+    [activeVirtualRange.endIndex, activeVirtualRange.startIndex, items],
+  );
+
+  useEffect(() => {
+    if (!infinite) {
+      return;
+    }
+
+    onVisibleItemsChange?.(renderedItems.map((item) => item.id));
+  }, [infinite, onVisibleItemsChange, renderedItems]);
+
+  useEffect(() => {
+    if (!infinite || !isVirtualized || !hasMore || loading) {
+      return undefined;
+    }
+
+    const contentNode = contentRef.current;
+    const sentinelNode = loadMoreSentinelRef.current;
+
+    if (!contentNode || !sentinelNode || typeof IntersectionObserver !== "function") {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMoreRef.current?.();
+        }
+      },
+      {
+        root: contentNode,
+        rootMargin: "640px 0px",
+      },
+    );
+
+    observer.observe(sentinelNode);
+
+    return () => observer.disconnect();
+  }, [hasMore, infinite, isVirtualized, loading, totalGridHeight]);
 
   return (
     <SectionPanel className="booruView__panel booruView__panel--fill">
@@ -2183,21 +2426,40 @@ function ResourceGrid({
         >
           <div className="booruView__resourcePanelContent">
             <div
-              className="booruView__mediaGrid booruView__mediaGrid--paged"
+              ref={gridRef}
+              className={[
+                "booruView__mediaGrid",
+                infinite ? "booruView__mediaGrid--infinite" : "booruView__mediaGrid--paged",
+                isVirtualized ? "is-virtualized" : "",
+              ].filter(Boolean).join(" ")}
+              style={isVirtualized ? { height: `${totalGridHeight}px` } : undefined}
               onPointerDown={(event) => {
                 if (event.target === event.currentTarget) {
                   onClearSelection?.();
                 }
               }}
             >
-              {items.map((item, absoluteIndex) => {
+              {renderedItems.map((item, index) => {
+                const absoluteIndex = activeVirtualRange.startIndex + index;
                 const selected = selectedIds.includes(item.id);
+                const row = Math.floor(absoluteIndex / gridMetrics.columns);
+                const column = absoluteIndex % gridMetrics.columns;
+                const cardStyle = isVirtualized
+                  ? {
+                    position: "absolute",
+                    top: `${row * gridMetrics.rowHeight}px`,
+                    left: `${column * (gridMetrics.cardSize + gridMetrics.gap)}px`,
+                    width: `${gridMetrics.cardSize}px`,
+                    height: `${gridMetrics.cardSize}px`,
+                  }
+                  : undefined;
 
                 return (
                   <ResourceGridCard
                     key={item.id}
                     item={item}
                     absoluteIndex={absoluteIndex}
+                    style={cardStyle}
                     selected={selected}
                     multiSelected={selected && selectionMode === "multi"}
                     dragResourceIds={selected ? selectedIds : [item.id]}
@@ -2210,14 +2472,27 @@ function ResourceGrid({
                   />
                 );
               })}
+
+              {infinite && hasMore ? (
+                <div
+                  ref={loadMoreSentinelRef}
+                  className="booruView__resourceLoadSentinel"
+                  aria-hidden="true"
+                  style={isVirtualized ? { top: `${Math.max(0, totalGridHeight - 1)}px` } : undefined}
+                />
+              ) : null}
             </div>
 
-            <ResourcePagination
-              currentPage={currentPage}
-              totalCount={totalCount}
-              pageSize={pageSize}
-              onPageChange={onPageChange}
-            />
+            {infinite ? (
+              loading ? <span className="booruView__resourceLoadingMore">Cargando más media...</span> : null
+            ) : (
+              <ResourcePagination
+                currentPage={currentPage}
+                totalCount={totalCount}
+                pageSize={pageSize}
+                onPageChange={onPageChange}
+              />
+            )}
           </div>
         </div>
       ) : (
@@ -5006,7 +5281,12 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const [resourceRealityFilter, setResourceRealityFilter] = useState("all");
   const [resourcePendingMode, setResourcePendingMode] = useState("essential");
   const [resourceMissingFilter, setResourceMissingFilter] = useState(NO_MISSING_FILTER);
-  const [resourceState, setResourceState] = useState({ items: [], totalCount: 0, hasMore: false });
+  const [resourceState, setResourceState] = useState({
+    items: [],
+    totalCount: 0,
+    hasMore: false,
+    querySignature: "",
+  });
   const [resourcePageState, setResourcePageState] = useState(RESOURCE_PAGE_SECTIONS);
   const [selectedResourceState, setSelectedResourceState] = useState(RESOURCE_SELECTION_SECTIONS);
   const [classificationDraft, setClassificationDraft] = useState(buildClassificationDraft([]));
@@ -5044,6 +5324,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const showClassificationSidebar = CLASSIFICATION_SIDEBAR_SECTIONS.has(activeResourceSection);
   const showEntityProfile = Boolean(activeEntityKind && activeEntityProfile?.id);
   const resourceItems = Array.isArray(resourceState?.items) ? resourceState.items : [];
+  const [visibleResourceIds, setVisibleResourceIds] = useState([]);
   const entityProfileGalleryItems = Array.isArray(entityProfileGalleryState?.items) ? entityProfileGalleryState.items : [];
   const resourceQuery = useMemo(() => buildResourceQuery({
     searchTokens: normalizedResourceSearchTokens,
@@ -5068,12 +5349,39 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const resourceQuerySignature = JSON.stringify(resourceQuery || {});
   const entityProfileKey = getEntityProfileKey(activeEntityProfile);
   const entityThumbnailPrimingEnabled = showEntityProfile && activeEntityProfile?.tab !== "data";
-  const thumbnailPrimingItems = showResourceWorkspace ? resourceItems : (entityThumbnailPrimingEnabled ? entityProfileGalleryItems : []);
+  const visibleResourceItems = useMemo(() => {
+    if (activeResourceSection !== "media" || !visibleResourceIds.length) {
+      return resourceItems;
+    }
+
+    const visibleIds = new Set(visibleResourceIds);
+    return resourceItems.filter((item) => visibleIds.has(item.id));
+  }, [activeResourceSection, resourceItems, visibleResourceIds]);
+  const thumbnailPrimingItems = showResourceWorkspace
+    ? visibleResourceItems
+    : (entityThumbnailPrimingEnabled ? entityProfileGalleryItems : []);
+  const mediaThumbnailPrimingItems = useMemo(
+    () => activeResourceSection === "media"
+      ? thumbnailPrimingItems.filter((item) => {
+        const status = String(item?.thumbnail?.status || "").trim();
+        return status !== "ready" && status !== "error";
+      })
+      : thumbnailPrimingItems,
+    [activeResourceSection, thumbnailPrimingItems],
+  );
   const currentEntityProfilePage = activeEntityKind
     ? clampPageNumber(entityProfilePageState?.[activeSection]?.page, Number.MAX_SAFE_INTEGER)
     : 1;
   const visibleThumbnailPrimingUnavailableRef = useRef(false);
   const primedResourcePageSignatureRef = useRef("");
+  const primedMediaThumbnailIdsRef = useRef(new Set());
+  const visibleResourceIdsRef = useRef([]);
+  const mediaLoadMoreLockedRef = useRef(false);
+  const mediaResourceRequestRef = useRef(null);
+  const mediaThumbnailRefreshRef = useRef({
+    inFlight: false,
+    queued: false,
+  });
   const classificationDraftRef = useRef(classificationDraft);
   const resourceRequestVersionRef = useRef(0);
   const entityProfileRequestVersionRef = useRef(0);
@@ -5116,6 +5424,19 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const currentResourcePage = showResourceWorkspace
     ? normalizeResourcePageState(resourcePageState[activeResourceSection], resourceQuerySignature).page
     : 1;
+  const currentResourcePageMatchesQuery = !showResourceWorkspace
+    || String(resourcePageState?.[activeResourceSection]?.querySignature || "") === resourceQuerySignature;
+  const handleVisibleResourceIdsChange = useCallback((nextIds) => {
+    const normalizedIds = uniqueIds(nextIds);
+
+    setVisibleResourceIds((currentIds) => (
+      arraysEqual(currentIds, normalizedIds) ? currentIds : normalizedIds
+    ));
+  }, []);
+
+  useEffect(() => {
+    visibleResourceIdsRef.current = visibleResourceIds;
+  }, [visibleResourceIds]);
 
   useEffect(() => {
     booruViewLogger.info(
@@ -5190,10 +5511,14 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       return;
     }
 
-    setResourcePageState((currentValue) => {
-      const nextSectionState = normalizeResourcePageState(currentValue[activeResourceSection], resourceQuerySignature);
+    if (activeResourceSection === "media") {
+      mediaLoadMoreLockedRef.current = false;
+    }
 
-      if (nextSectionState.querySignature === resourceQuerySignature) {
+    setResourcePageState((currentValue) => {
+      const currentSectionState = currentValue[activeResourceSection];
+
+      if (String(currentSectionState?.querySignature || "") === resourceQuerySignature) {
         return currentValue;
       }
 
@@ -5375,6 +5700,17 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     }
 
     const normalizedRequestedPage = clampPageNumber(requestedPage, Number.MAX_SAFE_INTEGER);
+    const isInfiniteMedia = activeResourceSection === "media";
+    const activeMediaRequest = mediaResourceRequestRef.current;
+
+    if (
+      isInfiniteMedia
+      && activeMediaRequest?.querySignature === resourceQuerySignature
+      && !(normalizedRequestedPage === 1 && activeMediaRequest.page !== 1)
+    ) {
+      return;
+    }
+
     const nextQuery = {
       section: activeResourceSection,
       query: resourceQuery,
@@ -5384,6 +5720,14 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     const startedAt = performance.now();
     resourceRequestVersionRef.current += 1;
     const requestVersion = resourceRequestVersionRef.current;
+
+    if (isInfiniteMedia) {
+      mediaResourceRequestRef.current = {
+        requestVersion,
+        page: normalizedRequestedPage,
+        querySignature: resourceQuerySignature,
+      };
+    }
 
     setResourceLoading(true);
     booruViewLogger.debug(
@@ -5405,9 +5749,14 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       }
 
       setResourceState((currentValue) => ({
-        items: Array.isArray(nextResources?.items) ? nextResources.items : [],
+        items: isInfiniteMedia
+          && normalizedRequestedPage > 1
+          && currentValue.querySignature === resourceQuerySignature
+          ? appendResourcePageItems(currentValue.items, nextResources?.items)
+          : (Array.isArray(nextResources?.items) ? nextResources.items : []),
         totalCount: Number(nextResources?.totalCount || 0),
         hasMore: Boolean(nextResources?.hasMore),
+        querySignature: resourceQuerySignature,
       }));
       setError("");
       logRendererDuration(
@@ -5443,7 +5792,66 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         },
       );
     } finally {
-      setResourceLoading(false);
+      if (mediaResourceRequestRef.current?.requestVersion === requestVersion) {
+        mediaResourceRequestRef.current = null;
+      }
+
+      if (isInfiniteMedia && normalizedRequestedPage > 1) {
+        mediaLoadMoreLockedRef.current = false;
+      }
+
+      if (resourceRequestVersionRef.current === requestVersion) {
+        setResourceLoading(false);
+      }
+    }
+  };
+
+  const refreshVisibleMediaResources = async () => {
+    if (activeResourceSection !== "media") {
+      return;
+    }
+
+    const refreshState = mediaThumbnailRefreshRef.current;
+
+    if (refreshState.inFlight) {
+      refreshState.queued = true;
+      return;
+    }
+
+    const resourceIds = uniqueIds(visibleResourceIdsRef.current);
+
+    if (!resourceIds.length) {
+      return;
+    }
+
+    refreshState.inFlight = true;
+
+    try {
+      const result = await invoke("booru:get-resources-by-ids", { resourceIds });
+      const refreshedItems = Array.isArray(result?.items) ? result.items : [];
+
+      if (refreshedItems.length) {
+        setResourceState((currentValue) => ({
+          ...currentValue,
+          items: mergeResourcesIntoItems(currentValue.items, refreshedItems),
+        }));
+      }
+    } catch (refreshError) {
+      booruViewLogger.info(
+        "booru.thumbnail.visible-refresh.error",
+        "Booru no pudo actualizar las thumbnails visibles.",
+        {
+          resourceIds: summarizeIdsForLog(resourceIds),
+          error: refreshError instanceof Error ? refreshError.message : String(refreshError || ""),
+        },
+      );
+    } finally {
+      refreshState.inFlight = false;
+
+      if (refreshState.queued) {
+        refreshState.queued = false;
+        void refreshVisibleMediaResources();
+      }
     }
   };
 
@@ -5618,10 +6026,15 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       return;
     }
 
+    if (activeResourceSection === "media" && !currentResourcePageMatchesQuery) {
+      return;
+    }
+
     void loadResources({ requestedPage: currentResourcePage });
   }, [
     activeResourceSection,
     currentResourcePage,
+    currentResourcePageMatchesQuery,
     resourceQuerySignature,
     showResourceWorkspace,
   ]);
@@ -5688,7 +6101,12 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           },
         );
         if (showResourceWorkspace) {
-          void loadResources({ requestedPage: currentResourcePage });
+          if (activeResourceSection === "media") {
+            setResourcePageForSection(activeResourceSection, 1);
+            void loadResources({ requestedPage: 1 });
+          } else {
+            void loadResources({ requestedPage: currentResourcePage });
+          }
         }
         if (showEntityProfile && activeEntityProfile?.tab !== "data") {
           void loadEntityProfileGallery({ requestedPage: currentEntityProfilePage });
@@ -5697,6 +6115,20 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           void loadEntityProfile();
         }
         void loadSnapshot({ silent: true, reason: "state:resources" });
+      }),
+      stateApi.subscribeKey("plugins.runtimeState.nexus.booru.thumbnailsVersion", () => {
+        booruViewLogger.debug(
+          "booru.runtime-state.bump",
+          "Booru recibio una actualizacion de thumbnails.",
+          {
+            key: "thumbnailsVersion",
+            ...diagnosticsContextRef.current,
+          },
+        );
+
+        if (activeResourceSection === "media") {
+          void refreshVisibleMediaResources();
+        }
       }),
       stateApi.subscribeKey("plugins.runtimeState.nexus.booru.entitiesVersion", () => {
         booruViewLogger.debug(
@@ -5898,7 +6330,12 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       onClick: () => {
         void loadSnapshot({ silent: false, reason: "frame-refresh" });
         if (showResourceWorkspace) {
-          void loadResources({ requestedPage: currentResourcePage });
+          if (activeResourceSection === "media") {
+            setResourcePageForSection(activeResourceSection, 1);
+            void loadResources({ requestedPage: 1 });
+          } else {
+            void loadResources({ requestedPage: currentResourcePage });
+          }
         } else if (activeEntityKind) {
           setEntityRevision((currentValue) => currentValue + 1);
         }
@@ -6500,38 +6937,46 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     const supportsVisibleThumbnailPriming =
       snapshot?.derivatives
       && typeof snapshot?.stats?.thumbnailBacklogCount === "number";
+    const isInfiniteMedia = activeResourceSection === "media";
+    const itemsToPrime = isInfiniteMedia
+      ? mediaThumbnailPrimingItems.filter((item) => !primedMediaThumbnailIdsRef.current.has(item.id))
+      : thumbnailPrimingItems;
     const primingSignature = JSON.stringify({
       section: activeSection,
       mode: showResourceWorkspace ? "resource-section" : (entityThumbnailPrimingEnabled ? "entity-profile" : "idle"),
       page: showResourceWorkspace ? currentResourcePage : currentEntityProfilePage,
       querySignature: showResourceWorkspace ? resourceQuerySignature : entityProfileKey,
-      ids: thumbnailPrimingItems.map((item) => item.id),
+      ids: itemsToPrime.map((item) => item.id),
     });
 
     if (
-      !thumbnailPrimingItems.length
+      !itemsToPrime.length
       || !supportsVisibleThumbnailPriming
       || visibleThumbnailPrimingUnavailableRef.current
-      || primedResourcePageSignatureRef.current === primingSignature
+      || (!isInfiniteMedia && primedResourcePageSignatureRef.current === primingSignature)
     ) {
       return;
     }
 
-    primedResourcePageSignatureRef.current = primingSignature;
+    if (isInfiniteMedia) {
+      itemsToPrime.forEach((item) => primedMediaThumbnailIdsRef.current.add(item.id));
+    } else {
+      primedResourcePageSignatureRef.current = primingSignature;
+    }
     booruViewLogger.debug(
       "booru.thumbnail-prime.start",
-      "Booru priorizo thumbnails visibles desde la pagina cargada.",
+      "Booru priorizo thumbnails visibles sin repetir las que ya estan listas.",
       {
         mode: showResourceWorkspace ? "resource-section" : "entity-profile",
         section: activeSection,
         resourcePage: currentResourcePage,
         entityProfilePage: currentEntityProfilePage,
-        itemCount: thumbnailPrimingItems.length,
-        sampleIds: summarizeIdsForLog(thumbnailPrimingItems),
+        itemCount: itemsToPrime.length,
+        sampleIds: summarizeIdsForLog(itemsToPrime),
       },
     );
     void invoke("booru:prime-visible-thumbnails", {
-      resourceIds: thumbnailPrimingItems.map((item) => item.id),
+      resourceIds: itemsToPrime.map((item) => item.id),
     }).catch((primeError) => {
       const errorMessage = primeError instanceof Error ? primeError.message : String(primeError || "");
 
@@ -6545,8 +6990,8 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         {
           mode: showResourceWorkspace ? "resource-section" : "entity-profile",
           section: activeSection,
-          itemCount: thumbnailPrimingItems.length,
-          sampleIds: summarizeIdsForLog(thumbnailPrimingItems),
+          itemCount: itemsToPrime.length,
+          sampleIds: summarizeIdsForLog(itemsToPrime),
           error: truncateDiagnosticText(errorMessage, 600),
         },
       );
@@ -6557,6 +7002,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     currentResourcePage,
     entityProfileKey,
     entityThumbnailPrimingEnabled,
+    mediaThumbnailPrimingItems,
     resourceQuerySignature,
     thumbnailPrimingItems,
     showResourceWorkspace,
@@ -6638,6 +7084,20 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         querySignature: resourceQuerySignature,
       },
     }));
+  };
+
+  const loadNextMediaPage = () => {
+    if (
+      activeResourceSection !== "media"
+      || !resourceState.hasMore
+      || resourceLoading
+      || mediaLoadMoreLockedRef.current
+    ) {
+      return;
+    }
+
+    mediaLoadMoreLockedRef.current = true;
+    setResourcePageForSection(activeResourceSection, currentResourcePage + 1);
   };
 
   const setEntityProfilePageForSection = (section, nextPage) => {
@@ -7950,7 +8410,13 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                     shouldSuppressClick={consumeSuppressedResourceClick}
                     totalCount={resourceState.totalCount}
                     loading={resourceLoading}
-                    scrollKey={`${activeResourceSection}:${currentResourcePage}:${resourceQuerySignature}:${resourceSearchTokensSignature}`}
+                    scrollKey={activeResourceSection === "media"
+                      ? `${activeResourceSection}:${resourceQuerySignature}:${resourceSearchTokensSignature}`
+                      : `${activeResourceSection}:${currentResourcePage}:${resourceQuerySignature}:${resourceSearchTokensSignature}`}
+                    infinite={activeResourceSection === "media"}
+                    hasMore={resourceState.hasMore}
+                    onLoadMore={loadNextMediaPage}
+                    onVisibleItemsChange={activeResourceSection === "media" ? handleVisibleResourceIdsChange : undefined}
                     currentPage={currentResourcePage}
                     pageSize={RESOURCE_PAGE_SIZE}
                     onPageChange={(nextPage) => setResourcePageForSection(activeResourceSection, nextPage)}

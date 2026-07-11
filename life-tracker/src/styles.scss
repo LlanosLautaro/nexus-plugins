@@ -26,6 +26,7 @@
 .lifeTrackerView .financeDashboard--embedded .nexus-ui-body,
 .lifeTrackerView .trainingPlugin--embedded .nexus-ui-body {
   min-height: 0;
+  overflow: hidden;
 }
 
 .lifeTrackerWidget {

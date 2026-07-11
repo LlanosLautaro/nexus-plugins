@@ -68314,6 +68314,7 @@ function MetricCard({
 // ../nexus-frontend/src/utils/devLog.js
 var DEV_LOG_BATCH_CHANNEL = "dev-log:append-batch";
 var ipcRenderer = window.nexus.ipc;
+var rendererDevLoggingEnabled = window.location.protocol !== "file:";
 var devLogRawConsole = {
   debug: console.debug.bind(console),
   log: console.log.bind(console),
@@ -68439,6 +68440,9 @@ function buildRendererEvent(partialEvent = {}) {
   };
 }
 function queueRendererDevLogEvent(partialEvent = {}) {
+  if (!rendererDevLoggingEnabled) {
+    return;
+  }
   rendererDevLogState.queue.push(buildRendererEvent(partialEvent));
   if (shouldMirrorRendererConsole(partialEvent.level || "info")) {
     const rawMethod = partialEvent.level === "warn" ? devLogRawConsole.warn : devLogRawConsole.error;
@@ -68456,6 +68460,10 @@ function scheduleRendererDevLogFlush() {
   }, 80);
 }
 function flushRendererDevLogBuffer() {
+  if (!rendererDevLoggingEnabled) {
+    rendererDevLogState.queue.length = 0;
+    return;
+  }
   if (!rendererDevLogState.queue.length) {
     return;
   }
