@@ -14167,6 +14167,118 @@ function getPluginSettingsStateKey(pluginId) {
   return `plugins.settings.${pluginId}`;
 }
 
+// ../nexus-plugins/musica/src/audio-repository.ts
+function toDateText(value) {
+  if (value == null || value === "") {
+    return null;
+  }
+  return value instanceof Date ? value.toISOString() : String(value);
+}
+var MusicaAudioRepository = class {
+  constructor(sqlite) {
+    this.sqlite = sqlite;
+  }
+  sqlite;
+  normalizeTrack(row) {
+    if (!row) {
+      return null;
+    }
+    return {
+      ...row,
+      metadataCompleted: Boolean(row.metadataCompleted),
+      authors: this.getAuthorsForTrackSync(String(row.id))
+    };
+  }
+  getAuthorsForTrackSync(trackId) {
+    return this.sqlite.prepare(`
+      SELECT aa.id, aa.name, ata.position
+      FROM audio_authors aa
+      INNER JOIN audio_track_authors ata ON ata.authorId = aa.id
+      WHERE ata.audioTrackId = ?
+      ORDER BY ata.position ASC, aa.name ASC
+    `).all(trackId);
+  }
+  async findTrackWithAuthors(itemId) {
+    const row = this.sqlite.prepare("SELECT * FROM audio_tracks WHERE id = ?").get(itemId);
+    return this.normalizeTrack(row);
+  }
+  async deleteTrack(itemId) {
+    this.sqlite.prepare("DELETE FROM audio_tracks WHERE id = ?").run(itemId);
+  }
+  async upsertTrack(payload) {
+    const normalized = {
+      kind: "song",
+      duration: null,
+      genre: null,
+      album: null,
+      year: null,
+      trackNumber: null,
+      discNumber: null,
+      mimeType: null,
+      bitrate: null,
+      sampleRate: null,
+      bitsPerSample: null,
+      cover: null,
+      coverMimeType: null,
+      ...payload,
+      metadataCompleted: payload.metadataCompleted ? 1 : 0,
+      lastScannedAt: toDateText(payload.lastScannedAt)
+    };
+    this.sqlite.prepare(`
+      INSERT INTO audio_tracks (
+        id, kind, name, duration, genre, album, year, trackNumber, discNumber,
+        mimeType, bitrate, sampleRate, bitsPerSample, cover, coverMimeType,
+        metadataCompleted, lastScannedAt
+      ) VALUES (
+        @id, @kind, @name, @duration, @genre, @album, @year, @trackNumber, @discNumber,
+        @mimeType, @bitrate, @sampleRate, @bitsPerSample, @cover, @coverMimeType,
+        @metadataCompleted, @lastScannedAt
+      )
+      ON CONFLICT(id) DO UPDATE SET
+        kind = excluded.kind,
+        name = excluded.name,
+        duration = excluded.duration,
+        genre = excluded.genre,
+        album = excluded.album,
+        year = excluded.year,
+        trackNumber = excluded.trackNumber,
+        discNumber = excluded.discNumber,
+        mimeType = excluded.mimeType,
+        bitrate = excluded.bitrate,
+        sampleRate = excluded.sampleRate,
+        bitsPerSample = excluded.bitsPerSample,
+        cover = excluded.cover,
+        coverMimeType = excluded.coverMimeType,
+        metadataCompleted = excluded.metadataCompleted,
+        lastScannedAt = excluded.lastScannedAt
+    `).run(normalized);
+    return this.findTrackWithAuthors(payload.id);
+  }
+  async replaceTrackAuthors(trackId, authorNames) {
+    const transaction = this.sqlite.transaction((names) => {
+      this.sqlite.prepare("DELETE FROM audio_track_authors WHERE audioTrackId = ?").run(trackId);
+      const insertAuthor = this.sqlite.prepare(`
+        INSERT INTO audio_authors (name)
+        VALUES (?)
+        ON CONFLICT(name) DO NOTHING
+      `);
+      const findAuthor = this.sqlite.prepare("SELECT id FROM audio_authors WHERE name = ?");
+      const insertJoin = this.sqlite.prepare(`
+        INSERT INTO audio_track_authors (audioTrackId, authorId, position)
+        VALUES (?, ?, ?)
+      `);
+      for (const [index, name] of names.entries()) {
+        insertAuthor.run(name);
+        const author = findAuthor.get(name);
+        if (author?.id != null) {
+          insertJoin.run(trackId, author.id, index);
+        }
+      }
+    });
+    transaction(authorNames);
+  }
+};
+
 // ../nexus-plugins/musica/src/plugin-settings.js
 var MUSICA_ENGINE_ID = "nexus.musica.audio";
 var MUSICA_SETTINGS_DEFAULTS = Object.freeze({
@@ -14253,6 +14365,9 @@ var AUDIO_EXTENSIONS = /* @__PURE__ */ new Set([
   "webm",
   "wma"
 ]);
+function getMusicaAudioRepository(repositories) {
+  return new MusicaAudioRepository(repositories.sqlite);
+}
 function bufferToDataUrl(data, mime = "image/jpeg") {
   if (!data) {
     return null;
@@ -14414,10 +14529,10 @@ async function findAudioTrackWithAuthors(repositories, itemId) {
   if (!itemId) {
     return null;
   }
-  return repositories.audio.findTrackWithAuthors(itemId);
+  return getMusicaAudioRepository(repositories).findTrackWithAuthors(itemId);
 }
 async function replaceAudioAuthors(repositories, audioId, authorNames) {
-  await repositories.audio.replaceTrackAuthors(audioId, authorNames);
+  await getMusicaAudioRepository(repositories).replaceTrackAuthors(audioId, authorNames);
 }
 async function ensureAudioTrackWithAuthors(repositories, item, options = {
   structuralChanged: true,
@@ -14438,7 +14553,7 @@ async function syncAudioTrackRecord(repositories, item, options) {
   const existingTrack = itemId ? await findAudioTrackWithAuthors(repositories, itemId) : null;
   if (!isSupportedAudioItem(item)) {
     if (existingTrack) {
-      await repositories.audio.deleteTrack(itemId);
+      await getMusicaAudioRepository(repositories).deleteTrack(itemId);
     }
     return null;
   }
@@ -14497,7 +14612,7 @@ async function syncAudioTrackRecord(repositories, item, options) {
     ...editablePayload,
     ...technicalPayload
   };
-  const track = await repositories.audio.upsertTrack(payload);
+  const track = await getMusicaAudioRepository(repositories).upsertTrack(payload);
   if (!existingTrack) {
     await replaceAudioAuthors(repositories, itemId, authorNames);
   }
@@ -15165,7 +15280,7 @@ var audioTrackMetadataResource = {
         metadataCompleted: normalizedValues.metadataCompleted
       };
       if (track) {
-        await repositories.audio.upsertTrack({
+        await getMusicaAudioRepository(repositories).upsertTrack({
           id: itemId,
           kind: getModelValue(track, "kind") ?? "song",
           duration: getModelValue(track, "duration") ?? null,
@@ -15179,7 +15294,7 @@ var audioTrackMetadataResource = {
           ...trackPayload
         });
       } else {
-        await repositories.audio.upsertTrack({
+        await getMusicaAudioRepository(repositories).upsertTrack({
           id: itemId,
           kind: "song",
           ...trackPayload
@@ -15280,7 +15395,7 @@ async function reconcileMusicaAssignments(ctx) {
     }
     const assignedToMusica = await isMusicaAssignedItem(ctx, resolvedItem);
     if (!assignedToMusica) {
-      await repositories.audio.deleteTrack(String(getModelValue(item, "id") ?? ""));
+      await getMusicaAudioRepository(repositories).deleteTrack(String(getModelValue(item, "id") ?? ""));
       continue;
     }
     await syncAudioTrackRecord(repositories, resolvedItem, {
@@ -15370,7 +15485,7 @@ var musicaPlugin = {
           structuralChanged: true,
           contentChanged: true,
           extractEmbeddedCoverArt
-        }) : await repositories.audio.findTrackWithAuthors(itemId);
+        }) : await getMusicaAudioRepository(repositories).findTrackWithAuthors(itemId);
         const metadata = audioTrack ? null : await parseAudioMetadata(filePath, {
           includeCovers: extractEmbeddedCoverArt
         });
@@ -15427,7 +15542,7 @@ var musicaPlugin = {
     const assignedToMusica = await isMusicaAssignedItem(ctx, resolvedItem);
     const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
     if (!assignedToMusica) {
-      await ctx.requireRepositories().audio.deleteTrack(String(getModelValue(resolvedItem, "id") ?? ""));
+      await getMusicaAudioRepository(ctx.requireRepositories()).deleteTrack(String(getModelValue(resolvedItem, "id") ?? ""));
       return;
     }
     await syncAudioTrackRecord(ctx.requireRepositories(), resolvedItem, {

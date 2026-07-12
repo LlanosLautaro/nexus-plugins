@@ -4,6 +4,7 @@ import {
   bufferToDataUrl,
   ensureAudioTrackWithAuthors,
   getAudioItemName,
+  getMusicaAudioRepository,
   getAudioTrackAuthorNames,
   getModelValue,
   isMusicaCoverArtEnabled,
@@ -109,7 +110,7 @@ async function reconcileMusicaAssignments(ctx: NexusBackendPluginContext) {
     const assignedToMusica = await isMusicaAssignedItem(ctx, resolvedItem);
 
     if (!assignedToMusica) {
-      await repositories.audio.deleteTrack(String(getModelValue(item, "id") ?? ""));
+      await getMusicaAudioRepository(repositories).deleteTrack(String(getModelValue(item, "id") ?? ""));
       continue;
     }
 
@@ -210,7 +211,7 @@ const musicaPlugin: NexusBackendPluginModule = {
               contentChanged: true,
               extractEmbeddedCoverArt,
             })
-          : await repositories.audio.findTrackWithAuthors(itemId);
+          : await getMusicaAudioRepository(repositories).findTrackWithAuthors(itemId);
 
         const metadata = audioTrack
           ? null
@@ -281,7 +282,8 @@ const musicaPlugin: NexusBackendPluginModule = {
     const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
 
     if (!assignedToMusica) {
-      await ctx.requireRepositories().audio.deleteTrack(String(getModelValue(resolvedItem, "id") ?? ""));
+      await getMusicaAudioRepository(ctx.requireRepositories())
+        .deleteTrack(String(getModelValue(resolvedItem, "id") ?? ""));
       return;
     }
 

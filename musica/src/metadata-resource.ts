@@ -13,6 +13,7 @@ import {
   ensureAudioTrackWithAuthors,
   getAudioTrackAuthorNames,
   getAudioItemName,
+  getMusicaAudioRepository,
   getModelValue,
   isMusicaCoverArtEnabled,
   isMusicaAssignedItem,
@@ -326,7 +327,7 @@ const audioTrackMetadataResource: MetadataResourceDefinition = {
       };
 
       if (track) {
-        await repositories.audio.upsertTrack({
+        await getMusicaAudioRepository(repositories).upsertTrack({
           id: itemId,
           kind: getModelValue(track, "kind") ?? "song",
           duration: getModelValue(track, "duration") ?? null,
@@ -340,7 +341,7 @@ const audioTrackMetadataResource: MetadataResourceDefinition = {
           ...trackPayload,
         });
       } else {
-        await repositories.audio.upsertTrack({
+        await getMusicaAudioRepository(repositories).upsertTrack({
           id: itemId,
           kind: "song",
           ...trackPayload,

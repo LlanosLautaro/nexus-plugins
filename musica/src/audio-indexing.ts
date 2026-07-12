@@ -3,6 +3,7 @@ import path from "node:path";
 import { parseFile } from "music-metadata";
 import type { VaultRepositories } from "../../../nexus-backend/src/backend/vault-runtime/db/repositories.ts";
 import { getPluginSettingsStateKey } from "../../../nexus-backend/src/plugins/state-keys.ts";
+import { MusicaAudioRepository } from "./audio-repository";
 import {
   isMusicaEmbeddedCoverArtEnabled,
   normalizeRelativePath,
@@ -26,6 +27,12 @@ const AUDIO_EXTENSIONS = new Set([
   "webm",
   "wma",
 ]);
+
+type MusicaVaultRepositories = Pick<VaultRepositories, "items" | "sqlite">;
+
+export function getMusicaAudioRepository(repositories: Pick<VaultRepositories, "sqlite">) {
+  return new MusicaAudioRepository(repositories.sqlite);
+}
 
 export function bufferToDataUrl(
   data: Uint8Array | Buffer | null | undefined,
@@ -99,7 +106,7 @@ function getContentRelativePath(contentPath: string, itemPath: string | null | u
 }
 
 async function assignmentMatchesItemById(
-  repositories: VaultRepositories,
+  repositories: MusicaVaultRepositories,
   item: any,
   assignment: { rootItemId?: string; recursive?: boolean },
 ) {
@@ -279,26 +286,26 @@ export function getAudioTrackAuthorNames(track: any) {
 }
 
 export async function findAudioTrackWithAuthors(
-  repositories: VaultRepositories,
+  repositories: MusicaVaultRepositories,
   itemId: string,
 ) {
   if (!itemId) {
     return null;
   }
 
-  return repositories.audio.findTrackWithAuthors(itemId);
+  return getMusicaAudioRepository(repositories).findTrackWithAuthors(itemId);
 }
 
 export async function replaceAudioAuthors(
-  repositories: VaultRepositories,
+  repositories: MusicaVaultRepositories,
   audioId: string,
   authorNames: string[],
 ) {
-  await repositories.audio.replaceTrackAuthors(audioId, authorNames);
+  await getMusicaAudioRepository(repositories).replaceTrackAuthors(audioId, authorNames);
 }
 
 export async function ensureAudioTrackWithAuthors(
-  repositories: VaultRepositories,
+  repositories: MusicaVaultRepositories,
   item: any,
   options = {
     structuralChanged: true,
@@ -320,7 +327,7 @@ export async function ensureAudioTrackWithAuthors(
 }
 
 export async function syncAudioTrackRecord(
-  repositories: VaultRepositories,
+  repositories: MusicaVaultRepositories,
   item: any,
   options: {
     structuralChanged: boolean;
@@ -333,7 +340,7 @@ export async function syncAudioTrackRecord(
 
   if (!isSupportedAudioItem(item)) {
     if (existingTrack) {
-      await repositories.audio.deleteTrack(itemId);
+      await getMusicaAudioRepository(repositories).deleteTrack(itemId);
     }
 
     return null;
@@ -419,7 +426,7 @@ export async function syncAudioTrackRecord(
         ...technicalPayload,
       };
 
-  const track = await repositories.audio.upsertTrack(payload);
+  const track = await getMusicaAudioRepository(repositories).upsertTrack(payload);
 
   if (!existingTrack) {
     await replaceAudioAuthors(repositories, itemId, authorNames);
