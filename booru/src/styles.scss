@@ -1,4 +1,6 @@
 @use "../../../nexus-frontend/src/scss/tools" as *;
+@use "./styles/entity-visual-cropper";
+@use "./styles/clipboard-association";
 
 .booruView {
   background: var(--workspace-main-bg);

@@ -1,0 +1,25 @@
+.booruClipboardComposer {
+  position: fixed;
+  z-index: 40;
+  right: var(--space-4, 16px);
+  bottom: var(--space-4, 16px);
+  display: grid;
+  width: min(320px, calc(100vw - 32px));
+  gap: var(--space-2, 8px);
+  padding: var(--space-3, 12px);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--shell-panel-bg);
+  box-shadow: var(--shadow-l);
+}
+
+.booruClipboardComposer select,
+.booruClipboardComposer input {
+  width: 100%;
+}
+
+.booruClipboardComposer__field { position: relative; display: grid; gap: 4px; color: var(--color-text-soft); font-size: 0.78rem; }
+.booruClipboardComposer__suggestions { display: grid; max-height: 144px; overflow: auto; border: 1px solid var(--color-line); border-radius: var(--radius-s); background: var(--workspace-main-bg); }
+.booruClipboardComposer__suggestions button { padding: 6px 8px; border: 0; background: transparent; color: var(--color-text); text-align: left; }
+.booruClipboardComposer__suggestions button:hover { background: var(--shell-panel-soft); }
+.booruClipboardComposer__actions { display: flex; justify-content: flex-end; gap: var(--space-2, 8px); }

@@ -2785,17 +2785,24 @@ function normalizeTagRow(row) {
 }
 function normalizeEntityVisualLayout(value) {
   const scale = Number(value && typeof value === "object" ? value.scale : NaN);
-  const offsetX = Number(value && typeof value === "object" ? value.offsetX : NaN);
-  const offsetY = Number(value && typeof value === "object" ? value.offsetY : NaN);
+  const rawOffsetX = Number(value && typeof value === "object" ? value.offsetX : NaN);
+  const rawOffsetY = Number(value && typeof value === "object" ? value.offsetY : NaN);
+  const offsetX = Math.abs(rawOffsetX) > 1 ? rawOffsetX / 180 : rawOffsetX;
+  const offsetY = Math.abs(rawOffsetY) > 1 ? rawOffsetY / 180 : rawOffsetY;
   return {
-    scale: Number.isFinite(scale) ? Math.min(2.5, Math.max(1, scale)) : 1,
-    offsetX: Number.isFinite(offsetX) ? Math.min(160, Math.max(-160, offsetX)) : 0,
-    offsetY: Number.isFinite(offsetY) ? Math.min(160, Math.max(-160, offsetY)) : 0
+    scale: Number.isFinite(scale) ? Math.min(4, Math.max(0.7, scale)) : 1,
+    offsetX: Number.isFinite(offsetX) ? Math.min(0.5, Math.max(-0.5, offsetX)) : 0,
+    offsetY: Number.isFinite(offsetY) ? Math.min(0.5, Math.max(-0.5, offsetY)) : 0
   };
 }
 function getDefaultEntityVisualSettings() {
   return {
     avatar: {
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0
+    },
+    banner: {
       scale: 1,
       offsetX: 0,
       offsetY: 0
@@ -2809,7 +2816,8 @@ function normalizeEntityVisualSettings(value) {
   }
   return {
     ...defaults,
-    avatar: normalizeEntityVisualLayout(value.avatar)
+    avatar: normalizeEntityVisualLayout(value.avatar),
+    banner: normalizeEntityVisualLayout(value.banner)
   };
 }
 function parseEntityVisualSettings(value) {
@@ -2909,7 +2917,7 @@ function getPendingReasons(resource) {
     reasons.push("missing-author");
     pendingScore += 60;
   }
-  if (resource.reality === "ficticio" && !resource.characters.length) {
+  if (resource.reality === "ficticio" && !resource.characters.length && !hasUniverseContext) {
     reasons.push("missing-character");
     pendingScore += 60;
   }
@@ -3145,6 +3153,7 @@ function buildPendingSqlExpressions(alias = "r") {
   ) THEN 1 ELSE 0 END)`;
   const missingCharacter = `(CASE WHEN ${alias}.reality = 'ficticio'
     AND NOT EXISTS (SELECT 1 FROM booru_resource_characters rel WHERE rel.resource_id = ${alias}.id)
+    AND NOT EXISTS (SELECT 1 FROM booru_resource_universes rel WHERE rel.resource_id = ${alias}.id)
   THEN 1 ELSE 0 END)`;
   const missingUniverse = `(CASE WHEN ${alias}.reality = 'ficticio'
     AND NOT EXISTS (
@@ -4177,6 +4186,8 @@ function getVisibleResourceDescriptorSync(db, resourceId) {
   const thumbnailReady = normalizeThumbnailStatus(row?.thumbnail_status) === "ready";
   return {
     sampleResourceId: String(row.id || ""),
+    originalStoragePath: String(row.storage_path || ""),
+    originalMediaKind: normalizeBooruOptionalText(row.media_kind),
     storagePath: String(row.storage_path || ""),
     sampleStoragePath: thumbnailReady ? normalizeBooruOptionalText(row?.thumbnail_storage_path) || String(row.storage_path || "") : String(row.storage_path || ""),
     sampleMediaKind: thumbnailReady ? "image" : normalizeBooruOptionalText(row.media_kind)
@@ -4186,6 +4197,8 @@ function buildVisibleResourceDescriptorFromRow(row) {
   if (!row) {
     return {
       sampleResourceId: null,
+      originalStoragePath: null,
+      originalMediaKind: null,
       storagePath: null,
       sampleStoragePath: null,
       sampleMediaKind: null
@@ -4194,6 +4207,8 @@ function buildVisibleResourceDescriptorFromRow(row) {
   const thumbnailReady = normalizeThumbnailStatus(row?.thumbnail_status) === "ready";
   return {
     sampleResourceId: normalizeBooruOptionalText(row?.id),
+    originalStoragePath: normalizeBooruOptionalText(row?.storage_path),
+    originalMediaKind: normalizeBooruOptionalText(row?.media_kind),
     storagePath: normalizeBooruOptionalText(row?.storage_path),
     sampleStoragePath: thumbnailReady ? normalizeBooruOptionalText(row?.thumbnail_storage_path) || normalizeBooruOptionalText(row?.storage_path) : normalizeBooruOptionalText(row?.storage_path),
     sampleMediaKind: thumbnailReady ? "image" : normalizeBooruOptionalText(row?.media_kind)
@@ -4496,10 +4511,13 @@ function normalizeEntityRow(db, kind, row) {
     createdAt: String(row?.created_at || ""),
     resourceCount: Number(row?.resource_count || 0),
     sampleResourceId: sampleDescriptor.sampleResourceId,
+    sampleOriginalStoragePath: sampleDescriptor.originalStoragePath,
     sampleStoragePath: sampleDescriptor.sampleStoragePath,
     sampleMediaKind: sampleDescriptor.sampleMediaKind,
     cardResourceId: cardDescriptor.sampleResourceId,
     cardStoragePath: cardDescriptor.storagePath,
+    cardOriginalStoragePath: cardDescriptor.originalStoragePath,
+    cardOriginalMediaKind: cardDescriptor.originalMediaKind,
     cardPreviewPath: cardDescriptor.sampleStoragePath,
     cardMediaKind: cardDescriptor.sampleMediaKind
   };
@@ -5281,8 +5299,8 @@ function setEntityVisualLayoutSync(db, payload) {
   if (!entityId) {
     throw new Error("La entidad solicitada no es valida.");
   }
-  if (visualRole !== "avatar") {
-    throw new Error("Solo el perfil admite ajuste visual en esta iteracion.");
+  if (visualRole !== "avatar" && visualRole !== "banner") {
+    throw new Error("El visual solicitado no admite ajuste de encuadre.");
   }
   const entity = getEntityBaseRowByIdSync(db, kind, entityId);
   if (!entity) {
@@ -5291,10 +5309,10 @@ function setEntityVisualLayoutSync(db, payload) {
   const currentSettings = parseEntityVisualSettings(entity?.visual_settings_json);
   const nextSettings = normalizeEntityVisualSettings({
     ...currentSettings,
-    avatar: {
-      scale: payload?.scale,
-      offsetX: payload?.offsetX,
-      offsetY: payload?.offsetY
+    [visualRole]: {
+      scale: payload?.layout?.scale ?? payload?.scale,
+      offsetX: payload?.layout?.offsetX ?? payload?.offsetX,
+      offsetY: payload?.layout?.offsetY ?? payload?.offsetY
     }
   });
   db.prepare(`
@@ -5782,6 +5800,35 @@ async function pasteClipboardImageToEntitySync(ctx, db, payload) {
   } finally {
     await removeFileIfExists(tempFilePath);
   }
+}
+async function pasteClipboardMediaSync(ctx, db, payload) {
+  const association = payload?.association && typeof payload.association === "object" ? payload.association : payload;
+  const kind = normalizeBooruText(association?.kind);
+  let entityId = normalizeBooruText(association?.entityId);
+  if (!ENTITY_TABLES[kind]) {
+    throw new Error("Eleg\xED la entidad a la que quer\xE9s asociar el recurso.");
+  }
+  if (!entityId) {
+    const entityName = normalizeBooruText(association?.entityName);
+    if (!entityName) throw new Error("Escrib\xED o eleg\xED una entidad antes de pegar.");
+    if (kind === "character") {
+      let universeId = normalizeBooruText(association?.universeId);
+      if (!universeId) {
+        const universeName = normalizeBooruText(association?.universeName);
+        if (!universeName) throw new Error("Un character necesita un universe.");
+        universeId = String(ensureTypedEntitySync(db, "universe", universeName)?.entity?.id || "");
+      }
+      const ensured = ensureCharacterInUniverseSync(db, { name: entityName, universeId });
+      entityId = String(ensured?.entity?.id || "");
+    } else {
+      entityId = String(ensureTypedEntitySync(db, kind, entityName)?.entity?.id || "");
+    }
+  }
+  return pasteClipboardImageToEntitySync(ctx, db, {
+    kind,
+    entityId,
+    tempFilePath: payload?.tempFilePath
+  });
 }
 function normalizeRequestedResourceIds(value, fallbackResourceId = null) {
   return uniqueBooruIds([
@@ -6548,6 +6595,19 @@ var booruPlugin = {
         return createError(error, "No se pudo pegar la imagen del portapapeles en Booru.");
       }
     });
+    ctx.registerIpc("booru:paste-clipboard-media", async (_event, payload) => {
+      try {
+        const db = assertRuntimeDb();
+        const result = await pasteClipboardMediaSync(ctx, db, payload);
+        scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion");
+        return createSuccess({
+          ...result,
+          snapshot: buildResourcesSnapshot(ctx, await ctx.settings.get())
+        });
+      } catch (error) {
+        return createError(error, "No se pudo importar el recurso del portapapeles en Booru.");
+      }
+    });
     ctx.registerIpc("booru:trash-resources", async (_event, payload) => {
       const startedAt = performance.now();
       try {
@@ -6674,6 +6734,9 @@ var __booruTestUtils = {
   listDuplicateRows,
   listTrashRows,
   listResourcesSync,
+  listRecommendationsSync,
+  setEntityVisualSync,
+  setEntityVisualLayoutSync,
   trashResourcesSync,
   restoreResourcesSync,
   purgeResourcesSync,

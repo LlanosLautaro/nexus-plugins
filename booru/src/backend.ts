@@ -197,6 +197,7 @@ type BooruEntityVisualLayout = {
 
 type BooruEntityVisualSettings = {
   avatar: BooruEntityVisualLayout;
+  banner: BooruEntityVisualLayout;
 };
 
 type NormalizedRecommendationDraft = {
@@ -255,6 +256,16 @@ type PasteClipboardImageToEntityPayload = {
   kind?: unknown;
   entityId?: unknown;
   tempFilePath?: unknown;
+};
+
+type PasteClipboardMediaPayload = PasteClipboardImageToEntityPayload & {
+  association?: {
+    kind?: unknown;
+    entityId?: unknown;
+    entityName?: unknown;
+    universeId?: unknown;
+    universeName?: unknown;
+  };
 };
 
 type SetCharacterUniversePayload = {
@@ -869,19 +880,28 @@ function normalizeTagRow(row: any): BooruTagRecord {
 
 function normalizeEntityVisualLayout(value: unknown): BooruEntityVisualLayout {
   const scale = Number(value && typeof value === "object" ? (value as any).scale : NaN);
-  const offsetX = Number(value && typeof value === "object" ? (value as any).offsetX : NaN);
-  const offsetY = Number(value && typeof value === "object" ? (value as any).offsetY : NaN);
+  const rawOffsetX = Number(value && typeof value === "object" ? (value as any).offsetX : NaN);
+  const rawOffsetY = Number(value && typeof value === "object" ? (value as any).offsetY : NaN);
+  // Legacy layouts stored pixel offsets. Normalized values keep the crop
+  // stable when the avatar/banner is rendered at another responsive size.
+  const offsetX = Math.abs(rawOffsetX) > 1 ? rawOffsetX / 180 : rawOffsetX;
+  const offsetY = Math.abs(rawOffsetY) > 1 ? rawOffsetY / 180 : rawOffsetY;
 
   return {
-    scale: Number.isFinite(scale) ? Math.min(2.5, Math.max(1, scale)) : 1,
-    offsetX: Number.isFinite(offsetX) ? Math.min(160, Math.max(-160, offsetX)) : 0,
-    offsetY: Number.isFinite(offsetY) ? Math.min(160, Math.max(-160, offsetY)) : 0,
+    scale: Number.isFinite(scale) ? Math.min(4, Math.max(0.7, scale)) : 1,
+    offsetX: Number.isFinite(offsetX) ? Math.min(0.5, Math.max(-0.5, offsetX)) : 0,
+    offsetY: Number.isFinite(offsetY) ? Math.min(0.5, Math.max(-0.5, offsetY)) : 0,
   };
 }
 
 function getDefaultEntityVisualSettings(): BooruEntityVisualSettings {
   return {
     avatar: {
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0,
+    },
+    banner: {
       scale: 1,
       offsetX: 0,
       offsetY: 0,
@@ -899,6 +919,7 @@ function normalizeEntityVisualSettings(value: unknown): BooruEntityVisualSetting
   return {
     ...defaults,
     avatar: normalizeEntityVisualLayout((value as any).avatar),
+    banner: normalizeEntityVisualLayout((value as any).banner),
   };
 }
 
@@ -1034,7 +1055,7 @@ function getPendingReasons(resource: {
     pendingScore += 60;
   }
 
-  if (resource.reality === "ficticio" && !resource.characters.length) {
+  if (resource.reality === "ficticio" && !resource.characters.length && !hasUniverseContext) {
     reasons.push("missing-character");
     pendingScore += 60;
   }
@@ -1316,6 +1337,7 @@ function buildPendingSqlExpressions(alias = "r") {
   ) THEN 1 ELSE 0 END)`;
   const missingCharacter = `(CASE WHEN ${alias}.reality = 'ficticio'
     AND NOT EXISTS (SELECT 1 FROM booru_resource_characters rel WHERE rel.resource_id = ${alias}.id)
+    AND NOT EXISTS (SELECT 1 FROM booru_resource_universes rel WHERE rel.resource_id = ${alias}.id)
   THEN 1 ELSE 0 END)`;
   const missingUniverse = `(CASE WHEN ${alias}.reality = 'ficticio'
     AND NOT EXISTS (
@@ -2551,6 +2573,8 @@ function getVisibleResourceDescriptorSync(db: DatabaseSync, resourceId: string |
 
   return {
     sampleResourceId: String(row.id || ""),
+    originalStoragePath: String(row.storage_path || ""),
+    originalMediaKind: normalizeBooruOptionalText(row.media_kind),
     storagePath: String(row.storage_path || ""),
     sampleStoragePath: thumbnailReady
       ? (normalizeBooruOptionalText(row?.thumbnail_storage_path) || String(row.storage_path || ""))
@@ -2565,6 +2589,8 @@ function buildVisibleResourceDescriptorFromRow(row: any) {
   if (!row) {
     return {
       sampleResourceId: null,
+      originalStoragePath: null,
+      originalMediaKind: null,
       storagePath: null,
       sampleStoragePath: null,
       sampleMediaKind: null,
@@ -2575,6 +2601,8 @@ function buildVisibleResourceDescriptorFromRow(row: any) {
 
   return {
     sampleResourceId: normalizeBooruOptionalText(row?.id),
+    originalStoragePath: normalizeBooruOptionalText(row?.storage_path),
+    originalMediaKind: normalizeBooruOptionalText(row?.media_kind),
     storagePath: normalizeBooruOptionalText(row?.storage_path),
     sampleStoragePath: thumbnailReady
       ? (normalizeBooruOptionalText(row?.thumbnail_storage_path) || normalizeBooruOptionalText(row?.storage_path))
@@ -2943,10 +2971,13 @@ function normalizeEntityRow(db: DatabaseSync, kind: BooruEntityKind, row: any) {
     createdAt: String(row?.created_at || ""),
     resourceCount: Number(row?.resource_count || 0),
     sampleResourceId: sampleDescriptor.sampleResourceId,
+    sampleOriginalStoragePath: sampleDescriptor.originalStoragePath,
     sampleStoragePath: sampleDescriptor.sampleStoragePath,
     sampleMediaKind: sampleDescriptor.sampleMediaKind,
     cardResourceId: cardDescriptor.sampleResourceId,
     cardStoragePath: cardDescriptor.storagePath,
+    cardOriginalStoragePath: cardDescriptor.originalStoragePath,
+    cardOriginalMediaKind: cardDescriptor.originalMediaKind,
     cardPreviewPath: cardDescriptor.sampleStoragePath,
     cardMediaKind: cardDescriptor.sampleMediaKind,
   };
@@ -4011,8 +4042,8 @@ function setEntityVisualLayoutSync(db: DatabaseSync, payload: SetEntityVisualLay
     throw new Error("La entidad solicitada no es valida.");
   }
 
-  if (visualRole !== "avatar") {
-    throw new Error("Solo el perfil admite ajuste visual en esta iteracion.");
+  if (visualRole !== "avatar" && visualRole !== "banner") {
+    throw new Error("El visual solicitado no admite ajuste de encuadre.");
   }
 
   const entity = getEntityBaseRowByIdSync(db, kind, entityId);
@@ -4024,10 +4055,10 @@ function setEntityVisualLayoutSync(db: DatabaseSync, payload: SetEntityVisualLay
   const currentSettings = parseEntityVisualSettings(entity?.visual_settings_json);
   const nextSettings = normalizeEntityVisualSettings({
     ...currentSettings,
-    avatar: {
-      scale: payload?.scale,
-      offsetX: payload?.offsetX,
-      offsetY: payload?.offsetY,
+    [visualRole]: {
+      scale: (payload as any)?.layout?.scale ?? payload?.scale,
+      offsetX: (payload as any)?.layout?.offsetX ?? payload?.offsetX,
+      offsetY: (payload as any)?.layout?.offsetY ?? payload?.offsetY,
     },
   });
 
@@ -4733,6 +4764,46 @@ async function pasteClipboardImageToEntitySync(
   } finally {
     await removeFileIfExists(tempFilePath);
   }
+}
+
+async function pasteClipboardMediaSync(
+  ctx: NexusBackendPluginContext,
+  db: DatabaseSync,
+  payload: PasteClipboardMediaPayload,
+) {
+  const association = payload?.association && typeof payload.association === "object"
+    ? payload.association
+    : payload;
+  const kind = normalizeBooruText(association?.kind) as BooruEntityKind;
+  let entityId = normalizeBooruText(association?.entityId);
+
+  if (!ENTITY_TABLES[kind]) {
+    throw new Error("Elegí la entidad a la que querés asociar el recurso.");
+  }
+
+  if (!entityId) {
+    const entityName = normalizeBooruText(association?.entityName);
+    if (!entityName) throw new Error("Escribí o elegí una entidad antes de pegar.");
+
+    if (kind === "character") {
+      let universeId = normalizeBooruText(association?.universeId);
+      if (!universeId) {
+        const universeName = normalizeBooruText(association?.universeName);
+        if (!universeName) throw new Error("Un character necesita un universe.");
+        universeId = String(ensureTypedEntitySync(db, "universe", universeName)?.entity?.id || "");
+      }
+      const ensured = ensureCharacterInUniverseSync(db, { name: entityName, universeId });
+      entityId = String(ensured?.entity?.id || "");
+    } else {
+      entityId = String(ensureTypedEntitySync(db, kind, entityName)?.entity?.id || "");
+    }
+  }
+
+  return pasteClipboardImageToEntitySync(ctx, db, {
+    kind,
+    entityId,
+    tempFilePath: payload?.tempFilePath,
+  });
 }
 
 function normalizeRequestedResourceIds(value: unknown, fallbackResourceId: unknown = null) {
@@ -5643,6 +5714,20 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
+    ctx.registerIpc("booru:paste-clipboard-media", async (_event, payload: PasteClipboardMediaPayload) => {
+      try {
+        const db = assertRuntimeDb();
+        const result = await pasteClipboardMediaSync(ctx, db, payload);
+        scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion");
+        return createSuccess({
+          ...result,
+          snapshot: buildResourcesSnapshot(ctx, await ctx.settings.get()),
+        });
+      } catch (error) {
+        return createError(error, "No se pudo importar el recurso del portapapeles en Booru.");
+      }
+    });
+
     ctx.registerIpc("booru:trash-resources", async (_event, payload: TrashResourcesPayload) => {
       const startedAt = performance.now();
       try {
@@ -5777,6 +5862,9 @@ export const __booruTestUtils = {
   listDuplicateRows,
   listTrashRows,
   listResourcesSync,
+  listRecommendationsSync,
+  setEntityVisualSync,
+  setEntityVisualLayoutSync,
   trashResourcesSync,
   restoreResourcesSync,
   purgeResourcesSync,
