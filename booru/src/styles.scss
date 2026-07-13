@@ -125,6 +125,12 @@
   gap: 6px;
 }
 
+.booruView__searchCriteria {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
 .booruView__searchComposerShell {
   padding: 7px;
   border: 1px solid var(--color-line);
@@ -797,8 +803,7 @@
 }
 
 .booruView__entityProfileBanner {
-  height: clamp(220px, 26vh, 320px);
-  min-height: 220px;
+  aspect-ratio: 3 / 1;
   border-radius: calc(var(--radius-m) + 2px);
 }
 
@@ -851,7 +856,7 @@
 }
 
 .booruView__entityProfileAvatar .booruView__previewMedia {
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .booruView__entityProfileAvatarFallback {
@@ -888,7 +893,65 @@
 }
 
 .booruView__entityProfileTabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding-inline: 12px;
+}
+
+.booruView__entityProfileTabs .nexus-ui-segmentedControl {
+  flex: 1 1 auto;
+}
+
+.booruView__fastClassificationToggle {
+  position: relative;
+  min-width: 34px;
+  width: 34px;
+  padding-inline: 0;
+  justify-content: center;
+}
+
+.booruView__fastClassificationToggle.is-active {
+  color: var(--color-accent-text, var(--color-text));
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--shell-panel-bg) 74%, var(--color-accent) 26%);
+}
+
+.booruView__fastClassificationToggle::after {
+  position: absolute;
+  z-index: 20;
+  left: calc(100% + 8px);
+  top: 50%;
+  width: min(280px, 70vw);
+  padding: 8px 9px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--shell-panel-bg);
+  box-shadow: var(--shadow-m);
+  color: var(--color-text-soft);
+  content: attr(data-tooltip);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-3px, -50%);
+  transition: opacity 120ms ease 650ms, transform 120ms ease 650ms;
+}
+
+.booruView__fastClassificationToggle:hover::after,
+.booruView__fastClassificationToggle:focus-visible::after {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.booruView__cropOverlay {
+  position: fixed;
+  z-index: 1800;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: color-mix(in srgb, var(--workspace-main-bg) 72%, transparent);
 }
 
 .booruView__entityProfileFacts {
@@ -1223,8 +1286,7 @@
   }
 
   .booruView__entityProfileBanner {
-    height: 180px;
-    min-height: 180px;
+    aspect-ratio: 3 / 1;
   }
 
   .booruView__entityProfileIdentity {
@@ -1279,8 +1341,7 @@
   }
 
   .booruView__entityProfileBanner {
-    height: 150px;
-    min-height: 150px;
+    aspect-ratio: 3 / 1;
   }
 
   .booruView__metrics {

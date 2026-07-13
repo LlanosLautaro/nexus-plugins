@@ -21,6 +21,19 @@ export default function ResourceHeroOverlay({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, onNext, onPrev]);
 
+  useEffect(() => {
+    if (!item || item.mediaKind !== "video") return undefined;
+    const pausedByHero = Array.from(document.querySelectorAll("video:not(.booruView__heroMedia)"))
+      .filter((video) => !video.paused)
+      .map((video) => {
+        video.pause();
+        return video;
+      });
+    return () => {
+      pausedByHero.forEach((video) => void video.play().catch(() => undefined));
+    };
+  }, [item?.id, item?.mediaKind]);
+
   if (!item) return null;
 
   return (

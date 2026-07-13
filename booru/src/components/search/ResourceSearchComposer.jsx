@@ -76,12 +76,16 @@ export default function ResourceSearchComposer({
 
     setLoading(true);
 
+    const isExplicitTag = parsedDraft.mode === "tag" && /^(?:-?tag:)/i.test(String(parsedDraft.raw || ""));
+    const activeReality = normalizeResourceSearchTokens(tokens).find((token) => token?.type === "reality" && !token?.negative)?.value || null;
     const nextPromise = parsedDraft.mode === "entity" && parsedDraft.kind
       ? invoke("booru:list-entities", {
         kind: parsedDraft.kind,
         query: queryValue,
       })
-      : invoke("booru:list-tags", { query: queryValue });
+      : isExplicitTag
+        ? invoke("booru:list-tags", { query: queryValue })
+        : invoke("booru:list-search-suggestions", { query: queryValue, reality: activeReality });
 
     void nextPromise
       .then((data) => {
@@ -100,7 +104,7 @@ export default function ResourceSearchComposer({
               detail: `${item.resourceCount} recursos`,
             })),
           );
-        } else {
+        } else if (isExplicitTag) {
           setSuggestions(
             (Array.isArray(data?.items) ? data.items : []).map((item) => ({
               id: `tag:${item.id}`,
@@ -110,6 +114,8 @@ export default function ResourceSearchComposer({
               detail: `${item.resourceCount} recursos`,
             })),
           );
+        } else {
+          setSuggestions(Array.isArray(data?.items) ? data.items : []);
         }
         setError("");
       })
@@ -197,9 +203,11 @@ export default function ResourceSearchComposer({
 
   return (
     <div className="booruView__searchComposer">
-      <div className="booruView__searchComposerShell">
-        <div className="booruView__entitySelection booruView__entitySelection--composer">
-          {normalizeResourceSearchTokens(tokens).map((token) => (
+      {normalizeResourceSearchTokens(tokens).length ? (
+        <div className="booruView__searchCriteria">
+          <span className="booruView__groupLabel">Buscando</span>
+          <div className="booruView__entitySelection booruView__entitySelection--composer">
+            {normalizeResourceSearchTokens(tokens).map((token) => (
             <span
               key={buildResourceSearchTokenKey(token)}
               className={["booruView__selectionChip", getResourceQueryTokenClass(token)].filter(Boolean).join(" ")}
@@ -221,7 +229,13 @@ export default function ResourceSearchComposer({
                 x
               </button>
             </span>
-          ))}
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="booruView__searchComposerShell">
+        <div className="booruView__entitySelection booruView__entitySelection--composer">
 
           <input
             type="text"
@@ -271,7 +285,7 @@ export default function ResourceSearchComposer({
                 void handleCommitRawToken(draftValue, selectedSuggestion || null);
               }
             }}
-            placeholder="Tag, persona:, char:, artist:, universe:, reality:, missing:"
+            placeholder="Buscar tags, personas, characters, artists o universes"
             className="booruView__searchComposerInput"
             disabled={disabled}
             aria-label="Buscar por tags y filtros estructurados"
@@ -312,4 +326,3 @@ export default function ResourceSearchComposer({
     </div>
   );
 }
-

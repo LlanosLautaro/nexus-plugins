@@ -131,6 +131,7 @@ type RuntimeState = {
   mediaRoot: string;
   duplicatesRoot: string;
   thumbsRoot: string;
+  shortsRoot: string;
   watcher: any | null;
   watcherState: {
     active: boolean;
@@ -155,6 +156,7 @@ type RuntimeState = {
   invalidationTimer: ReturnType<typeof setTimeout> | null;
   invalidationDelayMs: number;
   db: DatabaseSync | null;
+  fastClassification: { kind: BooruEntityKind; entityId: string; scopeId: string } | null;
 };
 
 type RuntimeInvalidationKey =
@@ -292,6 +294,26 @@ type SetEntityVisualLayoutPayload = {
   scale?: unknown;
   offsetX?: unknown;
   offsetY?: unknown;
+};
+
+type SaveEntityProfilePayload = {
+  kind?: unknown;
+  entityId?: unknown;
+  aliasNames?: unknown;
+  tagIds?: unknown;
+  socialLinks?: unknown;
+};
+
+type ResourceEntityAssociationPayload = {
+  kind?: unknown;
+  entityId?: unknown;
+  resourceIds?: unknown;
+};
+
+type FastClassificationPayload = {
+  kind?: unknown;
+  entityId?: unknown;
+  scopeId?: unknown;
 };
 
 type TrashResourcesPayload = {
@@ -529,6 +551,7 @@ function getStoragePaths(ctx: NexusBackendPluginContext) {
     mediaRoot: path.join(storageRoot, "media"),
     duplicatesRoot: path.join(storageRoot, "review", "duplicates"),
     thumbsRoot: path.join(storageRoot, "thumbs"),
+    shortsRoot: path.join(storageRoot, "shorts"),
   };
 }
 
@@ -538,6 +561,7 @@ async function ensureStoragePaths(storagePaths: ReturnType<typeof getStoragePath
     storagePaths.mediaRoot,
     storagePaths.duplicatesRoot,
     storagePaths.thumbsRoot,
+    storagePaths.shortsRoot,
   ]) {
     await fsp.mkdir(directoryPath, { recursive: true });
   }
@@ -588,6 +612,80 @@ function ensureCatalogSchema(db: DatabaseSync) {
       tag_id TEXT NOT NULL REFERENCES booru_tags(id) ON DELETE CASCADE,
       created_at TEXT NOT NULL,
       PRIMARY KEY (resource_id, tag_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS booru_entity_tags (
+      entity_kind TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      tag_id TEXT NOT NULL REFERENCES booru_tags(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (entity_kind, entity_id, tag_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS booru_entity_aliases (
+      entity_kind TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      alias_name TEXT NOT NULL,
+      comparable_name TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (entity_kind, entity_id, comparable_name)
+    );
+
+    CREATE TABLE IF NOT EXISTS booru_social_platforms (
+      id TEXT PRIMARY KEY NOT NULL,
+      display_name TEXT NOT NULL UNIQUE,
+      icon_resource_id TEXT REFERENCES booru_resources(id) ON DELETE SET NULL,
+      icon_layout_json TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS booru_entity_social_links (
+      id TEXT PRIMARY KEY NOT NULL,
+      entity_kind TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      platform_id TEXT NOT NULL REFERENCES booru_social_platforms(id) ON DELETE CASCADE,
+      url TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE (entity_kind, entity_id, platform_id, url)
+    );
+
+    CREATE TABLE IF NOT EXISTS booru_resource_inherited_tags (
+      resource_id TEXT NOT NULL REFERENCES booru_resources(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES booru_tags(id) ON DELETE CASCADE,
+      source_kind TEXT NOT NULL,
+      source_entity_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (resource_id, tag_id, source_kind, source_entity_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS booru_resource_tag_exclusions (
+      resource_id TEXT NOT NULL REFERENCES booru_resources(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES booru_tags(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (resource_id, tag_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS booru_resource_inherited_universes (
+      resource_id TEXT NOT NULL REFERENCES booru_resources(id) ON DELETE CASCADE,
+      universe_id TEXT NOT NULL REFERENCES booru_universes(id) ON DELETE CASCADE,
+      character_id TEXT NOT NULL REFERENCES booru_characters(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (resource_id, universe_id, character_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS booru_resource_universe_exclusions (
+      resource_id TEXT NOT NULL REFERENCES booru_resources(id) ON DELETE CASCADE,
+      universe_id TEXT NOT NULL REFERENCES booru_universes(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (resource_id, universe_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS booru_resource_video_shorts (
+      resource_id TEXT PRIMARY KEY NOT NULL REFERENCES booru_resources(id) ON DELETE CASCADE,
+      storage_path TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      generated_at TEXT,
+      error_message TEXT
     );
 
     CREATE TABLE IF NOT EXISTS booru_authors (
@@ -760,6 +858,12 @@ function ensureCatalogSchema(db: DatabaseSync) {
 
     CREATE INDEX IF NOT EXISTS idx_booru_resources_media_info
     ON booru_resources (media_info_status, imported_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_booru_entity_aliases_lookup
+    ON booru_entity_aliases (entity_kind, comparable_name);
+
+    CREATE INDEX IF NOT EXISTS idx_booru_resource_inherited_tags_resource
+    ON booru_resource_inherited_tags (resource_id, tag_id);
   `);
 }
 
@@ -888,9 +992,9 @@ function normalizeEntityVisualLayout(value: unknown): BooruEntityVisualLayout {
   const offsetY = Math.abs(rawOffsetY) > 1 ? rawOffsetY / 180 : rawOffsetY;
 
   return {
-    scale: Number.isFinite(scale) ? Math.min(4, Math.max(0.7, scale)) : 1,
-    offsetX: Number.isFinite(offsetX) ? Math.min(0.5, Math.max(-0.5, offsetX)) : 0,
-    offsetY: Number.isFinite(offsetY) ? Math.min(0.5, Math.max(-0.5, offsetY)) : 0,
+    scale: Number.isFinite(scale) ? Math.min(4, Math.max(0.2, scale)) : 1,
+    offsetX: Number.isFinite(offsetX) ? Math.min(1.5, Math.max(-1.5, offsetX)) : 0,
+    offsetY: Number.isFinite(offsetY) ? Math.min(1.5, Math.max(-1.5, offsetY)) : 0,
   };
 }
 
@@ -997,26 +1101,89 @@ function listResourceEntitiesSync(
 
 function listResourceUniversesSync(db: DatabaseSync, resourceId: string) {
   const statement = db.prepare(`
-    SELECT u.id, u.display_name, u.slug
-    FROM booru_resource_universes rel
-    INNER JOIN booru_universes u ON u.id = rel.universe_id
-    WHERE rel.resource_id = ?
-    ORDER BY rel.sort_order ASC, u.display_name COLLATE NOCASE ASC
+    SELECT DISTINCT u.id, u.display_name, u.slug
+    FROM booru_universes u
+    WHERE (
+      EXISTS (
+        SELECT 1 FROM booru_resource_universes rel
+        WHERE rel.resource_id = ? AND rel.universe_id = u.id
+      )
+      OR EXISTS (
+        SELECT 1 FROM booru_resource_inherited_universes rel
+        WHERE rel.resource_id = ? AND rel.universe_id = u.id
+      )
+    )
+      AND NOT EXISTS (
+        SELECT 1 FROM booru_resource_universe_exclusions exclusion
+        WHERE exclusion.resource_id = ? AND exclusion.universe_id = u.id
+      )
+    ORDER BY u.display_name COLLATE NOCASE ASC
   `);
 
-  return statement.all(resourceId).map(normalizeLinkedEntityRow);
+  return statement.all(resourceId, resourceId, resourceId).map(normalizeLinkedEntityRow);
 }
 
 function listResourceTagsSync(db: DatabaseSync, resourceId: string) {
   const statement = db.prepare(`
-    SELECT t.id, t.name, t.source
-    FROM booru_resource_tags rel
-    INNER JOIN booru_tags t ON t.id = rel.tag_id
-    WHERE rel.resource_id = ?
+    SELECT DISTINCT t.id, t.name, t.source
+    FROM booru_tags t
+    WHERE (
+      EXISTS (
+        SELECT 1 FROM booru_resource_tags rel
+        WHERE rel.resource_id = ? AND rel.tag_id = t.id
+      )
+      OR EXISTS (
+        SELECT 1 FROM booru_resource_inherited_tags rel
+        WHERE rel.resource_id = ? AND rel.tag_id = t.id
+      )
+    )
+      AND NOT EXISTS (
+        SELECT 1 FROM booru_resource_tag_exclusions exclusion
+        WHERE exclusion.resource_id = ? AND exclusion.tag_id = t.id
+      )
     ORDER BY t.name COLLATE NOCASE ASC
   `);
 
-  return statement.all(resourceId).map(normalizeTagRow);
+  return statement.all(resourceId, resourceId, resourceId).map(normalizeTagRow);
+}
+
+function listEntityTagsSync(db: DatabaseSync, kind: BooruEntityKind, entityId: string) {
+  return db.prepare(`
+    SELECT t.id, t.name, t.source
+    FROM booru_entity_tags rel
+    INNER JOIN booru_tags t ON t.id = rel.tag_id
+    WHERE rel.entity_kind = ? AND rel.entity_id = ?
+    ORDER BY t.name COLLATE NOCASE ASC
+  `).all(kind, entityId).map(normalizeTagRow);
+}
+
+function listEntityAliasesSync(db: DatabaseSync, kind: BooruEntityKind, entityId: string) {
+  return db.prepare(`
+    SELECT alias_name
+    FROM booru_entity_aliases
+    WHERE entity_kind = ? AND entity_id = ?
+    ORDER BY alias_name COLLATE NOCASE ASC
+  `).all(kind, entityId).map((row: any) => String(row?.alias_name || "").trim()).filter(Boolean);
+}
+
+function listEntitySocialLinksSync(db: DatabaseSync, kind: BooruEntityKind, entityId: string) {
+  return db.prepare(`
+    SELECT rel.id, rel.url, platform.id AS platform_id, platform.display_name AS platform_name,
+      platform.icon_resource_id, platform.icon_layout_json
+    FROM booru_entity_social_links rel
+    INNER JOIN booru_social_platforms platform ON platform.id = rel.platform_id
+    WHERE rel.entity_kind = ? AND rel.entity_id = ?
+    ORDER BY platform.display_name COLLATE NOCASE ASC, rel.created_at ASC
+  `).all(kind, entityId).map((row: any) => ({
+    id: String(row?.id || ""),
+    url: String(row?.url || ""),
+    platform: {
+      id: String(row?.platform_id || ""),
+      displayName: String(row?.platform_name || ""),
+      iconResourceId: normalizeBooruOptionalText(row?.icon_resource_id),
+      iconLayout: parseEntityVisualSettings(row?.icon_layout_json)?.avatar || null,
+    },
+  }));
 }
 
 function getPendingReasons(resource: {
@@ -1136,6 +1303,8 @@ function normalizeResourceRow(db: DatabaseSync, row: any) {
     durationMs: Number.isFinite(Number(row.duration_ms)) ? Number(row.duration_ms) : null,
     mediaInfoStatus: normalizeMediaInfoStatus(row.media_info_status),
     mediaInfoError: normalizeBooruOptionalText(row.media_info_error),
+    autoplayStoragePath: normalizeBooruOptionalText(row.video_short_storage_path),
+    videoShortStatus: normalizeBooruOptionalText(row.video_short_status),
     thumbnail,
     contentHash: String(row.content_hash || ""),
     reality: normalizeBooruReality(row.reality),
@@ -1189,9 +1358,12 @@ function getResourceByIdSync(db: DatabaseSync, resourceId: string) {
       th.generated_at AS thumbnail_generated_at,
       th.error_message AS thumbnail_error_message,
       th.frame_timestamp_ms AS thumbnail_frame_timestamp_ms
+      ,vs.storage_path AS video_short_storage_path
+      ,vs.status AS video_short_status
     FROM booru_resources r
     LEFT JOIN booru_resources c ON c.id = r.canonical_resource_id
     LEFT JOIN booru_resource_thumbnails th ON th.resource_id = r.id
+    LEFT JOIN booru_resource_video_shorts vs ON vs.resource_id = r.id
     WHERE r.id = ?
     LIMIT 1
   `);
@@ -1359,6 +1531,27 @@ function buildPendingSqlExpressions(alias = "r") {
     WHERE rel.resource_id = ${alias}.id
       AND t.source = 'manual'
   )`;
+  // Pendientes is a completion queue. Count the essential classification data
+  // that a resource already has, rather than weighting the categories it
+  // still lacks. This keeps completely untyped imports at the very front,
+  // followed by progressively more classified resources.
+  const essentialTagCount = `(
+    (CASE WHEN ${alias}.reality IS NULL OR TRIM(${alias}.reality) = '' THEN 0 ELSE 1 END) +
+    (SELECT COUNT(DISTINCT rel.author_id) FROM booru_resource_authors rel WHERE rel.resource_id = ${alias}.id) +
+    (SELECT COUNT(DISTINCT rel.artist_id) FROM booru_resource_artists rel WHERE rel.resource_id = ${alias}.id) +
+    (SELECT COUNT(DISTINCT rel.character_id) FROM booru_resource_characters rel WHERE rel.resource_id = ${alias}.id) +
+    (SELECT COUNT(DISTINCT rel.universe_id) FROM booru_resource_universes rel WHERE rel.resource_id = ${alias}.id) +
+    (SELECT COUNT(DISTINCT rel.universe_id)
+      FROM booru_resource_inherited_universes rel
+      WHERE rel.resource_id = ${alias}.id
+        AND NOT EXISTS (
+          SELECT 1
+          FROM booru_resource_universes direct_rel
+          WHERE direct_rel.resource_id = ${alias}.id
+            AND direct_rel.universe_id = rel.universe_id
+        )
+    )
+  )`;
   const rawScore = `(
     (${missingReality} * 100) +
     (${missingAuthor} * 60) +
@@ -1379,6 +1572,7 @@ function buildPendingSqlExpressions(alias = "r") {
   return {
     isPending,
     pendingScore,
+    essentialTagCount,
     manualTagCount,
   };
 }
@@ -1402,11 +1596,8 @@ function buildEntityFilterSql(
           AND rel.universe_id IN (${placeholders})
       )`;
       const inheritedClause = `EXISTS (
-        SELECT 1
-        FROM booru_resource_characters rel
-        INNER JOIN booru_character_universes cu ON cu.character_id = rel.character_id
-        WHERE rel.resource_id = ${alias}.id
-          AND cu.universe_id IN (${placeholders})
+        SELECT 1 FROM booru_resource_inherited_universes rel
+        WHERE rel.resource_id = ${alias}.id AND rel.universe_id IN (${placeholders})
       )`;
       parameters.push(...filterIds, ...filterIds);
       return {
@@ -1455,13 +1646,10 @@ function buildTagFilterSql(
   if (filterIds.length) {
     const placeholders = filterIds.map(() => "?").join(", ");
     return {
-      clause: `${negate ? "NOT " : ""}EXISTS (
-        SELECT 1
-        FROM booru_resource_tags rel
-        WHERE rel.resource_id = ${alias}.id
-          AND rel.tag_id IN (${placeholders})
-      )`,
-      parameters: filterIds,
+      clause: negate
+        ? `(NOT EXISTS (SELECT 1 FROM booru_resource_tags rel WHERE rel.resource_id = ${alias}.id AND rel.tag_id IN (${placeholders})) AND NOT EXISTS (SELECT 1 FROM booru_resource_inherited_tags rel WHERE rel.resource_id = ${alias}.id AND rel.tag_id IN (${placeholders})))`
+        : `(EXISTS (SELECT 1 FROM booru_resource_tags rel WHERE rel.resource_id = ${alias}.id AND rel.tag_id IN (${placeholders})) OR EXISTS (SELECT 1 FROM booru_resource_inherited_tags rel WHERE rel.resource_id = ${alias}.id AND rel.tag_id IN (${placeholders})))`,
+      parameters: negate ? [...filterIds, ...filterIds] : [...filterIds, ...filterIds],
     };
   }
 
@@ -1489,9 +1677,10 @@ function buildResourceListSqlParts(
     whereClauses.push(`r.classification_state != 'duplicate-review'`);
     whereClauses.push(`r.trashed_at IS NULL`);
 
-    if (section === "pending" && pendingMode === "essential") {
-      whereClauses.push(`${pendingSql.isPending} = 1`);
-    }
+    // Pendientes is the classification work queue, not a filter that hides
+    // already-classified resources. It deliberately keeps every active,
+    // non-duplicate resource so the user can review the whole catalog in one
+    // deterministic completion-oriented order.
   }
 
   if (query.classificationState === "unclassified") {
@@ -1593,7 +1782,7 @@ function buildResourceListSqlParts(
   const orderBySql = section === "pending"
     ? pendingMode === "tags"
       ? `ORDER BY ${pendingSql.manualTagCount} ASC, r.imported_at DESC, r.id ASC`
-      : `ORDER BY ${pendingSql.pendingScore} DESC, r.imported_at DESC, r.id ASC`
+      : `ORDER BY ${pendingSql.essentialTagCount} ASC, ${pendingSql.manualTagCount} ASC, r.imported_at DESC, r.id ASC`
     : section === "trash"
       ? `ORDER BY r.trashed_at DESC, r.imported_at DESC, r.id ASC`
       : `ORDER BY r.imported_at DESC, r.id ASC`;
@@ -1625,9 +1814,12 @@ function getResourceRowsByIdsSync(db: DatabaseSync, resourceIds: string[]) {
       th.generated_at AS thumbnail_generated_at,
       th.error_message AS thumbnail_error_message,
       th.frame_timestamp_ms AS thumbnail_frame_timestamp_ms
+      ,vs.storage_path AS video_short_storage_path
+      ,vs.status AS video_short_status
     FROM booru_resources r
     LEFT JOIN booru_resources c ON c.id = r.canonical_resource_id
     LEFT JOIN booru_resource_thumbnails th ON th.resource_id = r.id
+    LEFT JOIN booru_resource_video_shorts vs ON vs.resource_id = r.id
     WHERE r.id IN (${placeholders})
   `).all(...resourceIds);
   const rowById = new Map(rows.map((row: any) => [String(row?.id || ""), row]));
@@ -2081,7 +2273,9 @@ async function runThumbnailWorkerForResource(state: RuntimeState, resource: any)
   }
 
   const outputPaths = getThumbnailOutputPaths(state.thumbsRoot, resource.id);
+  const shortPath = path.join(state.shortsRoot, `${resource.id}.mp4`);
   await fsp.mkdir(path.dirname(outputPaths.webpPath), { recursive: true });
+  await fsp.mkdir(path.dirname(shortPath), { recursive: true });
 
   return readSpawnedJson(getWorkerPythonCommand(state), [
     workerPath,
@@ -2097,6 +2291,8 @@ async function runThumbnailWorkerForResource(state: RuntimeState, resource: any)
     outputPaths.webpPath,
     "--thumbnail-jpeg-path",
     outputPaths.jpegPath,
+    "--video-short-path",
+    shortPath,
     "--max-side",
     String(THUMBNAIL_MAX_SIDE_PX),
   ]);
@@ -2164,6 +2360,20 @@ function persistThumbnailSuccessSync(
     generatedAt,
     Number.isFinite(Number(workerResult?.frameTimestampMs)) ? Number(workerResult.frameTimestampMs) : null,
   );
+
+  const shortPath = normalizeBooruOptionalText(workerResult?.shortPath);
+  const shortError = normalizeBooruOptionalText(workerResult?.shortError);
+  if (shortPath || shortError || Number(workerResult?.durationMs || 0) > 60_000) {
+    db.prepare(`
+      INSERT INTO booru_resource_video_shorts (resource_id, storage_path, status, generated_at, error_message)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(resource_id) DO UPDATE SET
+        storage_path = excluded.storage_path,
+        status = excluded.status,
+        generated_at = excluded.generated_at,
+        error_message = excluded.error_message
+    `).run(resourceId, shortPath, shortPath ? "ready" : (shortError ? "error" : "pending"), generatedAt, shortError);
+  }
 }
 
 function persistThumbnailErrorSync(
@@ -2423,6 +2633,7 @@ function createRuntimeState(ctx: NexusBackendPluginContext): RuntimeState {
     mediaRoot: storagePaths.mediaRoot,
     duplicatesRoot: storagePaths.duplicatesRoot,
     thumbsRoot: storagePaths.thumbsRoot,
+    shortsRoot: storagePaths.shortsRoot,
     watcher: null,
     watcherState: {
       active: false,
@@ -2452,6 +2663,7 @@ function createRuntimeState(ctx: NexusBackendPluginContext): RuntimeState {
     invalidationTimer: null,
     invalidationDelayMs: 0,
     db: null,
+    fastClassification: null,
   };
 }
 
@@ -2486,6 +2698,7 @@ function buildResourcesSnapshot(ctx: NexusBackendPluginContext, settingsValue: R
         mediaRoot: storagePaths.mediaRoot,
         duplicatesRoot: storagePaths.duplicatesRoot,
         thumbsRoot: storagePaths.thumbsRoot,
+        shortsRoot: storagePaths.shortsRoot,
       },
       stats: {
         totalCount: 0,
@@ -2528,6 +2741,7 @@ function buildResourcesSnapshot(ctx: NexusBackendPluginContext, settingsValue: R
       mediaRoot: state.mediaRoot,
       duplicatesRoot: state.duplicatesRoot,
       thumbsRoot: state.thumbsRoot,
+      shortsRoot: state.shortsRoot,
     },
     stats: readStats(state.db),
     derivatives: {
@@ -2850,6 +3064,9 @@ function getEntityProfileSync(db: DatabaseSync, kind: BooruEntityKind, entityId:
     banner,
     avatar,
     visualSettings,
+    tags: listEntityTagsSync(db, kind, entityId),
+    aliases: kind === "author" || kind === "artist" ? listEntityAliasesSync(db, kind, entityId) : [],
+    socialLinks: kind === "author" || kind === "artist" ? listEntitySocialLinksSync(db, kind, entityId) : [],
     metadata: {
       createdAt,
       visualSettings,
@@ -3023,6 +3240,12 @@ function getEntityQueryScore(row: any, comparableQuery: string, slugQuery: strin
   return 0;
 }
 
+function getEntityAliasQueryScoreSync(db: DatabaseSync, kind: BooruEntityKind, entityId: string, comparableQuery: string) {
+  if (!comparableQuery || (kind !== "author" && kind !== "artist")) return 0;
+  const aliases = listEntityAliasesSync(db, kind, entityId);
+  return aliases.reduce((bestScore, alias) => Math.max(bestScore, getEntityQueryScore({ display_name: alias, slug: alias }, comparableQuery, "")), 0);
+}
+
 function listEntitiesSync(
   db: DatabaseSync,
   kind: BooruEntityKind,
@@ -3033,10 +3256,10 @@ function listEntitiesSync(
   const rows = getEntityBaseRows(db, kind);
   const filteredRows = comparableQuery || slugQuery
     ? rows
-      .filter((row) => getEntityQueryScore(row, comparableQuery, slugQuery) > 0)
+      .filter((row) => getEntityQueryScore(row, comparableQuery, slugQuery) > 0 || getEntityAliasQueryScoreSync(db, kind, String(row?.id || ""), comparableQuery) > 0)
       .sort((left, right) => {
-        const leftScore = getEntityQueryScore(left, comparableQuery, slugQuery);
-        const rightScore = getEntityQueryScore(right, comparableQuery, slugQuery);
+        const leftScore = Math.max(getEntityQueryScore(left, comparableQuery, slugQuery), getEntityAliasQueryScoreSync(db, kind, String(left?.id || ""), comparableQuery));
+        const rightScore = Math.max(getEntityQueryScore(right, comparableQuery, slugQuery), getEntityAliasQueryScoreSync(db, kind, String(right?.id || ""), comparableQuery));
 
         if (leftScore !== rightScore) {
           return rightScore - leftScore;
@@ -3107,6 +3330,36 @@ function listTagsSync(db: DatabaseSync, query: string | null = null) {
     ...normalizeTagRow(row),
     resourceCount: Number(row?.resource_count || 0),
   }));
+}
+
+function listSearchSuggestionsSync(db: DatabaseSync, query: string | null, payload: any = {}) {
+  const normalizedQuery = normalizeBooruOptionalText(query);
+  const reality = normalizeBooruReality(payload?.reality);
+  const requestedKinds = Array.isArray(payload?.allowedKinds)
+    ? new Set(payload.allowedKinds.map((value: unknown) => normalizeBooruText(value)).filter((value: string) => ENTITY_TABLES[value as BooruEntityKind]))
+    : null;
+  const kinds: BooruEntityKind[] = ["author", "character", "artist", "universe"];
+  const items: any[] = [];
+  kinds.forEach((kind) => {
+    if (requestedKinds && !requestedKinds.has(kind)) return;
+    if (reality === "real" && (kind === "character" || kind === "artist")) return;
+    listEntitiesSync(db, kind, normalizedQuery).slice(0, 12).forEach((entity) => {
+      items.push({
+        id: `entity:${kind}:${entity.id}`,
+        type: "entity",
+        kind,
+        entityId: entity.id,
+        label: entity.displayName,
+        detail: kind === "character" && entity?.universe?.displayName
+          ? `${BOORU_ENTITY_KIND_LABELS[kind]} · ${entity.universe.displayName}`
+          : BOORU_ENTITY_KIND_LABELS[kind],
+      });
+    });
+  });
+  listTagsSync(db, normalizedQuery).slice(0, 12).forEach((tag) => {
+    items.push({ id: `tag:${tag.id}`, type: "tag", tagId: tag.id, label: tag.name, detail: "Tag" });
+  });
+  return items.slice(0, 24);
 }
 
 function findTagByIdSync(db: DatabaseSync, tagId: string) {
@@ -4099,7 +4352,10 @@ function setCharacterUniverseSync(db: DatabaseSync, payload: SetCharacterUnivers
     }
   }
 
-  replaceCharacterUniverseAssignmentSync(db, characterId, universeId);
+  withTransaction(db, () => {
+    replaceCharacterUniverseAssignmentSync(db, characterId, universeId);
+    syncEntityConsumerInheritanceSync(db, "character", characterId);
+  });
 
   const profile = getEntityProfileSync(db, "character", characterId);
 
@@ -4138,13 +4394,206 @@ function ensureCharacterInUniverseSync(db: DatabaseSync, payload: EnsureCharacte
   }
 
   if (!currentUniverse?.id) {
-    replaceCharacterUniverseAssignmentSync(db, characterId, universeId);
+    withTransaction(db, () => {
+      replaceCharacterUniverseAssignmentSync(db, characterId, universeId);
+      syncEntityConsumerInheritanceSync(db, "character", characterId);
+    });
   }
 
   return {
     created: Boolean(ensured?.created),
     entity: getEntityRecordByIdSync(db, "character", characterId) || ensured.entity,
   };
+}
+
+function normalizeUniqueTextList(value: unknown) {
+  const seen = new Set<string>();
+  const values: string[] = [];
+  (Array.isArray(value) ? value : []).forEach((entry) => {
+    const text = normalizeBooruOptionalText(entry);
+    const comparable = normalizeBooruComparableText(text);
+    if (!text || !comparable || seen.has(comparable)) return;
+    seen.add(comparable);
+    values.push(text);
+  });
+  return values;
+}
+
+function normalizeSocialLinks(value: unknown) {
+  const seen = new Set<string>();
+  const links: Array<{ platformId: string; url: string }> = [];
+  (Array.isArray(value) ? value : []).forEach((entry: any) => {
+    const platformId = normalizeBooruOptionalText(entry?.platformId);
+    const url = normalizeBooruOptionalText(entry?.url);
+    if (!platformId || !url) return;
+    const key = `${platformId}:${url}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    links.push({ platformId, url });
+  });
+  return links;
+}
+
+function saveEntityProfileSync(db: DatabaseSync, payload: SaveEntityProfilePayload) {
+  const kind = normalizeBooruText(payload?.kind) as BooruEntityKind;
+  const entityId = normalizeBooruOptionalText(payload?.entityId);
+  if (!ENTITY_TABLES[kind] || !entityId || !findEntityByIdSync(db, kind, entityId)) {
+    throw new Error("La entidad solicitada ya no existe en Booru.");
+  }
+
+  const tagIds = Object.prototype.hasOwnProperty.call(payload || {}, "tagIds")
+    ? uniqueBooruIds(payload?.tagIds)
+    : listEntityTagsSync(db, kind, entityId).map((tag) => tag.id);
+  assertValidTagIdsSync(db, tagIds);
+  const aliases = Object.prototype.hasOwnProperty.call(payload || {}, "aliasNames")
+    ? normalizeUniqueTextList(payload?.aliasNames)
+    : listEntityAliasesSync(db, kind, entityId);
+  const socialLinks = Object.prototype.hasOwnProperty.call(payload || {}, "socialLinks")
+    ? normalizeSocialLinks(payload?.socialLinks)
+    : listEntitySocialLinksSync(db, kind, entityId).map((link: any) => ({ platformId: link?.platform?.id, url: link?.url }));
+  if ((aliases.length || socialLinks.length) && kind !== "author" && kind !== "artist") {
+    throw new Error("Solo Persona y Artist admiten aliases y redes.");
+  }
+
+  socialLinks.forEach((link) => {
+    if (!db.prepare(`SELECT id FROM booru_social_platforms WHERE id = ?`).get(link.platformId)) {
+      throw new Error("Una plataforma seleccionada ya no existe.");
+    }
+  });
+
+  withTransaction(db, () => {
+    db.prepare(`DELETE FROM booru_entity_tags WHERE entity_kind = ? AND entity_id = ?`).run(kind, entityId);
+    const insertTag = db.prepare(`
+      INSERT INTO booru_entity_tags (entity_kind, entity_id, tag_id, created_at)
+      VALUES (?, ?, ?, ?)
+    `);
+    tagIds.forEach((tagId) => insertTag.run(kind, entityId, tagId, nowIso()));
+
+    if (kind === "author" || kind === "artist") {
+      db.prepare(`DELETE FROM booru_entity_aliases WHERE entity_kind = ? AND entity_id = ?`).run(kind, entityId);
+      const insertAlias = db.prepare(`
+        INSERT INTO booru_entity_aliases (entity_kind, entity_id, alias_name, comparable_name, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      aliases.forEach((alias) => insertAlias.run(kind, entityId, alias, normalizeBooruComparableText(alias), nowIso()));
+
+      db.prepare(`DELETE FROM booru_entity_social_links WHERE entity_kind = ? AND entity_id = ?`).run(kind, entityId);
+      const insertLink = db.prepare(`
+        INSERT INTO booru_entity_social_links (id, entity_kind, entity_id, platform_id, url, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      socialLinks.forEach((link) => insertLink.run(crypto.randomUUID(), kind, entityId, link.platformId, link.url, nowIso()));
+    }
+
+    syncEntityConsumerInheritanceSync(db, kind, entityId);
+  });
+
+  return getEntityProfileSync(db, kind, entityId);
+}
+
+function listSocialPlatformsSync(db: DatabaseSync) {
+  return db.prepare(`
+    SELECT p.*, COUNT(DISTINCT rel.id) AS profile_count
+    FROM booru_social_platforms p
+    LEFT JOIN booru_entity_social_links rel ON rel.platform_id = p.id
+    GROUP BY p.id
+    ORDER BY p.display_name COLLATE NOCASE ASC
+  `).all().map((row: any) => ({
+    id: String(row?.id || ""),
+    displayName: String(row?.display_name || ""),
+    iconResourceId: normalizeBooruOptionalText(row?.icon_resource_id),
+    iconLayout: parseEntityVisualSettings(row?.icon_layout_json)?.avatar || null,
+    profileCount: Number(row?.profile_count || 0),
+  }));
+}
+
+function saveSocialPlatformSync(db: DatabaseSync, payload: any) {
+  const id = normalizeBooruOptionalText(payload?.id) || crypto.randomUUID();
+  const displayName = normalizeBooruOptionalText(payload?.displayName);
+  const iconResourceId = normalizeBooruOptionalText(payload?.iconResourceId);
+  if (!displayName) throw new Error("El nombre de la plataforma es obligatorio.");
+  if (iconResourceId && !getResourceByIdSync(db, iconResourceId)) throw new Error("El icono elegido ya no existe.");
+  const currentLayout = normalizeEntityVisualLayout(payload?.iconLayout);
+  const layoutJson = serializeEntityVisualSettings({ avatar: currentLayout, banner: normalizeEntityVisualLayout({}) });
+  const existing = db.prepare(`SELECT id FROM booru_social_platforms WHERE id = ?`).get(id);
+  if (existing) {
+    db.prepare(`UPDATE booru_social_platforms SET display_name = ?, icon_resource_id = ?, icon_layout_json = ? WHERE id = ?`)
+      .run(displayName, iconResourceId, layoutJson, id);
+  } else {
+    db.prepare(`INSERT INTO booru_social_platforms (id, display_name, icon_resource_id, icon_layout_json, created_at) VALUES (?, ?, ?, ?, ?)`)
+      .run(id, displayName, iconResourceId, layoutJson, nowIso());
+  }
+  return listSocialPlatformsSync(db).find((platform) => platform.id === id) || null;
+}
+
+function deleteSocialPlatformSync(db: DatabaseSync, payload: any) {
+  const platformId = normalizeBooruOptionalText(payload?.platformId);
+  const confirmed = payload?.confirmed === true;
+  if (!platformId) throw new Error("La plataforma solicitada no es valida.");
+  const consumers = db.prepare(`
+    SELECT rel.entity_kind, rel.entity_id, e.display_name
+    FROM booru_entity_social_links rel
+    LEFT JOIN booru_authors e ON rel.entity_kind = 'author' AND e.id = rel.entity_id
+    WHERE rel.platform_id = ? AND rel.entity_kind = 'author'
+  `).all(platformId);
+  const artistConsumers = db.prepare(`
+    SELECT rel.entity_kind, rel.entity_id, e.display_name
+    FROM booru_entity_social_links rel
+    INNER JOIN booru_artists e ON rel.entity_kind = 'artist' AND e.id = rel.entity_id
+    WHERE rel.platform_id = ?
+  `).all(platformId);
+  const affectedProfiles = [...consumers, ...artistConsumers].map((row: any) => ({
+    kind: String(row?.entity_kind || ""), id: String(row?.entity_id || ""), displayName: String(row?.display_name || ""),
+  }));
+  if (affectedProfiles.length && !confirmed) return { deleted: false, affectedProfiles };
+  db.prepare(`DELETE FROM booru_social_platforms WHERE id = ?`).run(platformId);
+  return { deleted: true, affectedProfiles };
+}
+
+function excludeResourceTagSync(db: DatabaseSync, resourceId: string, tagId: string) {
+  if (!getResourceByIdSync(db, resourceId) || !findTagByIdSync(db, tagId)) throw new Error("La tag o el recurso ya no existe.");
+  withTransaction(db, () => {
+    db.prepare(`DELETE FROM booru_resource_tags WHERE resource_id = ? AND tag_id = ?`).run(resourceId, tagId);
+    db.prepare(`INSERT OR IGNORE INTO booru_resource_tag_exclusions (resource_id, tag_id, created_at) VALUES (?, ?, ?)`)
+      .run(resourceId, tagId, nowIso());
+  });
+  return getResourceByIdSync(db, resourceId);
+}
+
+function excludeResourceUniverseSync(db: DatabaseSync, resourceId: string, universeId: string) {
+  if (!getResourceByIdSync(db, resourceId) || !findEntityByIdSync(db, "universe", universeId)) throw new Error("El universe o el recurso ya no existe.");
+  withTransaction(db, () => {
+    db.prepare(`DELETE FROM booru_resource_universes WHERE resource_id = ? AND universe_id = ?`).run(resourceId, universeId);
+    db.prepare(`INSERT OR IGNORE INTO booru_resource_universe_exclusions (resource_id, universe_id, created_at) VALUES (?, ?, ?)`)
+      .run(resourceId, universeId, nowIso());
+  });
+  return getResourceByIdSync(db, resourceId);
+}
+
+function disassociateResourcesFromEntitySync(db: DatabaseSync, payload: ResourceEntityAssociationPayload) {
+  const kind = normalizeBooruText(payload?.kind) as BooruEntityKind;
+  const entityId = normalizeBooruOptionalText(payload?.entityId);
+  const resourceIds = uniqueBooruIds(payload?.resourceIds);
+  if (!ENTITY_TABLES[kind] || !entityId || !resourceIds.length) throw new Error("La entidad y los recursos son obligatorios.");
+  const table = kind === "universe" ? "booru_resource_universes" : getResourceRelationTable(kind);
+  const column = kind === "universe" ? "universe_id" : getResourceRelationEntityIdColumn(kind);
+  if (!table || !column) throw new Error("No se puede desasociar este tipo de entidad.");
+  withTransaction(db, () => {
+    const unlink = db.prepare(`DELETE FROM ${table} WHERE resource_id = ? AND ${column} = ?`);
+    resourceIds.forEach((resourceId) => {
+      unlink.run(resourceId, entityId);
+      syncResourceInheritanceSync(db, resourceId);
+    });
+    const visualColumnNames = Object.values(ENTITY_VISUAL_COLUMNS);
+    visualColumnNames.forEach((columnName) => {
+      const placeholders = resourceIds.map(() => "?").join(", ");
+      if (placeholders) {
+        db.prepare(`UPDATE ${getEntityTable(kind)} SET ${columnName} = NULL WHERE id = ? AND ${columnName} IN (${placeholders})`)
+          .run(entityId, ...resourceIds);
+      }
+    });
+  });
+  return { resourceIds, profile: getEntityProfileSync(db, kind, entityId) };
 }
 
 function replaceResourceEntityAssignmentsSync(
@@ -4181,6 +4630,87 @@ function replaceResourceEntityAssignmentsSync(
   });
 }
 
+function syncResourceInheritanceSync(db: DatabaseSync, resourceId: string) {
+  db.prepare(`DELETE FROM booru_resource_inherited_tags WHERE resource_id = ?`).run(resourceId);
+  db.prepare(`DELETE FROM booru_resource_inherited_universes WHERE resource_id = ?`).run(resourceId);
+
+  const sources: Array<{ kind: BooruEntityKind; entityId: string }> = [];
+  const addSources = (kind: Extract<BooruEntityKind, "author" | "artist" | "character">) => {
+    const relationTable = getResourceRelationTable(kind)!;
+    const entityColumn = getResourceRelationEntityIdColumn(kind)!;
+    db.prepare(`SELECT ${entityColumn} AS entity_id FROM ${relationTable} WHERE resource_id = ?`)
+      .all(resourceId)
+      .forEach((row: any) => sources.push({ kind, entityId: String(row?.entity_id || "") }));
+  };
+
+  addSources("author");
+  addSources("artist");
+  addSources("character");
+  db.prepare(`SELECT universe_id FROM booru_resource_universes WHERE resource_id = ?`)
+    .all(resourceId)
+    .forEach((row: any) => sources.push({ kind: "universe", entityId: String(row?.universe_id || "") }));
+
+  const inheritedUniverseInsert = db.prepare(`
+    INSERT OR IGNORE INTO booru_resource_inherited_universes (
+      resource_id, universe_id, character_id, created_at
+    ) VALUES (?, ?, ?, ?)
+  `);
+  const characterUniverseRows = db.prepare(`
+    SELECT rc.character_id, cu.universe_id
+    FROM booru_resource_characters rc
+    INNER JOIN booru_character_universes cu ON cu.character_id = rc.character_id
+    WHERE rc.resource_id = ?
+  `).all(resourceId);
+
+  characterUniverseRows.forEach((row: any) => {
+    const characterId = String(row?.character_id || "");
+    const universeId = String(row?.universe_id || "");
+    if (!characterId || !universeId) return;
+    inheritedUniverseInsert.run(resourceId, universeId, characterId, nowIso());
+    sources.push({ kind: "universe", entityId: universeId });
+  });
+
+  const tagInsert = db.prepare(`
+    INSERT OR IGNORE INTO booru_resource_inherited_tags (
+      resource_id, tag_id, source_kind, source_entity_id, created_at
+    ) VALUES (?, ?, ?, ?, ?)
+  `);
+  const seenSources = new Set<string>();
+  sources.forEach(({ kind, entityId }) => {
+    if (!entityId) return;
+    const key = `${kind}:${entityId}`;
+    if (seenSources.has(key)) return;
+    seenSources.add(key);
+    listEntityTagsSync(db, kind, entityId).forEach((tag) => {
+      tagInsert.run(resourceId, tag.id, kind, entityId, nowIso());
+    });
+  });
+}
+
+function syncEntityConsumerInheritanceSync(db: DatabaseSync, kind: BooruEntityKind, entityId: string) {
+  const resourceIds = new Set<string>();
+  if (kind === "universe") {
+    db.prepare(`SELECT resource_id FROM booru_resource_universes WHERE universe_id = ?`).all(entityId)
+      .forEach((row: any) => resourceIds.add(String(row?.resource_id || "")));
+    db.prepare(`
+      SELECT rc.resource_id
+      FROM booru_resource_characters rc
+      INNER JOIN booru_character_universes cu ON cu.character_id = rc.character_id
+      WHERE cu.universe_id = ?
+    `).all(entityId).forEach((row: any) => resourceIds.add(String(row?.resource_id || "")));
+  } else {
+    const table = getResourceRelationTable(kind);
+    const column = getResourceRelationEntityIdColumn(kind);
+    if (table && column) {
+      db.prepare(`SELECT resource_id FROM ${table} WHERE ${column} = ?`).all(entityId)
+        .forEach((row: any) => resourceIds.add(String(row?.resource_id || "")));
+    }
+  }
+  resourceIds.forEach((resourceId) => {
+    if (resourceId) syncResourceInheritanceSync(db, resourceId);
+  });
+}
+
 function replaceResourceTagAssignmentsSync(
   db: DatabaseSync,
   resourceId: string,
@@ -4206,6 +4736,7 @@ function replaceResourceTagAssignmentsSync(
 
   tagIds.forEach((tagId) => {
     insertStatement.run(resourceId, tagId, createdAt);
+    db.prepare(`DELETE FROM booru_resource_tag_exclusions WHERE resource_id = ? AND tag_id = ?`).run(resourceId, tagId);
   });
 }
 
@@ -4235,6 +4766,7 @@ function replaceResourceUniverseAssignmentsSync(
 
   universeIds.forEach((universeId, index) => {
     insertStatement.run(resourceId, universeId, index, createdAt);
+    db.prepare(`DELETE FROM booru_resource_universe_exclusions WHERE resource_id = ? AND universe_id = ?`).run(resourceId, universeId);
   });
 }
 
@@ -4429,7 +4961,7 @@ function resolveNextResourceDraftSync(
     ? dirtyFields.has("reality")
     : payload && Object.prototype.hasOwnProperty.call(payload, "reality");
   const requestedCharacterUniverses = normalizeCharacterUniverseAssignments(payload?.characterUniverses);
-  const reality = hasRealityField ? normalizeBooruReality(payload?.reality) : resource.reality;
+  const requestedReality = hasRealityField ? normalizeBooruReality(payload?.reality) : resource.reality;
   const authorMode = resolveRelationFieldUpdateMode(payload, dirtyFields, "authors", "authorIds", "authorPatch");
   const artistMode = resolveRelationFieldUpdateMode(payload, dirtyFields, "artists", "artistIds", "artistPatch");
   const characterMode = resolveRelationFieldUpdateMode(payload, dirtyFields, "characters", "characterIds", "characterPatch");
@@ -4502,6 +5034,12 @@ function resolveNextResourceDraftSync(
       universe: assignedUniverse || getCharacterUniverseRecordSync(db, characterId),
     };
   });
+
+  const reality = (characterIds.length || artistIds.length)
+    ? "ficticio"
+    : authorIds.length
+      ? "real"
+      : requestedReality;
 
   return {
     resourceId: resource.id,
@@ -4611,6 +5149,8 @@ function saveResourcesSync(
       if (shouldWriteEverything || dirtyFieldSet.has("manualTags")) {
         replaceResourceTagAssignmentsSync(db, nextDraft.resourceId, nextDraft.tagIds);
       }
+
+      syncResourceInheritanceSync(db, nextDraft.resourceId);
 
       db.prepare(`
         UPDATE booru_resources
@@ -5126,6 +5666,18 @@ async function ingestFile(
   ensureThumbnailPendingRowSync(state.db, resourceId, contentHash);
   queueThumbnailGeneration([resourceId], "high");
 
+  const fastTarget = state.fastClassification;
+  if (fastTarget && canonicalResource === null && findEntityByIdSync(state.db, fastTarget.kind, fastTarget.entityId)) {
+    // Resolve the target at persistence time. A renderer cleanup clears this
+    // state as soon as its profile unmounts, so queued watcher work never
+    // leaks into the next profile.
+    quickAssignEntitySync(state.db, {
+      resourceId,
+      kind: fastTarget.kind,
+      entityId: fastTarget.entityId,
+    });
+  }
+
   if (updateWatcherState) {
     state.watcherState.lastIngestedAt = importedAt;
     state.watcherState.lastIngestedOriginalFilename = originalFilename;
@@ -5508,6 +6060,82 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
+    ctx.registerIpc("booru:list-search-suggestions", async (_event, payload: any) => {
+      try {
+        return createSuccess({ items: listSearchSuggestionsSync(assertRuntimeDb(), normalizeBooruOptionalText(payload?.query), payload) });
+      } catch (error) {
+        return createError(error, "No se pudieron cargar las sugerencias de busqueda.");
+      }
+    });
+
+    ctx.registerIpc("booru:list-social-platforms", async () => {
+      try {
+        return createSuccess({ items: listSocialPlatformsSync(assertRuntimeDb()) });
+      } catch (error) {
+        return createError(error, "No se pudieron cargar las plataformas.");
+      }
+    });
+
+    ctx.registerIpc("booru:save-social-platform", async (_event, payload: any) => {
+      try {
+        const platform = saveSocialPlatformSync(assertRuntimeDb(), payload);
+        scheduleRuntimeInvalidation("entitiesVersion");
+        return createSuccess({ platform });
+      } catch (error) {
+        return createError(error, "No se pudo guardar la plataforma.");
+      }
+    });
+
+    ctx.registerIpc("booru:delete-social-platform", async (_event, payload: any) => {
+      try {
+        const result = deleteSocialPlatformSync(assertRuntimeDb(), payload);
+        scheduleRuntimeInvalidation("entitiesVersion");
+        return createSuccess(result);
+      } catch (error) {
+        return createError(error, "No se pudo eliminar la plataforma.");
+      }
+    });
+
+    ctx.registerIpc("booru:import-social-platform-icon", async (_event, payload: any) => {
+      const tempFilePath = assertClipboardTempFilePath(payload?.tempFilePath);
+      try {
+        const result = await ingestFile(ctx, tempFilePath, {
+          duplicateMode: "reuse-canonical",
+          updateWatcherState: false,
+          sourcePathOverride: "clipboard://social-platform-icon",
+          originalFilenameOverride: buildClipboardImportedFilename(),
+        });
+        if (!result?.resource) throw new Error("No se pudo importar el icono.");
+        return createSuccess({ resource: result.resource });
+      } catch (error) {
+        return createError(error, "No se pudo importar el icono de plataforma.");
+      } finally {
+        await removeFileIfExists(tempFilePath);
+      }
+    });
+
+    ctx.registerIpc("booru:import-social-platform-icon-file", async (_event, payload: any) => {
+      const sourcePath = normalizeBooruOptionalText(payload?.sourcePath);
+      if (!sourcePath || !fs.existsSync(sourcePath)) return createError(new Error("El archivo elegido ya no existe."), "No se pudo importar el icono de plataforma.");
+      const tempFilePath = path.join(CLIPBOARD_IMAGE_TEMP_ROOT, `${crypto.randomUUID()}${path.extname(sourcePath) || ".png"}`);
+      try {
+        await fsp.mkdir(CLIPBOARD_IMAGE_TEMP_ROOT, { recursive: true });
+        await fsp.copyFile(sourcePath, tempFilePath);
+        const result = await ingestFile(ctx, tempFilePath, {
+          duplicateMode: "reuse-canonical",
+          updateWatcherState: false,
+          sourcePathOverride: `platform-icon://${path.basename(sourcePath)}`,
+          originalFilenameOverride: path.basename(sourcePath),
+        });
+        if (!result?.resource) throw new Error("No se pudo importar el icono.");
+        return createSuccess({ resource: result.resource });
+      } catch (error) {
+        return createError(error, "No se pudo importar el icono de plataforma.");
+      } finally {
+        await removeFileIfExists(tempFilePath);
+      }
+    });
+
     ctx.registerIpc("booru:list-recommendations", async (_event, payload: ListRecommendationsPayload) => {
       const startedAt = performance.now();
       try {
@@ -5596,6 +6224,71 @@ const booruPlugin: NexusBackendPluginModule = {
       } catch (error) {
         return createError(error, "No se pudo actualizar el encuadre del perfil de entidad en Booru.");
       }
+    });
+
+    ctx.registerIpc("booru:save-entity-profile", async (_event, payload: SaveEntityProfilePayload) => {
+      try {
+        const profile = saveEntityProfileSync(assertRuntimeDb(), payload);
+        scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion");
+        return createSuccess({ profile });
+      } catch (error) {
+        return createError(error, "No se pudo guardar el perfil de entidad.");
+      }
+    });
+
+    ctx.registerIpc("booru:disassociate-resources-from-entity", async (_event, payload: ResourceEntityAssociationPayload) => {
+      try {
+        const result = disassociateResourcesFromEntitySync(assertRuntimeDb(), payload);
+        scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion");
+        return createSuccess(result);
+      } catch (error) {
+        return createError(error, "No se pudieron desasociar los recursos de la entidad.");
+      }
+    });
+
+    ctx.registerIpc("booru:exclude-resource-tag", async (_event, payload: any) => {
+      try {
+        const resource = excludeResourceTagSync(assertRuntimeDb(), normalizeBooruText(payload?.resourceId), normalizeBooruText(payload?.tagId));
+        scheduleRuntimeInvalidation("resourcesVersion");
+        return createSuccess({ resource });
+      } catch (error) {
+        return createError(error, "No se pudo excluir la tag heredada.");
+      }
+    });
+
+    ctx.registerIpc("booru:exclude-resource-universe", async (_event, payload: any) => {
+      try {
+        const resource = excludeResourceUniverseSync(assertRuntimeDb(), normalizeBooruText(payload?.resourceId), normalizeBooruText(payload?.universeId));
+        scheduleRuntimeInvalidation("resourcesVersion");
+        return createSuccess({ resource });
+      } catch (error) {
+        return createError(error, "No se pudo excluir el universe heredado.");
+      }
+    });
+
+    ctx.registerIpc("booru:set-fast-classification", async (_event, payload: FastClassificationPayload) => {
+      try {
+        const state = runtimeState;
+        const kind = normalizeBooruText(payload?.kind) as BooruEntityKind;
+        const entityId = normalizeBooruOptionalText(payload?.entityId);
+        const scopeId = normalizeBooruOptionalText(payload?.scopeId);
+        if (!state || !ENTITY_TABLES[kind] || !entityId || !scopeId || !findEntityByIdSync(assertRuntimeDb(), kind, entityId)) {
+          throw new Error("El perfil de clasificacion rapida ya no existe.");
+        }
+        state.fastClassification = { kind, entityId, scopeId };
+        return createSuccess({ active: true });
+      } catch (error) {
+        return createError(error, "No se pudo activar la clasificacion rapida.");
+      }
+    });
+
+    ctx.registerIpc("booru:clear-fast-classification", async (_event, payload: FastClassificationPayload) => {
+      const state = runtimeState;
+      const scopeId = normalizeBooruOptionalText(payload?.scopeId);
+      if (state?.fastClassification && (!scopeId || state.fastClassification.scopeId === scopeId)) {
+        state.fastClassification = null;
+      }
+      return createSuccess({ active: false });
     });
 
     ctx.registerIpc("booru:ensure-tag", async (_event, payload: any) => {
@@ -5857,6 +6550,11 @@ export const __booruTestUtils = {
   listEntitiesSync,
   getEntityProfileSync,
   listTagsSync,
+  listSearchSuggestionsSync,
+  saveEntityProfileSync,
+  syncResourceInheritanceSync,
+  excludeResourceTagSync,
+  disassociateResourcesFromEntitySync,
   listLibraryRows,
   listPendingRows,
   listDuplicateRows,

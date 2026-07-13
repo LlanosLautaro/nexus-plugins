@@ -46,6 +46,16 @@ export function FolderIcon(props) {
   );
 }
 
+export function DownloadIcon(props) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M12 3.8v10.1" />
+      <path d="m8.4 10.6 3.6 3.7 3.6-3.7" />
+      <path d="M5 18.4v1.1A1.7 1.7 0 0 0 6.7 21h10.6a1.7 1.7 0 0 0 1.7-1.5v-1.1" />
+    </BaseIcon>
+  );
+}
+
 export function DuplicateIcon(props) {
   return (
     <BaseIcon {...props}>

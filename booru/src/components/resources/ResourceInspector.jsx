@@ -11,6 +11,7 @@ export default function ResourceInspector({
   onRestore,
   onPurge,
   onClose,
+  onExcludeTag,
   helpers,
   MediaPreview,
   EntityField,
@@ -123,8 +124,17 @@ export default function ResourceInspector({
             </div>
 
             <div className="booruView__tagGroup">
-              <span className="booruView__groupLabel">Tags manuales</span>
-              {renderTagChips(resource.manualTags, "Sin tags manuales")}
+              <span className="booruView__groupLabel">Tags</span>
+              {Array.isArray(resource.manualTags) && resource.manualTags.length ? (
+                <div className="booruView__tagRow">
+                  {resource.manualTags.map((tag) => (
+                    <span key={tag.id} className="booruView__selectionChip">
+                      <span>{tag.name}</span>
+                      <button type="button" className="booruView__selectionChipRemove" onClick={() => void onExcludeTag?.(tag)} disabled={saving} aria-label={`Quitar ${tag.name}`}>x</button>
+                    </span>
+                  ))}
+                </div>
+              ) : renderTagChips(resource.manualTags, "Sin tags")}
             </div>
           </>
         ) : (

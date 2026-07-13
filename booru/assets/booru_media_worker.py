@@ -169,6 +169,24 @@ def render_thumbnail(
         raise RuntimeError(message)
 
 
+def render_video_short(ffmpeg_path, source_path, output_path):
+    remove_if_exists(output_path)
+    result = run_command([
+        ffmpeg_path, "-hide_banner", "-loglevel", "error", "-y",
+        "-i", source_path,
+        "-t", "60",
+        "-an",
+        "-sn",
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "25",
+        "-movflags", "+faststart",
+        output_path,
+    ])
+    if result.returncode != 0 or not os.path.exists(output_path):
+        raise RuntimeError((result.stderr or result.stdout or "ffmpeg fallo generando short").strip())
+
+
 def probe_generated_thumbnail(ffprobe_path, file_path):
     metadata = run_ffprobe(ffprobe_path, file_path)
     stream = pick_primary_stream(metadata)
@@ -257,6 +275,7 @@ def main():
     parser.add_argument("--ffprobe-path", required=True)
     parser.add_argument("--thumbnail-webp-path", required=True)
     parser.add_argument("--thumbnail-jpeg-path", required=True)
+    parser.add_argument("--video-short-path")
     parser.add_argument("--max-side", type=int, default=384)
     args = parser.parse_args()
 
@@ -265,6 +284,7 @@ def main():
     ffprobe_path = os.path.abspath(args.ffprobe_path)
     output_webp = os.path.abspath(args.thumbnail_webp_path)
     output_jpeg = os.path.abspath(args.thumbnail_jpeg_path)
+    output_short = os.path.abspath(args.video_short_path) if args.video_short_path else None
 
     if not os.path.exists(source_path):
         raise FileNotFoundError(f"No existe la media original: {source_path}")
@@ -322,6 +342,15 @@ def main():
         selected_mime_type = "image/jpeg"
 
     thumb_info = probe_generated_thumbnail(ffprobe_path, selected_output)
+    short_path = None
+    short_error = None
+    if args.media_kind == "video" and media_info["durationMs"] and media_info["durationMs"] > 60000 and output_short:
+        try:
+            Path(output_short).parent.mkdir(parents=True, exist_ok=True)
+            render_video_short(ffmpeg_path, source_path, output_short)
+            short_path = output_short
+        except Exception as error:
+            short_error = str(error)
     payload = {
         "width": media_info["width"],
         "height": media_info["height"],
@@ -332,6 +361,8 @@ def main():
         "thumbnailHeight": thumb_info["height"],
         "thumbnailByteSize": thumb_info["byteSize"],
         "frameTimestampMs": frame_timestamp_ms,
+        "shortPath": short_path,
+        "shortError": short_error,
     }
 
     sys.stdout.write(json.dumps(payload))

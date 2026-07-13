@@ -20,10 +20,18 @@ function toFileUrl(pathValue) {
   return new URL(window.nexus.urls.pathToFileUrl(pathValue)).href;
 }
 
+function normalizeLayout(value) {
+  return {
+    scale: clamp(value?.scale, 0.2, 4),
+    offsetX: clamp(value?.offsetX, -1.5, 1.5),
+    offsetY: clamp(value?.offsetY, -1.5, 1.5),
+  };
+}
+
 /**
- * Reusable, ratio-locked crop workbench for entity avatars and banners.
- * Crop size is represented as zoom; x/y are normalized focal offsets so the
- * same saved layout remains correct at every responsive size.
+ * Ratio-locked workbench for entity avatars and banners. The visible frame is
+ * the final target ratio. Dragging pans the media and the wheel adjusts its
+ * scale; the surrounding frame remains Nexus background by design.
  */
 export default function EntityVisualCropper({
   kind,
@@ -37,20 +45,12 @@ export default function EntityVisualCropper({
 }) {
   const frameRef = useRef(null);
   const pointerRef = useRef(null);
-  const [layout, setLayout] = useState(() => ({
-    scale: Number(initialLayout?.scale || 1),
-    offsetX: Number(initialLayout?.offsetX || 0),
-    offsetY: Number(initialLayout?.offsetY || 0),
-  }));
+  const [layout, setLayout] = useState(() => normalizeLayout(initialLayout));
   const [saving, setSaving] = useState(false);
   const isBanner = role === "banner";
 
   useEffect(() => {
-    setLayout({
-      scale: Number(initialLayout?.scale || 1),
-      offsetX: Number(initialLayout?.offsetX || 0),
-      offsetY: Number(initialLayout?.offsetY || 0),
-    });
+    setLayout(normalizeLayout(initialLayout));
   }, [entityId, initialLayout?.offsetX, initialLayout?.offsetY, initialLayout?.scale, role]);
 
   const mediaStyle = useMemo(() => ({
@@ -58,13 +58,12 @@ export default function EntityVisualCropper({
     transformOrigin: "center center",
   }), [layout]);
 
-  const beginPointer = (event, mode) => {
+  const beginPointer = (event) => {
     if (busy || saving || !frameRef.current) return;
     event.preventDefault();
     const bounds = frameRef.current.getBoundingClientRect();
     pointerRef.current = {
       id: event.pointerId,
-      mode,
       x: event.clientX,
       y: event.clientY,
       width: bounds.width,
@@ -79,19 +78,10 @@ export default function EntityVisualCropper({
     if (!gesture || gesture.id !== event.pointerId) return;
     const dx = (event.clientX - gesture.x) / Math.max(1, gesture.width);
     const dy = (event.clientY - gesture.y) / Math.max(1, gesture.height);
-    if (gesture.mode === "move") {
-      setLayout((current) => ({
-        ...current,
-        offsetX: clamp(gesture.layout.offsetX + dx / gesture.layout.scale, -0.5, 0.5),
-        offsetY: clamp(gesture.layout.offsetY + dy / gesture.layout.scale, -0.5, 0.5),
-      }));
-      return;
-    }
-    const distance = Math.max(Math.abs(dx), Math.abs(dy));
-    const direction = gesture.mode === "shrink" ? -1 : 1;
     setLayout((current) => ({
       ...current,
-      scale: clamp(gesture.layout.scale + (distance * direction * 2), 0.7, 4),
+      offsetX: clamp(gesture.layout.offsetX + dx, -1.5, 1.5),
+      offsetY: clamp(gesture.layout.offsetY + dy, -1.5, 1.5),
     }));
   };
 
@@ -102,9 +92,10 @@ export default function EntityVisualCropper({
   const handleWheel = (event) => {
     if (busy || saving) return;
     event.preventDefault();
+    const multiplier = event.deltaY < 0 ? 1.12 : 0.88;
     setLayout((current) => ({
       ...current,
-      scale: clamp(current.scale * (event.deltaY > 0 ? 0.94 : 1.06), 0.7, 4),
+      scale: clamp(current.scale * multiplier, 0.2, 4),
     }));
   };
 
@@ -123,7 +114,7 @@ export default function EntityVisualCropper({
     }
   };
 
-  if (!source?.pathValue || source.mediaKind === "video") return null;
+  if (!source?.pathValue) return null;
   const src = toFileUrl(source.pathValue);
 
   return (
@@ -131,28 +122,23 @@ export default function EntityVisualCropper({
       <div
         ref={frameRef}
         className={["booruVisualCropper__frame", isBanner ? "is-banner" : "is-avatar"].join(" ")}
-        onPointerDown={(event) => beginPointer(event, "move")}
+        onPointerDown={beginPointer}
         onPointerMove={movePointer}
         onPointerUp={endPointer}
         onPointerCancel={endPointer}
         onWheel={handleWheel}
       >
-        <img src={src} alt="" draggable="false" style={mediaStyle} />
-        <span className="booruVisualCropper__shade" aria-hidden="true" />
-        <span className="booruVisualCropper__handle booruVisualCropper__handle--nw" onPointerDown={(event) => beginPointer(event, "shrink")} />
-        <span className="booruVisualCropper__handle booruVisualCropper__handle--ne" onPointerDown={(event) => beginPointer(event, "grow")} />
-        <span className="booruVisualCropper__handle booruVisualCropper__handle--sw" onPointerDown={(event) => beginPointer(event, "shrink")} />
-        <span className="booruVisualCropper__handle booruVisualCropper__handle--se" onPointerDown={(event) => beginPointer(event, "grow")} />
+        {source.mediaKind === "video" ? (
+          <video src={src} style={mediaStyle} muted autoPlay loop playsInline preload="metadata" />
+        ) : (
+          <img src={src} alt="" draggable="false" style={mediaStyle} />
+        )}
       </div>
       <div className="booruVisualCropper__actions">
         <Button
           type="button"
           onClick={() => {
-            setLayout({
-              scale: Number(initialLayout?.scale || 1),
-              offsetX: Number(initialLayout?.offsetX || 0),
-              offsetY: Number(initialLayout?.offsetY || 0),
-            });
+            setLayout(normalizeLayout(initialLayout));
             onCancel?.();
           }}
           disabled={saving}

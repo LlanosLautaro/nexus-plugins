@@ -1,5 +1,14 @@
-import { Button, MetricCard, Notice, SectionPanel, StateBlock } from "../../../../../nexus-frontend/src/ui/index.js";
+import { Button, Field, MetricCard, Notice, SectionPanel, StateBlock } from "../../../../../nexus-frontend/src/ui/index.js";
 import { FolderIcon, RefreshIcon } from "../../icons.jsx";
+
+const React = window.React;
+const { useEffect, useState } = React;
+
+async function invoke(channel, payload) {
+  const response = await window.nexus.ipc.invoke(channel, payload);
+  if (!response?.ok) throw new Error(response?.error || "No se pudo actualizar las plataformas.");
+  return response.data;
+}
 
 
 export default function SettingsSection({
@@ -13,6 +22,48 @@ export default function SettingsSection({
   onOpenTrash,
   onOpenPath,
 }) {
+  const [platforms, setPlatforms] = useState([]);
+  const [platformName, setPlatformName] = useState("");
+  const [iconResourceId, setIconResourceId] = useState("");
+  const [resources, setResources] = useState([]);
+  const [platformError, setPlatformError] = useState("");
+  const loadPlatforms = async () => {
+    const result = await invoke("booru:list-social-platforms");
+    setPlatforms(Array.isArray(result?.items) ? result.items : []);
+  };
+  useEffect(() => { void loadPlatforms().catch((error) => setPlatformError(error.message)); }, []);
+  useEffect(() => {
+    void invoke("booru:list-resources", { section: "media", limit: 80 }).then((result) => {
+      setResources(Array.isArray(result?.items) ? result.items : []);
+    }).catch(() => setResources([]));
+  }, []);
+  const pasteIcon = async () => {
+    const tempFilePath = await window.nexus.clipboard.exportMediaToTempFile("booru-platform-icon");
+    const result = await invoke("booru:import-social-platform-icon", { tempFilePath });
+    setIconResourceId(result?.resource?.id || "");
+  };
+  const savePlatform = async () => {
+    const result = await invoke("booru:save-social-platform", { displayName: platformName, iconResourceId: iconResourceId || null });
+    if (result?.platform) {
+      setPlatformName("");
+      setIconResourceId("");
+      await loadPlatforms();
+    }
+  };
+  const importFileIcon = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file?.path) return;
+    const result = await invoke("booru:import-social-platform-icon-file", { sourcePath: file.path });
+    setIconResourceId(result?.resource?.id || "");
+    event.target.value = "";
+  };
+  const deletePlatform = async (platform) => {
+    const preview = await invoke("booru:delete-social-platform", { platformId: platform.id });
+    if (!preview?.affectedProfiles?.length || window.confirm(`Esta plataforma esta usada por: ${preview.affectedProfiles.map((item) => item.displayName).join(", ")}. Se eliminaran esos enlaces. Continuar?`)) {
+      await invoke("booru:delete-social-platform", { platformId: platform.id, confirmed: true });
+      await loadPlatforms();
+    }
+  };
   return (
     <div className="booruView__content booruView__content--metrics">
       <div className="booruView__metrics">
@@ -44,6 +95,36 @@ export default function SettingsSection({
             <span className="booruView__suggestionsHint">
               La busqueda principal ahora compone chips de tags y filtros estructurados; no busca por filename.
             </span>
+          </div>
+        </SectionPanel>
+
+        <SectionPanel className="booruView__panel">
+          <div className="booruView__statusStack">
+            <span className="booruView__groupLabel">Plataformas de redes</span>
+            <Field label="Nueva plataforma" className="booruView__field">
+              <div className="booruView__entityInputRow">
+                <input value={platformName} onChange={(event) => setPlatformName(event.target.value)} placeholder="Nombre de la red" />
+                <Button type="button" onClick={() => void pasteIcon()} title="Pegar icono desde portapapeles">Pegar icono</Button>
+                <label className="nexus-ui-button"><span>Elegir archivo</span><input type="file" accept="image/png,image/svg+xml,image/*" onChange={(event) => void importFileIcon(event)} hidden /></label>
+                <Button type="button" tone="primary" onClick={() => void savePlatform()} disabled={!platformName.trim()}>Guardar</Button>
+              </div>
+            </Field>
+            <Field label="O usar recurso existente" className="booruView__field">
+              <select value={iconResourceId} onChange={(event) => setIconResourceId(event.target.value)}>
+                <option value="">Sin icono</option>
+                {resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.originalFilename}</option>)}
+              </select>
+            </Field>
+            {iconResourceId ? <span className="booruView__suggestionsHint">Icono preparado desde recurso {iconResourceId.slice(0, 8)}.</span> : null}
+            {platformError ? <Notice tone="danger">{platformError}</Notice> : null}
+            <div className="booruView__tagRow">
+              {platforms.length ? platforms.map((platform) => (
+                <span key={platform.id} className="booruView__selectionChip">
+                  <span>{platform.displayName}{platform.profileCount ? ` (${platform.profileCount})` : ""}</span>
+                  <button type="button" className="booruView__selectionChipRemove" onClick={() => void deletePlatform(platform)} aria-label={`Eliminar ${platform.displayName}`}>x</button>
+                </span>
+              )) : <span className="booruView__suggestionsHint">Todavia no hay plataformas registradas.</span>}
+            </div>
           </div>
         </SectionPanel>
 

@@ -1,6 +1,6 @@
 import { StateBlock } from "../../../../../nexus-frontend/src/ui/index.js";
 const React = window.React;
-const { useEffect, useRef } = React;
+const { useEffect, useRef, useState } = React;
 
 
 export default function EntityProfileGalleryGrid({
@@ -15,6 +15,12 @@ export default function EntityProfileGalleryGrid({
   resourceGridColumns,
 }) {
   const sentinelRef = useRef(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  useEffect(() => {
+    const availableIds = new Set(items.map((item) => item.id));
+    setSelectedIds((current) => current.filter((id) => availableIds.has(id)));
+  }, [items]);
 
   useEffect(() => {
     if (!hasMore || loading || !sentinelRef.current || typeof IntersectionObserver !== "function") {
@@ -56,17 +62,30 @@ export default function EntityProfileGalleryGrid({
               "booruView__mediaCard",
               "booruView__mediaCard--static",
               canUseVisual(item) ? "booruView__mediaCard--contextual" : "",
+              selectedIds.includes(item.id) ? "is-multi-selected" : "",
             ].filter(Boolean).join(" ")}
             role="button"
             tabIndex={0}
-            onClick={() => onOpenResource?.(item, items)}
+            onClick={(event) => {
+              if (event.ctrlKey || event.metaKey) {
+                setSelectedIds((current) => current.includes(item.id)
+                  ? current.filter((id) => id !== item.id)
+                  : [...current, item.id]);
+                return;
+              }
+              onOpenResource?.(item, items);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
                 onOpenResource?.(item, items);
               }
             }}
-            onContextMenu={(event) => onContextMenu?.(item, event)}
+            onContextMenu={(event) => {
+              const contextIds = selectedIds.includes(item.id) ? selectedIds : [item.id];
+              if (!selectedIds.includes(item.id)) setSelectedIds([item.id]);
+              onContextMenu?.(item, event, contextIds);
+            }}
           >
             <div className="booruView__mediaCardPreview">
               <MediaPreview
@@ -76,8 +95,9 @@ export default function EntityProfileGalleryGrid({
                 thumbnail={item.thumbnail}
                 highPriority={absoluteIndex < resourceGridColumns}
                 preferOriginalWhenThumbnailMissing
-                autoplay={item.mediaKind === "video"}
+                autoplay={item.mediaKind === "video" && (Number(item.durationMs || 0) <= 60000 || Boolean(item.autoplayStoragePath))}
                 loop={item.mediaKind === "video"}
+                autoplayPath={item.autoplayStoragePath}
                 hoverPlayable={item.mediaKind === "gif"}
               />
             </div>

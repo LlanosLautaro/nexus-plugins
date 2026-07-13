@@ -17,11 +17,13 @@ export default function MediaThumbnail({
   hoverPlayable = false,
   mediaStyle = null,
   objectFit = "",
+  autoplayPath = "",
   toFileUrl,
   logger,
   mediaKindLabels,
 }) {
   const originalUrl = toFileUrl(pathValue);
+  const autoplayUrl = toFileUrl(autoplayPath);
   const isAnimatedImage = mediaKind === "gif" || /\.webp(?:$|[?#])/i.test(String(pathValue || ""));
   const [hoverActive, setHoverActive] = useState(false);
   const hoverTimerRef = useRef(0);
@@ -111,7 +113,7 @@ export default function MediaThumbnail({
           controls ? "is-interactive" : "",
           className,
         ].filter(Boolean).join(" ")}
-        src={originalUrl}
+        src={!controls && autoplay && autoplayUrl ? autoplayUrl : originalUrl}
         style={resolvedMediaStyle}
         muted={!controls || autoplay}
         playsInline

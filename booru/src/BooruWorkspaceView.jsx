@@ -11,6 +11,7 @@ import {
 import { createRendererDevLogger } from "../../../nexus-frontend/src/utils/devLog.js";
 import {
   AlertIcon,
+  DownloadIcon,
   FolderIcon,
   PulseIcon,
   RefreshIcon,
@@ -59,6 +60,7 @@ import RecommendationPanelComponent from "./components/recommendations/Recommend
 import ResourceInspectorComponent from "./components/resources/ResourceInspector.jsx";
 import EntityProfileViewComponent from "./components/entities/EntityProfileView.jsx";
 import EntityProfileDataTabComponent from "./components/entities/EntityProfileDataTab.jsx";
+import EntityProfileTagsTabComponent from "./components/entities/EntityProfileTagsTab.jsx";
 
 const ipcRenderer = window.nexus.ipc;
 const { pathToFileUrl } = window.nexus.urls;
@@ -102,6 +104,7 @@ const ENTITY_KIND_SECTION_MAP = Object.freeze({
 const ENTITY_PROFILE_TAB_OPTIONS = [
   { value: "gallery", label: "Galeria" },
   { value: "data", label: "Datos" },
+  { value: "tags", label: "Tags" },
 ];
 const CLASSIFICATION_SIDEBAR_SECTIONS = new Set(["media", "pending"]);
 const MEDIA_FILTER_OPTIONS = [
@@ -124,7 +127,6 @@ const RESOURCE_SEARCH_REALITY_SUGGESTIONS = [
   { id: "reality:ficticio", type: "reality", value: "ficticio", label: "Ficticio", detail: "Filtro de tipo" },
 ];
 const RESOURCE_SEARCH_MISSING_SUGGESTIONS = [
-  { id: "missing:type", type: "missing", value: "type", label: "Sin tipo", detail: "Faltante" },
   { id: "missing:author", type: "missing", value: "author", label: "Sin persona", detail: "Faltante" },
   { id: "missing:artist", type: "missing", value: "artist", label: "Sin artist", detail: "Faltante" },
   { id: "missing:character", type: "missing", value: "character", label: "Sin character", detail: "Faltante" },
@@ -229,11 +231,15 @@ function ResourceInspector(props) {
 }
 
 function EntityProfileView(props) {
-  return <EntityProfileViewComponent {...props} MediaPreview={MediaThumbnail} canUseVisual={canUseResourceAsEntityVisual} DataTab={EntityProfileDataTab} GalleryGrid={EntityProfileGalleryGrid} profileTabOptions={ENTITY_PROFILE_TAB_OPTIONS} resourceGridColumns={RESOURCE_GRID_COLUMNS} helpers={{ getInitials, entityKindLabels: BOORU_ENTITY_KIND_LABELS, isTextEntryElement, buildAvatarMediaStyle }} />;
+  return <EntityProfileViewComponent {...props} MediaPreview={MediaThumbnail} canUseVisual={canUseResourceAsEntityVisual} DataTab={EntityProfileDataTab} TagsTab={EntityProfileTagsTab} GalleryGrid={EntityProfileGalleryGrid} DownloadIcon={DownloadIcon} profileTabOptions={ENTITY_PROFILE_TAB_OPTIONS} resourceGridColumns={RESOURCE_GRID_COLUMNS} helpers={{ getInitials, entityKindLabels: BOORU_ENTITY_KIND_LABELS, isTextEntryElement, buildAvatarMediaStyle }} />;
 }
 
 function EntityProfileDataTab(props) {
-  return <EntityProfileDataTabComponent {...props} SingleEntityField={SingleEntityAutocompleteField} VisualCropper={EntityVisualCropper} helpers={{ formatDate, entityKindLabels: BOORU_ENTITY_KIND_LABELS }} />;
+  return <EntityProfileDataTabComponent {...props} SingleEntityField={SingleEntityAutocompleteField} helpers={{ formatDate, entityKindLabels: BOORU_ENTITY_KIND_LABELS }} />;
+}
+
+function EntityProfileTagsTab(props) {
+  return <EntityProfileTagsTabComponent {...props} TagField={TagAutocompleteField} />;
 }
 
 function normalizeSearchText(value) {
@@ -992,7 +998,6 @@ function getContextualMissingFilterOptions(realityValue, includeEntityFilters = 
     }));
   }
 
-  options.push({ value: "type", label: "Sin tipo" });
   return options.map((option) => ({
     ...option,
     disabled: option.value !== NO_MISSING_FILTER && disabledValues.has(option.value),
@@ -1261,7 +1266,8 @@ function normalizeEntityProfileInput(value, sectionKind = null) {
 
   const kind = String(value?.kind || "").trim();
   const id = String(value?.id || "").trim();
-  const tab = String(value?.tab || "").trim() === "data" ? "data" : "gallery";
+  const requestedTab = String(value?.tab || "").trim();
+  const tab = ["gallery", "data", "tags"].includes(requestedTab) ? requestedTab : "gallery";
 
   if (!kind || !id || !ENTITY_KIND_SECTION_MAP[kind]) {
     return null;
@@ -1317,14 +1323,18 @@ function buildContextResourceFromDescriptor(descriptor) {
   const resourceId = String(descriptor?.sampleResourceId || descriptor?.id || "").trim();
   const previewPath = String(descriptor?.sampleStoragePath || descriptor?.cardPreviewPath || "").trim();
   const storagePath = String(
-    descriptor?.storagePath
+    descriptor?.originalStoragePath
+    || descriptor?.cardOriginalStoragePath
+    || descriptor?.storagePath
     || descriptor?.cardStoragePath
     || descriptor?.sampleStoragePath
     || descriptor?.cardPreviewPath
     || "",
   ).trim();
   const mediaKind = String(
-    descriptor?.sampleMediaKind
+    descriptor?.originalMediaKind
+    || descriptor?.cardOriginalMediaKind
+    || descriptor?.sampleMediaKind
     || descriptor?.cardMediaKind
     || descriptor?.mediaKind
     || "",
@@ -1820,7 +1830,7 @@ function createResourceSearchTokenFromFragment(fragment) {
 }
 
 function buildAvatarMediaStyle(layout) {
-  const scale = Number(layout?.scale || 1);
+  const scale = Math.min(4, Math.max(0.2, Number(layout?.scale || 1)));
   const offsetX = Number(layout?.offsetX || 0);
   const offsetY = Number(layout?.offsetY || 0);
 
@@ -1844,7 +1854,6 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const [resourceMediaKindFilter, setResourceMediaKindFilter] = useState("all");
   const [resourceRealityFilter, setResourceRealityFilter] = useState("all");
   const [resourcePendingMode, setResourcePendingMode] = useState("essential");
-  const [resourceMissingFilter, setResourceMissingFilter] = useState(NO_MISSING_FILTER);
   const [resourceState, setResourceState] = useState({
     items: [],
     totalCount: 0,
@@ -1870,6 +1879,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const [customDragState, setCustomDragState] = useState(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [resourceHeroState, setResourceHeroState] = useState(null);
+  const [entityVisualCropState, setEntityVisualCropState] = useState(null);
   const [clipboardAssociationState, setClipboardAssociationState] = useState(null);
   const hoveredEntityRef = useRef(null);
   const activeSection = getActiveSection(input);
@@ -1897,21 +1907,15 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     mediaKindFilter: showClassificationSidebar ? resourceMediaKindFilter : "all",
     realityFilter: showClassificationSidebar ? resourceRealityFilter : "all",
     pendingMode: activeResourceSection === "pending" ? resourcePendingMode : "essential",
-    missingFilter: showClassificationSidebar ? resourceMissingFilter : NO_MISSING_FILTER,
+    missingFilter: NO_MISSING_FILTER,
   }), [
     activeResourceSection,
     resourceMediaKindFilter,
-    resourceMissingFilter,
     resourcePendingMode,
     resourceRealityFilter,
     normalizedResourceSearchTokens,
     showClassificationSidebar,
   ]);
-  const activeRealityFilter = resourceQuery?.reality || null;
-  const contextualMissingFilterOptions = useMemo(
-    () => getContextualMissingFilterOptions(activeRealityFilter, resourceQuery?.includeEntities),
-    [activeRealityFilter, resourceQuery?.includeEntities],
-  );
   const resourceQuerySignature = JSON.stringify(resourceQuery || {});
   const entityProfileKey = getEntityProfileKey(activeEntityProfile);
   const entityThumbnailPrimingEnabled = showEntityProfile && activeEntityProfile?.tab !== "data";
@@ -2077,9 +2081,9 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       return;
     }
 
-    if (activeResourceSection === "media") {
-      mediaLoadMoreLockedRef.current = false;
-    }
+    // Every resource section is incremental. A section/query transition must
+    // always release the paging lock, not only the historical Media surface.
+    mediaLoadMoreLockedRef.current = false;
 
     setResourcePageState((currentValue) => {
       const currentSectionState = currentValue[activeResourceSection];
@@ -2610,6 +2614,25 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   ]);
 
   useEffect(() => {
+    if (!showResourceWorkspace || !activeResourceSection || currentResourcePageMatchesQuery) {
+      return;
+    }
+
+    setResourcePageState((currentValue) => ({
+      ...currentValue,
+      [activeResourceSection]: {
+        page: 1,
+        querySignature: resourceQuerySignature,
+      },
+    }));
+  }, [
+    activeResourceSection,
+    currentResourcePageMatchesQuery,
+    resourceQuerySignature,
+    showResourceWorkspace,
+  ]);
+
+  useEffect(() => {
     if (!showEntityProfile) {
       return;
     }
@@ -2671,15 +2694,18 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           },
         );
         if (showResourceWorkspace) {
-          if (activeResourceSection === "media") {
-            setResourcePageForSection(activeResourceSection, 1);
-            void loadResources({ requestedPage: 1 });
-          } else {
-            void loadResources({ requestedPage: currentResourcePage });
-          }
+          // Imports are sorted into the newest edge of every resource queue.
+          // Reloading a later incremental page leaves that edge invisible,
+          // most noticeably in Pendientes after a newly downloaded file.
+          setResourcePageForSection(activeResourceSection, 1);
+          void loadResources({ requestedPage: 1 });
         }
         if (showEntityProfile && activeEntityProfile?.tab !== "data") {
-          void loadEntityProfileGallery({ requestedPage: currentEntityProfilePage });
+          // A watcher import belongs at the newest edge of this gallery. Reset
+          // its incremental cursor before reloading so the newly associated
+          // fast-classification resource is visible without reopening the profile.
+          setEntityProfilePageForSection(activeSection, 1);
+          void loadEntityProfileGallery({ requestedPage: 1 });
         }
         if (showEntityProfile) {
           void loadEntityProfile();
@@ -2999,21 +3025,6 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   }, [resourceHeroState]);
   const selectedResourceIdsSignature = selectedResources.map((resource) => resource.id).join("|");
   const showInspector = showResourceWorkspace && inspectorOpen && selectedResources.length > 0;
-
-  useEffect(() => {
-    if (!showClassificationSidebar) {
-      return;
-    }
-
-    const allowedFilterValues = new Set(
-      contextualMissingFilterOptions
-        .filter((option) => !option.disabled)
-        .map((option) => option.value),
-    );
-    setResourceMissingFilter((currentValue) => (
-      allowedFilterValues.has(currentValue) ? currentValue : NO_MISSING_FILTER
-    ));
-  }, [contextualMissingFilterOptions, showClassificationSidebar]);
 
   const consumeSuppressedResourceClick = useCallback(() => {
     if (!suppressNextResourceClickRef.current) {
@@ -3666,7 +3677,12 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     }
 
     mediaLoadMoreLockedRef.current = true;
-    setResourcePageForSection(activeResourceSection, currentResourcePage + 1);
+    const nextPage = currentResourcePage + 1;
+    setResourcePageForSection(activeResourceSection, nextPage);
+    // Do not depend exclusively on the page-state effect to start this
+    // request. A runtime invalidation can replace that state in the same
+    // render turn, leaving the grid stuck after its first loaded page.
+    void loadResources({ requestedPage: nextPage });
   };
 
   const setEntityProfilePageForSection = (section, nextPage) => {
@@ -3931,8 +3947,8 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     });
   };
 
-  const openEntityProfileResourceContextMenu = (item, event) => {
-    if (!showEntityProfile || !activeEntityKind || !activeEntityProfile?.id || !canUseResourceAsEntityVisual(item)) {
+  const openEntityProfileResourceContextMenu = (item, event, selectedIds = [item?.id]) => {
+    if (!showEntityProfile || !activeEntityKind || !activeEntityProfile?.id || !item?.id) {
       return;
     }
 
@@ -3947,10 +3963,13 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           { id: "copy", label: "Copiar al portapapeles" },
           { id: "google", label: "Buscar en Google" },
         ] : []),
-        { id: "set-avatar", label: "Usar como perfil" },
-        { id: "set-banner", label: "Usar como banner" },
+        ...(canUseResourceAsEntityVisual(item) ? [
+          { id: "set-avatar", label: "Usar como perfil" },
+          { id: "set-banner", label: "Usar como banner" },
+        ] : []),
+        { id: "disassociate-profile", label: selectedIds.length > 1 ? "Desasociar seleccion de esta entidad" : "Desasociar de esta entidad" },
       ],
-      resourceIds: [item.id],
+      resourceIds: uniqueIds(selectedIds),
       resources: [item],
       entityKind: activeEntityKind,
       entityId: activeEntityProfile.id,
@@ -3988,10 +4007,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     });
   };
 
-  const openEntityProfileVisualContextMenu = (descriptor, event) => {
+  const openEntityProfileVisualContextMenu = (visualRole, descriptor, event) => {
     const contextResource = buildContextResourceFromDescriptor(descriptor);
 
-    if (!contextResource || !canUseResourceForImageActions(contextResource)) {
+    if (!contextResource) {
       return;
     }
 
@@ -4002,11 +4021,17 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       x: event.clientX,
       y: event.clientY,
       items: [
-        { id: "copy", label: "Copiar al portapapeles" },
-        { id: "google", label: "Buscar en Google" },
+        ...(canUseResourceForImageActions(contextResource) ? [
+          { id: "copy", label: "Copiar al portapapeles" },
+          { id: "google", label: "Buscar en Google" },
+        ] : []),
+        { id: "adjust-visual", label: "Ajustar" },
       ],
       resourceIds: [contextResource.id],
       resources: [contextResource],
+      visualRole,
+      entityKind: activeEntityKind,
+      entityId: activeEntityProfile?.id,
     });
   };
 
@@ -4026,10 +4051,14 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
 
   const handleContextMenuAction = async (actionId) => {
     const contextResources = getContextSelectionResources();
-    const contextIds = contextResources.map((resource) => resource.id);
+    const contextIds = uniqueIds([
+      ...(Array.isArray(contextMenuState?.resourceIds) ? contextMenuState.resourceIds : []),
+      ...contextResources.map((resource) => resource.id),
+    ]);
     const singleResource = contextResources.length === 1 ? contextResources[0] : null;
     const contextEntityKind = String(contextMenuState?.entityKind || "").trim();
     const contextEntityId = String(contextMenuState?.entityId || "").trim();
+    const contextVisualRole = String(contextMenuState?.visualRole || "").trim();
     setContextMenuState(null);
 
     try {
@@ -4045,6 +4074,33 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           setEntityProfile(result.profile);
         }
         setEntityProfileError("");
+        return;
+      }
+
+      if (actionId === "adjust-visual" && singleResource && contextEntityKind && contextEntityId && (contextVisualRole === "avatar" || contextVisualRole === "banner")) {
+        setEntityVisualCropState({
+          kind: contextEntityKind,
+          entityId: contextEntityId,
+          role: contextVisualRole,
+          source: { pathValue: singleResource.storagePath, mediaKind: singleResource.mediaKind },
+          initialLayout: entityProfile?.visualSettings?.[contextVisualRole] || null,
+        });
+        return;
+      }
+
+      if (actionId === "disassociate-profile" && contextEntityKind && contextEntityId && contextIds.length) {
+        setEntityBusy(true);
+        const result = await invoke("booru:disassociate-resources-from-entity", {
+          kind: contextEntityKind,
+          entityId: contextEntityId,
+          resourceIds: contextIds,
+        });
+        if (result?.profile) setEntityProfile(result.profile);
+        setEntityProfileGalleryState((current) => ({
+          ...current,
+          items: (current?.items || []).filter((item) => !contextIds.includes(item.id)),
+        }));
+        setEntityRevision((current) => current + 1);
         return;
       }
 
@@ -4101,6 +4157,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           : "No se pudo ejecutar la accion contextual.",
       );
     } finally {
+      setEntityBusy(false);
       setBusyAction("");
     }
   };
@@ -4740,7 +4797,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       return;
     }
 
-    const normalizedTab = nextTab === "data" ? "data" : "gallery";
+    const normalizedTab = ["gallery", "data", "tags"].includes(nextTab) ? nextTab : "gallery";
     void ctx.openView({
       viewId: BOORU_WORKSPACE_VIEW_ID,
       reuse: true,
@@ -4920,17 +4977,6 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                             />
                           </div>
 
-                          <div className="booruView__filterGroup">
-                            <span className="booruView__groupLabel">Faltantes</span>
-                            <SegmentedControl
-                              className="booruView__filterSegmented"
-                              variant="compact"
-                              options={contextualMissingFilterOptions}
-                              value={resourceMissingFilter}
-                              onChange={(value) => setResourceMissingFilter(value || NO_MISSING_FILTER)}
-                              ariaLabel="Filtro de faltantes"
-                            />
-                          </div>
                         </div>
                       ) : null}
 
@@ -5093,6 +5139,16 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                       onRestore={handleRestoreSelected}
                       onPurge={handlePurgeSelected}
                       onClose={() => setInspectorOpen(false)}
+                      onExcludeTag={async (tag) => {
+                        if (!activeResource?.id || !tag?.id) return;
+                        const result = await invoke("booru:exclude-resource-tag", { resourceId: activeResource.id, tagId: tag.id });
+                        if (result?.resource?.id) {
+                          setResourceState((current) => ({
+                            ...current,
+                            items: (current?.items || []).map((item) => item.id === result.resource.id ? result.resource : item),
+                          }));
+                        }
+                      }}
                     />
                   ) : null}
                 </div>
@@ -5203,6 +5259,18 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           MediaPreview={MediaThumbnail}
           mediaKindLabels={BOORU_MEDIA_KIND_LABELS}
         />
+        {entityVisualCropState ? (
+          <div className="booruView__cropOverlay">
+            <EntityVisualCropper
+              {...entityVisualCropState}
+              onSaved={(profile) => {
+                if (profile) setEntityProfile(profile);
+                setEntityVisualCropState(null);
+              }}
+              onCancel={() => setEntityVisualCropState(null)}
+            />
+          </div>
+        ) : null}
         <BooruDragPreviewLayer
           resourcesById={dragPreviewResourcesById}
           customDragState={customDragState}

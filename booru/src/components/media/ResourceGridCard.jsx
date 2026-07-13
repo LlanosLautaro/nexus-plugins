@@ -163,8 +163,9 @@ export default function ResourceGridCard({
           thumbnail={item.thumbnail}
           highPriority={absoluteIndex < defaultColumns || selected}
           preferOriginalWhenThumbnailMissing
-          autoplay={item.mediaKind === "video"}
+          autoplay={item.mediaKind === "video" && (Number(item.durationMs || 0) <= 60000 || Boolean(item.autoplayStoragePath))}
           loop={item.mediaKind === "video"}
+          autoplayPath={item.autoplayStoragePath}
           hoverPlayable={item.mediaKind === "gif"}
         />
       </div>
