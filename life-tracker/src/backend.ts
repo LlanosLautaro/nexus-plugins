@@ -32,6 +32,39 @@ import trainingBackendPlugin, {
 export { buildTrainingManagedDocAssets };
 
 const LIFE_TRACKER_HABITS_CHANNEL_PREFIX = "life-tracker:habits";
+const LIFE_TRACKER_SETTINGS_STATE_KEY = "plugins.settings.nexus.life-tracker";
+const LEGACY_HABITS_SETTINGS_STATE_KEY = "plugins.settings.nexus.habitos";
+const LIFE_TRACKER_CANVAS_STATE_KEY = "lifeTrackerCanvases";
+const LEGACY_DASHBOARD_LAYOUTS_KEY = "dashboardLayouts";
+const LEGACY_CANVAS_WIDGET_IDS = ["daily-queue", "habit-outcome", "upcoming-tasks"];
+
+const LEGACY_DASHBOARD_DEFAULT_LAYOUTS = {
+  lg: [
+    { i: "daily-queue", x: 0, y: 0, w: 8, h: 13 },
+    { i: "habit-outcome", x: 8, y: 0, w: 4, h: 7 },
+    { i: "upcoming-tasks", x: 8, y: 7, w: 4, h: 6 },
+  ],
+  md: [
+    { i: "daily-queue", x: 0, y: 0, w: 6, h: 13 },
+    { i: "habit-outcome", x: 6, y: 0, w: 4, h: 7 },
+    { i: "upcoming-tasks", x: 6, y: 7, w: 4, h: 6 },
+  ],
+  sm: [
+    { i: "daily-queue", x: 0, y: 0, w: 6, h: 12 },
+    { i: "habit-outcome", x: 0, y: 12, w: 3, h: 6 },
+    { i: "upcoming-tasks", x: 3, y: 12, w: 3, h: 6 },
+  ],
+  xs: [
+    { i: "daily-queue", x: 0, y: 0, w: 4, h: 11 },
+    { i: "habit-outcome", x: 0, y: 11, w: 4, h: 6 },
+    { i: "upcoming-tasks", x: 0, y: 17, w: 4, h: 6 },
+  ],
+  xxs: [
+    { i: "daily-queue", x: 0, y: 0, w: 2, h: 10 },
+    { i: "habit-outcome", x: 0, y: 10, w: 2, h: 6 },
+    { i: "upcoming-tasks", x: 0, y: 16, w: 2, h: 6 },
+  ],
+} as const;
 
 function createSuccess(data: unknown) {
   return {
@@ -49,6 +82,95 @@ function createError(error: unknown, fallbackMessage: string) {
 
 function getSqlite(ctx: NexusBackendPluginContext) {
   return ctx.requireRepositories().sqlite;
+}
+
+function sameLayoutPosition(left: any, right: any) {
+  return Number(left?.x) === Number(right?.x)
+    && Number(left?.y) === Number(right?.y)
+    && Number(left?.w) === Number(right?.w)
+    && Number(left?.h) === Number(right?.h);
+}
+
+function migrateLegacyCanvasLayoutSync(sqlite: any) {
+  const rows = sqlite.prepare(
+    "SELECT key, value FROM States WHERE key IN (?, ?)",
+  ).all(LIFE_TRACKER_SETTINGS_STATE_KEY, LEGACY_HABITS_SETTINGS_STATE_KEY) as Array<{
+    key: string;
+    value: string | null;
+  }>;
+  const settingsByKey = new Map(rows.map((row) => {
+    try {
+      return [row.key, row.value ? JSON.parse(row.value) : null] as const;
+    } catch {
+      return [row.key, null] as const;
+    }
+  }));
+  const currentSettings = settingsByKey.get(LIFE_TRACKER_SETTINGS_STATE_KEY);
+  const legacySettings = settingsByKey.get(LEGACY_HABITS_SETTINGS_STATE_KEY);
+  const currentCanvasState = currentSettings?.[LIFE_TRACKER_CANVAS_STATE_KEY];
+  const legacyLayouts = legacySettings?.[LEGACY_DASHBOARD_LAYOUTS_KEY];
+
+  if (!currentCanvasState?.layouts || !legacyLayouts || typeof legacyLayouts !== "object") {
+    return;
+  }
+
+  let shouldRecover = false;
+  for (const [breakpoint, defaults] of Object.entries(LEGACY_DASHBOARD_DEFAULT_LAYOUTS)) {
+    const currentItems = Array.isArray(currentCanvasState.layouts[breakpoint])
+      ? currentCanvasState.layouts[breakpoint]
+      : [];
+    const legacyItems = Array.isArray(legacyLayouts[breakpoint])
+      ? legacyLayouts[breakpoint]
+      : [];
+    const currentById = new Map(currentItems.map((item: any) => [item?.i, item]));
+    const legacyById = new Map(legacyItems.map((item: any) => [item?.i, item]));
+
+    for (const defaultItem of defaults) {
+      const currentItem = currentById.get(defaultItem.i);
+      const legacyItem = legacyById.get(defaultItem.i);
+      if (!sameLayoutPosition(currentItem, defaultItem)) {
+        return;
+      }
+      if (!sameLayoutPosition(legacyItem, defaultItem)) {
+        shouldRecover = true;
+      }
+    }
+  }
+
+  if (!shouldRecover) {
+    return;
+  }
+
+  const recoveredLayouts = Object.fromEntries(
+    Object.entries(currentCanvasState.layouts).map(([breakpoint, currentItems]) => {
+      const legacyItems = Array.isArray(legacyLayouts[breakpoint]) ? legacyLayouts[breakpoint] : [];
+      const legacyById = new Map(legacyItems.map((item: any) => [item?.i, item]));
+      return [
+        breakpoint,
+        (Array.isArray(currentItems) ? currentItems : []).map((currentItem: any) => {
+          if (!LEGACY_CANVAS_WIDGET_IDS.includes(currentItem?.i)) {
+            return currentItem;
+          }
+
+          const legacyItem = legacyById.get(currentItem.i);
+          return legacyItem
+            ? { ...currentItem, ...legacyItem, i: currentItem.i, resizeHandles: currentItem.resizeHandles }
+            : currentItem;
+        }),
+      ];
+    }),
+  );
+  const nextSettings = {
+    ...currentSettings,
+    [LIFE_TRACKER_CANVAS_STATE_KEY]: {
+      ...currentCanvasState,
+      layouts: recoveredLayouts,
+    },
+  };
+
+  sqlite.prepare(
+    "UPDATE States SET value = ?, updatedAt = ? WHERE key = ?",
+  ).run(JSON.stringify(nextSettings), nowIso(), LIFE_TRACKER_SETTINGS_STATE_KEY);
 }
 
 function resolveViewDate(dateValue: unknown) {
@@ -93,6 +215,7 @@ const lifeTrackerBackendPlugin: NexusBackendPluginModule = {
     ensureHabitosSchema(getSqlite(ctx));
     financeBackendPlugin.ensureSchema?.(ctx);
     trainingBackendPlugin.ensureSchema?.(ctx);
+    migrateLegacyCanvasLayoutSync(getSqlite(ctx));
   },
 
   activate(ctx) {

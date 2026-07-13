@@ -372,6 +372,11 @@ function writeLifeTrackerCanvasState(settingsValue, canvasState) {
   };
 }
 
+function hasSameCanvasLayouts(leftCanvasState, rightCanvasState) {
+  return JSON.stringify(leftCanvasState?.layouts || {})
+    === JSON.stringify(rightCanvasState?.layouts || {});
+}
+
 function hasPluginSettingsOverrides(value, defaults = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
@@ -2640,6 +2645,7 @@ export default function LifeTrackerView({ ctx, input = null }) {
   const [manualEditableOccurrenceIds, setManualEditableOccurrenceIds] = useState([]);
   const [viewDate, setViewDate] = useState(systemToday);
   const viewDatePickerRef = useRef(null);
+  const canvasMigrationSettingsPromiseRef = useRef(null);
   const lastHabitStepIndex = HABIT_EDITOR_STEPS.length - 1;
   const managedCategories = useMemo(
     () => buildManagedHabitCategories(home.categoryCatalog, presetCategoryOverrides),
@@ -2685,13 +2691,96 @@ export default function LifeTrackerView({ ctx, input = null }) {
   }, [categoryMenu, queueMenu]);
 
   useEffect(() => {
-    const hasCurrentCanvasState = Boolean(readLifeTrackerCanvasState(pluginSettings));
-    if (hasCurrentCanvasState || !migratedCanvasState) {
+    if (!canvasWidgetProviders.length) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let settingsPromise = canvasMigrationSettingsPromiseRef.current;
+    if (!settingsPromise) {
+      settingsPromise = Promise.all([ctx.settings.get(), legacyHabitsSettingsApi.get()]);
+      canvasMigrationSettingsPromiseRef.current = settingsPromise;
+    }
+
+    void settingsPromise
+      .then(([currentSettings, legacySettings]) => {
+        if (cancelled) {
+          return;
+        }
+
+        const currentCanvasState = readLifeTrackerCanvasState(currentSettings);
+        const legacyLayouts = readHabitosDashboardLayouts(legacySettings);
+        const canvasOptions = {
+          breakpoints: HABITOS_DASHBOARD_BREAKPOINTS,
+          colsByBreakpoint: HABITOS_DASHBOARD_COLS,
+        };
+        const defaultCanvasState = createCanvasStateFromLegacyLayouts(
+          null,
+          canvasWidgetProviders,
+          canvasOptions,
+        );
+        const legacyCanvasState = createCanvasStateFromLegacyLayouts(
+          legacyLayouts,
+          canvasWidgetProviders,
+          canvasOptions,
+        );
+        const hasLegacyCustomLayout = !hasSameCanvasLayouts(legacyCanvasState, defaultCanvasState);
+        const needsInitialMigration = !currentCanvasState;
+        const needsLegacyRecovery = hasLegacyCustomLayout
+          && hasSameCanvasLayouts(currentCanvasState, defaultCanvasState);
+
+        if (!needsInitialMigration && !needsLegacyRecovery) {
+          return;
+        }
+
+        return ctx.settings.set(
+          writeLifeTrackerCanvasState(currentSettings, legacyCanvasState),
+        );
+      })
+      .catch((migrationError) => {
+        if (canvasMigrationSettingsPromiseRef.current === settingsPromise) {
+          canvasMigrationSettingsPromiseRef.current = null;
+        }
+        if (!cancelled) {
+          console.warn("[life-tracker] No se pudo migrar el layout del lienzo:", migrationError);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canvasWidgetProviders, ctx.settings, legacyHabitsSettingsApi]);
+
+  useEffect(() => {
+    const currentCanvasState = readLifeTrackerCanvasState(pluginSettings);
+    if (!currentCanvasState || !canvasWidgetProviders.length) {
       return;
     }
 
-    void ctx.settings.set(writeLifeTrackerCanvasState(pluginSettings, migratedCanvasState));
-  }, [ctx.settings, migratedCanvasState, pluginSettings]);
+    const canvasOptions = {
+      breakpoints: HABITOS_DASHBOARD_BREAKPOINTS,
+      colsByBreakpoint: HABITOS_DASHBOARD_COLS,
+    };
+    const defaultCanvasState = createCanvasStateFromLegacyLayouts(
+      null,
+      canvasWidgetProviders,
+      canvasOptions,
+    );
+    const legacyCanvasState = createCanvasStateFromLegacyLayouts(
+      readHabitosDashboardLayouts(legacyHabitsSettings),
+      canvasWidgetProviders,
+      canvasOptions,
+    );
+    const hasLegacyCustomLayout = !hasSameCanvasLayouts(legacyCanvasState, defaultCanvasState);
+    const needsLegacyRecovery = hasLegacyCustomLayout
+      && hasSameCanvasLayouts(currentCanvasState, defaultCanvasState);
+
+    if (needsLegacyRecovery) {
+      void ctx.settings.set(
+        writeLifeTrackerCanvasState(pluginSettings, legacyCanvasState),
+      );
+    }
+  }, [canvasWidgetProviders, ctx.settings, legacyHabitsSettings, pluginSettings]);
 
   useEffect(() => {
     const baseSettings = pluginSettings && typeof pluginSettings === "object" ? pluginSettings : {};
