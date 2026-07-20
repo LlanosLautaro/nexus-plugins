@@ -125,6 +125,11 @@ type ThumbnailStatus = "pending" | "ready" | "error";
 type MediaInfoStatus = "pending" | "ready" | "error";
 
 type RuntimeState = {
+  generation: string;
+  shuttingDown: boolean;
+  abortController: AbortController;
+  childProcesses: Set<any>;
+  backgroundTasks: Set<Promise<unknown>>;
   ctx: NexusBackendPluginContext;
   storageRoot: string;
   catalogPath: string;
@@ -413,6 +418,13 @@ const booruBackendLogger = createDevLogger("backend.plugins.booru");
 
 let runtimeState: RuntimeState | null = null;
 
+class BooruRuntimeCancelledError extends Error {
+  constructor() {
+    super("El runtime de Booru fue cancelado.");
+    this.name = "BooruRuntimeCancelledError";
+  }
+}
+
 function createSuccess(data: unknown) {
   return {
     ok: true,
@@ -462,10 +474,55 @@ function logBackendDuration(
   });
 }
 
-function scheduleRuntimeInvalidation(...keys: RuntimeInvalidationKey[]) {
-  const state = runtimeState;
+function isRuntimeStateActive(
+  state: RuntimeState | null | undefined,
+): state is RuntimeState {
+  return Boolean(
+    isRuntimeStateCurrent(state) &&
+    !state.shuttingDown &&
+    !state.abortController.signal.aborted,
+  );
+}
 
-  if (!state) {
+function isRuntimeStateCurrent(
+  state: RuntimeState | null | undefined,
+): state is RuntimeState {
+  return Boolean(state && runtimeState === state && state.db);
+}
+
+function assertRuntimeStateActive(state: RuntimeState) {
+  if (!isRuntimeStateActive(state)) {
+    throw new BooruRuntimeCancelledError();
+  }
+}
+
+function assertRuntimeStateCurrent(state: RuntimeState) {
+  if (!isRuntimeStateCurrent(state)) {
+    throw new BooruRuntimeCancelledError();
+  }
+}
+
+function isRuntimeCancellation(error: unknown) {
+  return (
+    error instanceof BooruRuntimeCancelledError ||
+    (error instanceof Error && error.name === "AbortError")
+  );
+}
+
+function trackRuntimeBackgroundTask<T>(state: RuntimeState, task: Promise<T>) {
+  const trackedTask = Promise.resolve(task) as Promise<unknown>;
+  state.backgroundTasks.add(trackedTask);
+  void trackedTask.finally(() => {
+    state.backgroundTasks.delete(trackedTask);
+  }).catch(() => undefined);
+  return task;
+}
+
+function scheduleRuntimeInvalidationForState(
+  state: RuntimeState | null | undefined,
+  ...keys: RuntimeInvalidationKey[]
+) {
+  if (!isRuntimeStateActive(state)) {
     return;
   }
 
@@ -484,25 +541,23 @@ function scheduleRuntimeInvalidation(...keys: RuntimeInvalidationKey[]) {
 
   state.invalidationDelayMs = desiredDelayMs;
   state.invalidationTimer = setTimeout(() => {
-    const nextState = runtimeState;
-
-    if (!nextState) {
+    if (!isRuntimeStateActive(state)) {
       return;
     }
 
-    const pendingKeys = Array.from(nextState.pendingInvalidations);
-    nextState.pendingInvalidations.clear();
-    nextState.invalidationTimer = null;
-    nextState.invalidationDelayMs = 0;
+    const pendingKeys = Array.from(state.pendingInvalidations);
+    state.pendingInvalidations.clear();
+    state.invalidationTimer = null;
+    state.invalidationDelayMs = 0;
 
     if (!pendingKeys.length) {
       return;
     }
 
-    const versionBase = `${Date.now()}-${nextState.invalidationVersion++}`;
+    const versionBase = `${Date.now()}-${state.invalidationVersion++}`;
 
     void Promise.all(
-      pendingKeys.map((key) => nextState.ctx.state.set(
+      pendingKeys.map((key) => state.ctx.state.set(
         BOORU_RUNTIME_STATE_KEYS[key],
         `${versionBase}:${key}`,
       )),
@@ -527,7 +582,11 @@ function scheduleRuntimeInvalidation(...keys: RuntimeInvalidationKey[]) {
           },
         );
       });
-  }, 40);
+  }, desiredDelayMs);
+}
+
+function scheduleRuntimeInvalidation(...keys: RuntimeInvalidationKey[]) {
+  scheduleRuntimeInvalidationForState(runtimeState, ...keys);
 }
 
 function withTransaction<T>(db: DatabaseSync, callback: () => T) {
@@ -2172,15 +2231,33 @@ function listThumbnailBacklogResourceIdsSync(db: DatabaseSync) {
   `).all().map((row: any) => String(row?.id || "")).filter(Boolean);
 }
 
-async function readSpawnedJson(command: string, args: string[]): Promise<SpawnedJsonExecutionResult> {
+async function readSpawnedJson(
+  state: RuntimeState,
+  command: string,
+  args: string[],
+): Promise<SpawnedJsonExecutionResult> {
+  assertRuntimeStateActive(state);
+
   return new Promise<any>((resolve, reject) => {
     const startedAt = performance.now();
     const child = spawn(command, args, {
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
+      signal: state.abortController.signal,
     });
+    state.childProcesses.add(child);
     let stdout = "";
     let stderr = "";
+    let settled = false;
+
+    const finish = (callback: () => void) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      state.childProcesses.delete(child);
+      callback();
+    };
 
     child.stdout?.on("data", (chunk) => {
       stdout += String(chunk || "");
@@ -2188,12 +2265,14 @@ async function readSpawnedJson(command: string, args: string[]): Promise<Spawned
     child.stderr?.on("data", (chunk) => {
       stderr += String(chunk || "");
     });
-    child.on("error", reject);
+    child.on("error", (error) => {
+      finish(() => reject(error));
+    });
     child.on("close", (code) => {
       const durationMs = Number((performance.now() - startedAt).toFixed(2));
 
       if (code !== 0) {
-        reject(Object.assign(
+        finish(() => reject(Object.assign(
           new Error(String(stderr || stdout || `El proceso termino con codigo ${code}.`).trim()),
           {
             args,
@@ -2203,12 +2282,12 @@ async function readSpawnedJson(command: string, args: string[]): Promise<Spawned
             stderr,
             stdout,
           },
-        ));
+        )));
         return;
       }
 
       try {
-        resolve({
+        const result = {
           args,
           command,
           data: JSON.parse(stdout || "{}"),
@@ -2216,9 +2295,10 @@ async function readSpawnedJson(command: string, args: string[]): Promise<Spawned
           exitCode: Number(code ?? 0),
           stderr,
           stdout,
-        });
+        };
+        finish(() => resolve(result));
       } catch (error: any) {
-        reject(Object.assign(
+        finish(() => reject(Object.assign(
           new Error(`El worker de Booru devolvio JSON invalido. ${error?.message || ""}`.trim()),
           {
             args,
@@ -2228,7 +2308,7 @@ async function readSpawnedJson(command: string, args: string[]): Promise<Spawned
             stderr,
             stdout,
           },
-        ));
+        )));
       }
     });
   });
@@ -2277,7 +2357,7 @@ async function runThumbnailWorkerForResource(state: RuntimeState, resource: any)
   await fsp.mkdir(path.dirname(outputPaths.webpPath), { recursive: true });
   await fsp.mkdir(path.dirname(shortPath), { recursive: true });
 
-  return readSpawnedJson(getWorkerPythonCommand(state), [
+  return readSpawnedJson(state, getWorkerPythonCommand(state), [
     workerPath,
     "--source-path",
     resource.storagePath,
@@ -2417,7 +2497,7 @@ function persistThumbnailErrorSync(
 function queueThumbnailGeneration(resourceIds: string[], priority: "high" | "low" = "low") {
   const state = runtimeState;
 
-  if (!state?.db) {
+  if (!isRuntimeStateActive(state)) {
     return;
   }
 
@@ -2466,7 +2546,7 @@ function queueThumbnailGeneration(resourceIds: string[], priority: "high" | "low
         sampleIds: summarizeIdsForLog(resourceIds),
       },
     );
-    scheduleRuntimeInvalidation("metricsVersion");
+    scheduleRuntimeInvalidationForState(state, "metricsVersion");
   }
 
   void pumpThumbnailQueue();
@@ -2491,9 +2571,7 @@ function dequeueNextThumbnailResourceId(state: RuntimeState) {
 }
 
 async function processThumbnailQueueEntry(state: RuntimeState, resourceId: string) {
-  if (!state.db) {
-    return;
-  }
+  assertRuntimeStateActive(state);
 
   const resource = getResourceByIdSync(state.db, resourceId);
 
@@ -2526,6 +2604,7 @@ async function processThumbnailQueueEntry(state: RuntimeState, resourceId: strin
 
   try {
     const workerExecution = await runThumbnailWorkerForResource(state, resource);
+    assertRuntimeStateActive(state);
     const workerResult = workerExecution.data;
     withTransaction(state.db, () => {
       persistThumbnailSuccessSync(state.db!, resourceId, resource.contentHash, workerResult);
@@ -2563,6 +2642,10 @@ async function processThumbnailQueueEntry(state: RuntimeState, resourceId: strin
       },
     );
   } catch (error: any) {
+    if (isRuntimeCancellation(error) || !isRuntimeStateActive(state)) {
+      return;
+    }
+
     const errorMessage =
       error instanceof Error ? error.message : "No se pudo generar la thumbnail de Booru.";
     withTransaction(state.db, () => {
@@ -2592,13 +2675,13 @@ async function processThumbnailQueueEntry(state: RuntimeState, resourceId: strin
     );
   }
 
-  scheduleRuntimeInvalidation("thumbnailsVersion");
+  scheduleRuntimeInvalidationForState(state, "thumbnailsVersion");
 }
 
 async function pumpThumbnailQueue() {
   const state = runtimeState;
 
-  if (!state?.db || !state.python.available) {
+  if (!isRuntimeStateActive(state) || !state.python.available) {
     return;
   }
 
@@ -2613,13 +2696,25 @@ async function pumpThumbnailQueue() {
     }
 
     state.thumbnailProcessingIds.add(nextResourceId);
-    scheduleRuntimeInvalidation("metricsVersion");
-    void processThumbnailQueueEntry(state, nextResourceId)
+    scheduleRuntimeInvalidationForState(state, "metricsVersion");
+    const task = processThumbnailQueueEntry(state, nextResourceId)
+      .catch((error) => {
+        if (!isRuntimeCancellation(error) && isRuntimeStateActive(state)) {
+          booruBackendLogger.error(
+            "booru.thumbnail.worker.unhandled",
+            "Booru encontro un error inesperado en la cola de thumbnails.",
+            { resourceId: nextResourceId, error },
+          );
+        }
+      })
       .finally(() => {
         state.thumbnailProcessingIds.delete(nextResourceId);
-        scheduleRuntimeInvalidation("metricsVersion");
-        void pumpThumbnailQueue();
+        scheduleRuntimeInvalidationForState(state, "metricsVersion");
+        if (isRuntimeStateActive(state)) {
+          void pumpThumbnailQueue();
+        }
       });
+    trackRuntimeBackgroundTask(state, task);
   }
 }
 
@@ -2627,6 +2722,11 @@ function createRuntimeState(ctx: NexusBackendPluginContext): RuntimeState {
   const storagePaths = getStoragePaths(ctx);
 
   return {
+    generation: crypto.randomUUID(),
+    shuttingDown: false,
+    abortController: new AbortController(),
+    childProcesses: new Set<any>(),
+    backgroundTasks: new Set<Promise<unknown>>(),
     ctx,
     storageRoot: storagePaths.storageRoot,
     catalogPath: storagePaths.catalogPath,
@@ -5583,6 +5683,7 @@ async function ingestFile(
   }
 
   const contentHash = await computeFileHash(absoluteFilePath);
+  assertRuntimeStateCurrent(state);
   const canonicalResource = getCanonicalResourceByHash(state.db, contentHash);
 
   if (canonicalResource && duplicateMode === "reuse-canonical") {
@@ -5614,8 +5715,10 @@ async function ingestFile(
     : (options.sourcePathOverride || null);
 
   await moveFile(absoluteFilePath, storagePath);
+  assertRuntimeStateCurrent(state);
 
   const fileStat = await fsp.stat(storagePath);
+  assertRuntimeStateCurrent(state);
   state.db.prepare(`
     INSERT INTO booru_resources (
       id,
@@ -5685,7 +5788,12 @@ async function ingestFile(
     state.watcherState.lastError = "";
   }
 
-  scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion", "watcherVersion");
+  scheduleRuntimeInvalidationForState(
+    state,
+    "resourcesVersion",
+    "entitiesVersion",
+    "watcherVersion",
+  );
 
   return {
     resource: getResourceByIdSync(state.db, resourceId),
@@ -5697,7 +5805,7 @@ async function ingestFile(
 function queueIngest(ctx: NexusBackendPluginContext, filePath: string) {
   const state = runtimeState;
 
-  if (!state) {
+  if (!isRuntimeStateActive(state)) {
     return;
   }
 
@@ -5709,29 +5817,33 @@ function queueIngest(ctx: NexusBackendPluginContext, filePath: string) {
 
   state.queuedPaths.add(absoluteFilePath);
   state.watcherState.pendingCount += 1;
-  scheduleRuntimeInvalidation("watcherVersion");
+  scheduleRuntimeInvalidationForState(state, "watcherVersion");
   state.queue = state.queue
-    .then(() => ingestFile(ctx, absoluteFilePath))
+    .then(() => {
+      assertRuntimeStateActive(state);
+      return ingestFile(ctx, absoluteFilePath);
+    })
     .catch((error) => {
+      if (isRuntimeCancellation(error) || !isRuntimeStateActive(state)) {
+        return;
+      }
       state.watcherState.lastError =
         error instanceof Error ? error.message : "No se pudo ingerir el archivo.";
-      scheduleRuntimeInvalidation("watcherVersion");
+      scheduleRuntimeInvalidationForState(state, "watcherVersion");
     })
     .finally(() => {
       state.queuedPaths.delete(absoluteFilePath);
       state.watcherState.pendingCount = Math.max(0, state.watcherState.pendingCount - 1);
-      scheduleRuntimeInvalidation("watcherVersion");
+      scheduleRuntimeInvalidationForState(state, "watcherVersion");
     });
 }
 
-async function stopWatcher() {
-  const state = runtimeState;
-
+async function stopWatcher(state: RuntimeState | null = runtimeState) {
   if (!state?.watcher) {
     if (state) {
       state.watcherState.active = false;
       state.watcherState.stage = "idle";
-      scheduleRuntimeInvalidation("watcherVersion");
+      scheduleRuntimeInvalidationForState(state, "watcherVersion");
     }
     return;
   }
@@ -5740,20 +5852,20 @@ async function stopWatcher() {
   state.watcher = null;
   state.watcherState.active = false;
   state.watcherState.stage = "idle";
-  scheduleRuntimeInvalidation("watcherVersion");
+  scheduleRuntimeInvalidationForState(state, "watcherVersion");
 }
 
 async function restartWatcher(
+  state: RuntimeState,
   ctx: NexusBackendPluginContext,
   settingsValue: Record<string, unknown>,
 ) {
-  const state = runtimeState;
-
-  if (!state) {
+  if (!isRuntimeStateActive(state)) {
     return;
   }
 
-  await stopWatcher();
+  await stopWatcher(state);
+  assertRuntimeStateActive(state);
   state.python = resolvePythonStatus(settingsValue);
   state.watcherState.watchedPath = readBooruWatchFolderPath(settingsValue);
   state.watcherState.lastError = "";
@@ -5762,7 +5874,7 @@ async function restartWatcher(
 
   if (!watchFolderPath) {
     state.watcherState.stage = "idle-no-folder";
-    scheduleRuntimeInvalidation("watcherVersion");
+    scheduleRuntimeInvalidationForState(state, "watcherVersion");
     return;
   }
 
@@ -5771,26 +5883,26 @@ async function restartWatcher(
     state.watcherState.lastError =
       state.python.error
       || "No se encontro Python para Booru. Configura pythonExecutable o asegurate de que python este disponible en PATH.";
-    scheduleRuntimeInvalidation("watcherVersion");
+    scheduleRuntimeInvalidationForState(state, "watcherVersion");
     return;
   }
 
   if (!fs.existsSync(watchFolderPath) || !fs.statSync(watchFolderPath).isDirectory()) {
     state.watcherState.stage = "blocked-folder";
     state.watcherState.lastError = "La carpeta vigilada no existe o no es una carpeta valida.";
-    scheduleRuntimeInvalidation("watcherVersion");
+    scheduleRuntimeInvalidationForState(state, "watcherVersion");
     return;
   }
 
   if (watchFolderPath.startsWith(state.storageRoot)) {
     state.watcherState.stage = "blocked-folder";
     state.watcherState.lastError = "La carpeta vigilada no puede apuntar al storage interno de Booru.";
-    scheduleRuntimeInvalidation("watcherVersion");
+    scheduleRuntimeInvalidationForState(state, "watcherVersion");
     return;
   }
 
   state.watcherState.stage = "starting";
-  scheduleRuntimeInvalidation("watcherVersion");
+  scheduleRuntimeInvalidationForState(state, "watcherVersion");
   state.watcher = chokidar.watch(watchFolderPath, {
     ignoreInitial: false,
     persistent: true,
@@ -5801,18 +5913,26 @@ async function restartWatcher(
   });
 
   state.watcher.on("add", (addedPath: string) => {
-    queueIngest(ctx, addedPath);
+    if (isRuntimeStateActive(state)) {
+      queueIngest(ctx, addedPath);
+    }
   });
   state.watcher.on("ready", () => {
+    if (!isRuntimeStateActive(state)) {
+      return;
+    }
     state.watcherState.active = true;
     state.watcherState.stage = "watching";
-    scheduleRuntimeInvalidation("watcherVersion");
+    scheduleRuntimeInvalidationForState(state, "watcherVersion");
   });
   state.watcher.on("error", (error: Error) => {
+    if (!isRuntimeStateActive(state)) {
+      return;
+    }
     state.watcherState.active = false;
     state.watcherState.stage = "error";
     state.watcherState.lastError = error instanceof Error ? error.message : "Error en el watcher de Booru.";
-    scheduleRuntimeInvalidation("watcherVersion");
+    scheduleRuntimeInvalidationForState(state, "watcherVersion");
   });
 }
 
@@ -5845,6 +5965,66 @@ function assertRuntimeDb() {
   return db;
 }
 
+async function drainRuntimeBackgroundWork(state: RuntimeState) {
+  state.abortController.abort();
+  state.thumbnailHighPriorityIds = [];
+  state.thumbnailLowPriorityIds = [];
+  state.thumbnailQueuedIds.clear();
+  state.fastClassification = null;
+
+  if (state.invalidationTimer) {
+    clearTimeout(state.invalidationTimer);
+    state.invalidationTimer = null;
+  }
+  state.pendingInvalidations.clear();
+
+  await stopWatcher(state);
+  await Promise.allSettled([state.queue]);
+
+  while (state.backgroundTasks.size) {
+    await Promise.allSettled([...state.backgroundTasks]);
+  }
+
+  for (const child of state.childProcesses) {
+    try {
+      child.kill();
+    } catch {
+      // El AbortController ya intento detener los procesos; un child cerrado no requiere mas trabajo.
+    }
+  }
+  state.childProcesses.clear();
+  state.thumbnailProcessingIds.clear();
+  state.queuedPaths.clear();
+  state.watcherState.pendingCount = 0;
+}
+
+async function shutdownRuntimeState(state: RuntimeState) {
+  if (state.shuttingDown) {
+    return;
+  }
+
+  const startedAt = performance.now();
+  state.shuttingDown = true;
+  await drainRuntimeBackgroundWork(state);
+
+  const db = state.db;
+  state.db = null;
+  db?.close();
+
+  if (runtimeState === state) {
+    runtimeState = null;
+  }
+
+  booruBackendLogger.info(
+    "booru.runtime.shutdown.done",
+    "Booru cerro su runtime despues de drenar trabajos asincronos.",
+    {
+      generation: state.generation,
+      durationMs: Number((performance.now() - startedAt).toFixed(2)),
+    },
+  );
+}
+
 const booruPlugin: NexusBackendPluginModule = {
   async ensureSchema(ctx: NexusBackendPluginContext) {
     const storagePaths = getStoragePaths(ctx);
@@ -5855,28 +6035,28 @@ const booruPlugin: NexusBackendPluginModule = {
   },
 
   async activate(ctx: NexusBackendPluginContext) {
-    runtimeState = createRuntimeState(ctx);
+    const state = createRuntimeState(ctx);
+    runtimeState = state;
     await ensureStoragePaths(getStoragePaths(ctx));
-    runtimeState.db = new DatabaseSync(runtimeState.catalogPath);
-    ensureCatalogSchema(runtimeState.db);
+    state.db = new DatabaseSync(state.catalogPath);
+    ensureCatalogSchema(state.db);
 
     const applySettings = async (settingsValue: Record<string, unknown>) => {
-      await restartWatcher(ctx, settingsValue);
-
-      if (runtimeState?.db) {
-        queueThumbnailGeneration(listThumbnailBacklogResourceIdsSync(runtimeState.db), "low");
+      if (!isRuntimeStateActive(state)) {
+        return;
       }
 
-      scheduleRuntimeInvalidation("watcherVersion");
+      await restartWatcher(state, ctx, settingsValue);
+
+      if (isRuntimeStateActive(state)) {
+        queueThumbnailGeneration(listThumbnailBacklogResourceIdsSync(state.db), "low");
+      }
+
+      scheduleRuntimeInvalidationForState(state, "watcherVersion");
     };
 
     ctx.registerCleanup(async () => {
-      await stopWatcher();
-      if (runtimeState?.invalidationTimer) {
-        clearTimeout(runtimeState.invalidationTimer);
-      }
-      runtimeState?.db?.close();
-      runtimeState = null;
+      await shutdownRuntimeState(state);
     });
 
     ctx.registerIpc("booru:get-snapshot", async () => {
@@ -6504,9 +6684,11 @@ const booruPlugin: NexusBackendPluginModule = {
 
     ctx.registerIpc("booru:restart-watcher", async () => {
       try {
+        const state = runtimeState;
+        assertRuntimeStateActive(state!);
         const settingsValue = await ctx.settings.get();
-        await restartWatcher(ctx, settingsValue);
-        scheduleRuntimeInvalidation("watcherVersion");
+        await restartWatcher(state!, ctx, settingsValue);
+        scheduleRuntimeInvalidationForState(state, "watcherVersion");
         return createSuccess(buildResourcesSnapshot(ctx, settingsValue));
       } catch (error) {
         return createError(error, "No se pudo reiniciar el watcher de Booru.");
@@ -6526,12 +6708,14 @@ const booruPlugin: NexusBackendPluginModule = {
 
     ctx.settings.subscribe(
       (settingsValue) => {
-        void applySettings(normalizeBooruSettings(settingsValue));
+        const task = applySettings(normalizeBooruSettings(settingsValue));
+        trackRuntimeBackgroundTask(state, task);
+        return task;
       },
       { emitCurrent: true },
     );
 
-    queueThumbnailGeneration(listThumbnailBacklogResourceIdsSync(runtimeState.db), "low");
+    queueThumbnailGeneration(listThumbnailBacklogResourceIdsSync(state.db), "low");
   },
 };
 
@@ -6568,6 +6752,7 @@ export const __booruTestUtils = {
   purgeResourcesSync,
   getResourceByIdSync,
   buildResourcesSnapshot,
+  drainRuntimeBackgroundWork,
 };
 
 export default booruPlugin;
