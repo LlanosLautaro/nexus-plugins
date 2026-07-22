@@ -1,4 +1,5 @@
 import { Button, SectionPanel, SegmentedControl } from "../../../../../nexus-frontend/src/ui/index.js";
+import EntityVisualMedia from "./EntityVisualMedia.jsx";
 const React = window.React;
 const { useEffect, useRef, useState } = React;
 export default function EntityProfileView({
@@ -7,12 +8,16 @@ export default function EntityProfileView({
   activeTab,
   galleryState,
   galleryLoading,
+  relationKind,
+  relationState,
+  relationLoading,
   onLoadMoreGallery,
+  onLoadMoreRelations,
   entityMutationBusy,
   universeCharacterCreateValue,
-  onBack,
   onTabChange,
-  onOpenInMedia,
+  onOpenRelatedEntity,
+  onRelatedEntityContextMenu,
   onUniverseCharacterCreateValueChange,
   onCreateCharacterInUniverse,
   onChangeCharacterUniverse,
@@ -26,43 +31,32 @@ export default function EntityProfileView({
   DataTab,
   TagsTab,
   GalleryGrid,
+  RelationsGrid,
   DownloadIcon,
   helpers,
   profileTabOptions,
   resourceGridColumns,
+  entityGridColumns,
+  scrollKey,
+  scrollTop = 0,
+  onScrollStateChange,
+  gallerySelectedIds,
+  onGallerySelectionChange,
+  onResourceColumnWheel,
+  onEntityColumnWheel,
+  onEntityHover,
+  onGroupAssociationHover,
 }) {
-  const { getInitials, entityKindLabels, isTextEntryElement, buildAvatarMediaStyle } = helpers;
+  const { getInitials, entityKindLabels, isTextEntryElement } = helpers;
   const entityProfileRootRef = useRef(null);
   const fastScopeRef = useRef(`booru-profile-${globalThis.crypto?.randomUUID?.() || Date.now()}`);
   const [fastClassificationActive, setFastClassificationActive] = useState(false);
-  const bannerSource = profile?.banner?.originalStoragePath || profile?.banner?.sampleStoragePath
-    ? {
-      pathValue: profile.banner.originalStoragePath || profile.banner.sampleStoragePath,
-      mediaKind: profile.banner.originalMediaKind || profile.banner.sampleMediaKind || "image",
-    }
-    : profile?.sample?.sampleStoragePath
-      ? {
-        pathValue: profile.sample.sampleStoragePath,
-        mediaKind: profile.sample.sampleMediaKind || "image",
-      }
-      : null;
-  const avatarSource = profile?.avatar?.originalStoragePath || profile?.avatar?.sampleStoragePath
-    ? {
-      pathValue: profile.avatar.originalStoragePath || profile.avatar.sampleStoragePath,
-      mediaKind: profile.avatar.originalMediaKind || profile.avatar.sampleMediaKind || "image",
-    }
-    : profile?.sample?.sampleStoragePath
-      ? {
-        pathValue: profile.sample.sampleStoragePath,
-        mediaKind: profile.sample.sampleMediaKind || "image",
-      }
-      : null;
+  const avatarVisual = profile?.visuals?.avatar || profile?.visual || null;
+  const bannerVisual = profile?.visuals?.banner || null;
   const profileMeta = [
     `${profile?.resourceCount || 0} recursos`,
     entityKindLabels[kind] || kind,
   ];
-  const avatarMediaStyle = buildAvatarMediaStyle(profile?.visualSettings?.avatar);
-  const bannerMediaStyle = buildAvatarMediaStyle(profile?.visualSettings?.banner);
 
   if (kind === "character" && profile?.universe?.displayName) {
     profileMeta.push(profile.universe.displayName);
@@ -71,6 +65,15 @@ export default function EntityProfileView({
   useEffect(() => {
     entityProfileRootRef.current?.focus();
   }, [kind, profile?.id]);
+
+  useEffect(() => {
+    const node = entityProfileRootRef.current;
+    if (!node) return undefined;
+    const frameId = window.requestAnimationFrame(() => {
+      node.scrollTop = Math.max(0, Number(scrollTop) || 0);
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [scrollKey, scrollTop]);
 
   useEffect(() => () => {
     void window.nexus.ipc.invoke("booru:clear-fast-classification", { scopeId: fastScopeRef.current });
@@ -117,61 +120,41 @@ export default function EntityProfileView({
         className="booruView__resourcePanelBody"
         tabIndex={-1}
         onKeyDownCapture={handleKeyDownCapture}
+        onScroll={(event) => onScrollStateChange?.(event.currentTarget.scrollTop || 0)}
       >
         <div className="booruView__resourcePanelContent booruView__entityProfileContent">
-          <div className="booruView__entityProfileToolbar">
-            <Button type="button" onClick={() => onBack?.()}>
-              Volver
-            </Button>
-            <Button type="button" tone="primary" onClick={() => onOpenInMedia?.()}>
-              Abrir en Media
-            </Button>
-          </div>
-
           <div className="booruView__entityProfileHero">
             <div
               className="booruView__entityProfileBanner"
-              onContextMenu={(event) => onVisualContextMenu?.("banner", profile?.banner || profile?.sample, event)}
+              onContextMenu={(event) => onVisualContextMenu?.("banner", bannerVisual, event)}
             >
-              {bannerSource ? (
-                <MediaPreview
-                  pathValue={bannerSource.pathValue}
-                  mediaKind={bannerSource.mediaKind}
-                  alt={profile?.displayName || ""}
-                  autoplay={bannerSource.mediaKind === "video"}
-                  loop={bannerSource.mediaKind === "video"}
-                  objectFit="contain"
-                  mediaStyle={bannerMediaStyle}
-                  forceOriginal
-                />
-              ) : (
-                <div className="booruView__entityProfileBannerFallback">
-                  <span>{entityKindLabels[kind] || kind}</span>
-                </div>
-              )}
+              <EntityVisualMedia
+                visual={bannerVisual}
+                alt={profile?.displayName || ""}
+                MediaPreview={MediaPreview}
+                fallback={(
+                  <div className="booruView__entityProfileBannerFallback">
+                    <span>{entityKindLabels[kind] || kind}</span>
+                  </div>
+                )}
+              />
             </div>
 
             <div className="booruView__entityProfileIdentity">
               <div
                 className="booruView__entityProfileAvatar"
-                onContextMenu={(event) => onVisualContextMenu?.("avatar", profile?.avatar || profile?.sample, event)}
+                onContextMenu={(event) => onVisualContextMenu?.("avatar", avatarVisual, event)}
               >
-                {avatarSource ? (
-                  <MediaPreview
-                    pathValue={avatarSource.pathValue}
-                    mediaKind={avatarSource.mediaKind}
-                    alt={profile?.displayName || ""}
-                  autoplay={avatarSource.mediaKind === "video"}
-                  loop={avatarSource.mediaKind === "video"}
-                  objectFit="contain"
-                  mediaStyle={avatarMediaStyle}
-                  forceOriginal
-                  />
-                ) : (
-                  <div className="booruView__entityProfileAvatarFallback">
-                    <span>{getInitials(profile?.displayName)}</span>
-                  </div>
-                )}
+                <EntityVisualMedia
+                  visual={avatarVisual}
+                  alt={profile?.displayName || ""}
+                  MediaPreview={MediaPreview}
+                  fallback={(
+                    <div className="booruView__entityVisualFallback">
+                      <span>{getInitials(profile?.displayName)}</span>
+                    </div>
+                  )}
+                />
               </div>
 
               <div className="booruView__entityProfileCopy">
@@ -226,9 +209,24 @@ export default function EntityProfileView({
               busy={entityMutationBusy}
               onProfileChange={onProfileChange}
             />
+          ) : relationKind ? (
+            <RelationsGrid
+              kind={relationKind}
+              state={relationState}
+              loading={relationLoading}
+              onLoadMore={onLoadMoreRelations}
+              onOpenEntity={onOpenRelatedEntity}
+              onPreviewContextMenu={onRelatedEntityContextMenu}
+              MediaPreview={MediaPreview}
+              columns={entityGridColumns}
+              onColumnWheel={onEntityColumnWheel}
+              onEntityHover={onEntityHover}
+              onGroupAssociationHover={onGroupAssociationHover}
+            />
           ) : (
             <GalleryGrid
               items={Array.isArray(galleryState?.items) ? galleryState.items : []}
+              placements={Array.isArray(galleryState?.placements) ? galleryState.placements : []}
               loading={galleryLoading}
               hasMore={Boolean(galleryState?.hasMore)}
               onLoadMore={onLoadMoreGallery}
@@ -237,6 +235,10 @@ export default function EntityProfileView({
               MediaPreview={MediaPreview}
               canUseVisual={canUseVisual}
               resourceGridColumns={resourceGridColumns}
+              selectedIds={gallerySelectedIds}
+              onSelectionChange={onGallerySelectionChange}
+              onColumnWheel={onResourceColumnWheel}
+              onGroupAssociationHover={onGroupAssociationHover}
             />
           )}
         </div>

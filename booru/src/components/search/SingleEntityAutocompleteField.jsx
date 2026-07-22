@@ -14,6 +14,8 @@ export default function SingleEntityAutocompleteField({
   invoke,
   helpers,
   entityKindLabels,
+  onEnsureEntity,
+  allowClear = true,
 }) {
   const { findExactEntityMatch, stepSuggestionIndex } = helpers;
   const [query, setQuery] = useState("");
@@ -100,8 +102,10 @@ export default function SingleEntityAutocompleteField({
     setLoading(true);
 
     try {
-      const result = await invoke("booru:ensure-entity", { kind, name: trimmedQuery });
-      handleSelectEntity(result.entity);
+      const result = onEnsureEntity
+        ? await onEnsureEntity(kind, trimmedQuery)
+        : await invoke("booru:ensure-entity", { kind, name: trimmedQuery });
+      if (result?.entity) handleSelectEntity(result.entity);
     } catch (ensureError) {
       setError(
         ensureError instanceof Error
@@ -119,15 +123,17 @@ export default function SingleEntityAutocompleteField({
         <div className="booruView__entitySelection">
           <span className="booruView__selectionChip">
             <span>{value.displayName}</span>
-            <button
-              type="button"
-              className="booruView__selectionChipRemove"
-              onClick={() => onChange?.(null)}
-              disabled={disabled}
-              aria-label={`Quitar ${value.displayName}`}
-            >
-              x
-            </button>
+            {allowClear ? (
+              <button
+                type="button"
+                className="booruView__selectionChipRemove"
+                onClick={() => onChange?.(null)}
+                disabled={disabled}
+                aria-label={`Quitar ${value.displayName}`}
+              >
+                x
+              </button>
+            ) : null}
           </span>
         </div>
       ) : null}

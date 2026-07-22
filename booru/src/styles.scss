@@ -1,6 +1,7 @@
 @use "../../../nexus-frontend/src/scss/tools" as *;
 @use "./styles/entity-visual-cropper";
 @use "./styles/clipboard-association";
+@use "./styles/character-creation";
 
 .booruView {
   background: var(--workspace-main-bg);
@@ -9,6 +10,10 @@
 .booruView__layout.nexus-ui-split--sidebar-detail {
   grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
   gap: 8px;
+}
+
+.booruView__layout--entity.nexus-ui-split--sidebar-detail {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .booruView__body,
@@ -42,6 +47,183 @@
 .booruView__content {
   padding: 6px;
   gap: 6px;
+}
+
+.booruView__entityNavbar {
+  display: grid;
+  grid-template-columns: minmax(190px, auto) minmax(220px, 1fr) auto minmax(190px, 0.7fr);
+  align-items: end;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 6px;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--workspace-main-bg);
+}
+
+.booruView__entityNavbarContext,
+.booruView__entityNavbarCreate {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.booruView__entityNavbarTitle {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  min-height: var(--control-height-m);
+}
+
+.booruView__entityNavbarTitle span,
+.booruView__entityNavbarTitle strong {
+  @include truncate;
+}
+
+.booruView__entityNavbarTitle span {
+  color: var(--color-text-muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.booruView__entityNavbarTitle strong {
+  color: var(--color-text);
+  font-size: 0.8rem;
+}
+
+.booruView__entityNavbarSearch,
+.booruView__entityNavbarCreate .nexus-ui-inline-field {
+  min-width: 0;
+}
+
+.booruView__browseControls {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.booruView__browseField {
+  display: flex;
+  min-width: 150px;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--color-text-muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.booruView__browseField select {
+  min-height: var(--control-height-m);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--shell-panel-soft);
+  color: var(--color-text);
+  padding: 0 24px 0 8px;
+}
+
+.booruView__browseDirection {
+  width: var(--control-height-m);
+  min-width: var(--control-height-m);
+  padding-inline: 0;
+}
+
+.booruView__browseTooltipHost {
+  position: relative;
+  display: inline-flex;
+}
+
+.booruView__browseTooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 5px);
+  z-index: 20;
+  width: max-content;
+  max-width: 180px;
+  transform: translate(-50%, 3px);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--shell-panel-bg);
+  color: var(--color-text);
+  padding: 4px 6px;
+  font-size: 0.68rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.booruView__browseTooltipHost:hover .booruView__browseTooltip,
+.booruView__browseTooltipHost:focus-within .booruView__browseTooltip {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+.booruView__groupedGallery {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.booruView__galleryGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.booruView__galleryGroupHeader {
+  display: flex;
+  width: 100%;
+  min-height: 24px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.booruView__galleryGroupHeader:hover,
+.booruView__galleryGroupHeader:focus-visible {
+  background: transparent;
+  color: var(--color-text);
+}
+
+.booruView__galleryGroupChevron {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(45deg) translate(-1px, -1px);
+  transition: transform 120ms ease;
+}
+
+.booruView__galleryGroup.is-collapsed .booruView__galleryGroupChevron {
+  transform: rotate(-45deg);
+}
+
+.booruView__galleryGroupDivider {
+  height: 1px;
+  flex: 1 1 auto;
+  background: var(--color-line);
+}
+
+.booruView__entityRelations {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .booruView__content--metrics {
@@ -543,6 +725,88 @@
   padding-bottom: 2px;
 }
 
+.booruView__detailsMetadata {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px 12px;
+  margin: 0;
+  padding: 7px 0;
+  border-block: 1px solid var(--color-line);
+}
+
+.booruView__detailsMetadataItem {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.booruView__detailsMetadataItem dt,
+.booruView__detailsMetadataItem dd {
+  @include truncate;
+  margin: 0;
+}
+
+.booruView__detailsMetadataItem dt {
+  color: var(--color-text-muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.booruView__detailsMetadataItem dd {
+  color: var(--color-text-soft);
+  font-size: 0.76rem;
+}
+
+.booruView__detailsEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.booruView__detailsEditor > .booruView__field,
+.booruView__detailsReality,
+.booruView__characterUniverseRepair {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.booruView__detailsReality {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px 10px;
+}
+
+.booruView__detailsReality > span {
+  color: var(--color-text-soft);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.booruView__detailsReality > strong {
+  color: var(--color-text);
+  font-size: 0.78rem;
+}
+
+.booruView__detailsReality > small {
+  @include truncate;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.booruView__characterUniverseRepair {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.booruView__detailsSaveState {
+  padding-top: 7px;
+}
+
 .booruView__titlePill,
 .booruView__tagChip,
 .booruView__selectionChip {
@@ -859,7 +1123,7 @@
   object-fit: contain;
 }
 
-.booruView__entityProfileAvatarFallback {
+.booruView__entityVisualFallback {
   display: grid;
   width: 100%;
   height: 100%;
@@ -1201,6 +1465,76 @@
   box-shadow: var(--shadow-l, 0 14px 36px rgba(0, 0, 0, 0.32));
 }
 
+.booruView__floatingDetails {
+  position: fixed;
+  z-index: 900;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--shell-panel-bg);
+  box-shadow: var(--shadow-l, 0 14px 36px rgba(0, 0, 0, 0.32));
+}
+
+.booruView__floatingDetailsBar {
+  display: flex;
+  min-height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px 4px 10px;
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-text);
+  cursor: move;
+  user-select: none;
+}
+
+.booruView__floatingDetailsContent {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 6px;
+}
+
+.booruView__floatingDetailsContent > * {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  border: 0;
+  background: transparent;
+}
+
+.booruView__floatingDetailsContent .booruView__inspectorTitleRow > :last-child {
+  display: none;
+}
+
+.booruView__floatingDetailsResize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  cursor: nwse-resize;
+}
+
+.booruView__floatingDetailsResize::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid var(--color-text-soft);
+  border-bottom: 1px solid var(--color-text-soft);
+  opacity: 0.7;
+}
+
 .booruView__contextMenuItem {
   display: flex;
   align-items: center;
@@ -1271,6 +1605,14 @@
     grid-template-columns: 1fr;
   }
 
+  .booruView__entityNavbar {
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 1fr);
+  }
+
+  .booruView__entityNavbarCreate {
+    grid-column: 1 / -1;
+  }
+
   .booruView__mediaGrid--paged {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -1283,6 +1625,18 @@
 @media (max-width: 820px) {
   .booruView__inspectorPreview {
     min-height: 240px;
+  }
+
+  .booruView__detailsMetadata {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .booruView__detailsReality {
+    grid-template-columns: auto 1fr;
+  }
+
+  .booruView__detailsReality > small {
+    grid-column: 1 / -1;
   }
 
   .booruView__entityProfileBanner {
@@ -1338,6 +1692,14 @@
 @media (max-width: 620px) {
   .booruView__content {
     padding: 6px;
+  }
+
+  .booruView__entityNavbar {
+    grid-template-columns: 1fr;
+  }
+
+  .booruView__entityNavbarCreate {
+    grid-column: auto;
   }
 
   .booruView__entityProfileBanner {

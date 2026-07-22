@@ -1,5 +1,4 @@
 import {
-  BOORU_CLASSIFICATION_LABELS,
   BOORU_DEFAULT_SECTION,
   BOORU_ENTITY_KIND_LABELS,
   BOORU_MEDIA_KIND_LABELS,
@@ -19,7 +18,6 @@ import {
 import {
   Button,
   Field,
-  InlineField,
   MetricCard,
   Notice,
   PanelStack,
@@ -39,12 +37,72 @@ import {
   parseBooruSearchSyntax,
   tokenizeBooruQuery,
 } from "./booru-utils.js";
-import { ClipboardAssociationComposer, EntityVisualCropper } from "./components/index.js";
+import {
+  getBooruEssentialState,
+  normalizeRealitySource,
+  resolveBooruReality,
+} from "./domain/classification-policy.js";
+import { getBooruDetailsMixedFields } from "./domain/details-policy.js";
+import {
+  getBooruEntityProfileTabOptions,
+  getBooruEntityRelationKindFromTab,
+} from "./domain/entity-relations.js";
+import {
+  BOORU_RESOURCE_GROUP_OPTIONS,
+  BOORU_RESOURCE_GROUP_ORDER_OPTIONS,
+  BOORU_RESOURCE_SORT_OPTIONS,
+  createBooruRandomSeed,
+  getBooruEntitySortOptions,
+  normalizeBooruBrowseQuery,
+} from "./domain/contextual-browse.js";
+import { buildBooruResourceActions } from "./domain/resource-actions.js";
+import { mergeBooruClipboardAssociations } from "./domain/contextual-paste.js";
+import {
+  clampBooruFloatingDetailsGeometry,
+  createBooruFloatingDetailsGeometry,
+} from "./domain/floating-details.js";
+import {
+  BOORU_DEFAULT_GRID_COLUMNS,
+  BOORU_GRID_FAMILIES,
+  BOORU_NAVIGATION_INPUT_KEY,
+  createBooruResourceRouteSession,
+  createBooruSectionRootRoute,
+  createBooruWorkspaceRouteKey,
+  normalizeBooruGridPreferences,
+  normalizeBooruNavigationState,
+  normalizeBooruWorkspaceRoute,
+  popBooruWorkspaceRoute,
+  pushBooruWorkspaceRoute,
+  replaceBooruWorkspaceRoute,
+  resetBooruWorkspaceSection,
+  resolveBooruProfileForRoute,
+  routeToBooruWorkspaceInput,
+  stepBooruGridColumns,
+} from "./domain/workspace-navigation.js";
+import {
+  BOORU_NO_MISSING_FILTER,
+  buildBooruResourceQuery,
+  getBooruContextualMissingFilterOptions,
+  getBooruRecommendationScope,
+  isBooruMissingFilterCompatible,
+} from "./domain/pending-workflow.js";
+import {
+  applyBooruMutationToResourceWindow,
+  isBooruResourceWindowContextCurrent,
+  mergeBooruResourceRecords,
+  normalizeBooruResourceMutationResult,
+  resolveBooruAnchoredResources,
+} from "./domain/resource-mutations.js";
+import { CharacterCreationDialog, ClipboardAssociationComposer, EntityVisualCropper } from "./components/index.js";
 import SettingsSection from "./components/settings/SettingsSection.jsx";
 import EntityGrid from "./components/entities/EntityGrid.jsx";
+import EntityNavigationBar from "./components/entities/EntityNavigationBar.jsx";
+import EntityRelationsGridComponent from "./components/entities/EntityRelationsGrid.jsx";
 import EntityProfileGalleryGrid from "./components/entities/EntityProfileGallery.jsx";
 import ResourceHeroOverlay from "./components/media/ResourceHeroOverlay.jsx";
+import FloatingDetailsWindow from "./components/resources/FloatingDetailsWindow.jsx";
 import FloatingContextMenu from "./components/shared/FloatingContextMenu.jsx";
+import ContextBrowseControls from "./components/shared/ContextBrowseControls.jsx";
 import BooruDragPreviewLayer from "./components/media/BooruDragPreviewLayer.jsx";
 import MediaThumbnailComponent from "./components/media/MediaThumbnail.jsx";
 import ResourceSearchComposer from "./components/search/ResourceSearchComposer.jsx";
@@ -101,11 +159,6 @@ const ENTITY_KIND_SECTION_MAP = Object.freeze({
   artist: "artists",
   universe: "universes",
 });
-const ENTITY_PROFILE_TAB_OPTIONS = [
-  { value: "gallery", label: "Galeria" },
-  { value: "data", label: "Datos" },
-  { value: "tags", label: "Tags" },
-];
 const CLASSIFICATION_SIDEBAR_SECTIONS = new Set(["media", "pending"]);
 const MEDIA_FILTER_OPTIONS = [
   { value: "all", label: "Todo" },
@@ -113,10 +166,15 @@ const MEDIA_FILTER_OPTIONS = [
   { value: "video", label: "Video" },
   { value: "gif", label: "GIF" },
 ];
-const REALITY_FILTER_OPTIONS = [
+const MEDIA_REALITY_FILTER_OPTIONS = [
   { value: "all", label: "Cualquiera" },
   { value: "real", label: "Real" },
   { value: "ficticio", label: "Ficticio" },
+];
+const PENDING_REALITY_FILTER_OPTIONS = [
+  MEDIA_REALITY_FILTER_OPTIONS[0],
+  { value: "untyped", label: "Sin tipo" },
+  ...MEDIA_REALITY_FILTER_OPTIONS.slice(1),
 ];
 const PENDING_MODE_OPTIONS = [
   { value: "essential", label: "Esencial" },
@@ -127,13 +185,14 @@ const RESOURCE_SEARCH_REALITY_SUGGESTIONS = [
   { id: "reality:ficticio", type: "reality", value: "ficticio", label: "Ficticio", detail: "Filtro de tipo" },
 ];
 const RESOURCE_SEARCH_MISSING_SUGGESTIONS = [
+  { id: "missing:type", type: "missing", value: "type", label: "Sin tipo", detail: "Faltante" },
   { id: "missing:author", type: "missing", value: "author", label: "Sin persona", detail: "Faltante" },
   { id: "missing:artist", type: "missing", value: "artist", label: "Sin artist", detail: "Faltante" },
   { id: "missing:character", type: "missing", value: "character", label: "Sin character", detail: "Faltante" },
   { id: "missing:universe", type: "missing", value: "universe", label: "Sin universe", detail: "Faltante" },
 ];
+const EMPTY_RESOURCE_SEARCH_SUGGESTIONS = [];
 const RECOMMENDATION_PAGE_SIZE = 24;
-const NO_MISSING_FILTER = "none";
 const BOORU_RESOURCE_DND_TYPE = "nexus.booru.resource-card";
 const RESOURCE_PAGE_SIZE = 42;
 const RESOURCE_GRID_COLUMNS = 6;
@@ -219,7 +278,7 @@ function ResourcePagination(props) {
 }
 
 function ResourceGridCard(props) {
-  return <ResourceGridCardComponent {...props} useDrag={safeUseDrag} dndType={BOORU_RESOURCE_DND_TYPE} emptyImage={getEmptyImage} logger={booruViewLogger} uniqueIds={uniqueIds} MediaPreview={MediaThumbnail} defaultColumns={RESOURCE_GRID_COLUMNS} />;
+  return <ResourceGridCardComponent {...props} useDrag={safeUseDrag} dndType={BOORU_RESOURCE_DND_TYPE} emptyImage={getEmptyImage} logger={booruViewLogger} uniqueIds={uniqueIds} MediaPreview={MediaThumbnail} defaultColumns={props.columns || RESOURCE_GRID_COLUMNS} />;
 }
 
 function RecommendationPanel(props) {
@@ -227,11 +286,15 @@ function RecommendationPanel(props) {
 }
 
 function ResourceInspector(props) {
-  return <ResourceInspectorComponent {...props} helpers={{ canSaveDraftProgress, formatDate, formatFileSize, getCommonScalar, getCommonItems, getCharacterUniverse, getDraftUniverseForCharacter, markDraftDirty, openPath, pruneCharacterUniverseAssignments, renderEntityChips, renderTagChips }} MediaPreview={MediaThumbnail} EntityField={EntityAutocompleteField} TagField={TagAutocompleteField} SingleEntityField={SingleEntityAutocompleteField} mediaKindLabels={BOORU_MEDIA_KIND_LABELS} classificationLabels={BOORU_CLASSIFICATION_LABELS} realityLabels={BOORU_REALITY_LABELS} realityOptions={BOORU_REALITY_OPTIONS} />;
+  return <ResourceInspectorComponent {...props} helpers={{ applyClassificationPolicyToDraft, canSaveDraftProgress, formatFileSize, getCharacterUniverse, getDraftUniverseForCharacter, markDraftDirty, pruneCharacterUniverseAssignments }} MediaPreview={MediaThumbnail} EntityField={EntityAutocompleteField} TagField={TagAutocompleteField} SingleEntityField={SingleEntityAutocompleteField} mediaKindLabels={BOORU_MEDIA_KIND_LABELS} realityOptions={BOORU_REALITY_OPTIONS} />;
 }
 
 function EntityProfileView(props) {
-  return <EntityProfileViewComponent {...props} MediaPreview={MediaThumbnail} canUseVisual={canUseResourceAsEntityVisual} DataTab={EntityProfileDataTab} TagsTab={EntityProfileTagsTab} GalleryGrid={EntityProfileGalleryGrid} DownloadIcon={DownloadIcon} profileTabOptions={ENTITY_PROFILE_TAB_OPTIONS} resourceGridColumns={RESOURCE_GRID_COLUMNS} helpers={{ getInitials, entityKindLabels: BOORU_ENTITY_KIND_LABELS, isTextEntryElement, buildAvatarMediaStyle }} />;
+  return <EntityProfileViewComponent {...props} MediaPreview={MediaThumbnail} canUseVisual={canUseResourceAsEntityVisual} DataTab={EntityProfileDataTab} TagsTab={EntityProfileTagsTab} GalleryGrid={EntityProfileGalleryGrid} RelationsGrid={EntityRelationsGrid} DownloadIcon={DownloadIcon} profileTabOptions={getBooruEntityProfileTabOptions(props.kind)} helpers={{ getInitials, entityKindLabels: BOORU_ENTITY_KIND_LABELS, isTextEntryElement }} />;
+}
+
+function EntityRelationsGrid(props) {
+  return <EntityRelationsGridComponent {...props} EntityGrid={EntityGrid} entityKindLabels={BOORU_ENTITY_KIND_LABELS} getInitials={getInitials} />;
 }
 
 function EntityProfileDataTab(props) {
@@ -563,38 +626,6 @@ function findExactTagMatch(items, query) {
   );
 }
 
-function renderEntityChips(items, emptyLabel) {
-  if (!Array.isArray(items) || !items.length) {
-    return <span className="booruView__metaPlaceholder">{emptyLabel}</span>;
-  }
-
-  return (
-    <div className="booruView__tagRow">
-      {items.map((item) => (
-        <span key={item.id} className="booruView__tagChip">
-          {item?.universe?.displayName ? `${item.displayName} - ${item.universe.displayName}` : item.displayName}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function renderTagChips(items, emptyLabel) {
-  if (!Array.isArray(items) || !items.length) {
-    return <span className="booruView__metaPlaceholder">{emptyLabel}</span>;
-  }
-
-  return (
-    <div className="booruView__tagRow">
-      {items.map((item) => (
-        <span key={item.id} className="booruView__tagChip">
-          {item.name}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function getCharacterUniverse(character) {
   return character?.universe?.id ? character.universe : null;
 }
@@ -743,6 +774,18 @@ function appendResourcePageItems(items, nextResources) {
   return mergedItems;
 }
 
+function appendBrowsePlacements(items, nextPlacements) {
+  const merged = [];
+  const seen = new Set();
+  for (const placement of [...(Array.isArray(items) ? items : []), ...(Array.isArray(nextPlacements) ? nextPlacements : [])]) {
+    const id = String(placement?.placementId || "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    merged.push(placement);
+  }
+  return merged;
+}
+
 function normalizeResourceEntityFilters(items) {
   const uniqueItems = [];
   const seenIds = new Set();
@@ -878,130 +921,6 @@ function removeStructuredQueryToken(value, tokenRaw) {
     })
     .join(" ")
     .trim();
-}
-
-function buildResourceQuery({
-  searchTokens = [],
-  mediaKindFilter = "all",
-  realityFilter = "all",
-  pendingMode = "essential",
-  missingFilter = NO_MISSING_FILTER,
-}) {
-  let searchReality = null;
-  let searchClassificationState = null;
-  let searchMissing = null;
-  let searchMediaKind = null;
-  const includeEntities = [];
-  const excludeEntities = [];
-  const includeTags = [];
-  const excludeTags = [];
-
-  for (const token of normalizeResourceSearchTokens(searchTokens)) {
-    if (token.type === "entity") {
-      const nextFilter = {
-        kind: token.kind,
-        id: token.id || null,
-        value: token.value,
-        label: token.label || token.value,
-      };
-
-      if (token.negative) {
-        excludeEntities.push(nextFilter);
-      } else {
-        includeEntities.push(nextFilter);
-      }
-      continue;
-    }
-
-    if (token.type === "tag") {
-      const nextFilter = {
-        id: token.id || null,
-        value: token.value,
-        label: token.label || token.value,
-      };
-
-      if (token.negative) {
-        excludeTags.push(nextFilter);
-      } else {
-        includeTags.push(nextFilter);
-      }
-      continue;
-    }
-
-    if (token.type === "reality" && !token.negative) {
-      searchReality = token.value;
-      continue;
-    }
-
-    if (token.type === "missing" && !token.negative) {
-      searchMissing = token.value;
-      continue;
-    }
-
-    if (token.type === "classification-state" && !token.negative) {
-      searchClassificationState = token.value;
-      continue;
-    }
-
-    if (token.type === "media-kind" && !token.negative) {
-      searchMediaKind = token.value;
-    }
-  }
-
-  return {
-    mediaKind: mediaKindFilter !== "all" ? mediaKindFilter : searchMediaKind,
-    reality: realityFilter !== "all" ? realityFilter : searchReality,
-    classificationState: searchClassificationState || null,
-    pendingMode: pendingMode === "tags" ? "tags" : "essential",
-    includeEntities,
-    excludeEntities,
-    includeTags,
-    excludeTags,
-    missing: missingFilter !== NO_MISSING_FILTER ? missingFilter : searchMissing,
-  };
-}
-
-function getContextualMissingFilterOptions(realityValue, includeEntityFilters = []) {
-  const entityKinds = new Set(
-    (Array.isArray(includeEntityFilters) ? includeEntityFilters : [])
-      .map((filter) => String(filter?.kind || "").trim())
-      .filter(Boolean),
-  );
-  const disabledValues = new Set();
-
-  if (entityKinds.has("character")) {
-    disabledValues.add("character");
-    disabledValues.add("universe");
-  } else if (entityKinds.has("universe")) {
-    disabledValues.add("universe");
-  }
-
-  const options = [{ value: NO_MISSING_FILTER, label: "Ninguno" }];
-
-  if (realityValue === "real") {
-    options.push({ value: "author", label: "Sin persona" });
-    return options.map((option) => ({
-      ...option,
-      disabled: option.value !== NO_MISSING_FILTER && disabledValues.has(option.value),
-    }));
-  }
-
-  if (realityValue === "ficticio") {
-    options.push(
-      { value: "character", label: "Sin char" },
-      { value: "artist", label: "Sin artist" },
-      { value: "universe", label: "Sin universe" },
-    );
-    return options.map((option) => ({
-      ...option,
-      disabled: option.value !== NO_MISSING_FILTER && disabledValues.has(option.value),
-    }));
-  }
-
-  return options.map((option) => ({
-    ...option,
-    disabled: option.value !== NO_MISSING_FILTER && disabledValues.has(option.value),
-  }));
 }
 
 function getResourceQueryTokenClass(token) {
@@ -1267,7 +1186,9 @@ function normalizeEntityProfileInput(value, sectionKind = null) {
   const kind = String(value?.kind || "").trim();
   const id = String(value?.id || "").trim();
   const requestedTab = String(value?.tab || "").trim();
-  const tab = ["gallery", "data", "tags"].includes(requestedTab) ? requestedTab : "gallery";
+  const tab = getBooruEntityProfileTabOptions(kind).some((option) => option.value === requestedTab)
+    ? requestedTab
+    : "gallery";
 
   if (!kind || !id || !ENTITY_KIND_SECTION_MAP[kind]) {
     return null;
@@ -1320,10 +1241,12 @@ function canUseResourceForImageActions(resource) {
 }
 
 function buildContextResourceFromDescriptor(descriptor) {
-  const resourceId = String(descriptor?.sampleResourceId || descriptor?.id || "").trim();
-  const previewPath = String(descriptor?.sampleStoragePath || descriptor?.cardPreviewPath || "").trim();
+  const source = descriptor?.source && typeof descriptor.source === "object" ? descriptor.source : null;
+  const resourceId = String(source?.resourceId || descriptor?.resourceId || descriptor?.sampleResourceId || descriptor?.id || "").trim();
+  const previewPath = String(source?.previewPath || descriptor?.sampleStoragePath || descriptor?.cardPreviewPath || "").trim();
   const storagePath = String(
-    descriptor?.originalStoragePath
+    source?.pathValue
+    || descriptor?.originalStoragePath
     || descriptor?.cardOriginalStoragePath
     || descriptor?.storagePath
     || descriptor?.cardStoragePath
@@ -1332,7 +1255,8 @@ function buildContextResourceFromDescriptor(descriptor) {
     || "",
   ).trim();
   const mediaKind = String(
-    descriptor?.originalMediaKind
+    source?.mediaKind
+    || descriptor?.originalMediaKind
     || descriptor?.cardOriginalMediaKind
     || descriptor?.sampleMediaKind
     || descriptor?.cardMediaKind
@@ -1403,6 +1327,26 @@ function markDraftDirty(draft, fieldName) {
   return {
     ...draft,
     dirtyFields: Array.from(dirtyFields),
+    mixedFields: (Array.isArray(draft?.mixedFields) ? draft.mixedFields : [])
+      .filter((mixedField) => mixedField !== fieldName),
+  };
+}
+
+function applyClassificationPolicyToDraft(draft, { realityWasEdited = false } = {}) {
+  const realityPolicy = resolveBooruReality({
+    reality: draft?.reality,
+    realitySource: draft?.realitySource,
+    realityWasEdited,
+    authors: draft?.authors,
+    artists: draft?.artists,
+    characters: draft?.characters,
+    universes: draft?.universes,
+  });
+
+  return {
+    ...draft,
+    reality: realityPolicy.reality,
+    realitySource: realityPolicy.source,
   };
 }
 
@@ -1413,6 +1357,7 @@ function buildClassificationDraft(resources) {
     return {
       resourceIds: [],
       reality: null,
+      realitySource: "auto",
       authors: [],
       artists: [],
       characters: [],
@@ -1420,6 +1365,7 @@ function buildClassificationDraft(resources) {
       manualTags: [],
       characterUniverses: {},
       dirtyFields: [],
+      mixedFields: [],
     };
   }
 
@@ -1428,44 +1374,50 @@ function buildClassificationDraft(resources) {
     return {
       resourceIds: [resource.id],
       reality: resource.reality || null,
+      realitySource: normalizeRealitySource(resource.realitySource),
       authors: Array.isArray(resource.authors) ? resource.authors : [],
       artists: Array.isArray(resource.artists) ? resource.artists : [],
       characters: Array.isArray(resource.characters) ? resource.characters : [],
-      universes: Array.isArray(resource.universes) ? resource.universes : [],
+      universes: Array.isArray(resource.directUniverses) ? resource.directUniverses : [],
       manualTags: Array.isArray(resource.manualTags) ? resource.manualTags : [],
       characterUniverses: {},
       dirtyFields: [],
+      mixedFields: [],
     };
   }
 
   return {
     resourceIds: normalizedResources.map((resource) => resource.id),
     reality: getCommonScalar(normalizedResources, "reality"),
+    realitySource: normalizeRealitySource(getCommonScalar(normalizedResources, "realitySource")),
     authors: getCommonItems(normalizedResources, "authors"),
     artists: getCommonItems(normalizedResources, "artists"),
     characters: getCommonItems(normalizedResources, "characters"),
-    universes: getCommonItems(normalizedResources, "universes"),
+    universes: getCommonItems(normalizedResources, "directUniverses"),
     manualTags: getCommonItems(normalizedResources, "manualTags"),
     characterUniverses: {},
     dirtyFields: [],
+    mixedFields: getBooruDetailsMixedFields(normalizedResources),
   };
 }
 
 function canSaveClassification(draft) {
-  if (!draft?.resourceIds?.length || !draft?.reality) {
+  if (!draft?.resourceIds?.length) {
     return false;
   }
 
-  if (draft.reality === "real") {
-    return Array.isArray(draft.authors) && draft.authors.length > 0;
-  }
+  const characters = (Array.isArray(draft.characters) ? draft.characters : []).map((character) => ({
+    ...character,
+    universe: resolveCharacterUniverse(draft, character),
+  }));
 
-  if (draft.reality === "ficticio") {
-    return ((Array.isArray(draft.characters) && draft.characters.length > 0) || (Array.isArray(draft.universes) && draft.universes.length > 0))
-      && draft.characters.every((character) => Boolean(resolveCharacterUniverse(draft, character)));
-  }
-
-  return false;
+  return getBooruEssentialState({
+    reality: draft.reality,
+    authors: draft.authors,
+    artists: draft.artists,
+    characters,
+    universes: draft.universes,
+  }).complete;
 }
 
 function canSaveDraftProgress(draft) {
@@ -1524,7 +1476,7 @@ function buildSavePayload(selectedResources, draft) {
     authorPatch: buildRelationPatch(getCommonIds(normalizedResources, "authors"), draft.authors.map((item) => item.id)),
     artistPatch: buildRelationPatch(getCommonIds(normalizedResources, "artists"), draft.artists.map((item) => item.id)),
     characterPatch: buildRelationPatch(getCommonIds(normalizedResources, "characters"), draft.characters.map((item) => item.id)),
-    universePatch: buildRelationPatch(getCommonIds(normalizedResources, "universes"), draft.universes.map((item) => item.id)),
+    universePatch: buildRelationPatch(getCommonIds(normalizedResources, "directUniverses"), draft.universes.map((item) => item.id)),
     tagPatch: buildRelationPatch(getCommonIds(normalizedResources, "manualTags"), draft.manualTags.map((item) => item.id)),
     characterUniverses: characterUniverseAssignments,
   };
@@ -1780,7 +1732,7 @@ function parseResourceSearchDraft(value) {
     raw: rawValue,
     negative,
     mode: "tag",
-    value: negative ? normalizedValue : rawValue,
+    value: normalizedValue.replace(/^"|"$/g, ""),
   };
 }
 
@@ -1829,18 +1781,18 @@ function createResourceSearchTokenFromFragment(fragment) {
   return createSearchTokenFromParsedToken(parsedSearch?.tokens?.[0] || null);
 }
 
-function buildAvatarMediaStyle(layout) {
-  const scale = Math.min(4, Math.max(0.2, Number(layout?.scale || 1)));
-  const offsetX = Number(layout?.offsetX || 0);
-  const offsetY = Number(layout?.offsetY || 0);
-
-  return {
-    transform: `translate(${offsetX * 100}%, ${offsetY * 100}%) scale(${scale})`,
-    transformOrigin: "center center",
-  };
-}
-
 export default function BooruWorkspaceView({ input = null, ctx }) {
+  const uiPreferencesApi = useMemo(
+    () => ctx.createPluginSettingsApi("nexus.booru.ui", {
+      gridColumns: BOORU_DEFAULT_GRID_COLUMNS,
+    }),
+    [ctx],
+  );
+  const persistedUiPreferences = uiPreferencesApi.useValue();
+  const gridColumns = useMemo(
+    () => normalizeBooruGridPreferences(persistedUiPreferences?.gridColumns),
+    [persistedUiPreferences?.gridColumns],
+  );
   const [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [resourceLoading, setResourceLoading] = useState(false);
@@ -1848,15 +1800,21 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const [savingClassification, setSavingClassification] = useState(false);
   const [error, setError] = useState("");
   const [resourceSearchTokens, setResourceSearchTokens] = useState(() => buildResourceSearchInputTokens(input));
+  const [resourceSearchText, setResourceSearchText] = useState("");
   const [entitySearchValue, setEntitySearchValue] = useState("");
+  const [entitySearchTokens, setEntitySearchTokens] = useState([]);
+  const [resourceBrowse, setResourceBrowse] = useState(() => normalizeBooruBrowseQuery(null, "resource"));
+  const [entityBrowse, setEntityBrowse] = useState(() => normalizeBooruBrowseQuery(null, "entity"));
   const [entityCreateValue, setEntityCreateValue] = useState("");
-  const [entityCreateUniverse, setEntityCreateUniverse] = useState(null);
   const [resourceMediaKindFilter, setResourceMediaKindFilter] = useState("all");
   const [resourceRealityFilter, setResourceRealityFilter] = useState("all");
+  const [resourceMissingFilter, setResourceMissingFilter] = useState(BOORU_NO_MISSING_FILTER);
   const [resourcePendingMode, setResourcePendingMode] = useState("essential");
   const [resourceState, setResourceState] = useState({
     items: [],
+    placements: [],
     totalCount: 0,
+    placementCount: 0,
     hasMore: false,
     querySignature: "",
   });
@@ -1864,24 +1822,68 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const [selectedResourceState, setSelectedResourceState] = useState(RESOURCE_SELECTION_SECTIONS);
   const [classificationDraft, setClassificationDraft] = useState(buildClassificationDraft([]));
   const [entityItems, setEntityItems] = useState([]);
+  const [entityPlacements, setEntityPlacements] = useState([]);
+  const [entityTotalCount, setEntityTotalCount] = useState(0);
+  const [entityHasMore, setEntityHasMore] = useState(false);
   const [entityLoading, setEntityLoading] = useState(false);
   const [entityBusy, setEntityBusy] = useState(false);
   const [entityError, setEntityError] = useState("");
   const [entityProfile, setEntityProfile] = useState(null);
   const [entityProfileLoading, setEntityProfileLoading] = useState(false);
   const [entityProfileError, setEntityProfileError] = useState("");
-  const [entityProfileGalleryState, setEntityProfileGalleryState] = useState({ items: [], totalCount: 0, hasMore: false });
+  const [entityProfileGalleryState, setEntityProfileGalleryState] = useState({ items: [], placements: [], totalCount: 0, placementCount: 0, hasMore: false });
   const [entityProfileGalleryLoading, setEntityProfileGalleryLoading] = useState(false);
+  const [entityProfileRelationState, setEntityProfileRelationState] = useState({ items: [], placements: [], totalCount: 0, placementCount: 0, hasMore: false, relationKind: null });
+  const [entityProfileRelationLoading, setEntityProfileRelationLoading] = useState(false);
   const [entityProfilePageState, setEntityProfilePageState] = useState(ENTITY_PROFILE_PAGE_SECTIONS);
   const [universeCharacterCreateValue, setUniverseCharacterCreateValue] = useState("");
   const [entityRevision, setEntityRevision] = useState(0);
   const [contextMenuState, setContextMenuState] = useState(null);
   const [customDragState, setCustomDragState] = useState(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [detailsContext, setDetailsContext] = useState(null);
+  const [anchoredResources, setAnchoredResources] = useState([]);
+  const [floatingDetailsGeometry, setFloatingDetailsGeometry] = useState(() => createBooruFloatingDetailsGeometry({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
   const [resourceHeroState, setResourceHeroState] = useState(null);
   const [entityVisualCropState, setEntityVisualCropState] = useState(null);
   const [clipboardAssociationState, setClipboardAssociationState] = useState(null);
+  const [characterCreationName, setCharacterCreationName] = useState("");
+  const [activeRouteScrollTop, setActiveRouteScrollTop] = useState(0);
+  const [profileGallerySelectedIds, setProfileGallerySelectedIds] = useState([]);
+  const characterCreationResolverRef = useRef(null);
   const hoveredEntityRef = useRef(null);
+  const hoveredGroupAssociationRef = useRef(null);
+  const routeSessionsRef = useRef(new Map());
+  const sectionLastRouteRef = useRef(new Map());
+  const sectionNavigationRef = useRef(new Map());
+  const activeRouteScrollTopRef = useRef(0);
+
+  const finishCharacterCreation = useCallback((result = null) => {
+    const resolveRequest = characterCreationResolverRef.current;
+    characterCreationResolverRef.current = null;
+    setCharacterCreationName("");
+    resolveRequest?.(result);
+  }, []);
+
+  const ensureEntityFromUi = useCallback((kind, name) => {
+    if (kind !== "character") {
+      return invoke("booru:ensure-entity", { kind, name });
+    }
+
+    return new Promise((resolve) => {
+      characterCreationResolverRef.current?.(null);
+      characterCreationResolverRef.current = resolve;
+      setCharacterCreationName(String(name || "").trim());
+    });
+  }, []);
+
+  useEffect(() => () => {
+    characterCreationResolverRef.current?.(null);
+    characterCreationResolverRef.current = null;
+  }, []);
   const activeSection = getActiveSection(input);
   const settingsSubview = getSettingsSubview(input);
   const activeResourceSection = getActiveResourceSection(activeSection, settingsSubview);
@@ -1894,31 +1896,96 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     [normalizedResourceSearchTokens],
   );
   const deferredEntitySearchValue = useDeferredValue(entitySearchValue);
+  const normalizedEntitySearchTokens = useMemo(
+    () => normalizeResourceSearchTokens(entitySearchTokens),
+    [entitySearchTokens],
+  );
   const activeEntityKind = ENTITY_SECTION_KIND_MAP[activeSection] || null;
   const activeEntityProfile = normalizeEntityProfileInput(input?.entityProfile, activeEntityKind);
+  const workspaceRoute = useMemo(
+    () => normalizeBooruWorkspaceRoute({
+      section: activeSection,
+      settingsSubview,
+      entityProfile: activeEntityProfile,
+    }),
+    [activeEntityProfile?.id, activeEntityProfile?.kind, activeEntityProfile?.tab, activeSection, settingsSubview],
+  );
+  const workspaceRouteKey = createBooruWorkspaceRouteKey(workspaceRoute);
   const showResourceWorkspace = Boolean(activeResourceSection);
   const showClassificationSidebar = CLASSIFICATION_SIDEBAR_SECTIONS.has(activeResourceSection);
+  const supportsMissingResourceFilters = activeResourceSection === "pending"
+    && resourcePendingMode === "essential";
+  const visibleRealityFilterOptions = activeResourceSection === "media"
+    ? MEDIA_REALITY_FILTER_OPTIONS
+    : PENDING_REALITY_FILTER_OPTIONS;
+  const effectiveResourceRealityFilter = activeResourceSection === "media"
+    && resourceRealityFilter === "untyped"
+    ? "all"
+    : resourceRealityFilter;
+  const resourceQuerySearchTokens = useMemo(
+    () => supportsMissingResourceFilters
+      ? normalizedResourceSearchTokens
+      : normalizedResourceSearchTokens.filter((token) => token?.type !== "missing"),
+    [normalizedResourceSearchTokens, supportsMissingResourceFilters],
+  );
   const showEntityProfile = Boolean(activeEntityKind && activeEntityProfile?.id);
+  const activeEntityRelationKind = showEntityProfile
+    ? getBooruEntityRelationKindFromTab(activeEntityKind, activeEntityProfile?.tab)
+    : null;
+  const activeEntityProfileBrowseTab = activeEntityProfile?.tab === "gallery" || Boolean(activeEntityRelationKind);
+  const entityBrowseUsesResources = showEntityProfile && activeEntityProfile?.tab === "gallery";
+  const allowUniverseEntitySort = activeEntityKind === "character"
+    || (activeEntityRelationKind === "character" && activeEntityKind !== "universe");
+  const entitySearchAllowedKinds = useMemo(
+    () => entityBrowseUsesResources ? null : [activeEntityRelationKind || activeEntityKind].filter(Boolean),
+    [activeEntityKind, activeEntityRelationKind, entityBrowseUsesResources],
+  );
   const resourceItems = Array.isArray(resourceState?.items) ? resourceState.items : [];
   const [visibleResourceIds, setVisibleResourceIds] = useState([]);
   const entityProfileGalleryItems = Array.isArray(entityProfileGalleryState?.items) ? entityProfileGalleryState.items : [];
-  const resourceQuery = useMemo(() => buildResourceQuery({
-    searchTokens: normalizedResourceSearchTokens,
+  const resourceQuery = useMemo(() => buildBooruResourceQuery({
+    searchTokens: resourceQuerySearchTokens,
+    freeText: resourceSearchText,
+    browse: resourceBrowse,
     mediaKindFilter: showClassificationSidebar ? resourceMediaKindFilter : "all",
-    realityFilter: showClassificationSidebar ? resourceRealityFilter : "all",
+    realityFilter: showClassificationSidebar ? effectiveResourceRealityFilter : "all",
     pendingMode: activeResourceSection === "pending" ? resourcePendingMode : "essential",
-    missingFilter: NO_MISSING_FILTER,
+    missingFilter: showClassificationSidebar && supportsMissingResourceFilters
+      ? resourceMissingFilter
+      : BOORU_NO_MISSING_FILTER,
   }), [
     activeResourceSection,
+    effectiveResourceRealityFilter,
     resourceMediaKindFilter,
+    resourceMissingFilter,
     resourcePendingMode,
-    resourceRealityFilter,
-    normalizedResourceSearchTokens,
+    resourceQuerySearchTokens,
+    resourceSearchText,
+    resourceBrowse,
     showClassificationSidebar,
+    supportsMissingResourceFilters,
   ]);
   const resourceQuerySignature = JSON.stringify(resourceQuery || {});
+  const recommendationScope = getBooruRecommendationScope(activeResourceSection, resourcePendingMode);
+  const contextualMissingFilterOptions = useMemo(
+    () => getBooruContextualMissingFilterOptions(
+      resourceQuery.reality,
+      resourceQuery.includeEntities,
+      recommendationScope,
+    ),
+    [recommendationScope, resourceQuerySignature],
+  );
+  const contextualMissingFilterOptionsSignature = JSON.stringify(contextualMissingFilterOptions);
+  const hasContextualMissingFilters = contextualMissingFilterOptions.some(
+    (option) => option.value !== BOORU_NO_MISSING_FILTER,
+  );
+  const visibleMissingFilterValue = contextualMissingFilterOptions.some(
+    (option) => option.value === resourceQuery.missing && !option.disabled,
+  )
+    ? resourceQuery.missing
+    : BOORU_NO_MISSING_FILTER;
   const entityProfileKey = getEntityProfileKey(activeEntityProfile);
-  const entityThumbnailPrimingEnabled = showEntityProfile && activeEntityProfile?.tab !== "data";
+  const entityThumbnailPrimingEnabled = showEntityProfile && activeEntityProfile?.tab === "gallery";
   const visibleResourceItems = useMemo(() => {
     if (activeResourceSection !== "media" || !visibleResourceIds.length) {
       return resourceItems;
@@ -1954,8 +2021,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   });
   const classificationDraftRef = useRef(classificationDraft);
   const resourceRequestVersionRef = useRef(0);
+  const entitySectionRequestVersionRef = useRef(0);
   const entityProfileRequestVersionRef = useRef(0);
   const entityProfileGalleryRequestVersionRef = useRef(0);
+  const entityProfileRelationRequestVersionRef = useRef(0);
   const latestInputRef = useRef(input);
   const diagnosticsContextRef = useRef({
     activeSection,
@@ -1989,13 +2058,51 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const customDragTimerRef = useRef(0);
   const suppressNextResourceClickRef = useRef(false);
   const handleQuickAssignEntityRef = useRef(null);
-  const lastSectionNonceRef = useRef("");
-  const previousVisibleResourceIdsRef = useRef([]);
+  const lastSectionNonceRef = useRef(String(input?.[WORKSPACE_FRAME_SECTION_NONCE_KEY] || "").trim());
+  const currentWorkspaceRouteRef = useRef(workspaceRoute);
+  const latestWorkspaceSessionStateRef = useRef(null);
+  const anchoredResourcesRef = useRef([]);
+  const detailsAnchorRef = useRef({ open: false, section: "", ids: [], activeId: "" });
+  const detailsAnchorRequestVersionRef = useRef(0);
+  const resourceWindowContextRef = useRef(null);
+  const resourceWindowRequestVersionRef = useRef(0);
   const currentResourcePage = showResourceWorkspace
     ? normalizeResourcePageState(resourcePageState[activeResourceSection], resourceQuerySignature).page
     : 1;
   const currentResourcePageMatchesQuery = !showResourceWorkspace
     || String(resourcePageState?.[activeResourceSection]?.querySignature || "") === resourceQuerySignature;
+  resourceWindowContextRef.current = {
+    activeResourceSection,
+    currentResourcePage,
+    itemCount: resourceItems.length,
+    query: resourceQuery,
+    querySignature: resourceQuerySignature,
+    showResourceWorkspace,
+  };
+  latestWorkspaceSessionStateRef.current = {
+    resourceSearchTokens,
+    resourceSearchText,
+    resourceBrowse,
+    resourceMediaKindFilter,
+    resourceRealityFilter,
+    resourceMissingFilter,
+    resourcePendingMode,
+    resourceState,
+    resourcePageState,
+    selectedResourceState,
+    entitySearchValue,
+    entitySearchTokens,
+    entityBrowse,
+    entityItems,
+    entityPlacements,
+    entityTotalCount,
+    entityHasMore,
+    entityProfile,
+    entityProfileGalleryState,
+    entityProfileRelationState,
+    entityProfilePageState,
+    profileGallerySelectedIds,
+  };
   const handleVisibleResourceIdsChange = useCallback((nextIds) => {
     const normalizedIds = uniqueIds(nextIds);
 
@@ -2026,31 +2133,316 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   }, [classificationDraft]);
 
   useEffect(() => {
+    anchoredResourcesRef.current = anchoredResources;
+  }, [anchoredResources]);
+
+  useEffect(() => {
     latestInputRef.current = input;
   }, [input]);
 
   useEffect(() => {
-    const nextTokens = buildResourceSearchInputTokens(input);
-    const nextSignature = nextTokens.map((token) => buildResourceSearchTokenKey(token)).join("|");
+    hoveredEntityRef.current = null;
+    hoveredGroupAssociationRef.current = null;
+  }, [workspaceRouteKey]);
+
+  const captureWorkspaceRouteSession = useCallback((routeValue) => {
+    const route = normalizeBooruWorkspaceRoute(routeValue);
+    const routeKey = createBooruWorkspaceRouteKey(route);
+    const state = latestWorkspaceSessionStateRef.current;
+    if (!state) return;
+
+    const resourceSection = getActiveResourceSection(route.section, route.settingsSubview);
+    const session = {
+      route,
+      query: null,
+      filters: null,
+      order: null,
+      direction: null,
+      grouping: null,
+      results: null,
+      selection: null,
+      scrollTop: activeRouteScrollTopRef.current,
+    };
+
+    if (resourceSection) {
+      session.query = state.resourceSearchTokens;
+      session.freeText = state.resourceSearchText;
+      session.filters = {
+        mediaKind: state.resourceMediaKindFilter,
+        reality: state.resourceRealityFilter,
+        missing: state.resourceMissingFilter,
+        pendingMode: state.resourcePendingMode,
+      };
+      session.results = state.resourceState;
+      session.page = state.resourcePageState?.[resourceSection] || null;
+      session.selection = state.selectedResourceState?.[resourceSection] || null;
+      session.order = state.resourceBrowse?.sortBy || null;
+      session.direction = state.resourceBrowse?.direction || null;
+      session.grouping = state.resourceBrowse?.grouping || null;
+      session.randomSeed = state.resourceBrowse?.randomSeed || null;
+      session.groupBy = state.resourceBrowse?.groupBy || null;
+      session.groupOrderBy = state.resourceBrowse?.groupOrderBy || null;
+    } else if (route.entityKind) {
+      const routeBrowse = route.profile?.tab === "gallery" ? state.resourceBrowse : state.entityBrowse;
+      session.query = state.entitySearchValue;
+      session.exactFilters = state.entitySearchTokens;
+      session.order = routeBrowse?.sortBy || null;
+      session.direction = routeBrowse?.direction || null;
+      session.grouping = routeBrowse?.grouping || null;
+      session.randomSeed = routeBrowse?.randomSeed || null;
+      session.groupBy = routeBrowse?.groupBy || null;
+      session.groupOrderBy = routeBrowse?.groupOrderBy || null;
+      session.results = route.profile
+        ? {
+            profile: state.entityProfile,
+            gallery: state.entityProfileGalleryState,
+            relations: state.entityProfileRelationState,
+          }
+        : {
+            entities: state.entityItems,
+            placements: state.entityPlacements,
+            totalCount: state.entityTotalCount,
+            hasMore: state.entityHasMore,
+          };
+      session.page = state.entityProfilePageState?.[route.section] || null;
+      session.selection = route.profile ? state.profileGallerySelectedIds : null;
+    }
+
+    routeSessionsRef.current.set(routeKey, session);
+    sectionLastRouteRef.current.set(route.section, route);
+  }, []);
+
+  const restoreWorkspaceRouteSession = useCallback((routeValue, routeInput = null) => {
+    const route = normalizeBooruWorkspaceRoute(routeValue);
+    const routeKey = createBooruWorkspaceRouteKey(route);
+    const session = routeSessionsRef.current.get(routeKey) || null;
+    const resourceSection = getActiveResourceSection(route.section, route.settingsSubview);
+    const nextScrollTop = Math.max(0, Number(session?.scrollTop) || 0);
+
+    activeRouteScrollTopRef.current = nextScrollTop;
+    setActiveRouteScrollTop(nextScrollTop);
+    setProfileGallerySelectedIds(Array.isArray(session?.selection) ? session.selection : []);
+
+    if (resourceSection) {
+      setResourceSearchTokens(session?.query || buildResourceSearchInputTokens(routeInput));
+      setResourceSearchText(String(session?.freeText || ""));
+      setResourceBrowse(normalizeBooruBrowseQuery({
+        sortBy: session?.order,
+        direction: session?.direction,
+        grouping: session?.grouping,
+        randomSeed: session?.randomSeed,
+        groupBy: session?.groupBy,
+        groupOrderBy: session?.groupOrderBy,
+      }, "resource"));
+      setResourceMediaKindFilter(session?.filters?.mediaKind || "all");
+      setResourceRealityFilter(session?.filters?.reality || "all");
+      setResourceMissingFilter(session?.filters?.missing || BOORU_NO_MISSING_FILTER);
+      setResourcePendingMode(session?.filters?.pendingMode || "essential");
+      setResourceState(session?.results || { items: [], placements: [], totalCount: 0, placementCount: 0, hasMore: false, querySignature: "" });
+      setResourcePageState((currentValue) => ({
+        ...currentValue,
+        [resourceSection]: session?.page || { page: 1, querySignature: "" },
+      }));
+      setSelectedResourceState((currentValue) => ({
+        ...currentValue,
+        [resourceSection]: normalizeSectionSelection(session?.selection || EMPTY_SELECTION_STATE),
+      }));
+      return;
+    }
+
+    if (route.entityKind) {
+      setEntitySearchValue(String(session?.query || ""));
+      setEntitySearchTokens(Array.isArray(session?.exactFilters) ? session.exactFilters : []);
+      const restoredBrowseValue = {
+        sortBy: session?.order,
+        direction: session?.direction,
+        grouping: session?.grouping,
+        randomSeed: session?.randomSeed,
+        groupBy: session?.groupBy,
+        groupOrderBy: session?.groupOrderBy,
+      };
+      if (route.profile?.tab === "gallery") {
+        setResourceBrowse(normalizeBooruBrowseQuery(restoredBrowseValue, "resource"));
+      } else {
+        setEntityBrowse(normalizeBooruBrowseQuery(restoredBrowseValue, "entity", route.entityKind === "character"));
+      }
+      if (route.profile) {
+        setEntityProfile(resolveBooruProfileForRoute(
+          route,
+          session?.results?.profile,
+          latestWorkspaceSessionStateRef.current?.entityProfile,
+        ));
+        setEntityProfileGalleryState(session?.results?.gallery || { items: [], totalCount: 0, hasMore: false });
+        setEntityProfileRelationState(session?.results?.relations || { items: [], totalCount: 0, hasMore: false, relationKind: null });
+        setEntityProfilePageState((currentValue) => ({
+          ...currentValue,
+          [route.section]: session?.page || { page: 1, profileKey: `${route.profile.kind}:${route.profile.id}` },
+        }));
+      } else {
+        setEntityItems(session?.results?.entities || []);
+        setEntityPlacements(session?.results?.placements || []);
+        setEntityTotalCount(Number(session?.results?.totalCount || 0));
+        setEntityHasMore(Boolean(session?.results?.hasMore));
+      }
+    }
+  }, []);
+
+  const openWorkspaceRoute = useCallback((routeValue, navigationValue, baseInput = latestInputRef.current) => {
+    const route = normalizeBooruWorkspaceRoute(routeValue);
+    void ctx.openView({
+      viewId: BOORU_WORKSPACE_VIEW_ID,
+      reuse: true,
+      input: routeToBooruWorkspaceInput(route, baseInput, navigationValue),
+    });
+  }, [ctx]);
+
+  const handleRouteScrollStateChange = useCallback((nextScrollTop) => {
+    const normalizedScrollTop = Math.max(0, Number(nextScrollTop) || 0);
+    activeRouteScrollTopRef.current = normalizedScrollTop;
+    const route = currentWorkspaceRouteRef.current;
+    const routeKey = createBooruWorkspaceRouteKey(route);
+    const currentSession = routeSessionsRef.current.get(routeKey);
+    if (currentSession) {
+      routeSessionsRef.current.set(routeKey, { ...currentSession, scrollTop: normalizedScrollTop });
+    }
+  }, []);
+
+  const handleGridColumnWheel = useCallback((family, event) => {
+    const nextColumns = stepBooruGridColumns(gridColumns, family, event?.deltaY);
+    if (nextColumns[family] === gridColumns[family]) return;
+    void uiPreferencesApi.set({
+      ...(persistedUiPreferences && typeof persistedUiPreferences === "object" ? persistedUiPreferences : {}),
+      gridColumns: nextColumns,
+    });
+  }, [gridColumns, persistedUiPreferences, uiPreferencesApi]);
+
+  const updateResourceBrowse = useCallback((nextValue) => {
+    setResourceBrowse((currentValue) => {
+      const enteringRandom = nextValue?.sortBy === "random" && currentValue?.sortBy !== "random";
+      return normalizeBooruBrowseQuery({
+        ...currentValue,
+        ...nextValue,
+        randomSeed: enteringRandom ? createBooruRandomSeed() : (nextValue?.randomSeed || currentValue?.randomSeed),
+      }, "resource");
+    });
+  }, []);
+
+  const updateEntityBrowse = useCallback((nextValue) => {
+    setEntityBrowse((currentValue) => {
+      const enteringRandom = nextValue?.sortBy === "random" && currentValue?.sortBy !== "random";
+      return normalizeBooruBrowseQuery({
+        ...currentValue,
+        ...nextValue,
+        randomSeed: enteringRandom ? createBooruRandomSeed() : (nextValue?.randomSeed || currentValue?.randomSeed),
+      }, "entity", allowUniverseEntitySort);
+    });
+  }, [allowUniverseEntitySort]);
+
+  useEffect(() => {
+    const previousRoute = currentWorkspaceRouteRef.current;
+    const previousRouteKey = createBooruWorkspaceRouteKey(previousRoute);
+    const nextNonce = String(input?.[WORKSPACE_FRAME_SECTION_NONCE_KEY] || "").trim();
+    const isFrameSectionAction = Boolean(nextNonce && nextNonce !== lastSectionNonceRef.current);
+
+    if (isFrameSectionAction) {
+      lastSectionNonceRef.current = nextNonce;
+      captureWorkspaceRouteSession(previousRoute);
+      sectionNavigationRef.current.set(
+        previousRoute.section,
+        normalizeBooruNavigationState(input?.[BOORU_NAVIGATION_INPUT_KEY], previousRoute),
+      );
+
+      setResourceHeroState(null);
+      setInspectorOpen(false);
+      setAnchoredResources([]);
+      setContextMenuState(null);
+
+      if (previousRoute.section === workspaceRoute.section) {
+        for (const [key, session] of routeSessionsRef.current.entries()) {
+          if (session?.route?.section === workspaceRoute.section) routeSessionsRef.current.delete(key);
+        }
+        sectionLastRouteRef.current.delete(workspaceRoute.section);
+        sectionNavigationRef.current.delete(workspaceRoute.section);
+        const resetNavigation = resetBooruWorkspaceSection(
+          normalizeBooruNavigationState(input?.[BOORU_NAVIGATION_INPUT_KEY], previousRoute),
+          workspaceRoute.section,
+        );
+        const resetRoute = resetNavigation.activeRoute;
+        currentWorkspaceRouteRef.current = resetRoute;
+        restoreWorkspaceRouteSession(resetRoute, null);
+        openWorkspaceRoute(resetRoute, resetNavigation, input);
+        return;
+      }
+
+      const restoredNavigation = sectionNavigationRef.current.get(workspaceRoute.section);
+      const restoredRoute = sectionLastRouteRef.current.get(workspaceRoute.section)
+        || createBooruSectionRootRoute(workspaceRoute.section);
+      const nextNavigation = normalizeBooruNavigationState(
+        restoredNavigation || { activeRoute: restoredRoute, backStack: [] },
+        restoredRoute,
+      );
+      currentWorkspaceRouteRef.current = restoredRoute;
+      restoreWorkspaceRouteSession(restoredRoute, null);
+      openWorkspaceRoute(restoredRoute, nextNavigation, input);
+      return;
+    }
+
+    if (previousRouteKey === workspaceRouteKey) return;
+
+    captureWorkspaceRouteSession(previousRoute);
+    currentWorkspaceRouteRef.current = workspaceRoute;
+    sectionLastRouteRef.current.set(workspaceRoute.section, workspaceRoute);
+    sectionNavigationRef.current.set(
+      workspaceRoute.section,
+      normalizeBooruNavigationState(input?.[BOORU_NAVIGATION_INPUT_KEY], workspaceRoute),
+    );
+    restoreWorkspaceRouteSession(workspaceRoute, input);
+  }, [
+    captureWorkspaceRouteSession,
+    input?.[WORKSPACE_FRAME_SECTION_NONCE_KEY],
+    input?.[BOORU_NAVIGATION_INPUT_KEY],
+    openWorkspaceRoute,
+    restoreWorkspaceRouteSession,
+    workspaceRouteKey,
+  ]);
+
+  useEffect(() => {
+    if (activeResourceSection === "media") {
+      setResourceRealityFilter((currentValue) => currentValue === "untyped" ? "all" : currentValue);
+    }
+
+    if (!supportsMissingResourceFilters) {
+      setResourceMissingFilter(BOORU_NO_MISSING_FILTER);
+      setResourceSearchTokens((currentValue) => {
+        const normalizedTokens = normalizeResourceSearchTokens(currentValue);
+        const nextTokens = normalizedTokens.filter((token) => token?.type !== "missing");
+        return nextTokens.length === normalizedTokens.length ? currentValue : nextTokens;
+      });
+    }
+  }, [activeResourceSection, supportsMissingResourceFilters]);
+
+  useEffect(() => {
+    setResourceMissingFilter((currentValue) => (
+      isBooruMissingFilterCompatible(currentValue, contextualMissingFilterOptions)
+        ? currentValue
+        : BOORU_NO_MISSING_FILTER
+    ));
 
     setResourceSearchTokens((currentValue) => {
-      const currentSignature = normalizeResourceSearchTokens(currentValue)
-        .map((token) => buildResourceSearchTokenKey(token))
-        .join("|");
+      const normalizedTokens = normalizeResourceSearchTokens(currentValue);
+      const nextTokens = normalizedTokens.filter((token) => (
+        token?.type !== "missing"
+        || token?.negative
+        || isBooruMissingFilterCompatible(token.value, contextualMissingFilterOptions)
+      ));
 
-      return currentSignature === nextSignature ? currentValue : nextTokens;
+      return nextTokens.length === normalizedTokens.length ? currentValue : nextTokens;
     });
-  }, [input]);
+  }, [contextualMissingFilterOptionsSignature]);
 
   useEffect(() => {
     if (!activeEntityKind) {
       setEntityCreateValue("");
-    }
-  }, [activeEntityKind]);
-
-  useEffect(() => {
-    if (activeEntityKind !== "character") {
-      setEntityCreateUniverse(null);
     }
   }, [activeEntityKind]);
 
@@ -2065,14 +2457,18 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       setEntityProfile(null);
       setEntityProfileError("");
       setEntityProfileLoading(false);
-      setEntityProfileGalleryState({ items: [], totalCount: 0, hasMore: false });
+      setEntityProfileGalleryState({ items: [], placements: [], totalCount: 0, placementCount: 0, hasMore: false });
       setEntityProfileGalleryLoading(false);
+      setEntityProfileRelationState({ items: [], placements: [], totalCount: 0, placementCount: 0, hasMore: false, relationKind: null });
+      setEntityProfileRelationLoading(false);
     }
   }, [showEntityProfile]);
 
   useEffect(() => {
     if (!showResourceWorkspace) {
       setInspectorOpen(false);
+      setAnchoredResources([]);
+      detailsAnchorRequestVersionRef.current += 1;
     }
   }, [showResourceWorkspace]);
 
@@ -2126,11 +2522,25 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   }, [activeEntityKind, activeSection, entityProfileKey, showEntityProfile]);
 
   useEffect(() => {
+    if (!showEntityProfile || activeEntityProfile?.tab !== "gallery") {
+      return;
+    }
+
+    setEntityProfilePageState((currentValue) => ({
+      ...currentValue,
+      [activeSection]: {
+        page: 1,
+        profileKey: entityProfileKey,
+      },
+    }));
+  }, [activeSection, activeEntityProfile?.tab, deferredEntitySearchValue, entityProfileKey, normalizedEntitySearchTokens, resourceBrowse, showEntityProfile]);
+
+  useEffect(() => {
     if (!showResourceWorkspace) {
       return;
     }
 
-    const totalPages = Math.max(1, Math.ceil(Number(resourceState.totalCount || 0) / RESOURCE_PAGE_SIZE));
+    const totalPages = Math.max(1, Math.ceil(Number(resourceState.placementCount || resourceState.totalCount || 0) / RESOURCE_PAGE_SIZE));
 
     if (currentResourcePage > totalPages) {
       setResourcePageState((currentValue) => ({
@@ -2141,14 +2551,14 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         },
       }));
     }
-  }, [activeResourceSection, currentResourcePage, resourceQuerySignature, resourceState.totalCount, showResourceWorkspace]);
+  }, [activeResourceSection, currentResourcePage, resourceQuerySignature, resourceState.placementCount, resourceState.totalCount, showResourceWorkspace]);
 
   useEffect(() => {
     if (!showEntityProfile || !activeEntityKind) {
       return;
     }
 
-    const totalPages = Math.max(1, Math.ceil(Number(entityProfileGalleryState.totalCount || 0) / RESOURCE_PAGE_SIZE));
+    const totalPages = Math.max(1, Math.ceil(Number(entityProfileGalleryState.placementCount || entityProfileGalleryState.totalCount || 0) / RESOURCE_PAGE_SIZE));
 
     if (currentEntityProfilePage > totalPages) {
       setEntityProfilePageState((currentValue) => ({
@@ -2163,6 +2573,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     activeEntityKind,
     activeSection,
     currentEntityProfilePage,
+    entityProfileGalleryState.placementCount,
     entityProfileGalleryState.totalCount,
     entityProfileKey,
     showEntityProfile,
@@ -2326,7 +2737,13 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           && currentValue.querySignature === resourceQuerySignature
           ? appendResourcePageItems(currentValue.items, nextResources?.items)
           : (Array.isArray(nextResources?.items) ? nextResources.items : []),
+        placements: isInfiniteMedia
+          && normalizedRequestedPage > 1
+          && currentValue.querySignature === resourceQuerySignature
+          ? appendBrowsePlacements(currentValue.placements, nextResources?.placements)
+          : (Array.isArray(nextResources?.placements) ? nextResources.placements : []),
         totalCount: Number(nextResources?.totalCount || 0),
+        placementCount: Number(nextResources?.placementCount || nextResources?.totalCount || 0),
         hasMore: Boolean(nextResources?.hasMore),
         querySignature: resourceQuerySignature,
       }));
@@ -2427,6 +2844,138 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     }
   };
 
+  const reconcileResourceWindow = async () => {
+    const requestContext = resourceWindowContextRef.current;
+
+    if (!requestContext?.showResourceWorkspace || !requestContext.activeResourceSection) {
+      return;
+    }
+
+    resourceWindowRequestVersionRef.current += 1;
+    const requestVersion = resourceWindowRequestVersionRef.current;
+    const requestedLimit = Math.max(
+      RESOURCE_PAGE_SIZE,
+      Number(requestContext.itemCount || 0),
+      Number(requestContext.currentResourcePage || 1) * RESOURCE_PAGE_SIZE,
+    );
+
+    try {
+      const result = await invoke("booru:list-resources", {
+        section: requestContext.activeResourceSection,
+        query: requestContext.query,
+        offset: 0,
+        limit: requestedLimit,
+      });
+      const currentContext = resourceWindowContextRef.current;
+
+      if (
+        resourceWindowRequestVersionRef.current !== requestVersion
+        || !isBooruResourceWindowContextCurrent(requestContext, currentContext)
+      ) {
+        return;
+      }
+
+      setResourceState({
+        items: Array.isArray(result?.items) ? result.items : [],
+        placements: Array.isArray(result?.placements) ? result.placements : [],
+        totalCount: Number(result?.totalCount || 0),
+        placementCount: Number(result?.placementCount || result?.totalCount || 0),
+        hasMore: Boolean(result?.hasMore),
+        querySignature: requestContext.querySignature,
+      });
+    } catch (reconcileError) {
+      booruViewLogger.info(
+        "booru.resources.reconcile.error",
+        "Booru no pudo reconciliar la ventana incremental activa.",
+        {
+          section: requestContext.activeResourceSection,
+          querySignature: requestContext.querySignature,
+          error: reconcileError instanceof Error ? reconcileError.message : String(reconcileError || ""),
+        },
+      );
+    }
+  };
+
+  const refreshDetailsAnchor = async () => {
+    const requestContext = detailsAnchorRef.current;
+    const resourceIds = uniqueIds(requestContext?.ids);
+
+    if (!requestContext?.open || !requestContext.section || !resourceIds.length) {
+      return;
+    }
+
+    detailsAnchorRequestVersionRef.current += 1;
+    const requestVersion = detailsAnchorRequestVersionRef.current;
+
+    try {
+      const result = await invoke("booru:get-resources-by-ids", { resourceIds });
+      const currentContext = detailsAnchorRef.current;
+
+      if (
+        detailsAnchorRequestVersionRef.current !== requestVersion
+        || !currentContext?.open
+        || currentContext.section !== requestContext.section
+        || currentContext.activeId !== requestContext.activeId
+        || !arraysEqual(uniqueIds(currentContext.ids), resourceIds)
+      ) {
+        return;
+      }
+
+      const refreshedResources = Array.isArray(result?.items) ? result.items.filter((item) => item?.id) : [];
+      const refreshedById = new Map(refreshedResources.map((resource) => [resource.id, resource]));
+      const activeResource = refreshedById.get(requestContext.activeId) || null;
+      const activeWasDeleted = !activeResource
+        || (requestContext.section !== "trash" && Boolean(activeResource?.trashedAt));
+
+      if (activeWasDeleted) {
+        setInspectorOpen(false);
+        setDetailsContext(null);
+        setAnchoredResources([]);
+        if (requestContext.section === "profile") {
+          setProfileGallerySelectedIds([]);
+        } else {
+          setSelectedResourceState((currentValue) => ({
+            ...currentValue,
+            [requestContext.section]: RESOURCE_SELECTION_SECTIONS[requestContext.section] || EMPTY_SELECTION_STATE,
+          }));
+        }
+        return;
+      }
+
+      const nextResources = resourceIds
+        .map((resourceId) => refreshedById.get(resourceId) || null)
+        .filter(Boolean);
+      const nextIds = nextResources.map((resource) => resource.id);
+
+      setAnchoredResources(nextResources);
+
+      if (!arraysEqual(nextIds, resourceIds)) {
+        if (requestContext.section === "profile") {
+          setProfileGallerySelectedIds(nextIds);
+          setDetailsContext((currentValue) => currentValue ? { ...currentValue, ids: nextIds } : currentValue);
+        } else {
+          setSelectedResourceState((currentValue) => ({
+            ...currentValue,
+            [requestContext.section]: {
+              ids: nextIds,
+              activeId: requestContext.activeId,
+              mode: nextIds.length > 1 ? "multi" : "single",
+            },
+          }));
+        }
+      }
+    } catch (refreshError) {
+      booruViewLogger.info(
+        "booru.details.anchor-refresh.error",
+        "Booru no pudo actualizar el recurso anclado de Details.",
+        {
+          resourceIds,
+          error: refreshError instanceof Error ? refreshError.message : String(refreshError || ""),
+        },
+      );
+    }
+  };
+
   const loadEntityProfile = async () => {
     if (!showEntityProfile || !activeEntityProfile?.id || !activeEntityKind) {
       return;
@@ -2501,7 +3050,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   };
 
   const loadEntityProfileGallery = async ({ requestedPage = currentEntityProfilePage } = {}) => {
-    if (!showEntityProfile || activeEntityProfile?.tab === "data" || !activeEntityKind || !activeEntityProfile?.id) {
+    if (!showEntityProfile || activeEntityProfile?.tab !== "gallery" || !activeEntityKind || !activeEntityProfile?.id) {
       return;
     }
 
@@ -2522,10 +3071,16 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     );
 
     try {
+      const contextualQuery = buildBooruResourceQuery({
+        searchTokens: normalizedEntitySearchTokens,
+        freeText: deferredEntitySearchValue,
+        browse: resourceBrowse,
+      });
       const nextResources = await invoke("booru:list-resources", {
-        section: "media",
+        section: "profile",
         query: {
-          includeEntities: [{
+          ...contextualQuery,
+          includeEntities: [...contextualQuery.includeEntities, {
             kind: activeEntityKind,
             id: activeEntityProfile.id,
             label: getEntityProfileLabel(activeEntityProfile, entityProfile) || null,
@@ -2543,7 +3098,11 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         items: normalizedRequestedPage > 1
           ? appendResourcePageItems(currentValue.items, nextResources?.items)
           : (Array.isArray(nextResources?.items) ? nextResources.items : []),
+        placements: normalizedRequestedPage > 1
+          ? appendBrowsePlacements(currentValue.placements, nextResources?.placements)
+          : (Array.isArray(nextResources?.placements) ? nextResources.placements : []),
         totalCount: Number(nextResources?.totalCount || 0),
+        placementCount: Number(nextResources?.placementCount || nextResources?.totalCount || 0),
         hasMore: Boolean(nextResources?.hasMore),
       }));
       setEntityProfileError("");
@@ -2566,7 +3125,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         return;
       }
 
-      setEntityProfileGalleryState({ items: [], totalCount: 0, hasMore: false });
+      setEntityProfileGalleryState({ items: [], placements: [], totalCount: 0, placementCount: 0, hasMore: false });
       setEntityProfileError(
         loadError instanceof Error
           ? loadError.message
@@ -2587,6 +3146,62 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     } finally {
       if (entityProfileGalleryRequestVersionRef.current === requestVersion) {
         setEntityProfileGalleryLoading(false);
+      }
+    }
+  };
+
+  const loadEntityProfileRelations = async ({ append = false } = {}) => {
+    if (!showEntityProfile || !activeEntityRelationKind || !activeEntityKind || !activeEntityProfile?.id) {
+      return;
+    }
+
+    const offset = append
+      ? (entityProfileRelationState.placements?.length || entityProfileRelationState.items.length)
+      : 0;
+    const requestVersion = ++entityProfileRelationRequestVersionRef.current;
+    setEntityProfileRelationLoading(true);
+
+    try {
+      const result = await invoke("booru:list-entity-relations", {
+        sourceKind: activeEntityKind,
+        sourceId: activeEntityProfile.id,
+        relationKind: activeEntityRelationKind,
+        query: String(deferredEntitySearchValue || "").trim() || null,
+        exactFilters: normalizedEntitySearchTokens,
+        ...entityBrowse,
+        offset,
+        limit: RESOURCE_PAGE_SIZE,
+      });
+
+      if (entityProfileRelationRequestVersionRef.current !== requestVersion) {
+        return;
+      }
+
+      setEntityProfileRelationState((currentValue) => ({
+        items: append
+          ? appendResourcePageItems(currentValue.items, result?.items)
+          : (Array.isArray(result?.items) ? result.items : []),
+        placements: append
+          ? appendBrowsePlacements(currentValue.placements, result?.placements)
+          : (Array.isArray(result?.placements) ? result.placements : []),
+        totalCount: Number(result?.totalCount || 0),
+        placementCount: Number(result?.placementCount || result?.totalCount || 0),
+        hasMore: Boolean(result?.hasMore),
+        relationKind: activeEntityRelationKind,
+      }));
+      setEntityProfileError("");
+    } catch (loadError) {
+      if (entityProfileRelationRequestVersionRef.current !== requestVersion) {
+        return;
+      }
+
+      setEntityProfileRelationState({ items: [], placements: [], totalCount: 0, placementCount: 0, hasMore: false, relationKind: activeEntityRelationKind });
+      setEntityProfileError(
+        loadError instanceof Error ? loadError.message : "No se pudieron cargar las relaciones del perfil.",
+      );
+    } finally {
+      if (entityProfileRelationRequestVersionRef.current === requestVersion) {
+        setEntityProfileRelationLoading(false);
       }
     }
   };
@@ -2638,10 +3253,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     }
 
     void loadEntityProfile();
-  }, [activeEntityKind, activeEntityProfile?.id, entityRevision, showEntityProfile]);
+  }, [activeEntityKind, activeEntityProfile?.id, activeEntityProfile?.tab, entityRevision, showEntityProfile]);
 
   useEffect(() => {
-    if (!showEntityProfile || activeEntityProfile?.tab === "data") {
+    if (!showEntityProfile || activeEntityProfile?.tab !== "gallery") {
       return;
     }
 
@@ -2651,6 +3266,26 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     activeEntityProfile?.id,
     activeEntityProfile?.tab,
     currentEntityProfilePage,
+    deferredEntitySearchValue,
+    normalizedEntitySearchTokens,
+    resourceBrowse,
+    showEntityProfile,
+  ]);
+
+  useEffect(() => {
+    if (!showEntityProfile || !activeEntityRelationKind) {
+      return;
+    }
+
+    void loadEntityProfileRelations({ append: false });
+  }, [
+    activeEntityKind,
+    activeEntityProfile?.id,
+    activeEntityRelationKind,
+    deferredEntitySearchValue,
+    normalizedEntitySearchTokens,
+    entityBrowse,
+    entityRevision,
     showEntityProfile,
   ]);
 
@@ -2694,11 +3329,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           },
         );
         if (showResourceWorkspace) {
-          // Imports are sorted into the newest edge of every resource queue.
-          // Reloading a later incremental page leaves that edge invisible,
-          // most noticeably in Pendientes after a newly downloaded file.
-          setResourcePageForSection(activeResourceSection, 1);
-          void loadResources({ requestedPage: 1 });
+          // Reconcile the already loaded window without resetting its
+          // incremental cursor, selection or scroll position.
+          void reconcileResourceWindow();
+          void refreshDetailsAnchor();
         }
         if (showEntityProfile && activeEntityProfile?.tab !== "data") {
           // A watcher import belongs at the newest edge of this gallery. Reset
@@ -2787,16 +3421,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     showResourceWorkspace,
   ]);
 
-  useEffect(() => {
-    if (!activeEntityKind) {
-      setEntityItems([]);
-      setEntityLoading(false);
-      setEntityError("");
-      return;
-    }
-
-    let cancelled = false;
+  const loadEntitySection = async ({ append = false } = {}) => {
+    if (!activeEntityKind || showEntityProfile || (append && (entityLoading || !entityHasMore))) return;
     const startedAt = performance.now();
+    const requestVersion = ++entitySectionRequestVersionRef.current;
     setEntityLoading(true);
     booruViewLogger.debug(
       "booru.entities.section.start",
@@ -2808,18 +3436,26 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       },
     );
 
-    void invoke("booru:list-entities", {
+    try {
+      const data = await invoke("booru:list-entities", {
       kind: activeEntityKind,
       query: String(deferredEntitySearchValue || "").trim() || null,
-    })
-      .then((data) => {
-        if (cancelled) {
-          return;
-        }
-
-        setEntityItems(Array.isArray(data?.items) ? data.items : []);
-        setEntityError("");
-        logRendererDuration(
+        exactFilters: normalizedEntitySearchTokens,
+        ...entityBrowse,
+        offset: append ? (entityPlacements.length || entityItems.length) : 0,
+        limit: RESOURCE_PAGE_SIZE,
+      });
+      if (entitySectionRequestVersionRef.current !== requestVersion) return;
+      setEntityItems((currentValue) => append
+        ? appendResourcePageItems(currentValue, data?.items)
+        : (Array.isArray(data?.items) ? data.items : []));
+      setEntityPlacements((currentValue) => append
+        ? appendBrowsePlacements(currentValue, data?.placements)
+        : (Array.isArray(data?.placements) ? data.placements : []));
+      setEntityTotalCount(Number(data?.totalCount || 0));
+      setEntityHasMore(Boolean(data?.hasMore));
+      setEntityError("");
+      logRendererDuration(
           "booru.entities.section.done",
           "Booru resolvio la carga de entidades de una seccion.",
           performance.now() - startedAt,
@@ -2831,13 +3467,14 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
             sampleIds: summarizeIdsForLog(data?.items),
           },
         );
-      })
-      .catch((loadError) => {
-        if (cancelled) {
-          return;
-        }
-
+    } catch (loadError) {
+        if (entitySectionRequestVersionRef.current !== requestVersion) return;
+        if (!append) {
         setEntityItems([]);
+        setEntityPlacements([]);
+        setEntityTotalCount(0);
+        setEntityHasMore(false);
+        }
         setEntityError(
           loadError instanceof Error
             ? loadError.message
@@ -2854,17 +3491,24 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
             error: loadError instanceof Error ? loadError.message : String(loadError || ""),
           },
         );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setEntityLoading(false);
-        }
-      });
+    } finally {
+      if (entitySectionRequestVersionRef.current === requestVersion) setEntityLoading(false);
+    }
+  };
 
-    return () => {
-      cancelled = true;
-    };
-  }, [activeEntityKind, deferredEntitySearchValue, entityRevision]);
+  useEffect(() => {
+    if (!activeEntityKind || showEntityProfile) {
+      setEntityItems([]);
+      setEntityPlacements([]);
+      setEntityTotalCount(0);
+      setEntityHasMore(false);
+      setEntityLoading(false);
+      setEntityError("");
+      return;
+    }
+
+    void loadEntitySection({ append: false });
+  }, [activeEntityKind, deferredEntitySearchValue, entityBrowse, entityRevision, normalizedEntitySearchTokens, showEntityProfile]);
 
   const frameStatusTitle = useMemo(() => composeFrameStatusTitle(snapshot, {
     loading,
@@ -2971,6 +3615,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       return;
     }
 
+    if (inspectorOpen) {
+      return;
+    }
+
     setSelectedResourceState((currentValue) => {
       const nextSectionState = currentValue[activeResourceSection] || RESOURCE_SELECTION_SECTIONS[activeResourceSection];
       const visibleIds = new Set(resourceItems.map((item) => item.id));
@@ -2989,30 +3637,78 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         [activeResourceSection]: normalizedSelection,
       };
     });
-  }, [activeResourceSection, resourceItems, showResourceWorkspace]);
+  }, [activeResourceSection, inspectorOpen, resourceItems, showResourceWorkspace]);
+
+  const floatingDetailsActive = Boolean(
+    inspectorOpen
+    && detailsContext?.mode === "floating"
+    && showEntityProfile
+    && detailsContext?.surfaceKey === workspaceRouteKey,
+  );
+  const floatingDetailsIdsSignature = uniqueIds(detailsContext?.ids).join("|");
+  const detailsSelection = useMemo(() => {
+    if (!floatingDetailsActive) return currentSelection;
+    const ids = floatingDetailsIdsSignature ? floatingDetailsIdsSignature.split("|") : [];
+    return {
+      ids,
+      activeId: String(detailsContext?.activeId || "").trim(),
+      mode: ids.length > 1 ? "multi" : "single",
+    };
+  }, [currentSelection, detailsContext?.activeId, floatingDetailsActive, floatingDetailsIdsSignature]);
+  const detailsSourceItems = floatingDetailsActive
+    ? (Array.isArray(entityProfileGalleryState?.items) ? entityProfileGalleryState.items : [])
+    : resourceItems;
+  const currentSelectionIdsSignature = uniqueIds(detailsSelection.ids).join("|");
+  detailsAnchorRef.current = {
+    open: inspectorOpen && (showResourceWorkspace || floatingDetailsActive),
+    section: floatingDetailsActive ? "profile" : (activeResourceSection || ""),
+    surfaceKey: floatingDetailsActive ? workspaceRouteKey : (activeResourceSection || ""),
+    ids: uniqueIds(detailsSelection.ids),
+    activeId: String(detailsSelection.activeId || "").trim(),
+  };
 
   const selectedResources = useMemo(() => {
-    if (!showResourceWorkspace) {
-      return [];
-    }
-
-    const itemsById = new Map(resourceItems.map((item) => [item.id, item]));
-    return currentSelection.ids.map((resourceId) => itemsById.get(resourceId)).filter(Boolean);
-  }, [currentSelection.ids, resourceItems, showResourceWorkspace]);
+    return resolveBooruAnchoredResources(detailsSelection.ids, detailsSourceItems, anchoredResources);
+  }, [anchoredResources, detailsSelection.ids, detailsSourceItems]);
 
   const activeResource = useMemo(() => {
-    if (!showResourceWorkspace) {
-      return null;
-    }
-
-    return selectedResources.find((resource) => resource.id === currentSelection.activeId) || selectedResources[0] || null;
-  }, [currentSelection.activeId, selectedResources, showResourceWorkspace]);
+    const activeId = String(detailsSelection.activeId || "").trim();
+    return activeId
+      ? (selectedResources.find((resource) => resource.id === activeId) || null)
+      : (selectedResources[0] || null);
+  }, [detailsSelection.activeId, selectedResources]);
 
   useEffect(() => {
-    if (!currentSelection.ids.length) {
+    if (!detailsSelection.ids.length) {
       setInspectorOpen(false);
+      setDetailsContext(null);
+      setAnchoredResources([]);
     }
-  }, [currentSelection.ids.length]);
+  }, [detailsSelection.ids.length]);
+
+  useEffect(() => {
+    if (!inspectorOpen || !detailsSelection.ids.length || (!showResourceWorkspace && !floatingDetailsActive)) {
+      return;
+    }
+
+    const visibleById = new Map(detailsSourceItems.map((resource) => [resource.id, resource]));
+    const visibleSelection = detailsSelection.ids
+      .map((resourceId) => visibleById.get(resourceId))
+      .filter(Boolean);
+
+    if (visibleSelection.length) {
+      setAnchoredResources((currentValue) => mergeBooruResourceRecords(currentValue, visibleSelection));
+    }
+
+    void refreshDetailsAnchor();
+  }, [
+    activeResourceSection,
+    detailsSelection.activeId,
+    currentSelectionIdsSignature,
+    floatingDetailsActive,
+    inspectorOpen,
+    showResourceWorkspace,
+  ]);
 
   const dragPreviewResourcesById = useMemo(
     () => new Map(resourceItems.map((item) => [item.id, item])),
@@ -3024,7 +3720,45 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     return heroItems.find((item) => item?.id === activeHeroId) || heroItems[0] || null;
   }, [resourceHeroState]);
   const selectedResourceIdsSignature = selectedResources.map((resource) => resource.id).join("|");
-  const showInspector = showResourceWorkspace && inspectorOpen && selectedResources.length > 0;
+  const showInspector = showResourceWorkspace && inspectorOpen && detailsContext?.mode !== "floating" && Boolean(activeResource);
+  const showFloatingInspector = floatingDetailsActive && Boolean(activeResource);
+
+  const applyResourceMutationResult = (rawResult, expectedQuerySignature = resourceQuerySignature) => {
+    const mutation = normalizeBooruResourceMutationResult(rawResult);
+    const anchorIds = new Set(detailsAnchorRef.current?.ids || []);
+    const anchorUpdates = mutation.updatedResources.filter((resource) => anchorIds.has(resource.id));
+
+    if (anchorUpdates.length) {
+      setAnchoredResources((currentValue) => (
+        mergeBooruResourceRecords(currentValue, anchorUpdates)
+          .filter((resource) => anchorIds.has(resource.id))
+      ));
+    }
+
+    if (showEntityProfile && mutation.updatedResources.length) {
+      setEntityProfileGalleryState((currentValue) => ({
+        ...currentValue,
+        items: mergeBooruResourceRecords(currentValue?.items || [], mutation.updatedResources),
+      }));
+    }
+
+    if (resourceWindowContextRef.current?.querySignature === expectedQuerySignature) {
+      if (resourceWindowContextRef.current?.query?.grouping === "sectioned") {
+        void reconcileActiveResourceWindow();
+      } else {
+        setResourceState((currentValue) => {
+          const nextWindow = applyBooruMutationToResourceWindow(currentValue.items, mutation);
+          return {
+            ...currentValue,
+            items: nextWindow.items,
+            totalCount: Math.max(0, Number(currentValue.totalCount || 0) + mutation.totalCountDelta),
+          };
+        });
+      }
+    }
+
+    return mutation;
+  };
 
   const consumeSuppressedResourceClick = useCallback(() => {
     if (!suppressNextResourceClickRef.current) {
@@ -3443,7 +4177,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   ]);
 
   useEffect(() => {
-    if (!showResourceWorkspace) {
+    if (!detailsAnchorRef.current?.open) {
       setClassificationDraft(buildClassificationDraft([]));
       return;
     }
@@ -3457,7 +4191,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
 
       return buildClassificationDraft(selectedResources);
     });
-  }, [selectedResources, showResourceWorkspace]);
+  }, [selectedResources, showResourceWorkspace, floatingDetailsActive]);
 
   useEffect(() => {
     const clearCurrentSelection = () => {
@@ -3491,11 +4225,15 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           setBusyAction("trash");
           const result = await invoke("booru:trash-resources", {
             resourceIds: currentSelection.ids,
+            view: { section: activeResourceSection, query: resourceQuery },
           });
+          applyResourceMutationResult(result);
           setSnapshot(result?.snapshot || snapshot);
           setError("");
           setContextMenuState(null);
           clearCurrentSelection();
+          setInspectorOpen(false);
+          setAnchoredResources([]);
         } catch (trashError) {
           setError(
             trashError instanceof Error
@@ -3512,7 +4250,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [activeResourceSection, currentSelection.ids, showResourceWorkspace, snapshot]);
+  }, [activeResourceSection, currentSelection.ids, resourceQuerySignature, showResourceWorkspace, snapshot]);
 
   useEffect(() => {
     const supportsVisibleThumbnailPriming =
@@ -3706,6 +4444,19 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     setEntityProfilePageForSection(activeSection, currentEntityProfilePage + 1);
   };
 
+  const loadNextEntityProfileRelationPage = () => {
+    if (
+      !showEntityProfile
+      || !activeEntityRelationKind
+      || !entityProfileRelationState.hasMore
+      || entityProfileRelationLoading
+    ) {
+      return;
+    }
+
+    void loadEntityProfileRelations({ append: true });
+  };
+
   const clearSelectionForSection = (section) => {
     setSelectionForSection(section, {
       ids: [],
@@ -3731,6 +4482,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       items: nextItems,
     });
     setInspectorOpen(false);
+    setAnchoredResources([]);
   };
 
   const stepResourceHero = (direction) => {
@@ -3758,101 +4510,6 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       };
     });
   };
-
-  useEffect(() => {
-    if (!showResourceWorkspace || !activeResourceSection || !inspectorOpen) {
-      previousVisibleResourceIdsRef.current = resourceItems.map((item) => item.id);
-      return;
-    }
-
-    const nextVisibleIds = resourceItems.map((item) => item.id);
-    const currentActiveId = String(currentSelection.activeId || "").trim();
-    const activeStillVisible = currentActiveId && nextVisibleIds.includes(currentActiveId);
-
-    if (!activeStillVisible) {
-      if (!nextVisibleIds.length) {
-        setInspectorOpen(false);
-        previousVisibleResourceIdsRef.current = nextVisibleIds;
-        return;
-      }
-
-      const previousIds = previousVisibleResourceIdsRef.current;
-      const previousIndex = previousIds.indexOf(currentActiveId);
-      const fallbackIndex = previousIndex >= 0
-        ? Math.min(previousIndex, nextVisibleIds.length - 1)
-        : 0;
-      const replacementId = nextVisibleIds[fallbackIndex] || nextVisibleIds[0] || "";
-
-      if (replacementId) {
-        setSelectionForSection(activeResourceSection, {
-          ids: [replacementId],
-          activeId: replacementId,
-          mode: "single",
-        });
-      } else {
-        setInspectorOpen(false);
-      }
-    }
-
-    previousVisibleResourceIdsRef.current = nextVisibleIds;
-  }, [
-    activeResourceSection,
-    currentSelection.activeId,
-    inspectorOpen,
-    resourceItems,
-    showResourceWorkspace,
-  ]);
-
-  useEffect(() => {
-    const nextNonce = String(input?.[WORKSPACE_FRAME_SECTION_NONCE_KEY] || "").trim();
-
-    if (!nextNonce || lastSectionNonceRef.current === nextNonce) {
-      return;
-    }
-
-    lastSectionNonceRef.current = nextNonce;
-    setResourceHeroState(null);
-    setInspectorOpen(false);
-    setContextMenuState(null);
-
-    if (activeResourceSection) {
-      clearSelectionForSection(activeResourceSection);
-      setResourcePageForSection(activeResourceSection, 1);
-    }
-
-    if (activeSection === "settings" && settingsSubview !== NO_SETTINGS_SUBVIEW) {
-      void ctx.openView({
-        viewId: BOORU_WORKSPACE_VIEW_ID,
-        reuse: true,
-        input: {
-          ...(input && typeof input === "object" ? input : {}),
-          section: "settings",
-          settingsSubview: NO_SETTINGS_SUBVIEW,
-          entityProfile: null,
-        },
-      });
-      return;
-    }
-
-    if (showEntityProfile) {
-      void ctx.openView({
-        viewId: BOORU_WORKSPACE_VIEW_ID,
-        reuse: true,
-        input: {
-          ...(input && typeof input === "object" ? input : {}),
-          section: activeSection,
-          entityProfile: null,
-        },
-      });
-    }
-  }, [
-    activeResourceSection,
-    activeSection,
-    ctx,
-    input,
-    settingsSubview,
-    showEntityProfile,
-  ]);
 
   useEffect(() => {
     setResourceHeroState(null);
@@ -3924,18 +4581,12 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     const selectedContextResources = selectionIds.map((resourceId) => itemsById.get(resourceId)).filter(Boolean);
     const singleContextResource = selectedContextResources.length === 1 ? selectedContextResources[0] : null;
     const imageCompatible = canUseResourceForImageActions(singleContextResource);
-    const menuItems = activeResourceSection === "trash"
-      ? [
-        { id: "details", label: "Detalles" },
-        { id: "restore", label: "Restaurar" },
-        { id: "purge", label: "Purgar", danger: true },
-      ]
-      : [
-        { id: "details", label: "Detalles" },
-        { id: "trash", label: "Eliminar", danger: true },
-        ...(imageCompatible ? [{ id: "copy", label: "Copiar al portapapeles" }] : []),
-        ...(imageCompatible ? [{ id: "google", label: "Buscar en Google" }] : []),
-      ];
+    const menuItems = buildBooruResourceActions({
+      surface: "resource",
+      section: activeResourceSection,
+      selectionCount: selectionIds.length,
+      imageCompatible,
+    });
 
     setContextMenuState({
       x: event.clientX,
@@ -3944,6 +4595,8 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       resourceIds: selectionIds,
       resources: selectedContextResources,
       activeId,
+      surface: "resource",
+      section: activeResourceSection,
     });
   };
 
@@ -3955,34 +4608,31 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     event.preventDefault();
     event.stopPropagation();
 
+    const contextIds = uniqueIds(selectedIds);
+    const profileItemsById = new Map((entityProfileGalleryState?.items || []).map((resource) => [resource.id, resource]));
+    const contextResources = contextIds.map((resourceId) => profileItemsById.get(resourceId)).filter(Boolean);
+    setProfileGallerySelectedIds(contextIds);
     setContextMenuState({
       x: event.clientX,
       y: event.clientY,
-      items: [
-        ...(canUseResourceForImageActions(item) ? [
-          { id: "copy", label: "Copiar al portapapeles" },
-          { id: "google", label: "Buscar en Google" },
-        ] : []),
-        ...(canUseResourceAsEntityVisual(item) ? [
-          { id: "set-avatar", label: "Usar como perfil" },
-          { id: "set-banner", label: "Usar como banner" },
-        ] : []),
-        { id: "disassociate-profile", label: selectedIds.length > 1 ? "Desasociar seleccion de esta entidad" : "Desasociar de esta entidad" },
-      ],
-      resourceIds: uniqueIds(selectedIds),
-      resources: [item],
+      items: buildBooruResourceActions({
+        surface: "profile",
+        selectionCount: contextIds.length,
+        imageCompatible: contextResources.length === 1 && canUseResourceForImageActions(item),
+        visualCompatible: contextResources.length === 1 && canUseResourceAsEntityVisual(item),
+      }),
+      resourceIds: contextIds,
+      resources: contextResources,
+      activeId: item.id,
+      surface: "profile",
+      section: "profile",
       entityKind: activeEntityKind,
       entityId: activeEntityProfile.id,
     });
   };
 
   const openEntityCardContextMenu = (item, event) => {
-    const contextResource = buildContextResourceFromDescriptor({
-      sampleResourceId: item?.cardResourceId || item?.sampleResourceId,
-      storagePath: item?.cardStoragePath || item?.sampleStoragePath,
-      sampleStoragePath: item?.cardPreviewPath || item?.sampleStoragePath,
-      sampleMediaKind: item?.cardMediaKind || item?.sampleMediaKind,
-    });
+    const contextResource = buildContextResourceFromDescriptor(item?.visual || item);
 
     if (!contextResource) {
       return;
@@ -4041,7 +4691,11 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     }
 
     const ids = Array.isArray(contextMenuState?.resourceIds) ? contextMenuState.resourceIds : [];
-    const itemsById = new Map(resourceItems.map((resource) => [resource.id, resource]));
+    const itemsById = new Map([
+      ...resourceItems,
+      ...(Array.isArray(entityProfileGalleryState?.items) ? entityProfileGalleryState.items : []),
+      ...anchoredResourcesRef.current,
+    ].map((resource) => [resource.id, resource]));
     return ids.map((resourceId) => itemsById.get(resourceId)).filter(Boolean);
   };
 
@@ -4056,9 +4710,11 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       ...contextResources.map((resource) => resource.id),
     ]);
     const singleResource = contextResources.length === 1 ? contextResources[0] : null;
+    const contextActiveId = String(contextMenuState?.activeId || contextIds[0] || "").trim();
     const contextEntityKind = String(contextMenuState?.entityKind || "").trim();
     const contextEntityId = String(contextMenuState?.entityId || "").trim();
     const contextVisualRole = String(contextMenuState?.visualRole || "").trim();
+    const contextSurface = String(contextMenuState?.surface || "resource").trim();
     setContextMenuState(null);
 
     try {
@@ -4104,7 +4760,32 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         return;
       }
 
-      if (actionId === "details" && activeResourceSection) {
+      if (actionId === "details" && contextIds.length) {
+        const contextById = new Map(contextResources.map((resource) => [resource.id, resource]));
+        setAnchoredResources(
+          contextIds.map((resourceId) => contextById.get(resourceId)).filter(Boolean),
+        );
+        if (contextSurface === "profile" && showEntityProfile) {
+          setProfileGallerySelectedIds(contextIds);
+          setDetailsContext({
+            mode: "floating",
+            surfaceKey: workspaceRouteKey,
+            ids: contextIds,
+            activeId: contextActiveId,
+            profileContext: { kind: contextEntityKind, entityId: contextEntityId },
+          });
+          setFloatingDetailsGeometry((currentValue) => clampBooruFloatingDetailsGeometry(currentValue, {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          }));
+        } else if (activeResourceSection) {
+          setSelectionForSection(activeResourceSection, {
+            ids: contextIds,
+            activeId: contextActiveId,
+            mode: contextIds.length > 1 ? "multi" : "single",
+          });
+          setDetailsContext({ mode: "fixed", surfaceKey: activeResourceSection });
+        }
         setInspectorOpen(true);
         return;
       }
@@ -4123,10 +4804,21 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         setBusyAction("trash");
         const result = await invoke("booru:trash-resources", {
           resourceIds: contextIds,
+          ...(activeResourceSection ? { view: { section: activeResourceSection, query: resourceQuery } } : {}),
         });
+        applyResourceMutationResult(result);
         setSnapshot(result?.snapshot || snapshot);
-        clearSelectionForSection(activeResourceSection);
+        if (activeResourceSection) clearSelectionForSection(activeResourceSection);
+        if (contextSurface === "profile") {
+          setProfileGallerySelectedIds([]);
+          setEntityProfileGalleryState((currentValue) => ({
+            ...currentValue,
+            items: (currentValue?.items || []).filter((resource) => !contextIds.includes(resource.id)),
+          }));
+        }
         setInspectorOpen(false);
+        setDetailsContext(null);
+        setAnchoredResources([]);
         return;
       }
 
@@ -4134,10 +4826,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         setBusyAction("restore");
         const result = await invoke("booru:restore-resources", {
           resourceIds: contextIds,
+          view: { section: activeResourceSection, query: resourceQuery },
         });
+        applyResourceMutationResult(result);
         setSnapshot(result?.snapshot || snapshot);
-        clearSelectionForSection(activeResourceSection);
-        setInspectorOpen(false);
         return;
       }
 
@@ -4145,10 +4837,13 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         setBusyAction("purge");
         const result = await invoke("booru:purge-resources", {
           resourceIds: contextIds,
+          view: { section: activeResourceSection, query: resourceQuery },
         });
+        applyResourceMutationResult(result);
         setSnapshot(result?.snapshot || snapshot);
         clearSelectionForSection(activeResourceSection);
         setInspectorOpen(false);
+        setAnchoredResources([]);
       }
     } catch (actionError) {
       setError(
@@ -4185,31 +4880,31 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     );
 
     try {
-      const itemsById = new Map(resourceItems.map((item) => [item.id, item]));
+      const itemsById = new Map(
+        [
+          ...resourceItems,
+          ...(Array.isArray(entityProfileGalleryState?.items) ? entityProfileGalleryState.items : []),
+          ...anchoredResourcesRef.current,
+        ].map((item) => [item.id, item]),
+      );
       const draftResources = draftToPersist.resourceIds
         .map((resourceId) => itemsById.get(resourceId))
         .filter(Boolean);
-      const payload = buildSavePayload(draftResources, draftToPersist);
+      const expectedQuerySignature = resourceQuerySignature;
+      const payload = {
+        ...buildSavePayload(draftResources, draftToPersist),
+        ...(showResourceWorkspace ? { view: { section: activeResourceSection, query: resourceQuery } } : {}),
+      };
       const result = await invoke(
         canSaveClassification(draftToPersist) ? "booru:save-basic-classification" : "booru:save-resource-metadata",
         payload,
       );
-      const savedResources = normalizeSelectedEntities(
-        Array.isArray(result?.resource)
-          ? result.resource
-          : [result?.resource].filter(Boolean),
-      );
+      const mutation = applyResourceMutationResult(result, expectedQuerySignature);
+      const savedResources = normalizeSelectedEntities(mutation.updatedResources);
       const savedById = new Map(savedResources.map((item) => [item.id, item]));
       const orderedSavedResources = draftToPersist.resourceIds
         .map((resourceId) => savedById.get(resourceId))
         .filter(Boolean);
-
-      if (orderedSavedResources.length) {
-        setResourceState((currentValue) => ({
-          ...currentValue,
-          items: mergeResourcesIntoItems(currentValue.items, orderedSavedResources),
-        }));
-      }
 
       setSnapshot(result?.snapshot || snapshot);
       setError("");
@@ -4265,7 +4960,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   };
 
   useEffect(() => {
-    if (!showResourceWorkspace || activeResourceSection === "duplicates" || activeResourceSection === "trash") {
+    if (
+      (!showResourceWorkspace && !floatingDetailsActive)
+      || (showResourceWorkspace && (activeResourceSection === "duplicates" || activeResourceSection === "trash"))
+    ) {
       return undefined;
     }
 
@@ -4285,7 +4983,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         autosaveTimerRef.current = 0;
       }
     };
-  }, [activeResourceSection, classificationDraft, selectedResourceIdsSignature, showResourceWorkspace]);
+  }, [activeResourceSection, classificationDraft, floatingDetailsActive, selectedResourceIdsSignature, showResourceWorkspace]);
 
   const handleQuickAssignEntity = async ({ resourceId, resourceIds, kind, entityId }) => {
     const normalizedResourceIds = uniqueIds([
@@ -4311,26 +5009,18 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     );
 
     try {
+      const expectedQuerySignature = resourceQuerySignature;
       const result = await invoke("booru:quick-assign-entity", {
         resourceId: normalizedResourceIds[0] || null,
         resourceIds: normalizedResourceIds,
         kind,
         entityId,
+        view: { section: activeResourceSection, query: resourceQuery },
       });
 
       setSnapshot(result?.snapshot || snapshot);
-      const updatedResources = normalizeSelectedEntities(
-        Array.isArray(result?.resource)
-          ? result.resource
-          : [result?.resource].filter(Boolean),
-      );
-
-      if (updatedResources.length) {
-        setResourceState((currentValue) => ({
-          ...currentValue,
-          items: mergeResourcesIntoItems(currentValue.items, updatedResources),
-        }));
-      }
+      const mutation = applyResourceMutationResult(result, expectedQuerySignature);
+      const updatedResources = normalizeSelectedEntities(mutation.updatedResources);
       setError("");
       setEntityRevision((currentValue) => currentValue + 1);
       logRendererDuration(
@@ -4414,7 +5104,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         nextDraft.reality = "ficticio";
       }
 
-      return markDraftDirty(nextDraft, draftField);
+      return applyClassificationPolicyToDraft(markDraftDirty(nextDraft, draftField));
     };
 
     booruViewLogger.debug(
@@ -4434,10 +5124,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
 
     try {
       if (item.type === "reality-action") {
-        setClassificationDraft((currentDraft) => markDraftDirty({
+        setClassificationDraft((currentDraft) => applyClassificationPolicyToDraft(markDraftDirty({
           ...resolveDraftForSelection(currentDraft),
           reality: item.reality || null,
-        }, "reality"));
+        }, "reality"), { realityWasEdited: true }));
       } else if (item.type === "entity") {
         const nextEntity = item.entity || {
           id: item.entityId,
@@ -4482,11 +5172,12 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           }, "manualTags");
         });
       } else if (item.type === "create-entity") {
-        const result = await invoke("booru:ensure-entity", {
-          kind: item.kind,
-          name: item.createName || item.label,
-        });
+        const result = await ensureEntityFromUi(item.kind, item.createName || item.label);
         const nextEntity = result?.entity;
+
+        if (!result) {
+          return;
+        }
 
         if (!nextEntity?.id) {
           throw new Error("Booru no devolvio la entidad creada.");
@@ -4598,15 +5289,20 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     }
   };
 
-  const importClipboardMedia = async (association) => {
-    if (!association || entityBusy) return;
+  const importClipboardMedia = async (associationValue) => {
+    const associations = mergeBooruClipboardAssociations(associationValue);
+    if (!associations.length) {
+      setClipboardAssociationState({ defaultKind: activeEntityKind || "author" });
+      return;
+    }
+    if (entityBusy) return;
     setEntityBusy(true);
 
     try {
       const tempFilePath = await window.nexus.clipboard.exportMediaToTempFile("booru-media");
       const result = await invoke("booru:paste-clipboard-media", {
         tempFilePath,
-        association,
+        associations,
       });
 
       setSnapshot(result?.snapshot || snapshot);
@@ -4617,17 +5313,19 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       setEntityProfileError("");
       setClipboardAssociationState(null);
       setEntityRevision((currentValue) => currentValue + 1);
-      setEntityProfilePageForSection(activeSection, 1);
+      if (showEntityProfile) setEntityProfilePageForSection(activeSection, 1);
 
-      if (activeEntityProfile?.tab !== "data" && currentEntityProfilePage === 1) {
+      if (showEntityProfile && activeEntityProfile?.tab !== "data" && currentEntityProfilePage === 1) {
         await loadEntityProfileGallery({ requestedPage: 1 });
+      } else if (showResourceWorkspace) {
+        await reconcileActiveResourceWindow();
       }
     } catch (pasteError) {
-      setEntityProfileError(
-        pasteError instanceof Error
-          ? pasteError.message
-          : "No se pudo pegar la imagen del portapapeles en esta entidad.",
-      );
+      const message = pasteError instanceof Error
+        ? pasteError.message
+        : "No se pudo pegar el recurso del portapapeles en Booru.";
+      if (showEntityProfile) setEntityProfileError(message);
+      else setError(message);
     } finally {
       setEntityBusy(false);
     }
@@ -4635,7 +5333,13 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
 
   const handlePasteClipboardImageToEntity = async () => {
     if (!showEntityProfile || !activeEntityKind || !activeEntityProfile?.id) return;
-    await importClipboardMedia({ kind: activeEntityKind, entityId: activeEntityProfile.id });
+    await importClipboardMedia(mergeBooruClipboardAssociations(
+      { kind: activeEntityKind, entityId: activeEntityProfile.id },
+      hoveredGroupAssociationRef.current,
+      hoveredEntityRef.current?.id && hoveredEntityRef.current?.kind
+        ? { kind: hoveredEntityRef.current.kind, entityId: hoveredEntityRef.current.id }
+        : null,
+    ));
   };
 
   const handleClipboardPasteShortcut = (event) => {
@@ -4650,14 +5354,17 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     event.preventDefault();
     event.stopPropagation();
 
-    if (showEntityProfile && activeEntityKind && activeEntityProfile?.id) {
-      void importClipboardMedia({ kind: activeEntityKind, entityId: activeEntityProfile.id });
-      return;
-    }
-
-    const hoveredEntity = hoveredEntityRef.current;
-    if (hoveredEntity?.id && hoveredEntity?.kind) {
-      void importClipboardMedia({ kind: hoveredEntity.kind, entityId: hoveredEntity.id });
+    const associations = mergeBooruClipboardAssociations(
+      showEntityProfile && activeEntityKind && activeEntityProfile?.id
+        ? { kind: activeEntityKind, entityId: activeEntityProfile.id }
+        : null,
+      hoveredGroupAssociationRef.current,
+      hoveredEntityRef.current?.id && hoveredEntityRef.current?.kind
+        ? { kind: hoveredEntityRef.current.kind, entityId: hoveredEntityRef.current.id }
+        : null,
+    );
+    if (associations.length) {
+      void importClipboardMedia(associations);
       return;
     }
     setClipboardAssociationState({ defaultKind: activeEntityKind || "author" });
@@ -4686,11 +5393,12 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     setEntityBusy(true);
 
     try {
-      if (activeEntityKind === "character" && entityCreateUniverse?.id) {
-        await invoke("booru:ensure-character-in-universe", {
-          name: trimmedName,
-          universeId: entityCreateUniverse.id,
-        });
+      if (activeEntityKind === "character") {
+        const created = await ensureEntityFromUi("character", trimmedName);
+
+        if (!created?.entity?.id) {
+          return;
+        }
       } else {
         await invoke("booru:ensure-entity", {
           kind: activeEntityKind,
@@ -4699,7 +5407,6 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       }
       setEntityError("");
       setEntityCreateValue("");
-      setEntityCreateUniverse(null);
       setEntityRevision((currentValue) => currentValue + 1);
     } catch (ensureError) {
       setEntityError(
@@ -4717,13 +5424,11 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       setBusyAction("restore");
       const result = await invoke("booru:restore-resources", {
         resourceIds: currentSelection.ids,
+        view: { section: activeResourceSection, query: resourceQuery },
       });
+      applyResourceMutationResult(result);
       setSnapshot(result?.snapshot || snapshot);
       setError("");
-      if (activeResourceSection) {
-        clearSelectionForSection(activeResourceSection);
-      }
-      setInspectorOpen(false);
     } catch (restoreError) {
       setError(
         restoreError instanceof Error
@@ -4740,13 +5445,16 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       setBusyAction("purge");
       const result = await invoke("booru:purge-resources", {
         resourceIds: currentSelection.ids,
+        view: { section: activeResourceSection, query: resourceQuery },
       });
+      applyResourceMutationResult(result);
       setSnapshot(result?.snapshot || snapshot);
       setError("");
       if (activeResourceSection) {
         clearSelectionForSection(activeResourceSection);
       }
       setInspectorOpen(false);
+      setAnchoredResources([]);
     } catch (purgeError) {
       setError(
         purgeError instanceof Error
@@ -4765,31 +5473,37 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       return;
     }
 
-    void ctx.openView({
-      viewId: BOORU_WORKSPACE_VIEW_ID,
-      reuse: true,
-      input: {
-        ...(input && typeof input === "object" ? input : {}),
-        section: ENTITY_KIND_SECTION_MAP[kind] || activeSection,
-        entityProfile: {
-          kind,
-          id: item.id,
-          tab: "gallery",
-        },
-      },
+    const currentRoute = currentWorkspaceRouteRef.current;
+    const nextRoute = normalizeBooruWorkspaceRoute({
+      section: ENTITY_KIND_SECTION_MAP[kind] || activeSection,
+      entityProfile: { kind, id: item.id, tab: "gallery" },
     });
+    const navigation = pushBooruWorkspaceRoute(
+      normalizeBooruNavigationState(input?.[BOORU_NAVIGATION_INPUT_KEY], currentRoute),
+      nextRoute,
+    );
+    captureWorkspaceRouteSession(currentRoute);
+    openWorkspaceRoute(nextRoute, navigation, input);
   };
 
-  const handleCloseEntityProfile = () => {
-    void ctx.openView({
-      viewId: BOORU_WORKSPACE_VIEW_ID,
-      reuse: true,
-      input: {
-        ...(input && typeof input === "object" ? input : {}),
-        section: activeSection,
-        entityProfile: null,
+  const handleCloseEntityProfile = async () => {
+    const currentRoute = currentWorkspaceRouteRef.current;
+    const navigation = await popBooruWorkspaceRoute(
+      normalizeBooruNavigationState(input?.[BOORU_NAVIGATION_INPUT_KEY], currentRoute),
+      async (candidate) => {
+        if (!candidate.profile) return true;
+        try {
+          return Boolean(await invoke("booru:get-entity-profile", {
+            kind: candidate.profile.kind,
+            id: candidate.profile.id,
+          }));
+        } catch {
+          return false;
+        }
       },
-    });
+    );
+    captureWorkspaceRouteSession(currentRoute);
+    openWorkspaceRoute(navigation.activeRoute, navigation, input);
   };
 
   const handleChangeEntityProfileTab = (nextTab) => {
@@ -4797,20 +5511,25 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       return;
     }
 
-    const normalizedTab = ["gallery", "data", "tags"].includes(nextTab) ? nextTab : "gallery";
-    void ctx.openView({
-      viewId: BOORU_WORKSPACE_VIEW_ID,
-      reuse: true,
-      input: {
-        ...(input && typeof input === "object" ? input : {}),
-        section: activeSection,
-        entityProfile: {
-          kind: activeEntityKind,
-          id: activeEntityProfile.id,
-          tab: normalizedTab,
-        },
+    const normalizedTab = getBooruEntityProfileTabOptions(activeEntityKind)
+      .some((option) => option.value === nextTab)
+      ? nextTab
+      : "gallery";
+    const currentRoute = currentWorkspaceRouteRef.current;
+    const nextRoute = normalizeBooruWorkspaceRoute({
+      section: activeSection,
+      entityProfile: {
+        kind: activeEntityKind,
+        id: activeEntityProfile.id,
+        tab: normalizedTab,
       },
     });
+    const navigation = replaceBooruWorkspaceRoute(
+      normalizeBooruNavigationState(input?.[BOORU_NAVIGATION_INPUT_KEY], currentRoute),
+      nextRoute,
+    );
+    captureWorkspaceRouteSession(currentRoute);
+    openWorkspaceRoute(nextRoute, navigation, input);
   };
 
   const handleOpenEntityInMedia = () => {
@@ -4822,25 +5541,30 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       || BOORU_ENTITY_KIND_LABELS[activeEntityKind]
       || "Entidad";
 
-    void ctx.openView({
-      viewId: BOORU_WORKSPACE_VIEW_ID,
-      reuse: true,
-      input: {
-        ...(input && typeof input === "object" ? input : {}),
-        section: "media",
-        entityProfile: null,
-        settingsSubview: NO_SETTINGS_SUBVIEW,
-        resourceSearchTokens: [
-          {
-            type: "entity",
-            negative: false,
-            kind: activeEntityKind,
-            id: activeEntityProfile.id,
-            value: entityLabel,
-            label: entityLabel,
-          },
-        ],
+    const currentRoute = currentWorkspaceRouteRef.current;
+    const nextRoute = createBooruSectionRootRoute("media");
+    const mediaSearchTokens = [
+      {
+        type: "entity",
+        negative: false,
+        kind: activeEntityKind,
+        id: activeEntityProfile.id,
+        value: entityLabel,
+        label: entityLabel,
       },
+    ];
+    const navigation = pushBooruWorkspaceRoute(
+      normalizeBooruNavigationState(input?.[BOORU_NAVIGATION_INPUT_KEY], currentRoute),
+      nextRoute,
+    );
+    captureWorkspaceRouteSession(currentRoute);
+    routeSessionsRef.current.set(
+      createBooruWorkspaceRouteKey(nextRoute),
+      createBooruResourceRouteSession(nextRoute, mediaSearchTokens),
+    );
+    openWorkspaceRoute(nextRoute, navigation, {
+      ...(input && typeof input === "object" ? input : {}),
+      resourceSearchTokens: mediaSearchTokens,
     });
   };
 
@@ -4849,16 +5573,17 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       ? nextSubview
       : NO_SETTINGS_SUBVIEW;
 
-    void ctx.openView({
-      viewId: BOORU_WORKSPACE_VIEW_ID,
-      reuse: true,
-      input: {
-        ...(input && typeof input === "object" ? input : {}),
-        section: "settings",
-        settingsSubview: normalizedSubview,
-        entityProfile: null,
-      },
+    const currentRoute = currentWorkspaceRouteRef.current;
+    const nextRoute = normalizeBooruWorkspaceRoute({
+      section: "settings",
+      settingsSubview: normalizedSubview,
     });
+    const navigation = pushBooruWorkspaceRoute(
+      normalizeBooruNavigationState(input?.[BOORU_NAVIGATION_INPUT_KEY], currentRoute),
+      nextRoute,
+    );
+    captureWorkspaceRouteSession(currentRoute);
+    openWorkspaceRoute(nextRoute, navigation, input);
   };
 
   if (activeSection === "settings" && settingsSubview === NO_SETTINGS_SUBVIEW) {
@@ -4907,20 +5632,27 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   return (
     <WorkspacePage className="booruView" onKeyDownCapture={handleClipboardPasteShortcut}>
       <WorkspaceBody className="booruView__body">
-        <SplitLayout variant="sidebar-detail" className="booruView__layout">
+        <SplitLayout
+          variant="sidebar-detail"
+          className={["booruView__layout", activeEntityKind ? "booruView__layout--entity" : ""].filter(Boolean).join(" ")}
+        >
+          {showResourceWorkspace ? (
           <SplitSidebar className="booruView__sidebar">
             <ScrollRegion className="booruView__sidebarScroll">
               <PanelStack className="booruView__sidebarStack">
                 <SectionPanel className="booruView__panel booruView__panel--compact booruView__panel--fill">
-                  {showResourceWorkspace ? (
                     <>
                       <Field label="Buscar" className="booruView__field">
                         <ResourceSearchComposer
                           tokens={normalizedResourceSearchTokens}
                           onChange={setResourceSearchTokens}
+                          freeText={resourceSearchText}
+                          onFreeTextChange={setResourceSearchText}
                           invoke={invoke}
                           realitySuggestions={RESOURCE_SEARCH_REALITY_SUGGESTIONS}
-                          missingSuggestions={RESOURCE_SEARCH_MISSING_SUGGESTIONS}
+                          missingSuggestions={supportsMissingResourceFilters
+                            ? RESOURCE_SEARCH_MISSING_SUGGESTIONS
+                            : EMPTY_RESOURCE_SEARCH_SUGGESTIONS}
                           helpers={{
                             normalizeResourceSearchTokens,
                             buildResourceSearchTokenKey,
@@ -4947,7 +5679,18 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                                 variant="compact"
                                 options={PENDING_MODE_OPTIONS}
                                 value={resourcePendingMode}
-                                onChange={(value) => setResourcePendingMode(value === "tags" ? "tags" : "essential")}
+                                onChange={(value) => {
+                                  const nextMode = value === "tags" ? "tags" : "essential";
+                                  setResourcePendingMode(nextMode);
+
+                                  if (nextMode === "tags") {
+                                    setResourceMissingFilter(BOORU_NO_MISSING_FILTER);
+                                    setResourceSearchTokens((currentValue) => (
+                                      normalizeResourceSearchTokens(currentValue)
+                                        .filter((token) => token?.type !== "missing" || token?.negative)
+                                    ));
+                                  }
+                                }}
                                 ariaLabel="Modo de pendientes"
                               />
                             </div>
@@ -4970,12 +5713,32 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                             <SegmentedControl
                               className="booruView__filterSegmented"
                               variant="compact"
-                              options={REALITY_FILTER_OPTIONS}
-                              value={resourceRealityFilter}
+                              options={visibleRealityFilterOptions}
+                              value={effectiveResourceRealityFilter}
                               onChange={(value) => setResourceRealityFilter(value || "all")}
                               ariaLabel="Filtro de tipo"
                             />
                           </div>
+
+                          {supportsMissingResourceFilters && hasContextualMissingFilters ? (
+                            <div className="booruView__filterGroup">
+                              <span className="booruView__groupLabel">Faltantes</span>
+                              <SegmentedControl
+                                className="booruView__filterSegmented"
+                                variant="compact"
+                                options={contextualMissingFilterOptions}
+                                value={visibleMissingFilterValue}
+                                onChange={(value) => {
+                                  setResourceSearchTokens((currentValue) => (
+                                    normalizeResourceSearchTokens(currentValue)
+                                      .filter((token) => token?.type !== "missing" || token?.negative)
+                                  ));
+                                  setResourceMissingFilter(value || BOORU_NO_MISSING_FILTER);
+                                }}
+                                ariaLabel="Filtro de datos faltantes"
+                              />
+                            </div>
+                          ) : null}
 
                         </div>
                       ) : null}
@@ -4992,71 +5755,75 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                           assigning={busyAction === "quick-assign" || busyAction === "recommendation-apply"}
                           revisionKey={entityRevision}
                           resourceQuery={resourceQuery}
+                          recommendationScope={recommendationScope}
                           draft={classificationDraft}
                           onAssignEntity={handleQuickAssignEntity}
                           onApplyRecommendation={handleApplyRecommendation}
                         />
                       ) : null}
                     </>
-                  ) : null}
-
-                  {activeEntityKind ? (
-                    <>
-                      <InlineField label="Buscar" grow className="booruView__inlineField">
-                        <input
-                          type="text"
-                          value={entitySearchValue}
-                          onChange={(event) => setEntitySearchValue(event.target.value)}
-                          placeholder={`Buscar ${BOORU_ENTITY_KIND_LABELS[activeEntityKind]?.toLowerCase() || "entidad"}`}
-                        />
-                      </InlineField>
-
-                      <InlineField label="Crear" grow className="booruView__inlineField">
-                        <input
-                          type="text"
-                          value={entityCreateValue}
-                          onChange={(event) => setEntityCreateValue(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              void handleEnsureSectionEntity();
-                            }
-                          }}
-                          placeholder={`Crear ${BOORU_ENTITY_KIND_LABELS[activeEntityKind]?.toLowerCase() || "entidad"}`}
-                        />
-                      </InlineField>
-
-                      {activeEntityKind === "character" ? (
-                        <Field label="Universe inicial" className="booruView__field">
-                          <SingleEntityAutocompleteField
-                            kind="universe"
-                            label="Universe inicial"
-                            value={entityCreateUniverse}
-                            onChange={setEntityCreateUniverse}
-                            disabled={entityBusy}
-                            placeholder="Buscar universe o crear uno nuevo"
-                            buttonLabel="Elegir"
-                          />
-                        </Field>
-                      ) : null}
-
-                      <div className="booruView__sidebarActions booruView__sidebarActions--compact">
-                        <Button
-                          type="button"
-                          onClick={() => void handleEnsureSectionEntity()}
-                          disabled={!String(entityCreateValue || "").trim() || entityBusy}
-                        >
-                          Crear
-                        </Button>
-                      </div>
-                    </>
-                  ) : null}
                 </SectionPanel>
               </PanelStack>
             </ScrollRegion>
           </SplitSidebar>
+          ) : null}
 
           <SplitDetail className="booruView__detail">
+            {activeEntityKind ? (
+              <EntityNavigationBar
+                kind={activeEntityKind}
+                contextLabel={getEntityProfileLabel(activeEntityProfile, entityProfile)}
+                profileOpen={showEntityProfile}
+                searchValue={entitySearchValue}
+                createValue={entityCreateValue}
+                busy={entityBusy}
+                searchable={!showEntityProfile || activeEntityProfileBrowseTab}
+                searchContent={(!showEntityProfile || activeEntityProfileBrowseTab) ? (
+                  <ResourceSearchComposer
+                    tokens={normalizedEntitySearchTokens}
+                    onChange={setEntitySearchTokens}
+                    freeText={entitySearchValue}
+                    onFreeTextChange={setEntitySearchValue}
+                    invoke={invoke}
+                    realitySuggestions={EMPTY_RESOURCE_SEARCH_SUGGESTIONS}
+                    missingSuggestions={EMPTY_RESOURCE_SEARCH_SUGGESTIONS}
+                    allowedKinds={entitySearchAllowedKinds}
+                    helpers={{
+                      normalizeResourceSearchTokens,
+                      buildResourceSearchTokenKey,
+                      parseResourceSearchDraft,
+                      normalizeSearchText,
+                      normalizeResourceSearchToken,
+                      createResourceSearchTokenFromSuggestion,
+                      getResourceQueryTokenClass,
+                      buildResourceQueryTokenLabel,
+                      stepSuggestionIndex,
+                    }}
+                  />
+                ) : null}
+                browseControls={activeEntityProfileBrowseTab || !showEntityProfile ? (
+                  <ContextBrowseControls
+                    compact
+                    value={entityBrowseUsesResources ? resourceBrowse : entityBrowse}
+                    options={entityBrowseUsesResources
+                      ? BOORU_RESOURCE_SORT_OPTIONS
+                      : getBooruEntitySortOptions({ allowUniverseSort: allowUniverseEntitySort })}
+                    groupOptions={entityBrowseUsesResources ? BOORU_RESOURCE_GROUP_OPTIONS : []}
+                    groupOrderOptions={entityBrowseUsesResources ? BOORU_RESOURCE_GROUP_ORDER_OPTIONS : []}
+                    onChange={entityBrowseUsesResources ? updateResourceBrowse : updateEntityBrowse}
+                    onRegenerateRandom={() => (entityBrowseUsesResources
+                      ? updateResourceBrowse({ randomSeed: createBooruRandomSeed() })
+                      : updateEntityBrowse({ randomSeed: createBooruRandomSeed() }))}
+                  />
+                ) : null}
+                onBack={handleCloseEntityProfile}
+                onOpenInMedia={handleOpenEntityInMedia}
+                onSearchChange={setEntitySearchValue}
+                onCreateChange={setEntityCreateValue}
+                onCreate={() => void handleEnsureSectionEntity()}
+                entityKindLabels={BOORU_ENTITY_KIND_LABELS}
+              />
+            ) : null}
             {loading && !snapshot ? (
               <StateBlock
                 centered
@@ -5080,12 +5847,22 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                   )
                 ) : null}
 
+                <ContextBrowseControls
+                  value={resourceBrowse}
+                  options={BOORU_RESOURCE_SORT_OPTIONS}
+                  groupOptions={BOORU_RESOURCE_GROUP_OPTIONS}
+                  groupOrderOptions={BOORU_RESOURCE_GROUP_ORDER_OPTIONS}
+                  onChange={updateResourceBrowse}
+                  onRegenerateRandom={() => updateResourceBrowse({ randomSeed: createBooruRandomSeed() })}
+                />
+
                 <div className={[
                   "booruView__workspaceGrid",
                   !showInspector ? "booruView__workspaceGrid--single" : "",
                 ].filter(Boolean).join(" ")}>
                   <ResourceGrid
                     items={resourceItems}
+                    placements={resourceState.placements}
                     selectedIds={currentSelection.ids}
                     selectionMode={currentSelection.mode}
                     customDragState={customDragState}
@@ -5094,10 +5871,17 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                     totalCount={resourceState.totalCount}
                     loading={resourceLoading}
                     scrollKey={`${activeResourceSection}:${resourceQuerySignature}:${resourceSearchTokensSignature}`}
+                    scrollTop={activeRouteScrollTop}
+                    onScrollStateChange={handleRouteScrollStateChange}
+                    columns={gridColumns[BOORU_GRID_FAMILIES.RESOURCES]}
+                    onColumnWheel={(event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.RESOURCES, event)}
                     infinite
                     hasMore={resourceState.hasMore}
                     onLoadMore={loadNextMediaPage}
                     onVisibleItemsChange={handleVisibleResourceIdsChange}
+                    onGroupAssociationHover={(association) => {
+                      hoveredGroupAssociationRef.current = association;
+                    }}
                     onSelect={handleResourceClick}
                     onOpen={handleResourceOpen}
                     onContextMenu={openResourceContextMenu}
@@ -5138,17 +5922,12 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                       }}
                       onRestore={handleRestoreSelected}
                       onPurge={handlePurgeSelected}
-                      onClose={() => setInspectorOpen(false)}
-                      onExcludeTag={async (tag) => {
-                        if (!activeResource?.id || !tag?.id) return;
-                        const result = await invoke("booru:exclude-resource-tag", { resourceId: activeResource.id, tagId: tag.id });
-                        if (result?.resource?.id) {
-                          setResourceState((current) => ({
-                            ...current,
-                            items: (current?.items || []).map((item) => item.id === result.resource.id ? result.resource : item),
-                          }));
-                        }
+                      onClose={() => {
+                        setInspectorOpen(false);
+                        setDetailsContext(null);
+                        setAnchoredResources([]);
                       }}
+                      onEnsureEntity={ensureEntityFromUi}
                     />
                   ) : null}
                 </div>
@@ -5175,12 +5954,16 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                           activeTab={activeEntityProfile?.tab || "gallery"}
                           galleryState={entityProfileGalleryState}
                           galleryLoading={entityProfileGalleryLoading}
+                          relationKind={activeEntityRelationKind}
+                          relationState={entityProfileRelationState}
+                          relationLoading={entityProfileRelationLoading}
                           entityMutationBusy={entityBusy}
                           universeCharacterCreateValue={universeCharacterCreateValue}
                           onLoadMoreGallery={loadNextEntityProfileGalleryPage}
-                          onBack={handleCloseEntityProfile}
+                          onLoadMoreRelations={loadNextEntityProfileRelationPage}
                           onTabChange={handleChangeEntityProfileTab}
-                          onOpenInMedia={handleOpenEntityInMedia}
+                          onOpenRelatedEntity={handleOpenEntity}
+                          onRelatedEntityContextMenu={openEntityCardContextMenu}
                           onUniverseCharacterCreateValueChange={setUniverseCharacterCreateValue}
                           onCreateCharacterInUniverse={handleCreateCharacterInUniverse}
                           onChangeCharacterUniverse={handleSetCharacterUniverse}
@@ -5189,6 +5972,21 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                           onGalleryResourceOpen={openResourceHero}
                           onPasteClipboardImage={handlePasteClipboardImageToEntity}
                           onProfileChange={setEntityProfile}
+                          resourceGridColumns={gridColumns[BOORU_GRID_FAMILIES.PROFILE_RESOURCES]}
+                          entityGridColumns={gridColumns[BOORU_GRID_FAMILIES.ENTITIES]}
+                          scrollKey={workspaceRouteKey}
+                          scrollTop={activeRouteScrollTop}
+                          onScrollStateChange={handleRouteScrollStateChange}
+                          gallerySelectedIds={profileGallerySelectedIds}
+                          onGallerySelectionChange={setProfileGallerySelectedIds}
+                          onResourceColumnWheel={(event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.PROFILE_RESOURCES, event)}
+                          onEntityColumnWheel={(event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.ENTITIES, event)}
+                          onEntityHover={(kind, item) => {
+                            hoveredEntityRef.current = item ? { kind, id: item.id } : null;
+                          }}
+                          onGroupAssociationHover={(association) => {
+                            hoveredGroupAssociationRef.current = association;
+                          }}
                         />
                       ) : (
                         <StateBlock
@@ -5203,6 +6001,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                           <EntityGrid
                             kind={activeEntityKind}
                             items={entityItems}
+                            placements={entityPlacements}
+                            hasMore={entityHasMore}
+                            loading={entityLoading}
+                            onLoadMore={() => void loadEntitySection({ append: true })}
                             emptyTitle={`Sin ${BOORU_ENTITY_KIND_LABELS[activeEntityKind]?.toLowerCase() || "elementos"} todavia`}
                             emptyDescription="Empieza a escribir y presiona Enter para crear el primero."
                             onOpenEntity={handleOpenEntity}
@@ -5212,8 +6014,16 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                             }}
                             MediaPreview={MediaThumbnail}
                             entityKindLabels={BOORU_ENTITY_KIND_LABELS}
+                            getInitials={getInitials}
+                            columns={gridColumns[BOORU_GRID_FAMILIES.ENTITIES]}
+                            onColumnWheel={(event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.ENTITIES, event)}
+                            onGroupAssociationHover={(association) => {
+                              hoveredGroupAssociationRef.current = association;
+                            }}
+                            scrollKey={workspaceRouteKey}
+                            scrollTop={activeRouteScrollTop}
+                            onScrollStateChange={handleRouteScrollStateChange}
                           />
-                          <span className="booruView__suggestionsHint">Actualizando seccion...</span>
                         </div>
                       ) : (
                       <StateBlock
@@ -5226,6 +6036,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                       <EntityGrid
                         kind={activeEntityKind}
                         items={entityItems}
+                        placements={entityPlacements}
+                        hasMore={entityHasMore}
+                        loading={entityLoading}
+                        onLoadMore={() => void loadEntitySection({ append: true })}
                         emptyTitle={`Sin ${BOORU_ENTITY_KIND_LABELS[activeEntityKind]?.toLowerCase() || "elementos"} todavia`}
                         emptyDescription="Empieza a escribir y presiona Enter para crear el primero."
                         onOpenEntity={handleOpenEntity}
@@ -5235,6 +6049,15 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                         }}
                         MediaPreview={MediaThumbnail}
                         entityKindLabels={BOORU_ENTITY_KIND_LABELS}
+                        getInitials={getInitials}
+                        columns={gridColumns[BOORU_GRID_FAMILIES.ENTITIES]}
+                        onColumnWheel={(event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.ENTITIES, event)}
+                        onGroupAssociationHover={(association) => {
+                          hoveredGroupAssociationRef.current = association;
+                        }}
+                        scrollKey={workspaceRouteKey}
+                        scrollTop={activeRouteScrollTop}
+                        onScrollStateChange={handleRouteScrollStateChange}
                       />
                     )
                   ) : null}
@@ -5249,6 +6072,37 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           onClose={() => setContextMenuState(null)}
           onAction={(actionId) => void handleContextMenuAction(actionId)}
         />
+        {showFloatingInspector ? (
+          <FloatingDetailsWindow
+            geometry={floatingDetailsGeometry}
+            onGeometryChange={setFloatingDetailsGeometry}
+            onClose={() => {
+              setInspectorOpen(false);
+              setDetailsContext(null);
+              setAnchoredResources([]);
+            }}
+          >
+            <ResourceInspector
+              section="profile"
+              activeResource={activeResource}
+              selectedResources={selectedResources}
+              draft={classificationDraft}
+              saving={savingClassification}
+              onDraftChange={(updater) => {
+                setClassificationDraft((currentDraft) => (
+                  typeof updater === "function" ? updater(currentDraft) : updater
+                ));
+              }}
+              onClose={() => {
+                setInspectorOpen(false);
+                setDetailsContext(null);
+                setAnchoredResources([]);
+              }}
+              onEnsureEntity={ensureEntityFromUi}
+              priorityEntity={detailsContext?.profileContext || null}
+            />
+          </FloatingDetailsWindow>
+        ) : null}
         <ResourceHeroOverlay
           item={activeHeroItem}
           index={Math.max(0, (Array.isArray(resourceHeroState?.items) ? resourceHeroState.items : []).findIndex((entry) => entry?.id === activeHeroItem?.id))}
@@ -5286,6 +6140,21 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
             onCancel={() => setClipboardAssociationState(null)}
             onConfirm={importClipboardMedia}
           />
+        ) : null}
+        {characterCreationName ? (
+          <div className="booruView__cropOverlay">
+            <CharacterCreationDialog
+              name={characterCreationName}
+              invoke={invoke}
+              SingleEntityField={SingleEntityAutocompleteField}
+              onCancel={() => finishCharacterCreation(null)}
+              onCreated={(entity) => {
+                if (!entity?.id) return;
+                setEntityRevision((currentValue) => currentValue + 1);
+                finishCharacterCreation({ kind: "character", created: true, entity });
+              }}
+            />
+          </div>
         ) : null}
       </WorkspaceBody>
     </WorkspacePage>

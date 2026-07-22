@@ -25,6 +25,7 @@ export const BOORU_MEDIA_KIND_LABELS = Object.freeze({
 });
 
 export const BOORU_REALITY_OPTIONS = [
+  { value: "undefined", label: "Sin definir" },
   { value: "real", label: "Real" },
   { value: "ficticio", label: "Ficticio" },
 ];

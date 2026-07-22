@@ -1,9 +1,12 @@
 import { SectionPanel, StateBlock } from "../../../../../nexus-frontend/src/ui/index.js";
+import useGalleryColumnWheel from "../shared/useGalleryColumnWheel.js";
+import CollapsibleGalleryGroup from "../shared/CollapsibleGalleryGroup.jsx";
 const React = window.React;
-const { useEffect, useMemo, useRef, useState } = React;
+const { useCallback, useEffect, useMemo, useRef, useState } = React;
 
 export default function ResourceGrid({
   items,
+  placements = [],
   selectedIds,
   selectionMode = "single",
   customDragState = null,
@@ -12,10 +15,16 @@ export default function ResourceGrid({
   totalCount,
   loading,
   scrollKey,
+  defaultColumns,
+  scrollTop = 0,
+  onScrollStateChange,
+  onColumnWheel,
+  columns = defaultColumns,
   infinite = false,
   hasMore = false,
   onLoadMore,
   onVisibleItemsChange,
+  onGroupAssociationHover,
   currentPage,
   pageSize,
   onPageChange,
@@ -28,12 +37,16 @@ export default function ResourceGrid({
   ResourceCard,
   Pagination,
   getVirtualRange,
-  defaultColumns,
 }) {
   const contentRef = useRef(null);
   const gridRef = useRef(null);
   const loadMoreSentinelRef = useRef(null);
   const loadMoreRef = useRef(onLoadMore);
+  const attachColumnWheel = useGalleryColumnWheel(onColumnWheel);
+  const setContentNode = useCallback((node) => {
+    contentRef.current = node;
+    attachColumnWheel(node);
+  }, [attachColumnWheel]);
   const [virtualLayout, setVirtualLayout] = useState({
     gridWidth: 0,
     viewportHeight: 0,
@@ -44,14 +57,36 @@ export default function ResourceGrid({
     startIndex: 0,
     endIndex: 0,
   });
+  const groupedSections = useMemo(() => {
+    if (!Array.isArray(placements) || !placements.length) return [];
+    const itemById = new Map((Array.isArray(items) ? items : []).map((item) => [item.id, item]));
+    const groups = [];
+    const groupByKey = new Map();
+    placements.forEach((placement) => {
+      const item = itemById.get(placement?.resourceId);
+      if (!item) return;
+      const groupKey = String(placement?.groupKey || "");
+      if (!groupByKey.has(groupKey)) {
+        const group = { key: groupKey, label: placement?.groupLabel || groupKey, association: placement?.association || null, entries: [] };
+        groupByKey.set(groupKey, group);
+        groups.push(group);
+      }
+      groupByKey.get(groupKey).entries.push({ placement, item });
+    });
+    return groups;
+  }, [items, placements]);
+  const grouped = groupedSections.length > 0;
 
   loadMoreRef.current = onLoadMore;
-
   useEffect(() => {
-    if (contentRef.current) {
-      contentRef.current.scrollTop = 0;
-    }
-  }, [scrollKey]);
+    const contentNode = contentRef.current;
+    if (!contentNode) return undefined;
+
+    const frameId = window.requestAnimationFrame(() => {
+      contentNode.scrollTop = Math.max(0, Number(scrollTop) || 0);
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [scrollKey, scrollTop]);
 
   useEffect(() => {
     if (!infinite) {
@@ -107,6 +142,7 @@ export default function ResourceGrid({
       ));
     };
     const handleScroll = () => {
+      onScrollStateChange?.(contentNode.scrollTop || 0);
       if (frameId) {
         return;
       }
@@ -141,9 +177,9 @@ export default function ResourceGrid({
       resizeObserver?.disconnect();
       contentNode.removeEventListener("scroll", handleScroll);
     };
-  }, [hasMore, infinite, items.length, loading]);
+  }, [columns, hasMore, infinite, items.length, loading, onScrollStateChange]);
 
-  const isVirtualized = infinite && virtualLayout.gridWidth > 0;
+  const isVirtualized = infinite && !grouped && virtualLayout.gridWidth > 0;
   const gridMetrics = useMemo(() => {
     const columns = Math.max(1, virtualLayout.columns || defaultColumns);
     const gap = Math.max(0, virtualLayout.gap || 0);
@@ -223,7 +259,7 @@ export default function ResourceGrid({
         />
       ) : items.length ? (
         <div
-          ref={contentRef}
+          ref={setContentNode}
           className="booruView__resourcePanelBody"
           onPointerDown={(event) => {
             if (event.target === event.currentTarget) {
@@ -232,21 +268,49 @@ export default function ResourceGrid({
           }}
         >
           <div className="booruView__resourcePanelContent">
-            <div
-              ref={gridRef}
-              className={[
-                "booruView__mediaGrid",
-                infinite ? "booruView__mediaGrid--infinite" : "booruView__mediaGrid--paged",
-                isVirtualized ? "is-virtualized" : "",
-              ].filter(Boolean).join(" ")}
-              style={isVirtualized ? { height: `${totalGridHeight}px` } : undefined}
-              onPointerDown={(event) => {
-                if (event.target === event.currentTarget) {
-                  onClearSelection?.();
-                }
-              }}
-            >
-              {renderedItems.map((item, index) => {
+            {grouped ? (
+              <div ref={gridRef} className="booruView__groupedGallery">
+                {groupedSections.map((group) => (
+                  <CollapsibleGalleryGroup key={group.key} label={group.label} association={group.association} onAssociationHover={onGroupAssociationHover}>
+                    <div className="booruView__mediaGrid" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+                      {group.entries.map(({ placement, item }, index) => (
+                        <ResourceCard
+                          key={placement.placementId}
+                          item={item}
+                          absoluteIndex={index}
+                          selected={selectedIds.includes(item.id)}
+                          multiSelected={selectedIds.includes(item.id) && selectionMode === "multi"}
+                          dragResourceIds={selectedIds.includes(item.id) ? selectedIds : [item.id]}
+                          customDragActive={Boolean(customDragState?.active && customDragState.resourceIds?.includes(item.id))}
+                          onCustomDragPointerDown={onCustomDragPointerDown}
+                          shouldSuppressClick={shouldSuppressClick}
+                          onSelect={onSelect}
+                          onOpen={onOpen}
+                          onContextMenu={onContextMenu}
+                          columns={columns}
+                        />
+                      ))}
+                    </div>
+                  </CollapsibleGalleryGroup>
+                ))}
+              </div>
+            ) : (
+              <div
+                ref={gridRef}
+                className={[
+                  "booruView__mediaGrid",
+                  infinite ? "booruView__mediaGrid--infinite" : "booruView__mediaGrid--paged",
+                  isVirtualized ? "is-virtualized" : "",
+                ].filter(Boolean).join(" ")}
+                style={{
+                  gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                  ...(isVirtualized ? { height: `${totalGridHeight}px` } : {}),
+                }}
+                onPointerDown={(event) => {
+                  if (event.target === event.currentTarget) onClearSelection?.();
+                }}
+              >
+                {renderedItems.map((item, index) => {
                 const absoluteIndex = activeVirtualRange.startIndex + index;
                 const selected = selectedIds.includes(item.id);
                 const row = Math.floor(absoluteIndex / gridMetrics.columns);
@@ -276,19 +340,25 @@ export default function ResourceGrid({
                     onSelect={onSelect}
                     onOpen={onOpen}
                     onContextMenu={onContextMenu}
+                    columns={columns}
                   />
                 );
-              })}
+                })}
 
-              {infinite && hasMore ? (
-                <div
-                  ref={loadMoreSentinelRef}
-                  className="booruView__resourceLoadSentinel"
-                  aria-hidden="true"
-                  style={isVirtualized ? { top: `${Math.max(0, totalGridHeight - 1)}px` } : undefined}
-                />
-              ) : null}
-            </div>
+                {infinite && hasMore ? (
+                  <div
+                    ref={loadMoreSentinelRef}
+                    className="booruView__resourceLoadSentinel"
+                    aria-hidden="true"
+                    style={isVirtualized ? { top: `${Math.max(0, totalGridHeight - 1)}px` } : undefined}
+                  />
+                ) : null}
+              </div>
+            )}
+
+            {grouped && infinite && hasMore ? (
+              <div ref={loadMoreSentinelRef} className="booruView__resourceLoadSentinel" aria-hidden="true" />
+            ) : null}
 
             {infinite ? (
               loading ? <span className="booruView__resourceLoadingMore">Cargando más media...</span> : null

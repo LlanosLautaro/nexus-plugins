@@ -14,6 +14,8 @@ export default function EntityAutocompleteField({
   invoke,
   helpers,
   entityKindLabels,
+  onEnsureEntity,
+  priorityEntity = null,
 }) {
   const { normalizeSelectedEntities, findExactEntityMatch, stepSuggestionIndex } = helpers;
   const [query, setQuery] = useState("");
@@ -43,9 +45,10 @@ export default function EntityAutocompleteField({
         }
 
         const selectedIds = new Set((Array.isArray(selectedItems) ? selectedItems : []).map((item) => item.id));
-        setSuggestions(
-          (Array.isArray(data?.items) ? data.items : []).filter((item) => !selectedIds.has(item.id)),
-        );
+        const availableItems = (Array.isArray(data?.items) ? data.items : []).filter((item) => !selectedIds.has(item.id));
+        setSuggestions(availableItems.sort((left, right) => (
+          Number(right?.id === priorityEntity?.entityId) - Number(left?.id === priorityEntity?.entityId)
+        )));
         setError("");
       })
       .catch((loadError) => {
@@ -69,7 +72,7 @@ export default function EntityAutocompleteField({
     return () => {
       cancelled = true;
     };
-  }, [invoke, kind, query, selectedItems]);
+  }, [invoke, kind, priorityEntity?.entityId, query, selectedItems]);
 
   useEffect(() => {
     setHighlightedIndex(suggestions.length ? 0 : -1);
@@ -109,8 +112,10 @@ export default function EntityAutocompleteField({
     setLoading(true);
 
     try {
-      const result = await invoke("booru:ensure-entity", { kind, name: trimmedQuery });
-      handleSelectEntity(result.entity);
+      const result = onEnsureEntity
+        ? await onEnsureEntity(kind, trimmedQuery)
+        : await invoke("booru:ensure-entity", { kind, name: trimmedQuery });
+      if (result?.entity) handleSelectEntity(result.entity);
     } catch (ensureError) {
       setError(
         ensureError instanceof Error

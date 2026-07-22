@@ -4,14 +4,16 @@ const { useCallback, useEffect, useMemo, useState } = React;
 export default function ResourceSearchComposer({
   tokens,
   onChange,
+  freeText = "",
+  onFreeTextChange,
   disabled = false,
   helpers,
   invoke,
   realitySuggestions,
   missingSuggestions,
+  allowedKinds = null,
 }) {
-  const { normalizeResourceSearchTokens, buildResourceSearchTokenKey, parseResourceSearchDraft, normalizeSearchText, normalizeResourceSearchToken, createResourceSearchTokenFromSuggestion, createResourceSearchTokenFromFragment, tokenizeBooruQuery, getResourceQueryTokenClass, buildResourceQueryTokenLabel, stepSuggestionIndex } = helpers;
-  const [draftValue, setDraftValue] = useState("");
+  const { normalizeResourceSearchTokens, buildResourceSearchTokenKey, parseResourceSearchDraft, normalizeSearchText, normalizeResourceSearchToken, createResourceSearchTokenFromSuggestion, getResourceQueryTokenClass, buildResourceQueryTokenLabel, stepSuggestionIndex } = helpers;
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -20,6 +22,10 @@ export default function ResourceSearchComposer({
     () => normalizeResourceSearchTokens(tokens).map((token) => buildResourceSearchTokenKey(token)).join("|"),
     [tokens],
   );
+  const draftValue = useMemo(() => {
+    const matches = String(freeText || "").match(/"([^"\\]|\\.)*"|[^\s]+/g) || [];
+    return matches.at(-1) || "";
+  }, [freeText]);
   const parsedDraft = useMemo(
     () => parseResourceSearchDraft(draftValue),
     [draftValue],
@@ -85,7 +91,7 @@ export default function ResourceSearchComposer({
       })
       : isExplicitTag
         ? invoke("booru:list-tags", { query: queryValue })
-        : invoke("booru:list-search-suggestions", { query: queryValue, reality: activeReality });
+        : invoke("booru:list-search-suggestions", { query: queryValue, reality: activeReality, allowedKinds });
 
     void nextPromise
       .then((data) => {
@@ -140,10 +146,10 @@ export default function ResourceSearchComposer({
     return () => {
       cancelled = true;
     };
-  }, [parsedDraft]);
+  }, [allowedKinds, invoke, missingSuggestions, parsedDraft, realitySuggestions, tokensSignature]);
 
   useEffect(() => {
-    setHighlightedIndex(suggestions.length ? 0 : -1);
+    setHighlightedIndex(-1);
   }, [suggestions, draftValue]);
 
   const handleCommitToken = useCallback((nextToken) => {
@@ -157,48 +163,28 @@ export default function ResourceSearchComposer({
       ...(Array.isArray(tokens) ? tokens : []),
       normalizedToken,
     ]));
-    setDraftValue("");
+    const source = String(freeText || "");
+    const fragmentIndex = source.lastIndexOf(draftValue);
+    const nextFreeText = fragmentIndex >= 0
+      ? `${source.slice(0, fragmentIndex)}${source.slice(fragmentIndex + draftValue.length)}`.trim().replace(/\s+/g, " ")
+      : source;
+    onFreeTextChange?.(nextFreeText);
     setSuggestions([]);
     setHighlightedIndex(-1);
     setError("");
     return true;
-  }, [onChange, tokens]);
+  }, [draftValue, freeText, onChange, onFreeTextChange, tokens]);
 
-  const handleCommitRawToken = useCallback((rawToken, suggestion = null) => {
+  const handleCommitRawToken = useCallback((rawToken, suggestion) => {
     const nextToken = suggestion
       ? createResourceSearchTokenFromSuggestion(rawToken, suggestion)
-      : createResourceSearchTokenFromFragment(rawToken);
+      : null;
     return handleCommitToken(nextToken);
   }, [handleCommitToken]);
 
   const handleChange = (event) => {
-    const nextValue = String(event.target.value || "");
-    const endsWithWhitespace = /\s$/.test(nextValue);
-    const rawTokens = tokenizeBooruQuery(nextValue);
-    const completeTokens = endsWithWhitespace ? rawTokens : rawTokens.slice(0, -1);
-    const trailingToken = endsWithWhitespace ? "" : (rawTokens.at(-1) || "");
-
-    if (completeTokens.length) {
-      let nextTokens = Array.isArray(tokens) ? tokens : [];
-
-      for (const rawToken of completeTokens) {
-        const nextToken = createResourceSearchTokenFromFragment(rawToken);
-
-        if (!nextToken) {
-          continue;
-        }
-
-        nextTokens = normalizeResourceSearchTokens([
-          ...nextTokens,
-          nextToken,
-        ]);
-      }
-
-      onChange?.(nextTokens);
-      setError("");
-    }
-
-    setDraftValue(trailingToken);
+    onFreeTextChange?.(String(event.target.value || ""));
+    setError("");
   };
 
   return (
@@ -239,7 +225,7 @@ export default function ResourceSearchComposer({
 
           <input
             type="text"
-            value={draftValue}
+            value={freeText}
             onChange={handleChange}
             onKeyDown={(event) => {
               if (event.key === "ArrowDown") {
@@ -255,13 +241,13 @@ export default function ResourceSearchComposer({
               }
 
               if (event.key === "Escape") {
-                setDraftValue("");
+                onFreeTextChange?.("");
                 setSuggestions([]);
                 setHighlightedIndex(-1);
                 return;
               }
 
-              if (event.key === "Backspace" && !String(draftValue || "").trim()) {
+              if (event.key === "Backspace" && !String(freeText || "").trim()) {
                 const normalizedTokens = normalizeResourceSearchTokens(tokens);
 
                 if (!normalizedTokens.length) {
@@ -277,18 +263,16 @@ export default function ResourceSearchComposer({
                 if (!String(draftValue || "").trim()) {
                   return;
                 }
-
-                event.preventDefault();
-                const selectedSuggestion = highlightedIndex >= 0 && suggestions[highlightedIndex]
-                  ? suggestions[highlightedIndex]
-                  : suggestions[0];
-                void handleCommitRawToken(draftValue, selectedSuggestion || null);
+                if (highlightedIndex >= 0 && suggestions[highlightedIndex]) {
+                  event.preventDefault();
+                  void handleCommitRawToken(draftValue, suggestions[highlightedIndex]);
+                }
               }
             }}
             placeholder="Buscar tags, personas, characters, artists o universes"
             className="booruView__searchComposerInput"
             disabled={disabled}
-            aria-label="Buscar por tags y filtros estructurados"
+            aria-label="Buscar por texto libre o filtros exactos"
           />
         </div>
       </div>
@@ -318,7 +302,7 @@ export default function ResourceSearchComposer({
             ))
           ) : (
             <span className="booruView__suggestionsHint">
-              Tab o Enter agrega el filtro exacto sin crear tags nuevas.
+              Enter conserva el texto libre. Elige una sugerencia para filtrar por su ID exacto.
             </span>
           )}
         </div>

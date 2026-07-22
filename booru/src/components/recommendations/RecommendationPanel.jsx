@@ -8,6 +8,7 @@ export default function RecommendationPanel({
   assigning = false,
   revisionKey = 0,
   resourceQuery = null,
+  recommendationScope = "all",
   draft = null,
   onAssignEntity,
   onApplyRecommendation,
@@ -80,6 +81,7 @@ export default function RecommendationPanel({
       const data = await invoke("booru:list-recommendations", {
         query: String(deferredQuery || "").trim() || null,
         resourceQuery,
+        scope: recommendationScope,
         selectedResourceIds: normalizedSelectedResourceIds,
         draft,
         offset: requestedOffset,
@@ -148,6 +150,7 @@ export default function RecommendationPanel({
     normalizedSelectedResourceIds,
     pageSize,
     resourceQuery,
+    recommendationScope,
     revisionKey,
     selectionCount,
     summarizeIds,
@@ -160,6 +163,10 @@ export default function RecommendationPanel({
   useEffect(() => {
     setHighlightedIndex(items.length ? 0 : -1);
   }, [items, query]);
+
+  useEffect(() => {
+    setQuery("");
+  }, [recommendationScope]);
 
   const handleTriggerItem = async (item) => {
     if (!item || manualAssignDisabled) {
@@ -198,7 +205,9 @@ export default function RecommendationPanel({
 
   return (
     <div className="booruView__quickAssign">
-      <span className="booruView__groupLabel">Recomendaciones</span>
+      <span className="booruView__groupLabel">
+        {recommendationScope === "tags" ? "Tags" : "Recomendaciones"}
+      </span>
 
       <div className="booruView__entityInputRow">
         <input
@@ -233,7 +242,13 @@ export default function RecommendationPanel({
               }
             }
           }}
-          placeholder="Buscar recomendaciones o usar persona:, char:, artist:, universe:, tag:"
+          placeholder={
+            recommendationScope === "tags"
+              ? "Buscar o crear tags"
+              : recommendationScope === "essential"
+                ? "Buscar persona, char, artist o universe"
+                : "Buscar recomendaciones o usar persona:, char:, artist:, universe:, tag:"
+          }
           disabled={searchDisabled}
         />
       </div>

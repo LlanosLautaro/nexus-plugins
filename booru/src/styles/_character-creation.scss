@@ -1,0 +1,26 @@
+.booruCharacterCreation {
+  display: grid;
+  width: min(420px, calc(100vw - 32px));
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--workspace-main-bg);
+  box-shadow: var(--shadow-floating);
+}
+
+.booruCharacterCreation__header {
+  display: grid;
+  gap: 2px;
+}
+
+.booruCharacterCreation__header span {
+  color: var(--color-text-soft);
+  font-size: 0.82rem;
+}
+
+.booruCharacterCreation__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

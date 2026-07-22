@@ -79,7 +79,7 @@ export default function EntityProfileDataTab({
 
       {kind === "character" ? (
         <Field label="Universe" description="Busca uno existente o crea uno nuevo para este character." className="booruView__field">
-          <SingleEntityField kind="universe" label="Universe" value={profile?.universe || null} onChange={(value) => onChangeCharacterUniverse?.(value)} disabled={busy} placeholder="Buscar universe o crear uno nuevo" />
+          <SingleEntityField kind="universe" label="Universe" value={profile?.universe || null} onChange={(value) => onChangeCharacterUniverse?.(value)} disabled={busy} allowClear={false} placeholder="Buscar universe o crear uno nuevo" />
         </Field>
       ) : null}
 

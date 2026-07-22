@@ -1,4 +1,8 @@
 import { Button } from "../../../../nexus-frontend/src/ui/index.js";
+import {
+  getBooruEntityVisualMediaStyle,
+  normalizeBooruEntityVisualLayout,
+} from "../domain/entity-visual-policy.js";
 
 const React = window.React;
 const { useEffect, useMemo, useRef, useState } = React;
@@ -20,14 +24,6 @@ function toFileUrl(pathValue) {
   return new URL(window.nexus.urls.pathToFileUrl(pathValue)).href;
 }
 
-function normalizeLayout(value) {
-  return {
-    scale: clamp(value?.scale, 0.2, 4),
-    offsetX: clamp(value?.offsetX, -1.5, 1.5),
-    offsetY: clamp(value?.offsetY, -1.5, 1.5),
-  };
-}
-
 /**
  * Ratio-locked workbench for entity avatars and banners. The visible frame is
  * the final target ratio. Dragging pans the media and the wheel adjusts its
@@ -45,18 +41,15 @@ export default function EntityVisualCropper({
 }) {
   const frameRef = useRef(null);
   const pointerRef = useRef(null);
-  const [layout, setLayout] = useState(() => normalizeLayout(initialLayout));
+  const [layout, setLayout] = useState(() => normalizeBooruEntityVisualLayout(initialLayout));
   const [saving, setSaving] = useState(false);
   const isBanner = role === "banner";
 
   useEffect(() => {
-    setLayout(normalizeLayout(initialLayout));
+    setLayout(normalizeBooruEntityVisualLayout(initialLayout));
   }, [entityId, initialLayout?.offsetX, initialLayout?.offsetY, initialLayout?.scale, role]);
 
-  const mediaStyle = useMemo(() => ({
-    transform: `translate(${layout.offsetX * 100}%, ${layout.offsetY * 100}%) scale(${layout.scale})`,
-    transformOrigin: "center center",
-  }), [layout]);
+  const mediaStyle = useMemo(() => getBooruEntityVisualMediaStyle(layout), [layout]);
 
   const beginPointer = (event) => {
     if (busy || saving || !frameRef.current) return;
@@ -138,7 +131,7 @@ export default function EntityVisualCropper({
         <Button
           type="button"
           onClick={() => {
-            setLayout(normalizeLayout(initialLayout));
+            setLayout(normalizeBooruEntityVisualLayout(initialLayout));
             onCancel?.();
           }}
           disabled={saving}
