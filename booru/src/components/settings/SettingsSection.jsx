@@ -1,5 +1,15 @@
-import { Button, Field, MetricCard, Notice, SectionPanel, StateBlock } from "../../../../../nexus-frontend/src/ui/index.js";
-import { FolderIcon, RefreshIcon } from "../../icons.jsx";
+import {
+  Button,
+  Field,
+  Input,
+  MetricCard,
+  Notice,
+  ReloadIcon,
+  SectionPanel,
+  Select,
+  StateBlock,
+} from "@nexus/ui";
+import { FolderIcon } from "../../icons.jsx";
 
 const React = window.React;
 const { useEffect, useState } = React;
@@ -103,17 +113,17 @@ export default function SettingsSection({
             <span className="booruView__groupLabel">Plataformas de redes</span>
             <Field label="Nueva plataforma" className="booruView__field">
               <div className="booruView__entityInputRow">
-                <input value={platformName} onChange={(event) => setPlatformName(event.target.value)} placeholder="Nombre de la red" />
-                <Button type="button" onClick={() => void pasteIcon()} title="Pegar icono desde portapapeles">Pegar icono</Button>
+                <Input value={platformName} onChange={(event) => setPlatformName(event.target.value)} placeholder="Nombre de la red" />
+                <Button type="button" onClick={() => void pasteIcon()}>Pegar icono</Button>
                 <label className="nexus-ui-button"><span>Elegir archivo</span><input type="file" accept="image/png,image/svg+xml,image/*" onChange={(event) => void importFileIcon(event)} hidden /></label>
                 <Button type="button" tone="primary" onClick={() => void savePlatform()} disabled={!platformName.trim()}>Guardar</Button>
               </div>
             </Field>
             <Field label="O usar recurso existente" className="booruView__field">
-              <select value={iconResourceId} onChange={(event) => setIconResourceId(event.target.value)}>
+              <Select value={iconResourceId} onChange={(event) => setIconResourceId(event.target.value)}>
                 <option value="">Sin icono</option>
                 {resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.originalFilename}</option>)}
-              </select>
+              </Select>
             </Field>
             {iconResourceId ? <span className="booruView__suggestionsHint">Icono preparado desde recurso {iconResourceId.slice(0, 8)}.</span> : null}
             {platformError ? <Notice tone="danger">{platformError}</Notice> : null}
@@ -158,7 +168,7 @@ export default function SettingsSection({
                 onClick={() => void onRefresh?.()}
                 disabled={loading}
               >
-                <RefreshIcon size={15} />
+                <ReloadIcon size={15} />
                 <span>Actualizar</span>
               </Button>
               <Button

@@ -1,7 +1,7 @@
 {
   "id": "nexus.life-tracker",
   "displayName": "Life Tracker",
-  "version": "0.2.33",
+  "version": "0.2.38",
   "apiVersion": 1,
   "schemaVersion": 1,
   "description": "Canvas personal con seguimiento diario, dinero y entrenamiento dentro de Nexus.",

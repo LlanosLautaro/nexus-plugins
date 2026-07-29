@@ -4,7 +4,7 @@ import {
   InlineField,
   Notice,
   StateBlock,
-} from "../../../../nexus-frontend/src/ui/index.js";
+} from "@nexus/ui";
 
 const React = window.React;
 const { useEffect, useMemo, useState } = React;

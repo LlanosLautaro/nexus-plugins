@@ -1,5 +1,11 @@
 const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
 import {
+  Button,
+  CyberIconButton,
+  SegmentedControl,
+  StateBlock,
+} from "@nexus/ui";
+import {
   BookIcon,
   ExternalIcon,
   RefreshIcon,
@@ -202,23 +208,23 @@ export default function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }
     <section className="booksEngine">
       <div className="booksEngine__toolbar">
         <div className="booksEngine__toolbarGroup">
-          <button type="button" onClick={() => setZoom((currentValue) => clampZoom(currentValue - 10))}>
+          <CyberIconButton label="Reducir zoom" onClick={() => setZoom((currentValue) => clampZoom(currentValue - 10))}>
             <ZoomOutIcon size={16} />
-          </button>
-          <button type="button" onClick={() => setZoom(100)}>
+          </CyberIconButton>
+          <Button type="button" onClick={() => setZoom(100)}>
             {zoom}%
-          </button>
-          <button type="button" onClick={() => setZoom((currentValue) => clampZoom(currentValue + 10))}>
+          </Button>
+          <CyberIconButton label="Aumentar zoom" onClick={() => setZoom((currentValue) => clampZoom(currentValue + 10))}>
             <ZoomInIcon size={16} />
-          </button>
+          </CyberIconButton>
         </div>
 
         <div className="booksEngine__toolbarGroup">
-          <button type="button" onClick={() => setReloadToken((currentValue) => currentValue + 1)}>
+          <CyberIconButton label="Recargar documento" onClick={() => setReloadToken((currentValue) => currentValue + 1)}>
             <RefreshIcon size={16} />
-          </button>
-          <button
-            type="button"
+          </CyberIconButton>
+          <CyberIconButton
+            label="Abrir biblioteca"
             onClick={() =>
               void hostApi.openView({
                 viewId: BOOKS_LIBRARY_VIEW_ID,
@@ -228,10 +234,10 @@ export default function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }
             }
           >
             <BookIcon size={16} />
-          </button>
-          <button type="button" onClick={() => void openExternal()}>
+          </CyberIconButton>
+          <CyberIconButton label="Abrir externamente" onClick={() => void openExternal()}>
             <ExternalIcon size={16} />
-          </button>
+          </CyberIconButton>
         </div>
       </div>
 
@@ -247,7 +253,7 @@ export default function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }
 
         <aside className="booksEngine__aside">
           {loading ? (
-            <div className="booksEngine__state">Cargando libro...</div>
+            <StateBlock className="booksEngine__state" title="Cargando libro" />
           ) : book ? (
             <>
               <div className="booksEngine__copy">
@@ -262,24 +268,17 @@ export default function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }
                   <StatePill status={book.readingStatus} />
                 </div>
 
-                <div className="booksEngine__choiceGroup">
-                  {BOOK_READING_STATUSES.map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      className={[
-                        "booksEngine__choiceButton",
-                        book.readingStatus === status && "is-active",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      disabled={saving}
-                      onClick={() => void handleUpdateBook({ readingStatus: status })}
-                    >
-                      {getReadingStatusLabel(status)}
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl
+                  className="booksEngine__choiceGroup"
+                  ariaLabel="Estado de lectura"
+                  options={BOOK_READING_STATUSES.map((status) => ({
+                    value: status,
+                    label: getReadingStatusLabel(status),
+                    disabled: saving,
+                  }))}
+                  value={book.readingStatus}
+                  onChange={(status) => void handleUpdateBook({ readingStatus: status })}
+                />
 
                 <div className="booksEngine__field">
                   <span>Progreso</span>
@@ -304,14 +303,14 @@ export default function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }
                       onMouseUp={() => void handleUpdateBook({ progressPercent: book.progressPercent })}
                       onTouchEnd={() => void handleUpdateBook({ progressPercent: book.progressPercent })}
                     />
-                    <button
+                    <Button
                       type="button"
                       className="booksEngine__secondaryButton"
                       disabled={saving}
                       onClick={() => void handleUpdateBook({ progressPercent: book.progressPercent })}
                     >
                       {formatPercent(book.progressPercent)}
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -327,7 +326,7 @@ export default function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }
               </div>
             </>
           ) : (
-            <div className="booksEngine__state">No se pudo resolver el libro actual.</div>
+            <StateBlock className="booksEngine__state" title="No se pudo resolver el libro actual" />
           )}
 
           {error ? <div className="booksEngine__state booksEngine__state--error">{error}</div> : null}

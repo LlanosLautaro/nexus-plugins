@@ -16,15 +16,18 @@ import {
 } from "chart.js";
 
 import {
+  ActionMenu,
   Button,
   Field,
   FieldGrid,
-  IconButton,
+  CyberIconButton,
+  Input,
   Notice,
   PanelHeader,
   PanelStack,
   PanelTitle,
   ScrollRegion,
+  SearchField,
   SegmentedControl,
   SectionPanel,
   SplitDetail,
@@ -33,7 +36,7 @@ import {
   StateBlock,
   WorkspaceBody,
   WorkspacePage,
-} from "../../../nexus-frontend/src/ui/index.js";
+} from "@nexus/ui";
 import {
   getCachedIconSvgMarkup,
   loadIconSvgMarkup,
@@ -1498,7 +1501,7 @@ function QuantityQueueInput({
   }, [committedValue, disabled, draftValue, onCommit]);
 
   return (
-    <input
+    <Input
       className="habitosView__queueNumberInput"
       type="number"
       min="0"
@@ -1763,7 +1766,7 @@ function CustomHabitCategoryBuilder({
 
       <FieldGrid>
         <Field label="Nombre" wide>
-          <input
+          <Input
             value={draft.name}
             onChange={(event) => onChange("name", event.target.value)}
             placeholder="Nombre de la categoria"
@@ -1779,15 +1782,15 @@ function CustomHabitCategoryBuilder({
           onChange={(value) => onChange("color", value)}
         />
 
-        <label className="habitosView__categoryIconSearch">
-          <input
-            type="text"
+        <div className="habitosView__categoryIconSearch">
+          <SearchField
             value={iconSearchQuery}
             onChange={(event) => setIconSearchQuery(event.target.value)}
             placeholder="Buscar icono"
             disabled={saving}
+            aria-label="Buscar icono"
           />
-        </label>
+        </div>
       </div>
 
       <div className="habitosView__categoryIconMeta">
@@ -2574,6 +2577,61 @@ export default function LifeTrackerView({ ctx, input = null }) {
     ? input.section
     : LIFE_TRACKER_DEFAULT_SECTION;
   const dashboardEditMode = Boolean(input?.dashboardEditMode);
+
+  useEffect(() => {
+    if (!ctx?.setWorkspaceFrameActions || !ctx?.clearWorkspaceFrameActions) {
+      return undefined;
+    }
+
+    if (activeSection !== "home") {
+      ctx.clearWorkspaceFrameActions(LIFE_TRACKER_WORKSPACE_VIEW_ID);
+      return undefined;
+    }
+
+    ctx.setWorkspaceFrameActions(LIFE_TRACKER_WORKSPACE_VIEW_ID, [
+      {
+        id: "life-tracker-edit-canvas",
+        placement: "side-toolbar-context",
+        icon: PencilIcon,
+        title: dashboardEditMode ? "Salir de edicion del lienzo" : "Editar lienzo",
+        active: dashboardEditMode,
+        pressed: dashboardEditMode,
+        onClick: () => {
+          void ctx.openView({
+            viewId: LIFE_TRACKER_WORKSPACE_VIEW_ID,
+            reuse: true,
+            sourceId: "nexus.life-tracker.canvas-edit",
+            input: {
+              ...(input && typeof input === "object" ? input : {}),
+              section: "home",
+              dashboardEditMode: !dashboardEditMode,
+            },
+          });
+        },
+      },
+    ]);
+
+    return () => {
+      ctx.clearWorkspaceFrameActions(LIFE_TRACKER_WORKSPACE_VIEW_ID);
+    };
+  }, [activeSection, ctx, dashboardEditMode, input]);
+
+  useEffect(() => {
+    if (activeSection === "home" || !dashboardEditMode) {
+      return;
+    }
+
+    void ctx.openView({
+      viewId: LIFE_TRACKER_WORKSPACE_VIEW_ID,
+      reuse: true,
+      sourceId: "nexus.life-tracker.canvas-edit-exit",
+      input: {
+        ...(input && typeof input === "object" ? input : {}),
+        dashboardEditMode: false,
+      },
+    });
+  }, [activeSection, ctx, dashboardEditMode, input]);
+
   const widgetProviders = ctx.useWidgetProviders();
   const lifeTrackerWidgetProviders = useMemo(
     () => widgetProviders
@@ -4258,17 +4316,17 @@ export default function LifeTrackerView({ ctx, input = null }) {
               />
             </div>
 
-            <IconButton
+            <CyberIconButton
               type="button"
               aria-label="Configuraciones"
               title="Configuraciones"
               onClick={openHabitsDrawer}
             >
               <SettingsIcon />
-            </IconButton>
-            <IconButton type="button" tone="primary" aria-label="Crear nuevo" onClick={openCreateChooser}>
+            </CyberIconButton>
+            <CyberIconButton type="button" tone="primary" aria-label="Crear nuevo" onClick={openCreateChooser}>
               <PlusIcon />
-            </IconButton>
+            </CyberIconButton>
           </div>
         )}
       >
@@ -4378,40 +4436,38 @@ export default function LifeTrackerView({ ctx, input = null }) {
       ) : null}
 
       {activeSection === "home" && queueMenu?.item ? (
-        <div
-          className="habitosView__contextMenu"
-          style={{
-            position: "fixed",
-            top: `${queueMenu.y}px`,
-            left: `${queueMenu.x}px`,
-            zIndex: 1400,
-          }}
-          onMouseDown={(event) => event.stopPropagation()}
-          onContextMenu={(event) => event.preventDefault()}
-        >
-          {queueMenu.item.type === "habit" && isPastView && !queueMenu.item.isProjected ? (
-            <button
-              type="button"
-              className="context-menu-item"
-              onClick={() => {
+        <ActionMenu
+          ariaLabel="Acciones del elemento"
+          x={queueMenu.x}
+          y={queueMenu.y}
+          groups={[{
+            id: "queue-actions",
+            items: [
+              queueMenu.item.type === "habit" && isPastView && !queueMenu.item.isProjected
+                ? {
+                    id: "toggle-outcome-edit",
+                    label: manualEditableOccurrenceIds.includes(queueMenu.item.recordId)
+                      ? "Bloquear resultado"
+                      : "Editar resultado",
+                  }
+                : null,
+              { id: "edit", label: "Editar" },
+              { id: "delete", label: "Eliminar", danger: true },
+            ].filter(Boolean),
+          }]}
+          onClose={() => setQueueMenu(null)}
+          onAction={(action) => {
+            if (action.id === "toggle-outcome-edit") {
                 const occurrenceId = queueMenu.item.recordId;
-                setQueueMenu(null);
                 if (manualEditableOccurrenceIds.includes(occurrenceId)) {
                   disableManualOccurrenceEdit(occurrenceId);
                   return;
                 }
-
                 enableManualOccurrenceEdit(occurrenceId);
-              }}
-            >
-              {manualEditableOccurrenceIds.includes(queueMenu.item.recordId) ? "Bloquear resultado" : "Editar resultado"}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="context-menu-item"
-            onClick={() => {
-              setQueueMenu(null);
+                return;
+            }
+
+            if (action.id === "edit") {
               if (queueMenu.item.type === "task") {
                 openTaskEditor(queueMenu.item.raw);
                 return;
@@ -4423,59 +4479,45 @@ export default function LifeTrackerView({ ctx, input = null }) {
               }
 
               openHabitEditor(queueMenu.item.habit);
-            }}
-          >
-            Editar
-          </button>
-          <button
-            type="button"
-            className="context-menu-item"
-            onClick={() => {
-              setQueueMenu(null);
+              return;
+            }
+
+            if (action.id === "delete") {
               void handleDeleteQueueItem(queueMenu.item);
-            }}
-          >
-            Eliminar
-          </button>
-        </div>
+            }
+          }}
+        />
       ) : null}
 
       {activeSection === "home" && categoryMenu?.option ? (
-        <div
-          className="habitosView__contextMenu"
-          style={{
-            position: "fixed",
-            top: `${categoryMenu.y}px`,
-            left: `${categoryMenu.x}px`,
-            zIndex: 1400,
-          }}
-          onMouseDown={(event) => event.stopPropagation()}
-          onContextMenu={(event) => event.preventDefault()}
-        >
-          <button
-            type="button"
-            className="context-menu-item"
-            onClick={() => {
+        <ActionMenu
+          ariaLabel="Acciones de categoria"
+          x={categoryMenu.x}
+          y={categoryMenu.y}
+          groups={[{
+            id: "category-actions",
+            items: [
+              { id: "edit", label: "Editar categoria" },
+              { id: "delete", label: "Eliminar categoria", danger: true },
+            ],
+          }]}
+          onClose={() => setCategoryMenu(null)}
+          onAction={(action) => {
+            if (action.id === "edit") {
               handleOpenCategoryBuilder({
                 id: categoryMenu.option.id,
                 name: categoryMenu.option.label,
                 iconId: categoryMenu.option.iconId,
                 color: categoryMenu.option.color,
               });
-            }}
-          >
-            Editar categoria
-          </button>
-          <button
-            type="button"
-            className="context-menu-item"
-            onClick={() => {
+              return;
+            }
+
+            if (action.id === "delete") {
               void handleDeleteCategory(categoryMenu.option);
-            }}
-          >
-            Eliminar categoria
-          </button>
-        </div>
+            }
+          }}
+        />
       ) : null}
 
       <FloatingWorkbenchModal

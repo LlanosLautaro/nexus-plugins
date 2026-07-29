@@ -55,6 +55,21 @@ var require_react = __commonJS({
   }
 });
 
+// scripts/plugins/shims/react-dom.cjs
+var require_react_dom = __commonJS({
+  "scripts/plugins/shims/react-dom.cjs"(exports, module) {
+    init_define_process();
+    function requireReactDom() {
+      const hostReactDom = globalThis?.window?.__NEXUS_HOST_REACT_DOM__;
+      if (!hostReactDom) {
+        throw new Error("Nexus plugins renderer no encontro react-dom del host en window.__NEXUS_HOST_REACT_DOM__.");
+      }
+      return hostReactDom;
+    }
+    module.exports = requireReactDom();
+  }
+});
+
 // node_modules/react-is/cjs/react-is.production.min.js
 var require_react_is_production_min = __commonJS({
   "node_modules/react-is/cjs/react-is.production.min.js"(exports) {
@@ -1011,21 +1026,6 @@ var require_prop_types = __commonJS({
   }
 });
 
-// scripts/plugins/shims/react-dom.cjs
-var require_react_dom = __commonJS({
-  "scripts/plugins/shims/react-dom.cjs"(exports, module) {
-    init_define_process();
-    function requireReactDom() {
-      const hostReactDom = globalThis?.window?.__NEXUS_HOST_REACT_DOM__;
-      if (!hostReactDom) {
-        throw new Error("Nexus plugins renderer no encontro react-dom del host en window.__NEXUS_HOST_REACT_DOM__.");
-      }
-      return hostReactDom;
-    }
-    module.exports = requireReactDom();
-  }
-});
-
 // node_modules/clsx/dist/clsx.js
 var require_clsx = __commonJS({
   "node_modules/clsx/dist/clsx.js"(exports, module) {
@@ -1412,7 +1412,7 @@ var require_Draggable = __commonJS({
     }
     var React13 = __toESM3(require_react());
     var import_prop_types3 = __toESM3(require_prop_types());
-    var import_react_dom3 = __toESM3(require_react_dom());
+    var import_react_dom4 = __toESM3(require_react_dom());
     function log2(...args) {
       if (define_process_default.env.DRAGGABLE_DEBUG) console.log(...args);
     }
@@ -1566,7 +1566,7 @@ var require_Draggable = __commonJS({
         if ((_a3 = this.props) == null ? void 0 : _a3.nodeRef) {
           return this.props.nodeRef.current;
         }
-        const legacyReactDOM = import_react_dom3.default;
+        const legacyReactDOM = import_react_dom4.default;
         if (typeof legacyReactDOM.findDOMNode === "function") {
           return legacyReactDOM.findDOMNode(this);
         }
@@ -68422,32 +68422,593 @@ var TimeSeriesScale = class extends TimeScale {
   }
 };
 
-// ../nexus-frontend/src/ui/index.js
+// ../packages/nexus-ui/src/index.js
 init_define_process();
 
-// ../nexus-frontend/src/ui/WorkspacePage.jsx
+// ../packages/nexus-ui/src/components/Button/Button.jsx
 init_define_process();
 
-// ../nexus-frontend/src/ui/cx.js
+// ../packages/nexus-ui/src/utils/cx.js
 init_define_process();
 function cx(...values2) {
   return values2.filter(Boolean).join(" ");
 }
 
-// ../nexus-frontend/src/ui/WorkspacePage.jsx
+// ../packages/nexus-ui/src/components/Button/Button.jsx
+function Button({
+  className: className2 = "",
+  tone = "secondary",
+  children,
+  ...props
+}) {
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      ...props,
+      className: cx(
+        "nexus-ui-button",
+        tone !== "secondary" && `nexus-ui-button--${tone}`,
+        className2
+      )
+    },
+    children
+  );
+}
+
+// ../packages/nexus-ui/src/components/CyberIconButton/CyberIconButton.jsx
+init_define_process();
+var import_react = __toESM(require_react(), 1);
+
+// ../packages/nexus-ui/src/components/Tooltip/Tooltip.jsx
+init_define_process();
+function Tooltip({ className: className2 = "", children }) {
+  return /* @__PURE__ */ React.createElement("span", { className: cx("nexus-ui-tooltip", className2) }, children);
+}
+
+// ../packages/nexus-ui/src/components/CyberIconButton/CyberIconButton.jsx
+function CyberIconButton({
+  active = false,
+  className: className2 = "",
+  children,
+  label,
+  title,
+  tone = "neutral",
+  ref,
+  onClick,
+  onPointerLeave,
+  ...props
+}) {
+  const [tooltipDismissed, setTooltipDismissed] = (0, import_react.useState)(false);
+  const accessibleLabel = props["aria-label"] || label || title;
+  const tooltipLabel = label || title;
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      ...props,
+      ref,
+      type: props.type || "button",
+      className: cx(
+        "nexus-ui-cyber-icon-button",
+        active && "is-active",
+        tone !== "neutral" && `nexus-ui-cyber-icon-button--${tone}`,
+        tooltipDismissed && "is-tooltip-dismissed",
+        className2
+      ),
+      "aria-label": accessibleLabel,
+      onClick: (event) => {
+        setTooltipDismissed(true);
+        onClick?.(event);
+      },
+      onPointerLeave: (event) => {
+        setTooltipDismissed(false);
+        onPointerLeave?.(event);
+      }
+    },
+    /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-cyber-icon-button__icon" }, children),
+    /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-cyber-icon-button__glare", "aria-hidden": "true" }),
+    tooltipLabel ? /* @__PURE__ */ React.createElement(Tooltip, null, tooltipLabel) : null
+  );
+}
+
+// ../packages/nexus-ui/src/components/SegmentedControl/SegmentedControl.jsx
+init_define_process();
+function readOptionValue(option) {
+  return option?.value ?? option?.id;
+}
+function SegmentedControl({
+  ariaLabel = "Selector",
+  className: className2 = "",
+  flush = false,
+  iconOnly = false,
+  onChange,
+  options = [],
+  orientation = "horizontal",
+  renderIcon,
+  value,
+  variant = "default"
+}) {
+  const normalizedOptions = Array.isArray(options) ? options.filter(Boolean) : [];
+  const activeIndex = Math.max(
+    0,
+    normalizedOptions.findIndex((option) => readOptionValue(option) === value)
+  );
+  const isCyber = variant === "cyber" || iconOnly;
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "aria-label": ariaLabel,
+      className: cx(
+        "nexus-ui-segmented",
+        `nexus-ui-segmented--${orientation}`,
+        variant !== "default" && `nexus-ui-segmented--${variant}`,
+        isCyber && "nexus-ui-segmented--icon-only",
+        flush && "nexus-ui-segmented--flush",
+        normalizedOptions.length && "has-active",
+        className2
+      ),
+      role: "radiogroup",
+      style: {
+        "--segment-count": Math.max(1, normalizedOptions.length),
+        "--active-index": activeIndex
+      }
+    },
+    /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__highlight", "aria-hidden": "true" }),
+    normalizedOptions.map((option) => {
+      const optionValue = readOptionValue(option);
+      const active = optionValue === value;
+      const disabled = Boolean(option.disabled);
+      const icon = renderIcon?.(option) ?? option.icon ?? null;
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          "aria-checked": active,
+          "aria-label": iconOnly ? option.label : void 0,
+          className: cx(
+            "nexus-ui-segmented__button",
+            active && "is-active",
+            disabled && "is-disabled"
+          ),
+          disabled,
+          key: optionValue,
+          role: "radio",
+          type: "button",
+          onClick: () => {
+            if (!disabled) {
+              onChange?.(optionValue);
+            }
+          }
+        },
+        icon ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__icon" }, icon) : null,
+        isCyber ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__glare", "aria-hidden": "true" }) : null,
+        !iconOnly ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__label" }, option.label) : null,
+        iconOnly ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-tooltip" }, option.label) : null
+      );
+    })
+  );
+}
+
+// ../packages/nexus-ui/src/components/ActionMenu/ActionMenu.jsx
+init_define_process();
+var import_react2 = __toESM(require_react(), 1);
+var import_react_dom = __toESM(require_react_dom(), 1);
+var VIEWPORT_MARGIN = 8;
+function ActionMenu({
+  align = "end",
+  anchorRef,
+  ariaLabel,
+  className: className2 = "",
+  groups = [],
+  onAction,
+  onClose,
+  x,
+  y
+}) {
+  const menuRef = (0, import_react2.useRef)(null);
+  const [position, setPosition] = (0, import_react2.useState)({
+    ready: false,
+    submenusLeft: false,
+    x: x ?? 0,
+    y: y ?? 0
+  });
+  (0, import_react2.useEffect)(() => {
+    const handlePointerDown = (event) => {
+      const clickedAnchor = anchorRef?.current?.contains?.(event.target);
+      if (!menuRef.current?.contains(event.target) && !clickedAnchor) {
+        onClose?.();
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose?.();
+    };
+    const closeOnViewportChange = () => onClose?.();
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", closeOnViewportChange);
+    window.addEventListener("scroll", closeOnViewportChange, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", closeOnViewportChange);
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+    };
+  }, [anchorRef, onClose]);
+  (0, import_react2.useLayoutEffect)(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const menuRect = menu.getBoundingClientRect();
+    const anchorRect = anchorRef?.current?.getBoundingClientRect();
+    const requestedX = Number.isFinite(x) ? x : align === "start" ? anchorRect?.left ?? VIEWPORT_MARGIN : (anchorRect?.right ?? VIEWPORT_MARGIN) - menuRect.width;
+    const requestedY = Number.isFinite(y) ? y : (anchorRect?.bottom ?? VIEWPORT_MARGIN) + 7;
+    setPosition({
+      ready: true,
+      submenusLeft: requestedX + menuRect.width + 224 > window.innerWidth,
+      x: Math.max(
+        VIEWPORT_MARGIN,
+        Math.min(requestedX, window.innerWidth - menuRect.width - VIEWPORT_MARGIN)
+      ),
+      y: Math.max(
+        VIEWPORT_MARGIN,
+        Math.min(requestedY, window.innerHeight - menuRect.height - VIEWPORT_MARGIN)
+      )
+    });
+  }, [align, anchorRef, groups, x, y]);
+  const renderActions = (actions, depth = 0) => actions.map((action) => {
+    const children = Array.isArray(action.children) ? action.children : [];
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: cx(
+          "nexus-ui-action-menu__item",
+          children.length && "has-children"
+        ),
+        key: action.id
+      },
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          "aria-checked": action.checked,
+          "aria-haspopup": children.length ? "menu" : void 0,
+          className: cx(
+            action.danger && "is-danger",
+            action.checked && "is-selected"
+          ),
+          disabled: action.disabled,
+          role: action.role || "menuitem",
+          type: "button",
+          onClick: () => {
+            if (children.length) return;
+            onAction?.(action);
+            action.onClick?.();
+            if (!action.keepOpen) onClose?.();
+          }
+        },
+        action.icon ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-action-menu__icon" }, action.icon) : null,
+        /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-action-menu__copy" }, /* @__PURE__ */ React.createElement("strong", null, action.label), action.description ? /* @__PURE__ */ React.createElement("small", null, action.description) : null),
+        /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-action-menu__end" }, children.length ? "\u203A" : action.end)
+      ),
+      children.length ? /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          "aria-label": action.label,
+          className: "nexus-ui-action-menu nexus-ui-action-menu__submenu",
+          role: "menu",
+          style: { "--submenu-depth": depth + 1 }
+        },
+        renderActions(children, depth + 1)
+      ) : null
+    );
+  });
+  return (0, import_react_dom.createPortal)(
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        "aria-label": ariaLabel,
+        className: cx(
+          "nexus-ui-action-menu",
+          position.submenusLeft && "has-submenus-left",
+          className2
+        ),
+        ref: menuRef,
+        role: "menu",
+        style: {
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          visibility: position.ready ? "visible" : "hidden"
+        }
+      },
+      groups.map((group, groupIndex) => /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-action-menu__group", key: group.id || groupIndex }, renderActions(group.items || [])))
+    ),
+    document.body
+  );
+}
+
+// ../packages/nexus-ui/src/components/Input/Input.jsx
+init_define_process();
+var import_react3 = __toESM(require_react(), 1);
+var Input = (0, import_react3.forwardRef)(function Input2({ className: className2 = "", type: type8 = "text", ...props }, ref) {
+  return /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      ...props,
+      ref,
+      className: cx("nexus-ui-input", className2),
+      type: type8
+    }
+  );
+});
+
+// ../packages/nexus-ui/src/components/Select/Select.jsx
+init_define_process();
+var import_react4 = __toESM(require_react(), 1);
+var Select = (0, import_react4.forwardRef)(function Select2({ className: className2 = "", children, ...props }, ref) {
+  return /* @__PURE__ */ React.createElement(
+    "select",
+    {
+      ...props,
+      ref,
+      className: cx("nexus-ui-select", className2)
+    },
+    children
+  );
+});
+
+// ../packages/nexus-ui/src/components/SearchField/SearchField.jsx
+init_define_process();
+var import_react5 = __toESM(require_react(), 1);
+function DefaultSearchIcon() {
+  return /* @__PURE__ */ React.createElement("svg", { "aria-hidden": "true", fill: "none", viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "10.5", cy: "10.5", r: "6.5" }), /* @__PURE__ */ React.createElement("path", { d: "m15.5 15.5 4 4" }));
+}
+var SearchField = (0, import_react5.forwardRef)(function SearchField2({
+  className: className2 = "",
+  endAction = null,
+  icon,
+  inputClassName = "",
+  ...props
+}, ref) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-search-field", className2) }, icon !== null ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-search-field__icon" }, icon === void 0 ? /* @__PURE__ */ React.createElement(DefaultSearchIcon, null) : icon) : null, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      ...props,
+      ref,
+      className: cx("nexus-ui-search-field__input", inputClassName),
+      type: "search"
+    }
+  ), endAction ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-search-field__action" }, endAction) : null);
+});
+
+// ../packages/nexus-ui/src/components/Gallery/Gallery.jsx
+init_define_process();
+var import_react6 = __toESM(require_react(), 1);
+function normalizeColumnCount(value, fallback2 = null) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) && numericValue > 0 ? Math.round(numericValue) : fallback2;
+}
+function assignRef(ref, value) {
+  if (typeof ref === "function") {
+    ref(value);
+  } else if (ref && typeof ref === "object") {
+    ref.current = value;
+  }
+}
+var GalleryGrid = (0, import_react6.forwardRef)(function GalleryGrid2({
+  as: Component3 = "div",
+  className: className2 = "",
+  compact = false,
+  virtual = false,
+  columns,
+  defaultColumns,
+  minColumns = 1,
+  maxColumns = 12,
+  adjustableColumns = true,
+  onColumnsChange,
+  style: style2,
+  children,
+  ...props
+}, ref) {
+  const nodeRef = (0, import_react6.useRef)(null);
+  const leftControlPressedRef = (0, import_react6.useRef)(false);
+  const [uncontrolledColumns, setUncontrolledColumns] = (0, import_react6.useState)(
+    () => normalizeColumnCount(defaultColumns)
+  );
+  const controlledColumns = normalizeColumnCount(columns);
+  const activeColumns = controlledColumns ?? uncontrolledColumns;
+  const normalizedMinColumns = normalizeColumnCount(minColumns, 1);
+  const normalizedMaxColumns = Math.max(
+    normalizedMinColumns,
+    normalizeColumnCount(maxColumns, 12)
+  );
+  const setNodeRef = (0, import_react6.useCallback)((node2) => {
+    nodeRef.current = node2;
+    assignRef(ref, node2);
+  }, [ref]);
+  (0, import_react6.useEffect)(() => {
+    if (!adjustableColumns || !activeColumns || !nodeRef.current) {
+      return void 0;
+    }
+    const handleKeyDown = (event) => {
+      if (event.code === "ControlLeft") {
+        leftControlPressedRef.current = true;
+      }
+    };
+    const handleKeyUp = (event) => {
+      if (event.code === "ControlLeft") {
+        leftControlPressedRef.current = false;
+      }
+    };
+    const handleBlur = () => {
+      leftControlPressedRef.current = false;
+    };
+    const handleWheel = (event) => {
+      if (!leftControlPressedRef.current || !Number(event.deltaY)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const direction = Number(event.deltaY) < 0 ? -1 : 1;
+      const nextColumns = Math.min(
+        normalizedMaxColumns,
+        Math.max(normalizedMinColumns, activeColumns + direction)
+      );
+      if (nextColumns === activeColumns) {
+        return;
+      }
+      if (controlledColumns == null) {
+        setUncontrolledColumns(nextColumns);
+      }
+      onColumnsChange?.(nextColumns);
+    };
+    const node2 = nodeRef.current;
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlur);
+    node2.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlur);
+      node2.removeEventListener("wheel", handleWheel);
+    };
+  }, [
+    activeColumns,
+    adjustableColumns,
+    controlledColumns,
+    normalizedMaxColumns,
+    normalizedMinColumns,
+    onColumnsChange
+  ]);
+  const resolvedStyle = activeColumns && !virtual ? {
+    ...style2,
+    gridTemplateColumns: `repeat(${activeColumns}, minmax(0, 1fr))`
+  } : style2;
+  return /* @__PURE__ */ React.createElement(
+    Component3,
+    {
+      ...props,
+      ref: setNodeRef,
+      "data-gallery-columns": activeColumns || void 0,
+      style: resolvedStyle,
+      className: cx(
+        "nexus-ui-gallery",
+        activeColumns && adjustableColumns && "nexus-ui-gallery--columns-adjustable",
+        compact && "nexus-ui-gallery--compact",
+        virtual && "nexus-ui-gallery--virtual",
+        className2
+      )
+    },
+    children
+  );
+});
+var GalleryCard = (0, import_react6.forwardRef)(function GalleryCard2({
+  as: Component3 = "article",
+  className: className2 = "",
+  interactive,
+  selected = false,
+  children,
+  ...props
+}, ref) {
+  const isInteractive = interactive ?? (Component3 === "button" || Component3 === "a");
+  return /* @__PURE__ */ React.createElement(
+    Component3,
+    {
+      ...props,
+      ref,
+      className: cx(
+        "nexus-ui-gallery-card",
+        isInteractive && "nexus-ui-gallery-card--interactive",
+        selected && "is-selected",
+        className2
+      )
+    },
+    children
+  );
+});
+function GalleryCardBody({ className: className2 = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-gallery-card__body", className2) }, children);
+}
+function GalleryCardTitle({ as: Component3 = "strong", className: className2 = "", children }) {
+  return /* @__PURE__ */ React.createElement(Component3, { className: cx("nexus-ui-gallery-card__title", className2) }, children);
+}
+function GalleryCardMeta({ as: Component3 = "span", className: className2 = "", children }) {
+  return /* @__PURE__ */ React.createElement(Component3, { className: cx("nexus-ui-gallery-card__meta", className2) }, children);
+}
+
+// ../packages/nexus-ui/src/legacy/Fields.jsx
+init_define_process();
+function Field({ className: className2 = "", label = "", description = "", wide = false, children }) {
+  return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-field", wide && "nexus-ui-field--wide", className2) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-field__label" }, label), description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-field__description" }, description) : null, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-field__control" }, children));
+}
+function InlineField({ className: className2 = "", label = "", children, grow = false }) {
+  return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-inline-field", grow && "nexus-ui-inline-field--grow", className2) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-inline-field__label" }, label), /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-inline-field__control" }, children));
+}
+function FieldGrid({ className: className2 = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-field-grid", className2) }, children);
+}
+
+// ../packages/nexus-ui/src/legacy/Panels.jsx
+init_define_process();
+function SectionPanel({ className: className2 = "", tone = "default", padding = "default", children }) {
+  return /* @__PURE__ */ React.createElement("section", { className: cx(
+    "nexus-ui-panel",
+    tone !== "default" && `nexus-ui-panel--${tone}`,
+    padding !== "default" && `nexus-ui-panel--padding-${padding}`,
+    className2
+  ) }, children);
+}
+function PanelHeader({ className: className2 = "", children, actions = null }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-panel-header", className2) }, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-panel-header__copy" }, children), actions ? /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-panel-header__actions" }, actions) : null);
+}
+function PanelTitle({ eyebrow = "", title = "", description = "" }) {
+  return /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-panel-title" }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null);
+}
+function PanelStack({ className: className2 = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-stack", className2) }, children);
+}
+
+// ../packages/nexus-ui/src/legacy/States.jsx
+init_define_process();
+function Notice({ className: className2 = "", tone = "info", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-notice", `nexus-ui-notice--${tone}`, className2) }, children);
+}
+function StateBlock({
+  className: className2 = "",
+  tone = "default",
+  eyebrow = "",
+  title = "",
+  description = "",
+  centered = false,
+  children = null
+}) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx(
+    "nexus-ui-state",
+    tone !== "default" && `nexus-ui-state--${tone}`,
+    centered && "nexus-ui-state--centered",
+    className2
+  ) }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null, children);
+}
+function MetricCard({
+  className: className2 = "",
+  tone = "default",
+  eyebrow = "",
+  value = "",
+  description = "",
+  children = null
+}) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx(
+    "nexus-ui-metric",
+    tone !== "default" && `nexus-ui-metric--${tone}`,
+    className2
+  ) }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, /* @__PURE__ */ React.createElement("strong", null, value), description ? /* @__PURE__ */ React.createElement("p", null, description) : null, children);
+}
+
+// ../packages/nexus-ui/src/legacy/Workspace.jsx
+init_define_process();
 function WorkspacePage({ className: className2 = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-page", className2) }, children);
 }
 function WorkspaceTopbar({ className: className2 = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-topbar", className2) }, children);
 }
-function WorkspaceTitle({
-  className: className2 = "",
-  eyebrow = "",
-  title = "",
-  description = "",
-  aside = null
-}) {
+function WorkspaceTitle({ className: className2 = "", eyebrow = "", title = "", description = "", aside = null }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-title", className2) }, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-title__copy" }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null), aside ? /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-title__aside" }, aside) : null);
 }
 function ToolbarActions({ className: className2 = "", children }) {
@@ -68457,17 +69018,11 @@ function WorkspaceBody({ className: className2 = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-body", className2) }, children);
 }
 function SplitLayout({ className: className2 = "", variant = "main-aside", children }) {
-  return /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      className: cx(
-        "nexus-ui-split",
-        variant === "sidebar-detail" ? "nexus-ui-split--sidebar-detail" : "nexus-ui-split--main-aside",
-        className2
-      )
-    },
-    children
-  );
+  return /* @__PURE__ */ React.createElement("div", { className: cx(
+    "nexus-ui-split",
+    variant === "sidebar-detail" ? "nexus-ui-split--sidebar-detail" : "nexus-ui-split--main-aside",
+    className2
+  ) }, children);
 }
 function SplitMain({ className: className2 = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-split__main", className2) }, children);
@@ -68483,196 +69038,6 @@ function SplitDetail({ className: className2 = "", children }) {
 }
 function ScrollRegion({ className: className2 = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-scroll-region", className2) }, children);
-}
-
-// ../nexus-frontend/src/ui/SectionPanel.jsx
-init_define_process();
-function SectionPanel({
-  className: className2 = "",
-  tone = "default",
-  padding = "default",
-  children
-}) {
-  return /* @__PURE__ */ React.createElement(
-    "section",
-    {
-      className: cx(
-        "nexus-ui-panel",
-        tone !== "default" && `nexus-ui-panel--${tone}`,
-        padding !== "default" && `nexus-ui-panel--padding-${padding}`,
-        className2
-      )
-    },
-    children
-  );
-}
-function PanelHeader({ className: className2 = "", children, actions = null }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-panel-header", className2) }, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-panel-header__copy" }, children), actions ? /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-panel-header__actions" }, actions) : null);
-}
-function PanelTitle({ eyebrow = "", title = "", description = "" }) {
-  return /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-panel-title" }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null);
-}
-function PanelStack({ className: className2 = "", children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-stack", className2) }, children);
-}
-
-// ../nexus-frontend/src/ui/Actions.jsx
-init_define_process();
-function Button({
-  className: className2 = "",
-  tone = "secondary",
-  iconOnly = false,
-  children,
-  ...props
-}) {
-  return /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      ...props,
-      className: cx(
-        "nexus-ui-button",
-        tone !== "secondary" && `nexus-ui-button--${tone}`,
-        iconOnly && "nexus-ui-button--icon",
-        className2
-      )
-    },
-    children
-  );
-}
-function IconButton({ className: className2 = "", tone = "secondary", title = "", children, ...props }) {
-  return /* @__PURE__ */ React.createElement(
-    Button,
-    {
-      ...props,
-      className: className2,
-      tone,
-      iconOnly: true,
-      title,
-      "aria-label": props["aria-label"] || title || void 0
-    },
-    children
-  );
-}
-function SegmentedControl({
-  className: className2 = "",
-  options = [],
-  value,
-  onChange,
-  ariaLabel = "Selector",
-  variant = "default"
-}) {
-  const normalizedOptions = Array.isArray(options) ? options.filter(Boolean) : [];
-  const activeIndex = normalizedOptions.findIndex((option) => option.value === value);
-  const style2 = variant === "compact" ? {
-    "--segment-count": Math.max(1, normalizedOptions.length),
-    "--active-index": Math.max(0, activeIndex)
-  } : void 0;
-  return /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      className: cx(
-        "nexus-ui-segmented",
-        variant !== "default" && `nexus-ui-segmented--${variant}`,
-        activeIndex >= 0 && "has-active",
-        className2
-      ),
-      role: "tablist",
-      "aria-label": ariaLabel,
-      style: style2
-    },
-    normalizedOptions.map((option) => {
-      const optionValue = option.value;
-      const active = optionValue === value;
-      const disabled = Boolean(option.disabled);
-      return /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          key: optionValue,
-          type: "button",
-          role: "tab",
-          "aria-selected": active,
-          "aria-disabled": disabled,
-          disabled,
-          className: cx(
-            "nexus-ui-segmented__button",
-            active && "is-active",
-            disabled && "is-disabled"
-          ),
-          onClick: () => {
-            if (!disabled) {
-              onChange?.(optionValue);
-            }
-          }
-        },
-        option.icon ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__icon" }, option.icon) : null,
-        /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__label" }, option.label)
-      );
-    })
-  );
-}
-
-// ../nexus-frontend/src/ui/Fields.jsx
-init_define_process();
-function Field({
-  className: className2 = "",
-  label = "",
-  description = "",
-  wide = false,
-  children
-}) {
-  return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-field", wide && "nexus-ui-field--wide", className2) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-field__label" }, label), description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-field__description" }, description) : null, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-field__control" }, children));
-}
-function InlineField({
-  className: className2 = "",
-  label = "",
-  children,
-  grow = false
-}) {
-  return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-inline-field", grow && "nexus-ui-inline-field--grow", className2) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-inline-field__label" }, label), /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-inline-field__control" }, children));
-}
-function FieldGrid({ className: className2 = "", children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-field-grid", className2) }, children);
-}
-
-// ../nexus-frontend/src/ui/States.jsx
-init_define_process();
-function Notice({ className: className2 = "", tone = "info", children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-notice", `nexus-ui-notice--${tone}`, className2) }, children);
-}
-function StateBlock({
-  className: className2 = "",
-  tone = "default",
-  eyebrow = "",
-  title = "",
-  description = "",
-  centered = false,
-  children = null
-}) {
-  return /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      className: cx(
-        "nexus-ui-state",
-        tone !== "default" && `nexus-ui-state--${tone}`,
-        centered && "nexus-ui-state--centered",
-        className2
-      )
-    },
-    eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null,
-    title ? /* @__PURE__ */ React.createElement("strong", null, title) : null,
-    description ? /* @__PURE__ */ React.createElement("p", null, description) : null,
-    children
-  );
-}
-function MetricCard({
-  className: className2 = "",
-  tone = "default",
-  eyebrow = "",
-  value = "",
-  description = "",
-  children = null
-}) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-metric", tone !== "default" && `nexus-ui-metric--${tone}`, className2) }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, /* @__PURE__ */ React.createElement("strong", null, value), description ? /* @__PURE__ */ React.createElement("p", null, description) : null, children);
 }
 
 // ../nexus-frontend/src/components/icons/iconCatalogClient.js
@@ -69846,7 +70211,7 @@ function getIndentationValue(value, breakpoint) {
 }
 
 // node_modules/react-grid-layout/dist/chunk-WGL5FSZH.mjs
-var import_react = __toESM(require_react(), 1);
+var import_react7 = __toESM(require_react(), 1);
 
 // node_modules/react-draggable/build/cjs/cjs.mjs
 init_define_process();
@@ -69855,7 +70220,7 @@ init_define_process();
 init_define_process();
 var React2 = __toESM(require_react(), 1);
 var import_prop_types = __toESM(require_prop_types(), 1);
-var import_react_dom = __toESM(require_react_dom(), 1);
+var import_react_dom2 = __toESM(require_react_dom(), 1);
 
 // node_modules/clsx/dist/clsx.mjs
 init_define_process();
@@ -69877,7 +70242,7 @@ var clsx_default = clsx;
 // node_modules/react-draggable/build/cjs/chunk-D5BXCJ5G.mjs
 var React3 = __toESM(require_react(), 1);
 var import_prop_types2 = __toESM(require_prop_types(), 1);
-var import_react_dom2 = __toESM(require_react_dom(), 1);
+var import_react_dom3 = __toESM(require_react_dom(), 1);
 function findInArray(array2, callback2) {
   for (let i = 0, length = array2.length; i < length; i++) {
     if (callback2.apply(callback2, [array2[i], i, array2])) return array2[i];
@@ -70352,7 +70717,7 @@ var DraggableCore = class extends React3.Component {
     if ((_a3 = this.props) == null ? void 0 : _a3.nodeRef) {
       return this.props.nodeRef.current;
     }
-    const legacyReactDOM = import_react_dom2.default;
+    const legacyReactDOM = import_react_dom3.default;
     if (typeof legacyReactDOM.findDOMNode === "function") {
       return legacyReactDOM.findDOMNode(this);
     }
@@ -70627,7 +70992,7 @@ var Draggable = class extends React2.Component {
     if ((_a3 = this.props) == null ? void 0 : _a3.nodeRef) {
       return this.props.nodeRef.current;
     }
-    const legacyReactDOM = import_react_dom.default;
+    const legacyReactDOM = import_react_dom2.default;
     if (typeof legacyReactDOM.findDOMNode === "function") {
       return legacyReactDOM.findDOMNode(this);
     }
@@ -70847,27 +71212,27 @@ function GridItem(props) {
     onResize: onResizeProp,
     onResizeStop: onResizeStopProp
   } = props;
-  const [dragging, setDragging] = (0, import_react.useState)(false);
-  const [resizing, setResizing] = (0, import_react.useState)(false);
-  const elementRef = (0, import_react.useRef)(null);
-  const dragPositionRef = (0, import_react.useRef)({ left: 0, top: 0 });
-  const resizePositionRef = (0, import_react.useRef)({
+  const [dragging, setDragging] = (0, import_react7.useState)(false);
+  const [resizing, setResizing] = (0, import_react7.useState)(false);
+  const elementRef = (0, import_react7.useRef)(null);
+  const dragPositionRef = (0, import_react7.useRef)({ left: 0, top: 0 });
+  const resizePositionRef = (0, import_react7.useRef)({
     top: 0,
     left: 0,
     width: 0,
     height: 0
   });
-  const prevDroppingPositionRef = (0, import_react.useRef)(
+  const prevDroppingPositionRef = (0, import_react7.useRef)(
     void 0
   );
-  const layoutRef = (0, import_react.useRef)(layout);
+  const layoutRef = (0, import_react7.useRef)(layout);
   layoutRef.current = layout;
-  const onDragStartRef = (0, import_react.useRef)(null);
-  const onDragRef = (0, import_react.useRef)(null);
-  const dragPendingRef = (0, import_react.useRef)(false);
-  const initialDragClientRef = (0, import_react.useRef)({ x: 0, y: 0 });
-  const thresholdExceededRef = (0, import_react.useRef)(false);
-  const positionParams = (0, import_react.useMemo)(
+  const onDragStartRef = (0, import_react7.useRef)(null);
+  const onDragRef = (0, import_react7.useRef)(null);
+  const dragPendingRef = (0, import_react7.useRef)(false);
+  const initialDragClientRef = (0, import_react7.useRef)({ x: 0, y: 0 });
+  const thresholdExceededRef = (0, import_react7.useRef)(false);
+  const positionParams = (0, import_react7.useMemo)(
     () => ({
       cols,
       containerPadding,
@@ -70878,7 +71243,7 @@ function GridItem(props) {
     }),
     [cols, containerPadding, containerWidth, margin, maxRows, rowHeight]
   );
-  const constraintContext = (0, import_react.useMemo)(
+  const constraintContext = (0, import_react7.useMemo)(
     () => ({
       cols,
       maxRows,
@@ -70893,14 +71258,14 @@ function GridItem(props) {
     }),
     [cols, maxRows, containerWidth, rowHeight, margin]
   );
-  const getConstraintContext = (0, import_react.useCallback)(
+  const getConstraintContext = (0, import_react7.useCallback)(
     () => ({
       ...constraintContext,
       layout: layoutRef.current
     }),
     [constraintContext]
   );
-  const effectiveLayoutItem = (0, import_react.useMemo)(
+  const effectiveLayoutItem = (0, import_react7.useMemo)(
     () => layoutItem ?? {
       i,
       x,
@@ -70914,7 +71279,7 @@ function GridItem(props) {
     },
     [layoutItem, i, x, y, w, h, minW, maxW, minH, maxH]
   );
-  const createStyle = (0, import_react.useCallback)(
+  const createStyle = (0, import_react7.useCallback)(
     (pos2) => {
       if (positionStrategy?.calcStyle) {
         return positionStrategy.calcStyle(pos2);
@@ -70934,7 +71299,7 @@ function GridItem(props) {
     },
     [positionStrategy, useCSSTransforms, usePercentages, containerWidth]
   );
-  const onDragStart = (0, import_react.useCallback)(
+  const onDragStart = (0, import_react7.useCallback)(
     (e, { node: node2 }) => {
       if (!onDragStartProp) return;
       const { offsetParent } = node2;
@@ -71003,7 +71368,7 @@ function GridItem(props) {
       i
     ]
   );
-  const onDrag = (0, import_react.useCallback)(
+  const onDrag = (0, import_react7.useCallback)(
     (e, { node: node2, deltaX, deltaY }) => {
       if (!onDragProp || !dragging) return;
       const mouseEvent = e;
@@ -71082,7 +71447,7 @@ function GridItem(props) {
       getConstraintContext
     ]
   );
-  const onDragStop = (0, import_react.useCallback)(
+  const onDragStop = (0, import_react7.useCallback)(
     (e, { node: node2 }) => {
       if (!onDragStopProp || !dragging) return;
       const wasPending = dragPendingRef.current;
@@ -71124,7 +71489,7 @@ function GridItem(props) {
   );
   onDragStartRef.current = onDragStart;
   onDragRef.current = onDrag;
-  const onResizeHandler = (0, import_react.useCallback)(
+  const onResizeHandler = (0, import_react7.useCallback)(
     (e, { node: node2, size, handle: resizeHandle2 }, position, handlerName) => {
       const handler = handlerName === "onResizeStart" ? onResizeStartProp : handlerName === "onResize" ? onResizeProp : onResizeStopProp;
       if (!handler) return;
@@ -71176,7 +71541,7 @@ function GridItem(props) {
       getConstraintContext
     ]
   );
-  const handleResizeStart = (0, import_react.useCallback)(
+  const handleResizeStart = (0, import_react7.useCallback)(
     (e, data2) => {
       setResizing(true);
       const pos2 = calcGridItemPosition(positionParams, x, y, w, h);
@@ -71188,7 +71553,7 @@ function GridItem(props) {
     },
     [onResizeHandler, positionParams, x, y, w, h]
   );
-  const handleResize = (0, import_react.useCallback)(
+  const handleResize = (0, import_react7.useCallback)(
     (e, data2) => {
       const pos2 = calcGridItemPosition(positionParams, x, y, w, h);
       const typedData = {
@@ -71199,7 +71564,7 @@ function GridItem(props) {
     },
     [onResizeHandler, positionParams, x, y, w, h]
   );
-  const handleResizeStop = (0, import_react.useCallback)(
+  const handleResizeStop = (0, import_react7.useCallback)(
     (e, data2) => {
       setResizing(false);
       resizePositionRef.current = { top: 0, left: 0, width: 0, height: 0 };
@@ -71212,7 +71577,7 @@ function GridItem(props) {
     },
     [onResizeHandler, positionParams, x, y, w, h]
   );
-  (0, import_react.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     if (!droppingPosition) return;
     const node2 = elementRef.current;
     if (!node2) return;
@@ -71263,7 +71628,7 @@ function GridItem(props) {
     dragging ? dragPositionRef.current : null,
     resizing ? resizePositionRef.current : null
   );
-  const child = import_react.default.Children.only(children);
+  const child = import_react7.default.Children.only(children);
   const colWidth = calcGridColWidth(positionParams);
   const minConstraints = [
     calcGridItemWHPx(minW, colWidth, margin[0]),
@@ -71276,7 +71641,7 @@ function GridItem(props) {
   const childProps = child.props;
   const childClassName = childProps["className"];
   const childStyle = childProps["style"];
-  let newChild = import_react.default.cloneElement(child, {
+  let newChild = import_react7.default.cloneElement(child, {
     ref: elementRef,
     className: clsx_default("react-grid-item", childClassName, className2, {
       static: isStatic,
@@ -71336,8 +71701,8 @@ try {
 } catch {
 }
 function childrenEqual(a2, b) {
-  const aArr = import_react.default.Children.toArray(a2);
-  const bArr = import_react.default.Children.toArray(b);
+  const aArr = import_react7.default.Children.toArray(a2);
+  const bArr = import_react7.default.Children.toArray(b);
   if (aArr.length !== bArr.length) return false;
   for (let i = 0; i < aArr.length; i++) {
     const aChild = aArr[i];
@@ -71349,8 +71714,8 @@ function childrenEqual(a2, b) {
 function synchronizeLayoutWithChildren(initialLayout, children, cols, compactor) {
   const layout = [];
   const childKeys = /* @__PURE__ */ new Set();
-  import_react.default.Children.forEach(children, (child) => {
-    if (!import_react.default.isValidElement(child) || child.key === null) return;
+  import_react7.default.Children.forEach(children, (child) => {
+    if (!import_react7.default.isValidElement(child) || child.key === null) return;
     const key = String(child.key);
     childKeys.add(key);
     const existingItem = initialLayout.find((l) => l.i === key);
@@ -71422,19 +71787,19 @@ function GridLayout(props) {
     onDrop: onDropProp = noop2,
     onDropDragOver: onDropDragOverProp = noop2
   } = props;
-  const gridConfig = (0, import_react.useMemo)(
+  const gridConfig = (0, import_react7.useMemo)(
     () => ({ ...defaultGridConfig, ...gridConfigProp }),
     [gridConfigProp]
   );
-  const dragConfig = (0, import_react.useMemo)(
+  const dragConfig = (0, import_react7.useMemo)(
     () => ({ ...defaultDragConfig, ...dragConfigProp }),
     [dragConfigProp]
   );
-  const resizeConfig = (0, import_react.useMemo)(
+  const resizeConfig = (0, import_react7.useMemo)(
     () => ({ ...defaultResizeConfig, ...resizeConfigProp }),
     [resizeConfigProp]
   );
-  const dropConfig = (0, import_react.useMemo)(
+  const dropConfig = (0, import_react7.useMemo)(
     () => ({ ...defaultDropConfig, ...dropConfigProp }),
     [dropConfigProp]
   );
@@ -71460,7 +71825,7 @@ function GridLayout(props) {
   const compactType = compactor.type;
   const allowOverlap = compactor.allowOverlap;
   const preventCollision = compactor.preventCollision ?? false;
-  const droppingItem = (0, import_react.useMemo)(
+  const droppingItem = (0, import_react7.useMemo)(
     () => droppingItemProp ?? {
       i: "__dropping-elem__",
       ...defaultDropItem
@@ -71470,33 +71835,33 @@ function GridLayout(props) {
   const useCSSTransforms = positionStrategy.type === "transform";
   const transformScale = positionStrategy.scale;
   const effectiveContainerPadding = containerPadding ?? margin;
-  const [mounted, setMounted] = (0, import_react.useState)(false);
-  const [layout, setLayout] = (0, import_react.useState)(
+  const [mounted, setMounted] = (0, import_react7.useState)(false);
+  const [layout, setLayout] = (0, import_react7.useState)(
     () => synchronizeLayoutWithChildren(propsLayout, children, cols, compactor)
   );
-  const [activeDrag, setActiveDrag] = (0, import_react.useState)(null);
-  const [resizing, setResizing] = (0, import_react.useState)(false);
-  const [droppingDOMNode, setDroppingDOMNode] = (0, import_react.useState)(
+  const [activeDrag, setActiveDrag] = (0, import_react7.useState)(null);
+  const [resizing, setResizing] = (0, import_react7.useState)(false);
+  const [droppingDOMNode, setDroppingDOMNode] = (0, import_react7.useState)(
     null
   );
-  const [droppingPosition, setDroppingPosition] = (0, import_react.useState)();
-  const oldDragItemRef = (0, import_react.useRef)(null);
-  const oldResizeItemRef = (0, import_react.useRef)(null);
-  const oldLayoutRef = (0, import_react.useRef)(null);
-  const dragEnterCounterRef = (0, import_react.useRef)(0);
-  const prevLayoutRef = (0, import_react.useRef)(layout);
-  const prevPropsLayoutRef = (0, import_react.useRef)(propsLayout);
-  const prevChildrenRef = (0, import_react.useRef)(children);
-  const prevCompactTypeRef = (0, import_react.useRef)(compactType);
-  const layoutRef = (0, import_react.useRef)(layout);
+  const [droppingPosition, setDroppingPosition] = (0, import_react7.useState)();
+  const oldDragItemRef = (0, import_react7.useRef)(null);
+  const oldResizeItemRef = (0, import_react7.useRef)(null);
+  const oldLayoutRef = (0, import_react7.useRef)(null);
+  const dragEnterCounterRef = (0, import_react7.useRef)(0);
+  const prevLayoutRef = (0, import_react7.useRef)(layout);
+  const prevPropsLayoutRef = (0, import_react7.useRef)(propsLayout);
+  const prevChildrenRef = (0, import_react7.useRef)(children);
+  const prevCompactTypeRef = (0, import_react7.useRef)(compactType);
+  const layoutRef = (0, import_react7.useRef)(layout);
   layoutRef.current = layout;
-  (0, import_react.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     setMounted(true);
     if (!(0, import_fast_equals.deepEqual)(layout, propsLayout)) {
       onLayoutChange(layout);
     }
   }, []);
-  (0, import_react.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     if (activeDrag) return;
     if (droppingDOMNode) return;
     const layoutChanged = !(0, import_fast_equals.deepEqual)(propsLayout, prevPropsLayoutRef.current);
@@ -71527,20 +71892,20 @@ function GridLayout(props) {
     droppingDOMNode,
     layout
   ]);
-  (0, import_react.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     if (!activeDrag && !(0, import_fast_equals.deepEqual)(layout, prevLayoutRef.current)) {
       prevLayoutRef.current = layout;
       const publicLayout = layout.filter((l) => l.i !== droppingItem.i);
       onLayoutChange(publicLayout);
     }
   }, [layout, activeDrag, onLayoutChange, droppingItem.i]);
-  const containerHeight = (0, import_react.useMemo)(() => {
+  const containerHeight = (0, import_react7.useMemo)(() => {
     if (!autoSize) return void 0;
     const nbRow = bottom(layout);
     const containerPaddingY = effectiveContainerPadding[1];
     return nbRow * rowHeight + (nbRow - 1) * margin[1] + containerPaddingY * 2 + "px";
   }, [autoSize, layout, rowHeight, margin, effectiveContainerPadding]);
-  const onDragStart = (0, import_react.useCallback)(
+  const onDragStart = (0, import_react7.useCallback)(
     (i, _x, _y, data2) => {
       const currentLayout = layoutRef.current;
       const l = getLayoutItem(currentLayout, i);
@@ -71559,7 +71924,7 @@ function GridLayout(props) {
     },
     [onDragStartProp]
   );
-  const onDrag = (0, import_react.useCallback)(
+  const onDrag = (0, import_react7.useCallback)(
     (i, x, y, data2) => {
       const currentLayout = layoutRef.current;
       const oldDragItem = oldDragItemRef.current;
@@ -71589,7 +71954,7 @@ function GridLayout(props) {
     },
     [preventCollision, compactType, cols, allowOverlap, compactor, onDragProp]
   );
-  const onDragStop = (0, import_react.useCallback)(
+  const onDragStop = (0, import_react7.useCallback)(
     (i, x, y, data2) => {
       if (!activeDrag) return;
       const currentLayout = layoutRef.current;
@@ -71629,7 +71994,7 @@ function GridLayout(props) {
       onLayoutChange
     ]
   );
-  const onResizeStart = (0, import_react.useCallback)(
+  const onResizeStart = (0, import_react7.useCallback)(
     (i, _w, _h, data2) => {
       const currentLayout = layoutRef.current;
       const l = getLayoutItem(currentLayout, i);
@@ -71641,7 +72006,7 @@ function GridLayout(props) {
     },
     [onResizeStartProp]
   );
-  const onResize = (0, import_react.useCallback)(
+  const onResize = (0, import_react7.useCallback)(
     (i, w, h, data2) => {
       const currentLayout = layoutRef.current;
       const oldResizeItem = oldResizeItemRef.current;
@@ -71721,7 +72086,7 @@ function GridLayout(props) {
     },
     [preventCollision, compactType, cols, allowOverlap, compactor, onResizeProp]
   );
-  const onResizeStop = (0, import_react.useCallback)(
+  const onResizeStop = (0, import_react7.useCallback)(
     (i, _w, _h, data2) => {
       const currentLayout = layoutRef.current;
       const oldResizeItem = oldResizeItemRef.current;
@@ -71747,7 +72112,7 @@ function GridLayout(props) {
     },
     [cols, compactor, onResizeStopProp, onLayoutChange]
   );
-  const removeDroppingPlaceholder = (0, import_react.useCallback)(() => {
+  const removeDroppingPlaceholder = (0, import_react7.useCallback)(() => {
     const currentLayout = layoutRef.current;
     const hasDroppingItem = currentLayout.some((l) => l.i === droppingItem.i);
     if (!hasDroppingItem) {
@@ -71765,7 +72130,7 @@ function GridLayout(props) {
     setActiveDrag(null);
     setDroppingPosition(void 0);
   }, [droppingItem.i, cols, compactor]);
-  const handleDragOver = (0, import_react.useCallback)(
+  const handleDragOver = (0, import_react7.useCallback)(
     (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -71864,7 +72229,7 @@ function GridLayout(props) {
       effectiveContainerPadding
     ]
   );
-  const handleDragLeave = (0, import_react.useCallback)(
+  const handleDragLeave = (0, import_react7.useCallback)(
     (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -71878,12 +72243,12 @@ function GridLayout(props) {
     },
     [removeDroppingPlaceholder]
   );
-  const handleDragEnter = (0, import_react.useCallback)((e) => {
+  const handleDragEnter = (0, import_react7.useCallback)((e) => {
     e.preventDefault();
     e.stopPropagation();
     dragEnterCounterRef.current++;
   }, []);
-  const handleDrop = (0, import_react.useCallback)(
+  const handleDrop = (0, import_react7.useCallback)(
     (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -71895,7 +72260,7 @@ function GridLayout(props) {
     },
     [droppingItem.i, removeDroppingPlaceholder, onDropProp]
   );
-  const processGridItem = (0, import_react.useCallback)(
+  const processGridItem = (0, import_react7.useCallback)(
     (child, isDroppingItem) => {
       if (!child || !child.key) return null;
       const l = getLayoutItem(layout, String(child.key));
@@ -72025,8 +72390,8 @@ function GridLayout(props) {
       onDragEnter: isDroppable ? handleDragEnter : void 0,
       onDragOver: isDroppable ? handleDragOver : void 0,
       children: [
-        import_react.default.Children.map(children, (child) => {
-          if (!import_react.default.isValidElement(child)) return null;
+        import_react7.default.Children.map(children, (child) => {
+          if (!import_react7.default.isValidElement(child)) return null;
           return processGridItem(child);
         }),
         isDroppable && droppingDOMNode && processGridItem(droppingDOMNode, true),
@@ -72053,8 +72418,8 @@ var noop22 = () => {
 };
 function synchronizeLayoutWithChildren2(initialLayout, children, cols, compactor) {
   const layout = [];
-  import_react.default.Children.forEach(children, (child) => {
-    if (!import_react.default.isValidElement(child) || child.key === null) return;
+  import_react7.default.Children.forEach(children, (child) => {
+    if (!import_react7.default.isValidElement(child) || child.key === null) return;
     const key = String(child.key);
     const existingItem = initialLayout.find((l) => l.i === key);
     if (existingItem) {
@@ -72117,13 +72482,13 @@ function ResponsiveGridLayout(props) {
   const compactor = compactorProp ?? getCompactor("vertical");
   const compactType = compactor.type;
   const allowOverlap = compactor.allowOverlap;
-  const initialBreakpoint = (0, import_react.useMemo)(() => {
+  const initialBreakpoint = (0, import_react7.useMemo)(() => {
     return propBreakpoint ?? getBreakpointFromWidth(breakpoints, width);
   }, []);
-  const initialCols = (0, import_react.useMemo)(() => {
+  const initialCols = (0, import_react7.useMemo)(() => {
     return getColsFromBreakpoint(initialBreakpoint, colsConfig);
   }, [initialBreakpoint, colsConfig]);
-  const initialLayout = (0, import_react.useMemo)(() => {
+  const initialLayout = (0, import_react7.useMemo)(() => {
     return findOrGenerateResponsiveLayout(
       propsLayouts,
       breakpoints,
@@ -72133,21 +72498,21 @@ function ResponsiveGridLayout(props) {
       compactType
     );
   }, []);
-  const [breakpoint, setBreakpoint] = (0, import_react.useState)(initialBreakpoint);
-  const [cols, setCols] = (0, import_react.useState)(initialCols);
-  const [layout, setLayout] = (0, import_react.useState)(initialLayout);
-  const [layouts2, setLayouts] = (0, import_react.useState)(propsLayouts);
-  const prevWidthRef = (0, import_react.useRef)(width);
-  const prevBreakpointRef = (0, import_react.useRef)(propBreakpoint);
-  const prevBreakpointsRef = (0, import_react.useRef)(breakpoints);
-  const prevColsRef = (0, import_react.useRef)(colsConfig);
-  const prevLayoutsRef = (0, import_react.useRef)(propsLayouts);
-  const prevCompactTypeRef = (0, import_react.useRef)(compactType);
-  const layoutsRef = (0, import_react.useRef)(layouts2);
-  (0, import_react.useEffect)(() => {
+  const [breakpoint, setBreakpoint] = (0, import_react7.useState)(initialBreakpoint);
+  const [cols, setCols] = (0, import_react7.useState)(initialCols);
+  const [layout, setLayout] = (0, import_react7.useState)(initialLayout);
+  const [layouts2, setLayouts] = (0, import_react7.useState)(propsLayouts);
+  const prevWidthRef = (0, import_react7.useRef)(width);
+  const prevBreakpointRef = (0, import_react7.useRef)(propBreakpoint);
+  const prevBreakpointsRef = (0, import_react7.useRef)(breakpoints);
+  const prevColsRef = (0, import_react7.useRef)(colsConfig);
+  const prevLayoutsRef = (0, import_react7.useRef)(propsLayouts);
+  const prevCompactTypeRef = (0, import_react7.useRef)(compactType);
+  const layoutsRef = (0, import_react7.useRef)(layouts2);
+  (0, import_react7.useEffect)(() => {
     layoutsRef.current = layouts2;
   }, [layouts2]);
-  const derivedLayout = (0, import_react.useMemo)(() => {
+  const derivedLayout = (0, import_react7.useMemo)(() => {
     if (!(0, import_fast_equals.deepEqual)(propsLayouts, prevLayoutsRef.current)) {
       return findOrGenerateResponsiveLayout(
         propsLayouts,
@@ -72161,7 +72526,7 @@ function ResponsiveGridLayout(props) {
     return null;
   }, [propsLayouts, breakpoints, breakpoint, cols, compactor]);
   const effectiveLayout = derivedLayout ?? layout;
-  (0, import_react.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     if (derivedLayout !== null) {
       setLayout(derivedLayout);
       setLayouts(propsLayouts);
@@ -72169,7 +72534,7 @@ function ResponsiveGridLayout(props) {
       prevLayoutsRef.current = propsLayouts;
     }
   }, [derivedLayout, propsLayouts]);
-  (0, import_react.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     if (compactType !== prevCompactTypeRef.current) {
       const newLayout = compactor.compact(cloneLayout(effectiveLayout), cols);
       const newLayouts = {
@@ -72191,7 +72556,7 @@ function ResponsiveGridLayout(props) {
     breakpoint,
     onLayoutChange
   ]);
-  (0, import_react.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     const widthChanged = width !== prevWidthRef.current;
     const breakpointPropChanged = propBreakpoint !== prevBreakpointRef.current;
     const breakpointsChanged = !(0, import_fast_equals.deepEqual)(
@@ -72263,7 +72628,7 @@ function ResponsiveGridLayout(props) {
     onLayoutChange,
     onWidthChange
   ]);
-  const handleLayoutChange = (0, import_react.useCallback)(
+  const handleLayoutChange = (0, import_react7.useCallback)(
     (newLayout) => {
       const currentLayouts = layoutsRef.current;
       const newLayouts = {
@@ -72277,20 +72642,20 @@ function ResponsiveGridLayout(props) {
     },
     [breakpoint, onLayoutChange]
   );
-  const currentMargin = (0, import_react.useMemo)(() => {
+  const currentMargin = (0, import_react7.useMemo)(() => {
     return getIndentationValue(
       propMargin,
       breakpoint
     );
   }, [propMargin, breakpoint]);
-  const currentContainerPadding = (0, import_react.useMemo)(() => {
+  const currentContainerPadding = (0, import_react7.useMemo)(() => {
     if (propContainerPadding === null) return null;
     return getIndentationValue(
       propContainerPadding,
       breakpoint
     );
   }, [propContainerPadding, breakpoint]);
-  const gridConfig = (0, import_react.useMemo)(
+  const gridConfig = (0, import_react7.useMemo)(
     () => ({
       cols,
       rowHeight,
@@ -72315,7 +72680,7 @@ function ResponsiveGridLayout(props) {
 }
 
 // node_modules/react-grid-layout/dist/legacy.mjs
-var import_react2 = __toESM(require_react(), 1);
+var import_react8 = __toESM(require_react(), 1);
 var import_jsx_runtime2 = __toESM(require_react_jsx_runtime(), 1);
 function ReactGridLayout(props) {
   const {
@@ -72569,14 +72934,14 @@ var layoutClassName2 = "react-grid-layout";
 function WidthProvider(ComposedComponent) {
   function WidthProviderWrapper(props) {
     const { measureBeforeMount = false, className: className2, style: style2, ...rest } = props;
-    const [width, setWidth] = (0, import_react2.useState)(1280);
-    const [mounted, setMounted] = (0, import_react2.useState)(false);
-    const elementRef = (0, import_react2.useRef)(null);
-    const resizeObserverRef = (0, import_react2.useRef)(null);
-    (0, import_react2.useEffect)(() => {
+    const [width, setWidth] = (0, import_react8.useState)(1280);
+    const [mounted, setMounted] = (0, import_react8.useState)(false);
+    const elementRef = (0, import_react8.useRef)(null);
+    const resizeObserverRef = (0, import_react8.useRef)(null);
+    (0, import_react8.useEffect)(() => {
       setMounted(true);
     }, []);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react8.useEffect)(() => {
       const node2 = elementRef.current;
       if (!(node2 instanceof HTMLElement)) return;
       let rafId = null;
@@ -72629,7 +72994,7 @@ function WidthProvider(ComposedComponent) {
 
 // ../nexus-frontend/src/internalModules/runtime/CanvasWorkspace.jsx
 var React4 = window.React;
-var { useEffect: useEffect3, useMemo: useMemo2, useRef: useRef3, useState: useState3 } = React4;
+var { useEffect: useEffect5, useMemo: useMemo2, useRef: useRef5, useState: useState6 } = React4;
 var ResponsiveGridLayout2 = WidthProvider(ResponsiveReactGridLayout_default);
 var DEFAULT_CANVAS_BREAKPOINTS = {
   lg: 1200,
@@ -72892,21 +73257,21 @@ function CanvasWorkspace({
     () => getCanvasLayoutsSignature(normalizedCanvasState.layouts),
     [normalizedCanvasState.layouts]
   );
-  const [renderedLayouts, setRenderedLayouts] = useState3(() => normalizedCanvasState.layouts);
-  const [gridMounted, setGridMounted] = useState3(false);
-  const persistedLayoutsSignatureRef = useRef3(persistedLayoutsSignature);
-  const persistTimerRef = useRef3(null);
-  const appliedPersistedLayoutsSignatureRef = useRef3(persistedLayoutsSignature);
-  const latestLayoutsRef = useRef3(normalizedCanvasState.layouts);
-  const activeBreakpointRef = useRef3(Object.keys(breakpoints)[0] || "lg");
+  const [renderedLayouts, setRenderedLayouts] = useState6(() => normalizedCanvasState.layouts);
+  const [gridMounted, setGridMounted] = useState6(false);
+  const persistedLayoutsSignatureRef = useRef5(persistedLayoutsSignature);
+  const persistTimerRef = useRef5(null);
+  const appliedPersistedLayoutsSignatureRef = useRef5(persistedLayoutsSignature);
+  const latestLayoutsRef = useRef5(normalizedCanvasState.layouts);
+  const activeBreakpointRef = useRef5(Object.keys(breakpoints)[0] || "lg");
   const providersById = useMemo2(
     () => new Map(providers.map((provider) => [provider.id, provider])),
     [providers]
   );
-  useEffect3(() => {
+  useEffect5(() => {
     setGridMounted(true);
   }, []);
-  useEffect3(() => {
+  useEffect5(() => {
     if (appliedPersistedLayoutsSignatureRef.current === persistedLayoutsSignature) {
       return;
     }
@@ -72915,7 +73280,7 @@ function CanvasWorkspace({
     latestLayoutsRef.current = normalizedCanvasState.layouts;
     setRenderedLayouts((currentValue) => getCanvasLayoutsSignature(currentValue) === persistedLayoutsSignature ? currentValue : normalizedCanvasState.layouts);
   }, [normalizedCanvasState.layouts, persistedLayoutsSignature]);
-  useEffect3(() => {
+  useEffect5(() => {
     return () => {
       if (persistTimerRef.current !== null) {
         window.clearTimeout(persistTimerRef.current);
@@ -73110,10 +73475,10 @@ function ArrowOutIcon(props) {
 var {
   startTransition,
   useDeferredValue,
-  useEffect: useEffect4,
+  useEffect: useEffect6,
   useMemo: useMemo3,
-  useRef: useRef4,
-  useState: useState4
+  useRef: useRef6,
+  useState: useState7
 } = window.React;
 var ipcRenderer3 = window.nexus.ipc;
 var LIFE_TRACKER_FINANCE_CHANNEL_PREFIX = "life-tracker:finance";
@@ -73506,8 +73871,8 @@ function MovementRow({ movement, onEdit, onDelete, deleting }) {
       ].join(" ")
     },
     formatSignedCurrency(signedAmountCents)
-  )), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementMeta" }, /* @__PURE__ */ React.createElement("span", null, formatDateLabel(movement?.movementDate)), /* @__PURE__ */ React.createElement("span", null, movement?.category || "Sin categoria"), /* @__PURE__ */ React.createElement("span", null, movement?.platform || "Sin plataforma"), movement?.counterparty ? /* @__PURE__ */ React.createElement("span", null, movement.counterparty) : null), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementPills" }, /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__pill" }, getMovementKindLabel(movement?.kind)), /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__pill" }, getMovementStatusLabel(movement?.status))), movement?.notes ? /* @__PURE__ */ React.createElement("p", { className: "financeDashboard__movementNotes" }, movement.notes) : null), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementActions" }, /* @__PURE__ */ React.createElement(IconButton, { type: "button", className: "financeDashboard__iconButton", onClick: onEdit, title: "Editar movimiento" }, /* @__PURE__ */ React.createElement(PencilIcon, { size: 15 })), /* @__PURE__ */ React.createElement(
-    IconButton,
+  )), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementMeta" }, /* @__PURE__ */ React.createElement("span", null, formatDateLabel(movement?.movementDate)), /* @__PURE__ */ React.createElement("span", null, movement?.category || "Sin categoria"), /* @__PURE__ */ React.createElement("span", null, movement?.platform || "Sin plataforma"), movement?.counterparty ? /* @__PURE__ */ React.createElement("span", null, movement.counterparty) : null), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementPills" }, /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__pill" }, getMovementKindLabel(movement?.kind)), /* @__PURE__ */ React.createElement("span", { className: "financeDashboard__pill" }, getMovementStatusLabel(movement?.status))), movement?.notes ? /* @__PURE__ */ React.createElement("p", { className: "financeDashboard__movementNotes" }, movement.notes) : null), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__movementActions" }, /* @__PURE__ */ React.createElement(CyberIconButton, { type: "button", className: "financeDashboard__iconButton", onClick: onEdit, title: "Editar movimiento" }, /* @__PURE__ */ React.createElement(PencilIcon, { size: 15 })), /* @__PURE__ */ React.createElement(
+    CyberIconButton,
     {
       type: "button",
       className: "financeDashboard__iconButton financeDashboard__iconButton--danger",
@@ -73538,9 +73903,9 @@ function PersonalFinanceView({
   shellMode = "workspace",
   showTopbar = true
 } = {}) {
-  const titleInputRef = useRef4(null);
-  const [movements, setMovements] = useState4([]);
-  const [cashAudit, setCashAudit] = useState4({
+  const titleInputRef = useRef6(null);
+  const [movements, setMovements] = useState7([]);
+  const [cashAudit, setCashAudit] = useState7({
     counts: [],
     denominations: FINANCE_CASH_DENOMINATIONS,
     latestCashCount: null,
@@ -73548,20 +73913,20 @@ function PersonalFinanceView({
     currentCountedCents: null,
     currentVarianceCents: null
   });
-  const [loading, setLoading] = useState4(true);
-  const [refreshing, setRefreshing] = useState4(false);
-  const [saving, setSaving] = useState4(false);
-  const [savingCashCount, setSavingCashCount] = useState4(false);
-  const [deletingId, setDeletingId] = useState4("");
-  const [error3, setError] = useState4("");
-  const [searchValue, setSearchValue] = useState4("");
-  const [periodFilter, setPeriodFilter] = useState4("90d");
-  const [kindFilter, setKindFilter] = useState4("all");
-  const [statusFilter, setStatusFilter] = useState4("all");
-  const [formState, setFormState] = useState4(() => buildEmptyFormState());
-  const [showAdvancedForm, setShowAdvancedForm] = useState4(false);
-  const [workbenchTab, setWorkbenchTab] = useState4("compose");
-  const [cashCountForm, setCashCountForm] = useState4(
+  const [loading, setLoading] = useState7(true);
+  const [refreshing, setRefreshing] = useState7(false);
+  const [saving, setSaving] = useState7(false);
+  const [savingCashCount, setSavingCashCount] = useState7(false);
+  const [deletingId, setDeletingId] = useState7("");
+  const [error3, setError] = useState7("");
+  const [searchValue, setSearchValue] = useState7("");
+  const [periodFilter, setPeriodFilter] = useState7("90d");
+  const [kindFilter, setKindFilter] = useState7("all");
+  const [statusFilter, setStatusFilter] = useState7("all");
+  const [formState, setFormState] = useState7(() => buildEmptyFormState());
+  const [showAdvancedForm, setShowAdvancedForm] = useState7(false);
+  const [workbenchTab, setWorkbenchTab] = useState7("compose");
+  const [cashCountForm, setCashCountForm] = useState7(
     () => buildCashCountFormState(FINANCE_CASH_DENOMINATIONS)
   );
   const deferredSearchValue = useDeferredValue(searchValue);
@@ -73597,7 +73962,7 @@ function PersonalFinanceView({
       setRefreshing(false);
     }
   };
-  useEffect4(() => {
+  useEffect6(() => {
     void loadMovements();
   }, []);
   const categories = useMemo3(() => {
@@ -73816,7 +74181,7 @@ function PersonalFinanceView({
     },
     "Nuevo movimiento"
   ), /* @__PURE__ */ React.createElement(
-    IconButton,
+    CyberIconButton,
     {
       type: "button",
       onClick: () => void loadMovements(),
@@ -73864,14 +74229,14 @@ function PersonalFinanceView({
       }
     )
   ), /* @__PURE__ */ React.createElement("div", { className: "financeDashboard__filtersBar" }, /* @__PURE__ */ React.createElement(InlineField, { className: "financeDashboard__inlineField financeDashboard__inlineField--search", label: "Buscar", grow: true }, /* @__PURE__ */ React.createElement(
-    "input",
+    SearchField,
     {
-      type: "search",
       value: searchValue,
       onChange: (event) => setSearchValue(event.target.value),
-      placeholder: "Titulo, categoria, plataforma o nota"
+      placeholder: "Titulo, categoria, plataforma o nota",
+      "aria-label": "Buscar movimientos"
     }
-  )), /* @__PURE__ */ React.createElement(InlineField, { className: "financeDashboard__inlineField", label: "Periodo" }, /* @__PURE__ */ React.createElement("select", { value: periodFilter, onChange: (event) => setPeriodFilter(event.target.value) }, FINANCE_PERIOD_FILTERS.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.value, value: option.value }, option.label)))), /* @__PURE__ */ React.createElement(InlineField, { className: "financeDashboard__inlineField", label: "Tipo" }, /* @__PURE__ */ React.createElement("select", { value: kindFilter, onChange: (event) => setKindFilter(event.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "all" }, "Todos"), /* @__PURE__ */ React.createElement("option", { value: "expense" }, "Gastos"), /* @__PURE__ */ React.createElement("option", { value: "income" }, "Ingresos"))), /* @__PURE__ */ React.createElement(InlineField, { className: "financeDashboard__inlineField", label: "Estado" }, /* @__PURE__ */ React.createElement("select", { value: statusFilter, onChange: (event) => setStatusFilter(event.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "all" }, "Todos"), /* @__PURE__ */ React.createElement("option", { value: "posted" }, "Realizados"), /* @__PURE__ */ React.createElement("option", { value: "planned" }, "Pendientes")))), /* @__PURE__ */ React.createElement(ScrollRegion, { className: "financeDashboard__movementRegion" }, loading ? /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement(InlineField, { className: "financeDashboard__inlineField", label: "Periodo" }, /* @__PURE__ */ React.createElement(Select, { value: periodFilter, onChange: (event) => setPeriodFilter(event.target.value) }, FINANCE_PERIOD_FILTERS.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.value, value: option.value }, option.label)))), /* @__PURE__ */ React.createElement(InlineField, { className: "financeDashboard__inlineField", label: "Tipo" }, /* @__PURE__ */ React.createElement(Select, { value: kindFilter, onChange: (event) => setKindFilter(event.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "all" }, "Todos"), /* @__PURE__ */ React.createElement("option", { value: "expense" }, "Gastos"), /* @__PURE__ */ React.createElement("option", { value: "income" }, "Ingresos"))), /* @__PURE__ */ React.createElement(InlineField, { className: "financeDashboard__inlineField", label: "Estado" }, /* @__PURE__ */ React.createElement(Select, { value: statusFilter, onChange: (event) => setStatusFilter(event.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "all" }, "Todos"), /* @__PURE__ */ React.createElement("option", { value: "posted" }, "Realizados"), /* @__PURE__ */ React.createElement("option", { value: "planned" }, "Pendientes")))), /* @__PURE__ */ React.createElement(ScrollRegion, { className: "financeDashboard__movementRegion" }, loading ? /* @__PURE__ */ React.createElement(
     StateBlock,
     {
       eyebrow: "Cargando",
@@ -75035,7 +75400,7 @@ function ArrowDownIcon(props) {
 
 // ../nexus-frontend/src/editors/Markdown/embeddedSurface.jsx
 init_define_process();
-var import_react3 = __toESM(require_react(), 1);
+var import_react9 = __toESM(require_react(), 1);
 
 // ../nexus-frontend/node_modules/@codemirror/commands/dist/index.js
 init_define_process();
@@ -96180,12 +96545,12 @@ function EmbeddedMarkdownReadSurface({
   onMetadataCollapsedChange = null,
   defaultMetadataCollapsed = true
 }) {
-  const [fileState, setFileState] = (0, import_react3.useState)({
+  const [fileState, setFileState] = (0, import_react9.useState)({
     filePath: "",
     source: ""
   });
   const source = typeof value === "string" && value.length ? value : fileState.filePath === filePath ? fileState.source : "";
-  (0, import_react3.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     if (typeof value === "string" && value.length) {
       return void 0;
     }
@@ -96205,13 +96570,13 @@ function EmbeddedMarkdownReadSurface({
   const {
     metadata,
     body: body2
-  } = (0, import_react3.useMemo)(() => extractMarkdownMetadata(source), [source]);
-  const html2 = (0, import_react3.useMemo)(() => renderMarkdown(body2), [body2]);
-  const [metadataCollapsedState, setMetadataCollapsedState] = (0, import_react3.useState)({
+  } = (0, import_react9.useMemo)(() => extractMarkdownMetadata(source), [source]);
+  const html2 = (0, import_react9.useMemo)(() => renderMarkdown(body2), [body2]);
+  const [metadataCollapsedState, setMetadataCollapsedState] = (0, import_react9.useState)({
     filePath,
     collapsed: Boolean(defaultMetadataCollapsed)
   });
-  const metadataSummary = (0, import_react3.useMemo)(
+  const metadataSummary = (0, import_react9.useMemo)(
     () => formatMarkdownMetadataSummary(metadata.length),
     [metadata.length]
   );
@@ -96234,14 +96599,14 @@ function EmbeddedMarkdownReadSurface({
     event.preventDefault();
     event.stopPropagation();
   };
-  return /* @__PURE__ */ import_react3.default.createElement(
+  return /* @__PURE__ */ import_react9.default.createElement(
     "div",
     {
       className: ["markdown-engine-read", compact ? "markdown-engine-read--compact" : ""].filter(Boolean).join(" "),
       onClick: handleAnchorInteraction,
       onAuxClick: handleAnchorInteraction
     },
-    /* @__PURE__ */ import_react3.default.createElement("div", { className: "markdown-engine-document" }, metadata.length ? /* @__PURE__ */ import_react3.default.createElement(
+    /* @__PURE__ */ import_react9.default.createElement("div", { className: "markdown-engine-document" }, metadata.length ? /* @__PURE__ */ import_react9.default.createElement(
       "section",
       {
         className: [
@@ -96250,7 +96615,7 @@ function EmbeddedMarkdownReadSurface({
         ].join(" "),
         "aria-label": "Propiedades"
       },
-      /* @__PURE__ */ import_react3.default.createElement(
+      /* @__PURE__ */ import_react9.default.createElement(
         "button",
         {
           type: "button",
@@ -96261,11 +96626,11 @@ function EmbeddedMarkdownReadSurface({
           onClick: handleMetadataToggle,
           "aria-expanded": !isMetadataCollapsed
         },
-        /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataToggleMain" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataDisclosure", "aria-hidden": "true" }), /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataLabel" }, "Propiedades")),
-        metadataSummary ? /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataSummary" }, metadataSummary) : null
+        /* @__PURE__ */ import_react9.default.createElement("span", { className: "markdown-engine-metadataToggleMain" }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "markdown-engine-metadataDisclosure", "aria-hidden": "true" }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "markdown-engine-metadataLabel" }, "Propiedades")),
+        metadataSummary ? /* @__PURE__ */ import_react9.default.createElement("span", { className: "markdown-engine-metadataSummary" }, metadataSummary) : null
       ),
-      !isMetadataCollapsed ? /* @__PURE__ */ import_react3.default.createElement("div", { className: "markdown-engine-metadataBody" }, metadata.map((entry) => /* @__PURE__ */ import_react3.default.createElement("div", { key: `${entry.key}:${entry.value}`, className: "markdown-engine-metadataRow" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataKey" }, entry.key), /* @__PURE__ */ import_react3.default.createElement("span", { className: "markdown-engine-metadataValue" }, entry.value)))) : null
-    ) : null, /* @__PURE__ */ import_react3.default.createElement("article", { className: "markdown-engine-richContent", dangerouslySetInnerHTML: { __html: html2 } }))
+      !isMetadataCollapsed ? /* @__PURE__ */ import_react9.default.createElement("div", { className: "markdown-engine-metadataBody" }, metadata.map((entry) => /* @__PURE__ */ import_react9.default.createElement("div", { key: `${entry.key}:${entry.value}`, className: "markdown-engine-metadataRow" }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "markdown-engine-metadataKey" }, entry.key), /* @__PURE__ */ import_react9.default.createElement("span", { className: "markdown-engine-metadataValue" }, entry.value)))) : null
+    ) : null, /* @__PURE__ */ import_react9.default.createElement("article", { className: "markdown-engine-richContent", dangerouslySetInnerHTML: { __html: html2 } }))
   );
 }
 function EmbeddedMarkdownLiveEditor({
@@ -96277,19 +96642,19 @@ function EmbeddedMarkdownLiveEditor({
   onMetadataCollapsedChange = null,
   persistToDisk = void 0
 }) {
-  const mountRef = (0, import_react3.useRef)(null);
-  const viewRef = (0, import_react3.useRef)(null);
-  const initialValueRef = (0, import_react3.useRef)(value);
-  const onChangeRef = (0, import_react3.useRef)(onChange);
-  const applyingExternalValueRef = (0, import_react3.useRef)(false);
+  const mountRef = (0, import_react9.useRef)(null);
+  const viewRef = (0, import_react9.useRef)(null);
+  const initialValueRef = (0, import_react9.useRef)(value);
+  const onChangeRef = (0, import_react9.useRef)(onChange);
+  const applyingExternalValueRef = (0, import_react9.useRef)(false);
   const shouldPersistToDisk = persistToDisk == null ? Boolean(filePath) : Boolean(persistToDisk && filePath);
-  (0, import_react3.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
-  (0, import_react3.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     initialValueRef.current = value;
   }, [value]);
-  (0, import_react3.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     if (!mountRef.current) {
       return void 0;
     }
@@ -96347,7 +96712,7 @@ function EmbeddedMarkdownLiveEditor({
       view.destroy();
     };
   }, [filePath, metadataCollapsed, onMetadataCollapsedChange, shouldPersistToDisk]);
-  (0, import_react3.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     if (!viewRef.current) {
       return;
     }
@@ -96355,7 +96720,7 @@ function EmbeddedMarkdownLiveEditor({
       effects: setMetadataCollapsedEffect.of(Boolean(metadataCollapsed))
     });
   }, [metadataCollapsed]);
-  (0, import_react3.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     const view = viewRef.current;
     const nextValue = typeof value === "string" ? value : "";
     if (!view) {
@@ -96376,14 +96741,14 @@ function EmbeddedMarkdownLiveEditor({
     });
     applyingExternalValueRef.current = false;
   }, [value]);
-  return /* @__PURE__ */ import_react3.default.createElement("div", { className: "markdown-engine-liveEditor", ref: mountRef });
+  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "markdown-engine-liveEditor", ref: mountRef });
 }
 
 // ../nexus-plugins/life-tracker/src/training/TrainingView.jsx
 var LIFE_TRACKER_TRAINING_CHANNEL_PREFIX = "life-tracker:training";
 var ipcRenderer4 = window.nexus.ipc;
 var React8 = window.React;
-var { useEffect: useEffect6, useMemo: useMemo5, useRef: useRef6, useState: useState6 } = React8;
+var { useEffect: useEffect8, useMemo: useMemo5, useRef: useRef8, useState: useState9 } = React8;
 var TRAINING_METRIC_MODE_OPTIONS = [
   { value: "reps", label: "Repeticiones" },
   { value: "time", label: "Tiempo" },
@@ -96886,12 +97251,12 @@ function TrainingGalleryHeader({
   filters = null
 }) {
   return /* @__PURE__ */ React8.createElement(SectionPanel, { className: "trainingPlugin__galleryHeader", tone: "highlight", padding: "tight" }, /* @__PURE__ */ React8.createElement(PanelHeader, { actions }, /* @__PURE__ */ React8.createElement(PanelTitle, { eyebrow, title, description: countLabel })), /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__galleryToolbar" }, typeof onSearchChange === "function" ? /* @__PURE__ */ React8.createElement(InlineField, { className: "trainingPlugin__gallerySearch", label: "Buscar", grow: true }, /* @__PURE__ */ React8.createElement(
-    "input",
+    SearchField,
     {
-      type: "search",
       value: searchValue,
       onChange: (event) => onSearchChange(event.target.value),
-      placeholder: searchPlaceholder
+      placeholder: searchPlaceholder,
+      "aria-label": searchPlaceholder
     }
   )) : null, filters));
 }
@@ -96903,15 +97268,15 @@ function TrainingGalleryCard({
   onClick
 }) {
   return /* @__PURE__ */ React8.createElement(
-    "button",
+    GalleryCard,
     {
+      as: "button",
       type: "button",
       className: ["trainingPlugin__galleryCard", active ? "is-active" : ""].filter(Boolean).join(" "),
+      selected: active,
       onClick
     },
-    /* @__PURE__ */ React8.createElement("strong", null, title),
-    summary ? /* @__PURE__ */ React8.createElement("span", { className: "trainingPlugin__galleryCardSummary" }, summary) : null,
-    meta2 ? /* @__PURE__ */ React8.createElement("span", { className: "trainingPlugin__galleryCardMeta" }, meta2) : null
+    /* @__PURE__ */ React8.createElement(GalleryCardBody, null, /* @__PURE__ */ React8.createElement(GalleryCardTitle, null, title), summary ? /* @__PURE__ */ React8.createElement(GalleryCardMeta, { className: "trainingPlugin__galleryCardSummary" }, summary) : null, meta2 ? /* @__PURE__ */ React8.createElement(GalleryCardMeta, { className: "trainingPlugin__galleryCardMeta" }, meta2) : null)
   );
 }
 function TrainingMetaPanel({
@@ -97179,7 +97544,7 @@ function MuscleLoadEditor({
     },
     /* @__PURE__ */ React8.createElement("strong", null, `Total ${totalPercentage}%`),
     /* @__PURE__ */ React8.createElement("span", null, remainingPercentage === 0 ? "Listo para guardar." : remainingPercentage > 0 ? `Faltan ${remainingPercentage}%.` : `Sobran ${Math.abs(remainingPercentage)}%.`)
-  ), /* @__PURE__ */ React8.createElement(FieldGrid, null, /* @__PURE__ */ React8.createElement(Field, { label: "Buscar", wide: true }, /* @__PURE__ */ React8.createElement("input", { type: "search", value: muscleSearch, onChange: (event) => setMuscleSearch(event.target.value), placeholder: "Pecho, trapecio, core..." })), /* @__PURE__ */ React8.createElement(Field, { label: "Region" }, /* @__PURE__ */ React8.createElement("select", { value: regionFilter, onChange: (event) => setRegionFilter(event.target.value) }, /* @__PURE__ */ React8.createElement("option", { value: "" }, "Todas"), (catalog.regions || []).map((region) => /* @__PURE__ */ React8.createElement("option", { key: region.id, value: region.id }, region.title)))), /* @__PURE__ */ React8.createElement(Field, { label: "Grupo" }, /* @__PURE__ */ React8.createElement("select", { value: groupFilter, onChange: (event) => setGroupFilter(event.target.value) }, /* @__PURE__ */ React8.createElement("option", { value: "" }, "Todos"), (catalog.groups || []).filter((group) => !regionFilter || group.regionId === regionFilter).map((group) => /* @__PURE__ */ React8.createElement("option", { key: group.id, value: group.id }, group.title))))), (draft.muscleLoads || []).length ? /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__chipGrid" }, draft.muscleLoads.map((entry) => /* @__PURE__ */ React8.createElement("div", { key: entry.muscleId, className: "trainingPlugin__muscleChip" }, /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__muscleChipCopy" }, /* @__PURE__ */ React8.createElement("strong", null, entry.title), /* @__PURE__ */ React8.createElement("span", null, entry.groupTitle)), /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__muscleChipControls" }, /* @__PURE__ */ React8.createElement(
+  ), /* @__PURE__ */ React8.createElement(FieldGrid, null, /* @__PURE__ */ React8.createElement(Field, { label: "Buscar", wide: true }, /* @__PURE__ */ React8.createElement(SearchField, { value: muscleSearch, onChange: (event) => setMuscleSearch(event.target.value), placeholder: "Pecho, trapecio, core...", "aria-label": "Buscar musculos" })), /* @__PURE__ */ React8.createElement(Field, { label: "Region" }, /* @__PURE__ */ React8.createElement(Select, { value: regionFilter, onChange: (event) => setRegionFilter(event.target.value) }, /* @__PURE__ */ React8.createElement("option", { value: "" }, "Todas"), (catalog.regions || []).map((region) => /* @__PURE__ */ React8.createElement("option", { key: region.id, value: region.id }, region.title)))), /* @__PURE__ */ React8.createElement(Field, { label: "Grupo" }, /* @__PURE__ */ React8.createElement(Select, { value: groupFilter, onChange: (event) => setGroupFilter(event.target.value) }, /* @__PURE__ */ React8.createElement("option", { value: "" }, "Todos"), (catalog.groups || []).filter((group) => !regionFilter || group.regionId === regionFilter).map((group) => /* @__PURE__ */ React8.createElement("option", { key: group.id, value: group.id }, group.title))))), (draft.muscleLoads || []).length ? /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__chipGrid" }, draft.muscleLoads.map((entry) => /* @__PURE__ */ React8.createElement("div", { key: entry.muscleId, className: "trainingPlugin__muscleChip" }, /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__muscleChipCopy" }, /* @__PURE__ */ React8.createElement("strong", null, entry.title), /* @__PURE__ */ React8.createElement("span", null, entry.groupTitle)), /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__muscleChipControls" }, /* @__PURE__ */ React8.createElement(
     "input",
     {
       type: "number",
@@ -97388,7 +97753,7 @@ function StructureStepCard({
 }) {
   const selectedExercise = step.exerciseId ? findExerciseById(exercises, step.exerciseId) : null;
   const summary = buildTrainingMetricSummary(draftMetricToPayload(step.metric, step.stepKind === "rest" ? "rest" : "exercise"));
-  return /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__stepCard" }, /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__stepHeader" }, /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__stepTitle" }, /* @__PURE__ */ React8.createElement("strong", null, step.stepKind === "rest" ? "Descanso" : selectedExercise?.title || "Paso de ejercicio"), /* @__PURE__ */ React8.createElement("span", null, summary || "Sin carga definida")), /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__stepActions" }, /* @__PURE__ */ React8.createElement(IconButton, { type: "button", "aria-label": "Subir paso", onClick: () => onMove(-1) }, /* @__PURE__ */ React8.createElement(ArrowUpIcon, { size: 14 })), /* @__PURE__ */ React8.createElement(IconButton, { type: "button", "aria-label": "Bajar paso", onClick: () => onMove(1) }, /* @__PURE__ */ React8.createElement(ArrowDownIcon, { size: 14 })), /* @__PURE__ */ React8.createElement(IconButton, { type: "button", tone: "danger", "aria-label": "Quitar paso", onClick: onRemove }, /* @__PURE__ */ React8.createElement(DeleteIcon, { size: 14 })))), /* @__PURE__ */ React8.createElement(FieldGrid, null, /* @__PURE__ */ React8.createElement(Field, { label: "Tipo" }, /* @__PURE__ */ React8.createElement(
+  return /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__stepCard" }, /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__stepHeader" }, /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__stepTitle" }, /* @__PURE__ */ React8.createElement("strong", null, step.stepKind === "rest" ? "Descanso" : selectedExercise?.title || "Paso de ejercicio"), /* @__PURE__ */ React8.createElement("span", null, summary || "Sin carga definida")), /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__stepActions" }, /* @__PURE__ */ React8.createElement(CyberIconButton, { type: "button", "aria-label": "Subir paso", onClick: () => onMove(-1) }, /* @__PURE__ */ React8.createElement(ArrowUpIcon, { size: 14 })), /* @__PURE__ */ React8.createElement(CyberIconButton, { type: "button", "aria-label": "Bajar paso", onClick: () => onMove(1) }, /* @__PURE__ */ React8.createElement(ArrowDownIcon, { size: 14 })), /* @__PURE__ */ React8.createElement(CyberIconButton, { type: "button", tone: "danger", "aria-label": "Quitar paso", onClick: onRemove }, /* @__PURE__ */ React8.createElement(DeleteIcon, { size: 14 })))), /* @__PURE__ */ React8.createElement(FieldGrid, null, /* @__PURE__ */ React8.createElement(Field, { label: "Tipo" }, /* @__PURE__ */ React8.createElement(
     "select",
     {
       value: step.stepKind,
@@ -97454,13 +97819,13 @@ function StructureBlockCard({
     nextSteps.splice(nextIndex, 0, moved);
     onChange({ ...block5, steps: nextSteps });
   }
-  return /* @__PURE__ */ React8.createElement("details", { className: "trainingPlugin__blockCard", open: true }, /* @__PURE__ */ React8.createElement("summary", { className: "trainingPlugin__blockSummary" }, /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__stepTitle" }, /* @__PURE__ */ React8.createElement("strong", null, block5.title || "Bloque"), /* @__PURE__ */ React8.createElement("span", null, blockSummary)), /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__stepActions" }, /* @__PURE__ */ React8.createElement(IconButton, { type: "button", "aria-label": "Subir bloque", onClick: (event) => {
+  return /* @__PURE__ */ React8.createElement("details", { className: "trainingPlugin__blockCard", open: true }, /* @__PURE__ */ React8.createElement("summary", { className: "trainingPlugin__blockSummary" }, /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__stepTitle" }, /* @__PURE__ */ React8.createElement("strong", null, block5.title || "Bloque"), /* @__PURE__ */ React8.createElement("span", null, blockSummary)), /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__stepActions" }, /* @__PURE__ */ React8.createElement(CyberIconButton, { type: "button", "aria-label": "Subir bloque", onClick: (event) => {
     event.preventDefault();
     onMove(-1);
-  } }, /* @__PURE__ */ React8.createElement(ArrowUpIcon, { size: 14 })), /* @__PURE__ */ React8.createElement(IconButton, { type: "button", "aria-label": "Bajar bloque", onClick: (event) => {
+  } }, /* @__PURE__ */ React8.createElement(ArrowUpIcon, { size: 14 })), /* @__PURE__ */ React8.createElement(CyberIconButton, { type: "button", "aria-label": "Bajar bloque", onClick: (event) => {
     event.preventDefault();
     onMove(1);
-  } }, /* @__PURE__ */ React8.createElement(ArrowDownIcon, { size: 14 })), /* @__PURE__ */ React8.createElement(IconButton, { type: "button", tone: "danger", "aria-label": "Quitar bloque", onClick: (event) => {
+  } }, /* @__PURE__ */ React8.createElement(ArrowDownIcon, { size: 14 })), /* @__PURE__ */ React8.createElement(CyberIconButton, { type: "button", tone: "danger", "aria-label": "Quitar bloque", onClick: (event) => {
     event.preventDefault();
     onRemove();
   } }, /* @__PURE__ */ React8.createElement(DeleteIcon, { size: 14 })))), /* @__PURE__ */ React8.createElement(FieldGrid, null, /* @__PURE__ */ React8.createElement(Field, { label: "Titulo" }, /* @__PURE__ */ React8.createElement("input", { type: "text", value: block5.title, onChange: (event) => onChange({ ...block5, title: event.target.value }), placeholder: "Superserie, circuito..." })), /* @__PURE__ */ React8.createElement(Field, { label: "Repeticiones" }, /* @__PURE__ */ React8.createElement("input", { type: "number", min: "1", value: block5.repeatCount, onChange: (event) => onChange({ ...block5, repeatCount: event.target.value }) }))), /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__inlineActions" }, /* @__PURE__ */ React8.createElement(Button, { type: "button", onClick: () => onChange({ ...block5, steps: [...block5.steps, createStructureStepDraft("exercise")] }) }, /* @__PURE__ */ React8.createElement(PlusIcon, { size: 16 }), /* @__PURE__ */ React8.createElement("span", null, "Ejercicio")), /* @__PURE__ */ React8.createElement(Button, { type: "button", onClick: () => onChange({ ...block5, steps: [...block5.steps, createStructureStepDraft("rest")] }) }, /* @__PURE__ */ React8.createElement(PlusIcon, { size: 16 }), /* @__PURE__ */ React8.createElement("span", null, "Descanso"))), /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__steps" }, block5.steps.map((step) => /* @__PURE__ */ React8.createElement(
@@ -97606,8 +97971,8 @@ function TrainingView({
   showTopbar = true
 }) {
   const isEmbedded = shellMode === "embedded";
-  const [mode, setMode] = useState6("exercises");
-  const [catalog, setCatalog] = useState6({
+  const [mode, setMode] = useState9("exercises");
+  const [catalog, setCatalog] = useState9({
     exercises: [],
     routines: [],
     assignments: [],
@@ -97615,34 +97980,34 @@ function TrainingView({
     regions: [],
     groups: []
   });
-  const [loading, setLoading] = useState6(true);
-  const [error3, setError] = useState6("");
-  const [exerciseSearch, setExerciseSearch] = useState6("");
-  const [routineSearch, setRoutineSearch] = useState6("");
-  const [assignmentSearch, setAssignmentSearch] = useState6("");
-  const [muscleSearch, setMuscleSearch] = useState6("");
-  const [exerciseTypeFilter, setExerciseTypeFilter] = useState6("");
-  const [exerciseCategoryFilter, setExerciseCategoryFilter] = useState6("");
-  const [exerciseTagFilter, setExerciseTagFilter] = useState6("");
-  const [regionFilter, setRegionFilter] = useState6("");
-  const [groupFilter, setGroupFilter] = useState6("");
-  const [selectedExerciseId, setSelectedExerciseId] = useState6(null);
-  const [selectedMuscleId, setSelectedMuscleId] = useState6(null);
-  const [selectedRoutineId, setSelectedRoutineId] = useState6(null);
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState6(null);
-  const [exerciseView, setExerciseView] = useState6("gallery");
-  const [muscleView, setMuscleView] = useState6("gallery");
-  const [routineView, setRoutineView] = useState6("gallery");
-  const [assignmentView, setAssignmentView] = useState6("gallery");
-  const [exerciseDraft, setExerciseDraft] = useState6(createExerciseDraft);
-  const [routineDraft, setRoutineDraft] = useState6(createRoutineDraft);
-  const [assignmentDraft, setAssignmentDraft] = useState6(createAssignmentDraft);
-  const [exerciseMarkdown, setExerciseMarkdown] = useState6(() => buildExerciseMarkdownTemplate());
-  const [muscleMarkdown, setMuscleMarkdown] = useState6("");
-  const [exerciseEditorKey, setExerciseEditorKey] = useState6(() => createId("exercise-editor"));
-  const [muscleEditorKey, setMuscleEditorKey] = useState6(() => createId("muscle-editor"));
-  const exerciseMarkdownLoadIdRef = useRef6(0);
-  const muscleMarkdownLoadIdRef = useRef6(0);
+  const [loading, setLoading] = useState9(true);
+  const [error3, setError] = useState9("");
+  const [exerciseSearch, setExerciseSearch] = useState9("");
+  const [routineSearch, setRoutineSearch] = useState9("");
+  const [assignmentSearch, setAssignmentSearch] = useState9("");
+  const [muscleSearch, setMuscleSearch] = useState9("");
+  const [exerciseTypeFilter, setExerciseTypeFilter] = useState9("");
+  const [exerciseCategoryFilter, setExerciseCategoryFilter] = useState9("");
+  const [exerciseTagFilter, setExerciseTagFilter] = useState9("");
+  const [regionFilter, setRegionFilter] = useState9("");
+  const [groupFilter, setGroupFilter] = useState9("");
+  const [selectedExerciseId, setSelectedExerciseId] = useState9(null);
+  const [selectedMuscleId, setSelectedMuscleId] = useState9(null);
+  const [selectedRoutineId, setSelectedRoutineId] = useState9(null);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState9(null);
+  const [exerciseView, setExerciseView] = useState9("gallery");
+  const [muscleView, setMuscleView] = useState9("gallery");
+  const [routineView, setRoutineView] = useState9("gallery");
+  const [assignmentView, setAssignmentView] = useState9("gallery");
+  const [exerciseDraft, setExerciseDraft] = useState9(createExerciseDraft);
+  const [routineDraft, setRoutineDraft] = useState9(createRoutineDraft);
+  const [assignmentDraft, setAssignmentDraft] = useState9(createAssignmentDraft);
+  const [exerciseMarkdown, setExerciseMarkdown] = useState9(() => buildExerciseMarkdownTemplate());
+  const [muscleMarkdown, setMuscleMarkdown] = useState9("");
+  const [exerciseEditorKey, setExerciseEditorKey] = useState9(() => createId("exercise-editor"));
+  const [muscleEditorKey, setMuscleEditorKey] = useState9(() => createId("muscle-editor"));
+  const exerciseMarkdownLoadIdRef = useRef8(0);
+  const muscleMarkdownLoadIdRef = useRef8(0);
   const filteredExercises = useMemo5(() => {
     return catalog.exercises.filter((exercise) => {
       if (exerciseTypeFilter && (exercise.exerciseType || "exercise") !== exerciseTypeFilter) {
@@ -97738,28 +98103,28 @@ function TrainingView({
       setLoading(false);
     }
   }
-  useEffect6(() => {
+  useEffect8(() => {
     void loadLibrary();
   }, []);
-  useEffect6(() => {
+  useEffect8(() => {
     if (selectedExerciseId && !catalog.exercises.some((exercise) => exercise.id === selectedExerciseId)) {
       setSelectedExerciseId(null);
       setExerciseView("gallery");
     }
   }, [catalog.exercises, selectedExerciseId]);
-  useEffect6(() => {
+  useEffect8(() => {
     if (selectedMuscleId && !catalog.muscles.some((muscle) => muscle.id === selectedMuscleId)) {
       setSelectedMuscleId(null);
       setMuscleView("gallery");
     }
   }, [catalog.muscles, selectedMuscleId]);
-  useEffect6(() => {
+  useEffect8(() => {
     if (selectedRoutineId && !catalog.routines.some((routine) => routine.id === selectedRoutineId)) {
       setSelectedRoutineId(null);
       setRoutineView("gallery");
     }
   }, [catalog.routines, selectedRoutineId]);
-  useEffect6(() => {
+  useEffect8(() => {
     if (selectedAssignmentId && !catalog.assignments.some((assignment) => assignment.id === selectedAssignmentId)) {
       setSelectedAssignmentId(null);
       setAssignmentView("gallery");
@@ -98134,7 +98499,7 @@ function TrainingView({
         filters: /* @__PURE__ */ React8.createElement(React8.Fragment, null, /* @__PURE__ */ React8.createElement(InlineField, { label: "Tipo" }, /* @__PURE__ */ React8.createElement("select", { value: exerciseTypeFilter, onChange: (event) => setExerciseTypeFilter(event.target.value) }, /* @__PURE__ */ React8.createElement("option", { value: "" }, "Todos"), TRAINING_EXERCISE_TYPE_OPTIONS.map((option) => /* @__PURE__ */ React8.createElement("option", { key: option.value, value: option.value }, option.label)))), /* @__PURE__ */ React8.createElement(InlineField, { label: "Perfil" }, /* @__PURE__ */ React8.createElement("select", { value: exerciseCategoryFilter, onChange: (event) => setExerciseCategoryFilter(event.target.value) }, /* @__PURE__ */ React8.createElement("option", { value: "" }, "Todos"), TRAINING_MEASUREMENT_CATEGORY_OPTIONS.map((option) => /* @__PURE__ */ React8.createElement("option", { key: option.value, value: option.value }, option.label)))), /* @__PURE__ */ React8.createElement(InlineField, { label: "Tag" }, /* @__PURE__ */ React8.createElement("select", { value: exerciseTagFilter, onChange: (event) => setExerciseTagFilter(event.target.value) }, /* @__PURE__ */ React8.createElement("option", { value: "" }, "Todos"), TRAINING_EXERCISE_TAG_OPTIONS.map((option) => /* @__PURE__ */ React8.createElement("option", { key: option.value, value: option.value }, option.label))))),
         actions: /* @__PURE__ */ React8.createElement(Button, { type: "button", tone: "primary", onClick: createExercise }, /* @__PURE__ */ React8.createElement(PlusIcon, { size: 16 }), /* @__PURE__ */ React8.createElement("span", null, "Nuevo"))
       }
-    ), filteredExercises.length ? /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__galleryGrid" }, filteredExercises.map((exercise) => /* @__PURE__ */ React8.createElement(
+    ), filteredExercises.length ? /* @__PURE__ */ React8.createElement(GalleryGrid, { className: "trainingPlugin__galleryGrid" }, filteredExercises.map((exercise) => /* @__PURE__ */ React8.createElement(
       TrainingGalleryCard,
       {
         key: exercise.id,
@@ -98158,7 +98523,7 @@ function TrainingView({
         onSearchChange: setMuscleSearch,
         filters: /* @__PURE__ */ React8.createElement(React8.Fragment, null, /* @__PURE__ */ React8.createElement(InlineField, { label: "Region" }, /* @__PURE__ */ React8.createElement("select", { value: regionFilter, onChange: (event) => setRegionFilter(event.target.value) }, /* @__PURE__ */ React8.createElement("option", { value: "" }, "Todas"), (catalog.regions || []).map((region) => /* @__PURE__ */ React8.createElement("option", { key: region.id, value: region.id }, region.title)))), /* @__PURE__ */ React8.createElement(InlineField, { label: "Grupo" }, /* @__PURE__ */ React8.createElement("select", { value: groupFilter, onChange: (event) => setGroupFilter(event.target.value) }, /* @__PURE__ */ React8.createElement("option", { value: "" }, "Todos"), visibleGroupOptions.map((group) => /* @__PURE__ */ React8.createElement("option", { key: group.id, value: group.id }, group.title)))))
       }
-    ), filteredMuscles.length ? /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__galleryGrid" }, filteredMuscles.map((muscle) => /* @__PURE__ */ React8.createElement(
+    ), filteredMuscles.length ? /* @__PURE__ */ React8.createElement(GalleryGrid, { className: "trainingPlugin__galleryGrid" }, filteredMuscles.map((muscle) => /* @__PURE__ */ React8.createElement(
       TrainingGalleryCard,
       {
         key: muscle.id,
@@ -98182,7 +98547,7 @@ function TrainingView({
         onSearchChange: setRoutineSearch,
         actions: /* @__PURE__ */ React8.createElement(Button, { type: "button", tone: "primary", onClick: createRoutine }, /* @__PURE__ */ React8.createElement(PlusIcon, { size: 16 }), /* @__PURE__ */ React8.createElement("span", null, "Nuevo"))
       }
-    ), filteredRoutines.length ? /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__galleryGrid" }, filteredRoutines.map((routine) => /* @__PURE__ */ React8.createElement(
+    ), filteredRoutines.length ? /* @__PURE__ */ React8.createElement(GalleryGrid, { className: "trainingPlugin__galleryGrid" }, filteredRoutines.map((routine) => /* @__PURE__ */ React8.createElement(
       TrainingGalleryCard,
       {
         key: routine.id,
@@ -98205,7 +98570,7 @@ function TrainingView({
         onSearchChange: setAssignmentSearch,
         actions: /* @__PURE__ */ React8.createElement(Button, { type: "button", tone: "primary", onClick: () => createAssignment() }, /* @__PURE__ */ React8.createElement(PlusIcon, { size: 16 }), /* @__PURE__ */ React8.createElement("span", null, "Nueva"))
       }
-    ), filteredAssignments.length ? /* @__PURE__ */ React8.createElement("div", { className: "trainingPlugin__galleryGrid" }, filteredAssignments.map((assignment) => /* @__PURE__ */ React8.createElement(
+    ), filteredAssignments.length ? /* @__PURE__ */ React8.createElement(GalleryGrid, { className: "trainingPlugin__galleryGrid" }, filteredAssignments.map((assignment) => /* @__PURE__ */ React8.createElement(
       TrainingGalleryCard,
       {
         key: assignment.id,
@@ -98990,9 +99355,9 @@ function buildHabitPayload(source = null, overrides3 = {}) {
 // ../nexus-plugins/life-tracker/src/home/editors.jsx
 var React10 = window.React;
 var {
-  useEffect: useEffect7,
-  useRef: useRef7,
-  useState: useState7
+  useEffect: useEffect9,
+  useRef: useRef9,
+  useState: useState10
 } = React10;
 function EditorSection({
   title,
@@ -99116,10 +99481,10 @@ function DateDraftInput({
   ), isTodayDefault ? /* @__PURE__ */ React10.createElement("span", { className: "habitosView__dateFieldGhost", "aria-hidden": "true" }, "Hoy") : null);
 }
 function useDragReorder(resetKey, onMoveItem) {
-  const [draggedIndex, setDraggedIndex] = useState7(null);
-  const [dropIndex, setDropIndex] = useState7(null);
-  const dragIntentRef = useRef7(null);
-  useEffect7(() => {
+  const [draggedIndex, setDraggedIndex] = useState10(null);
+  const [dropIndex, setDropIndex] = useState10(null);
+  const dragIntentRef = useRef9(null);
+  useEffect9(() => {
     dragIntentRef.current = null;
     setDraggedIndex(null);
     setDropIndex(null);
@@ -99234,7 +99599,7 @@ function ChecklistDraftEditor({
       }
     ),
     /* @__PURE__ */ React10.createElement(
-      IconButton,
+      CyberIconButton,
       {
         type: "button",
         "aria-label": "Eliminar item",
@@ -99751,10 +100116,10 @@ function QueueItemCard({
 var React11 = window.React;
 var {
   startTransition: startTransition2,
-  useEffect: useEffect8,
+  useEffect: useEffect10,
   useMemo: useMemo6,
-  useRef: useRef8,
-  useState: useState8
+  useRef: useRef10,
+  useState: useState11
 } = React11;
 var ipcRenderer5 = window.nexus.ipc;
 Chart.register(
@@ -100259,10 +100624,10 @@ function LifeTrackerUpcomingTasksWidget({ widgetContext }) {
   return widgetContext?.renderUpcomingTasks?.() || null;
 }
 function LifeTrackerFinanceSummaryWidget({ widgetContext }) {
-  const [snapshot, setSnapshot] = useState8(null);
-  const [loading, setLoading] = useState8(true);
-  const [error3, setError] = useState8("");
-  useEffect8(() => {
+  const [snapshot, setSnapshot] = useState11(null);
+  const [loading, setLoading] = useState11(true);
+  const [error3, setError] = useState11("");
+  useEffect10(() => {
     let isCancelled = false;
     async function loadFinanceSummary() {
       setLoading(true);
@@ -100312,10 +100677,10 @@ function LifeTrackerFinanceSummaryWidget({ widgetContext }) {
   )), /* @__PURE__ */ React11.createElement("div", { className: "lifeTrackerWidget__metaList" }, /* @__PURE__ */ React11.createElement("span", null, summary.movementCount, " movimientos visibles en el tablero financiero."), /* @__PURE__ */ React11.createElement("span", null, summary.latestMovement?.title ? `Ultimo: ${summary.latestMovement.title}` : "Todavia no hay movimientos cargados.")))));
 }
 function LifeTrackerTrainingSummaryWidget({ widgetContext }) {
-  const [snapshot, setSnapshot] = useState8(null);
-  const [loading, setLoading] = useState8(true);
-  const [error3, setError] = useState8("");
-  useEffect8(() => {
+  const [snapshot, setSnapshot] = useState11(null);
+  const [loading, setLoading] = useState11(true);
+  const [error3, setError] = useState11("");
+  useEffect10(() => {
     let isCancelled = false;
     async function loadTrainingSummary() {
       setLoading(true);
@@ -100434,8 +100799,8 @@ function HabitOutcomeLineChart({
   chartData,
   rangeValue = "7d"
 }) {
-  const canvasRef = useRef8(null);
-  const chartRef = useRef8(null);
+  const canvasRef = useRef10(null);
+  const chartRef = useRef10(null);
   const labels = Array.isArray(chartData?.labels) ? chartData.labels : [];
   const datasets = Array.isArray(chartData?.datasets) ? chartData.datasets : [];
   const completedDataset = datasets.find((entry) => entry.id === "completed") || datasets[0] || null;
@@ -100445,7 +100810,7 @@ function HabitOutcomeLineChart({
     failed: 0
   };
   const maxTicksLimit = HABIT_OUTCOME_RANGE_TICK_LIMITS[rangeValue] || 7;
-  useEffect8(() => {
+  useEffect10(() => {
     const canvas = canvasRef.current;
     if (!canvas) {
       return void 0;
@@ -100551,10 +100916,10 @@ function HabitOutcomeLineChart({
 }
 function HabitOutcomePanel({ chart, className: className2 = "", dashboardEditMode = false }) {
   const defaultRange = chart?.defaultRange || "7d";
-  const [rangeValue, setRangeValue] = useState8(defaultRange);
+  const [rangeValue, setRangeValue] = useState11(defaultRange);
   const rangeOptions = Array.isArray(chart?.options) && chart.options.length ? chart.options : createEmptyHome().habitOutcomeChart.options;
   const selectedChart = chart?.ranges?.[rangeValue] || chart?.ranges?.[defaultRange] || createEmptyHome().habitOutcomeChart.ranges["7d"];
-  useEffect8(() => {
+  useEffect10(() => {
     if (!rangeOptions.some((option) => option.value === rangeValue)) {
       setRangeValue(defaultRange);
     }
@@ -100804,10 +101169,10 @@ function QuantityQueueInput({
   onCommit
 }) {
   const committedValue = getOccurrenceQuantityDraftValue(item2);
-  const [draftValue, setDraftValue] = useState8(committedValue);
-  const isCommittingRef = useRef8(false);
-  const lastSubmittedValueRef = useRef8(committedValue);
-  useEffect8(() => {
+  const [draftValue, setDraftValue] = useState11(committedValue);
+  const isCommittingRef = useRef10(false);
+  const lastSubmittedValueRef = useRef10(committedValue);
+  useEffect10(() => {
     setDraftValue(committedValue);
     lastSubmittedValueRef.current = committedValue;
   }, [committedValue, item2.recordId]);
@@ -100831,7 +101196,7 @@ function QuantityQueueInput({
       isCommittingRef.current = false;
     });
   };
-  useEffect8(() => {
+  useEffect10(() => {
     const parsed = parseOccurrenceQuantityDraftValue(draftValue);
     if (!parsed.isValid || disabled || parsed.serialized === lastSubmittedValueRef.current || isCommittingRef.current) {
       return void 0;
@@ -100844,7 +101209,7 @@ function QuantityQueueInput({
     };
   }, [committedValue, disabled, draftValue, onCommit]);
   return /* @__PURE__ */ React11.createElement(
-    "input",
+    Input,
     {
       className: "habitosView__queueNumberInput",
       type: "number",
@@ -100903,8 +101268,8 @@ function RemoteCategoryIcon({
   color: color2 = "#111111",
   size = "m"
 }) {
-  const [svgMarkup, setSvgMarkup] = useState8(() => getCachedIconSvgMarkup(iconId));
-  useEffect8(() => {
+  const [svgMarkup, setSvgMarkup] = useState11(() => getCachedIconSvgMarkup(iconId));
+  useEffect10(() => {
     let isCancelled = false;
     if (!iconId) {
       setSvgMarkup(null);
@@ -101016,12 +101381,12 @@ function CustomHabitCategoryBuilder({
   onCancel,
   onSave
 }) {
-  const [catalogIcons, setCatalogIcons] = useState8([]);
-  const [catalogLoading, setCatalogLoading] = useState8(true);
-  const [catalogError, setCatalogError] = useState8("");
-  const [iconSearchQuery, setIconSearchQuery] = useState8("");
-  const [visibleIconCount, setVisibleIconCount] = useState8(48);
-  useEffect8(() => {
+  const [catalogIcons, setCatalogIcons] = useState11([]);
+  const [catalogLoading, setCatalogLoading] = useState11(true);
+  const [catalogError, setCatalogError] = useState11("");
+  const [iconSearchQuery, setIconSearchQuery] = useState11("");
+  const [visibleIconCount, setVisibleIconCount] = useState11(48);
+  useEffect10(() => {
     let isActive = true;
     setCatalogLoading(true);
     setCatalogError("");
@@ -101043,7 +101408,7 @@ function CustomHabitCategoryBuilder({
       isActive = false;
     };
   }, []);
-  useEffect8(() => {
+  useEffect10(() => {
     setVisibleIconCount(48);
   }, [iconSearchQuery]);
   const searchTokens = tokenizeSearch(iconSearchQuery);
@@ -101068,7 +101433,7 @@ function CustomHabitCategoryBuilder({
     },
     /* @__PURE__ */ React11.createElement(RemoteCategoryIcon, { iconId: draft.iconId, size: "l" })
   ), /* @__PURE__ */ React11.createElement("div", { className: "habitosView__categoryBuilderPreviewCopy" }, /* @__PURE__ */ React11.createElement("strong", null, String(draft.name || "").trim() || "Nueva categoria"), /* @__PURE__ */ React11.createElement("span", null, draft.iconId.replace(/^[^:]+:/, "")))), /* @__PURE__ */ React11.createElement(FieldGrid, null, /* @__PURE__ */ React11.createElement(Field, { label: "Nombre", wide: true }, /* @__PURE__ */ React11.createElement(
-    "input",
+    Input,
     {
       value: draft.name,
       onChange: (event) => onChange("name", event.target.value),
@@ -101082,14 +101447,14 @@ function CustomHabitCategoryBuilder({
       disabled: saving,
       onChange: (value) => onChange("color", value)
     }
-  ), /* @__PURE__ */ React11.createElement("label", { className: "habitosView__categoryIconSearch" }, /* @__PURE__ */ React11.createElement(
-    "input",
+  ), /* @__PURE__ */ React11.createElement("div", { className: "habitosView__categoryIconSearch" }, /* @__PURE__ */ React11.createElement(
+    SearchField,
     {
-      type: "text",
       value: iconSearchQuery,
       onChange: (event) => setIconSearchQuery(event.target.value),
       placeholder: "Buscar icono",
-      disabled: saving
+      disabled: saving,
+      "aria-label": "Buscar icono"
     }
   ))), /* @__PURE__ */ React11.createElement("div", { className: "habitosView__categoryIconMeta" }, /* @__PURE__ */ React11.createElement("span", null, catalogLoading ? "Cargando iconos..." : catalogError ? catalogError : `${filteredIcons.length.toLocaleString("es-AR")} iconos`)), /* @__PURE__ */ React11.createElement("div", { className: "habitosView__categoryIconViewport", onScroll: handleCatalogScroll }, /* @__PURE__ */ React11.createElement(
     "div",
@@ -101568,7 +101933,7 @@ function SettingsDrawer({
 function LifeTrackerView({ ctx, input = null }) {
   const systemToday = todayLocalDate3();
   const pluginSettings = ctx.settings.useValue();
-  const pluginSettingsRef = useRef8(pluginSettings);
+  const pluginSettingsRef = useRef10(pluginSettings);
   const legacyHabitsSettingsApi = useMemo6(
     () => ctx.createPluginSettingsApi("nexus.habitos"),
     [ctx]
@@ -101589,6 +101954,54 @@ function LifeTrackerView({ ctx, input = null }) {
   );
   const activeSection = typeof input?.section === "string" && input.section.trim() ? input.section : LIFE_TRACKER_DEFAULT_SECTION;
   const dashboardEditMode = Boolean(input?.dashboardEditMode);
+  useEffect10(() => {
+    if (!ctx?.setWorkspaceFrameActions || !ctx?.clearWorkspaceFrameActions) {
+      return void 0;
+    }
+    if (activeSection !== "home") {
+      ctx.clearWorkspaceFrameActions(LIFE_TRACKER_WORKSPACE_VIEW_ID);
+      return void 0;
+    }
+    ctx.setWorkspaceFrameActions(LIFE_TRACKER_WORKSPACE_VIEW_ID, [
+      {
+        id: "life-tracker-edit-canvas",
+        placement: "side-toolbar-context",
+        icon: PencilIcon2,
+        title: dashboardEditMode ? "Salir de edicion del lienzo" : "Editar lienzo",
+        active: dashboardEditMode,
+        pressed: dashboardEditMode,
+        onClick: () => {
+          void ctx.openView({
+            viewId: LIFE_TRACKER_WORKSPACE_VIEW_ID,
+            reuse: true,
+            sourceId: "nexus.life-tracker.canvas-edit",
+            input: {
+              ...input && typeof input === "object" ? input : {},
+              section: "home",
+              dashboardEditMode: !dashboardEditMode
+            }
+          });
+        }
+      }
+    ]);
+    return () => {
+      ctx.clearWorkspaceFrameActions(LIFE_TRACKER_WORKSPACE_VIEW_ID);
+    };
+  }, [activeSection, ctx, dashboardEditMode, input]);
+  useEffect10(() => {
+    if (activeSection === "home" || !dashboardEditMode) {
+      return;
+    }
+    void ctx.openView({
+      viewId: LIFE_TRACKER_WORKSPACE_VIEW_ID,
+      reuse: true,
+      sourceId: "nexus.life-tracker.canvas-edit-exit",
+      input: {
+        ...input && typeof input === "object" ? input : {},
+        dashboardEditMode: false
+      }
+    });
+  }, [activeSection, ctx, dashboardEditMode, input]);
   const widgetProviders = ctx.useWidgetProviders();
   const lifeTrackerWidgetProviders = useMemo6(
     () => widgetProviders.filter((provider) => provider?.pluginId === LIFE_TRACKER_PLUGIN_ID).sort((left, right) => Number(left?.order || 0) - Number(right?.order || 0)),
@@ -101625,50 +102038,50 @@ function LifeTrackerView({ ctx, input = null }) {
       }
     );
   }, [canvasStateValue, canvasWidgetProviders, legacyHabitsSettings]);
-  const [home, setHome] = useState8(createEmptyHome);
-  const [loading, setLoading] = useState8(true);
-  const [saving, setSaving] = useState8(false);
-  const [error3, setError] = useState8("");
-  const [modalMode, setModalMode] = useState8("overview");
-  const [isHabitsDrawerOpen, setIsHabitsDrawerOpen] = useState8(false);
-  const [settingsTab, setSettingsTab] = useState8("habits");
-  const [selectedHabitId, setSelectedHabitId] = useState8("");
-  const [selectedCategoryId, setSelectedCategoryId] = useState8("");
-  const [taskDraft, setTaskDraft] = useState8(createTaskDraft());
-  const [habitDraft, setHabitDraft] = useState8(createHabitDraft());
-  const [habitWizardError, setHabitWizardError] = useState8("");
-  const [categoryBuilderOpen, setCategoryBuilderOpen] = useState8(false);
-  const [categoryBuilderDraft, setCategoryBuilderDraft] = useState8(createHabitCategoryDraft());
-  const [categoryBuilderError, setCategoryBuilderError] = useState8("");
-  const [taskAdvancedOpen, setTaskAdvancedOpen] = useState8(false);
-  const [habitStep, setHabitStep] = useState8(0);
-  const [trainingLibrary, setTrainingLibrary] = useState8(EMPTY_TRAINING_LIBRARY);
-  const [trainingLibraryLoading, setTrainingLibraryLoading] = useState8(false);
-  const [trainingLibraryError, setTrainingLibraryError] = useState8("");
-  const [trainingAssignmentDraft, setTrainingAssignmentDraft] = useState8(createRoutineAssignmentDraft());
-  const [trainingAssignmentError, setTrainingAssignmentError] = useState8("");
-  const [routineCaptureDraft, setRoutineCaptureDraft] = useState8(null);
-  const [routineCaptureError, setRoutineCaptureError] = useState8("");
-  const [trainingRefreshToken, setTrainingRefreshToken] = useState8(0);
-  const [queueMenu, setQueueMenu] = useState8(null);
-  const [categoryMenu, setCategoryMenu] = useState8(null);
-  const [expandedQueueSubitemIds, setExpandedQueueSubitemIds] = useState8([]);
-  const [manualEditableOccurrenceIds, setManualEditableOccurrenceIds] = useState8([]);
-  const [viewDate, setViewDate] = useState8(systemToday);
-  const viewDatePickerRef = useRef8(null);
-  const canvasMigrationSettingsPromiseRef = useRef8(null);
+  const [home, setHome] = useState11(createEmptyHome);
+  const [loading, setLoading] = useState11(true);
+  const [saving, setSaving] = useState11(false);
+  const [error3, setError] = useState11("");
+  const [modalMode, setModalMode] = useState11("overview");
+  const [isHabitsDrawerOpen, setIsHabitsDrawerOpen] = useState11(false);
+  const [settingsTab, setSettingsTab] = useState11("habits");
+  const [selectedHabitId, setSelectedHabitId] = useState11("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState11("");
+  const [taskDraft, setTaskDraft] = useState11(createTaskDraft());
+  const [habitDraft, setHabitDraft] = useState11(createHabitDraft());
+  const [habitWizardError, setHabitWizardError] = useState11("");
+  const [categoryBuilderOpen, setCategoryBuilderOpen] = useState11(false);
+  const [categoryBuilderDraft, setCategoryBuilderDraft] = useState11(createHabitCategoryDraft());
+  const [categoryBuilderError, setCategoryBuilderError] = useState11("");
+  const [taskAdvancedOpen, setTaskAdvancedOpen] = useState11(false);
+  const [habitStep, setHabitStep] = useState11(0);
+  const [trainingLibrary, setTrainingLibrary] = useState11(EMPTY_TRAINING_LIBRARY);
+  const [trainingLibraryLoading, setTrainingLibraryLoading] = useState11(false);
+  const [trainingLibraryError, setTrainingLibraryError] = useState11("");
+  const [trainingAssignmentDraft, setTrainingAssignmentDraft] = useState11(createRoutineAssignmentDraft());
+  const [trainingAssignmentError, setTrainingAssignmentError] = useState11("");
+  const [routineCaptureDraft, setRoutineCaptureDraft] = useState11(null);
+  const [routineCaptureError, setRoutineCaptureError] = useState11("");
+  const [trainingRefreshToken, setTrainingRefreshToken] = useState11(0);
+  const [queueMenu, setQueueMenu] = useState11(null);
+  const [categoryMenu, setCategoryMenu] = useState11(null);
+  const [expandedQueueSubitemIds, setExpandedQueueSubitemIds] = useState11([]);
+  const [manualEditableOccurrenceIds, setManualEditableOccurrenceIds] = useState11([]);
+  const [viewDate, setViewDate] = useState11(systemToday);
+  const viewDatePickerRef = useRef10(null);
+  const canvasMigrationSettingsPromiseRef = useRef10(null);
   const lastHabitStepIndex = HABIT_EDITOR_STEPS.length - 1;
   const managedCategories = useMemo6(
     () => buildManagedHabitCategories(home.categoryCatalog, presetCategoryOverrides),
     [home.categoryCatalog, presetCategoryOverrides]
   );
-  useEffect8(() => {
+  useEffect10(() => {
     pluginSettingsRef.current = pluginSettings;
   }, [pluginSettings]);
-  useEffect8(() => {
+  useEffect10(() => {
     setHabitStep((currentValue) => Math.min(Math.max(currentValue, 0), lastHabitStepIndex));
   }, [lastHabitStepIndex]);
-  useEffect8(() => {
+  useEffect10(() => {
     if (!queueMenu && !categoryMenu) {
       return void 0;
     }
@@ -101693,7 +102106,7 @@ function LifeTrackerView({ ctx, input = null }) {
       window.removeEventListener("scroll", handlePointerDown, true);
     };
   }, [categoryMenu, queueMenu]);
-  useEffect8(() => {
+  useEffect10(() => {
     if (!canvasWidgetProviders.length) {
       return void 0;
     }
@@ -101744,7 +102157,7 @@ function LifeTrackerView({ ctx, input = null }) {
       cancelled = true;
     };
   }, [canvasWidgetProviders, ctx.settings, legacyHabitsSettingsApi]);
-  useEffect8(() => {
+  useEffect10(() => {
     const currentCanvasState = readLifeTrackerCanvasState(pluginSettings);
     if (!currentCanvasState || !canvasWidgetProviders.length) {
       return;
@@ -101771,7 +102184,7 @@ function LifeTrackerView({ ctx, input = null }) {
       );
     }
   }, [canvasWidgetProviders, ctx.settings, legacyHabitsSettings, pluginSettings]);
-  useEffect8(() => {
+  useEffect10(() => {
     const baseSettings = pluginSettings && typeof pluginSettings === "object" ? pluginSettings : {};
     if (baseSettings[LIFE_TRACKER_HABIT_CATEGORY_PRESET_OVERRIDES_KEY]) {
       return;
@@ -101784,7 +102197,7 @@ function LifeTrackerView({ ctx, input = null }) {
       writeHabitCategoryPresetOverrides(pluginSettings, readHabitCategoryPresetOverrides(legacySettings))
     );
   }, [ctx.settings, legacyHabitsSettings, pluginSettings]);
-  useEffect8(() => {
+  useEffect10(() => {
     if (!isHabitsDrawerOpen) {
       return;
     }
@@ -101799,7 +102212,7 @@ function LifeTrackerView({ ctx, input = null }) {
       setSelectedHabitId(getDefaultHabitId(home.habits));
     }
   }, [home.habits, isHabitsDrawerOpen, selectedHabitId]);
-  useEffect8(() => {
+  useEffect10(() => {
     if (!isHabitsDrawerOpen) {
       return;
     }
@@ -101814,13 +102227,13 @@ function LifeTrackerView({ ctx, input = null }) {
       setSelectedCategoryId(managedCategories[0]?.id || "");
     }
   }, [isHabitsDrawerOpen, managedCategories, selectedCategoryId]);
-  useEffect8(() => {
+  useEffect10(() => {
     const visibleExpandableQueueIds = new Set(
       home.dailyQueue.filter((entry) => entry.type === "habit" && entry.progressMode === "checklist" || entry.type === "task" && Array.isArray(entry.subitems) && entry.subitems.length).map((entry) => entry.id)
     );
     setExpandedQueueSubitemIds((currentValue) => currentValue.filter((entry) => visibleExpandableQueueIds.has(entry)));
   }, [home.dailyQueue]);
-  useEffect8(() => {
+  useEffect10(() => {
     const visibleOccurrenceIds = new Set(
       home.dailyQueue.filter((entry) => entry.type === "habit" && !entry.isProjected).map((entry) => entry.recordId)
     );
@@ -101861,7 +102274,7 @@ function LifeTrackerView({ ctx, input = null }) {
       }
     }
   };
-  useEffect8(() => {
+  useEffect10(() => {
     if (activeSection !== "home") {
       return;
     }
@@ -102966,7 +103379,7 @@ function LifeTrackerView({ ctx, input = null }) {
           "aria-hidden": "true"
         }
       )), /* @__PURE__ */ React11.createElement(
-        IconButton,
+        CyberIconButton,
         {
           type: "button",
           "aria-label": "Configuraciones",
@@ -102974,7 +103387,7 @@ function LifeTrackerView({ ctx, input = null }) {
           onClick: openHabitsDrawer
         },
         /* @__PURE__ */ React11.createElement(SettingsIcon, null)
-      ), /* @__PURE__ */ React11.createElement(IconButton, { type: "button", tone: "primary", "aria-label": "Crear nuevo", onClick: openCreateChooser }, /* @__PURE__ */ React11.createElement(PlusIcon2, null)))
+      ), /* @__PURE__ */ React11.createElement(CyberIconButton, { type: "button", tone: "primary", "aria-label": "Crear nuevo", onClick: openCreateChooser }, /* @__PURE__ */ React11.createElement(PlusIcon2, null)))
     },
     /* @__PURE__ */ React11.createElement(
       DashboardPanelTitle,
@@ -103037,42 +103450,34 @@ function LifeTrackerView({ ctx, input = null }) {
       containerPadding: [0, 0]
     }
   )))) : null, activeSection === "finance" ? /* @__PURE__ */ React11.createElement(PersonalFinanceView, { shellMode: "embedded", showTopbar: false }) : null, activeSection === "training" ? /* @__PURE__ */ React11.createElement(TrainingView_default, { ctx: trainingCtx, shellMode: "embedded", showTopbar: false }) : null, activeSection === "home" && queueMenu?.item ? /* @__PURE__ */ React11.createElement(
-    "div",
+    ActionMenu,
     {
-      className: "habitosView__contextMenu",
-      style: {
-        position: "fixed",
-        top: `${queueMenu.y}px`,
-        left: `${queueMenu.x}px`,
-        zIndex: 1400
-      },
-      onMouseDown: (event) => event.stopPropagation(),
-      onContextMenu: (event) => event.preventDefault()
-    },
-    queueMenu.item.type === "habit" && isPastView && !queueMenu.item.isProjected ? /* @__PURE__ */ React11.createElement(
-      "button",
-      {
-        type: "button",
-        className: "context-menu-item",
-        onClick: () => {
+      ariaLabel: "Acciones del elemento",
+      x: queueMenu.x,
+      y: queueMenu.y,
+      groups: [{
+        id: "queue-actions",
+        items: [
+          queueMenu.item.type === "habit" && isPastView && !queueMenu.item.isProjected ? {
+            id: "toggle-outcome-edit",
+            label: manualEditableOccurrenceIds.includes(queueMenu.item.recordId) ? "Bloquear resultado" : "Editar resultado"
+          } : null,
+          { id: "edit", label: "Editar" },
+          { id: "delete", label: "Eliminar", danger: true }
+        ].filter(Boolean)
+      }],
+      onClose: () => setQueueMenu(null),
+      onAction: (action) => {
+        if (action.id === "toggle-outcome-edit") {
           const occurrenceId = queueMenu.item.recordId;
-          setQueueMenu(null);
           if (manualEditableOccurrenceIds.includes(occurrenceId)) {
             disableManualOccurrenceEdit(occurrenceId);
             return;
           }
           enableManualOccurrenceEdit(occurrenceId);
+          return;
         }
-      },
-      manualEditableOccurrenceIds.includes(queueMenu.item.recordId) ? "Bloquear resultado" : "Editar resultado"
-    ) : null,
-    /* @__PURE__ */ React11.createElement(
-      "button",
-      {
-        type: "button",
-        className: "context-menu-item",
-        onClick: () => {
-          setQueueMenu(null);
+        if (action.id === "edit") {
           if (queueMenu.item.type === "task") {
             openTaskEditor(queueMenu.item.raw);
             return;
@@ -103082,62 +103487,42 @@ function LifeTrackerView({ ctx, input = null }) {
             return;
           }
           openHabitEditor(queueMenu.item.habit);
+          return;
         }
-      },
-      "Editar"
-    ),
-    /* @__PURE__ */ React11.createElement(
-      "button",
-      {
-        type: "button",
-        className: "context-menu-item",
-        onClick: () => {
-          setQueueMenu(null);
+        if (action.id === "delete") {
           void handleDeleteQueueItem(queueMenu.item);
         }
-      },
-      "Eliminar"
-    )
+      }
+    }
   ) : null, activeSection === "home" && categoryMenu?.option ? /* @__PURE__ */ React11.createElement(
-    "div",
+    ActionMenu,
     {
-      className: "habitosView__contextMenu",
-      style: {
-        position: "fixed",
-        top: `${categoryMenu.y}px`,
-        left: `${categoryMenu.x}px`,
-        zIndex: 1400
-      },
-      onMouseDown: (event) => event.stopPropagation(),
-      onContextMenu: (event) => event.preventDefault()
-    },
-    /* @__PURE__ */ React11.createElement(
-      "button",
-      {
-        type: "button",
-        className: "context-menu-item",
-        onClick: () => {
+      ariaLabel: "Acciones de categoria",
+      x: categoryMenu.x,
+      y: categoryMenu.y,
+      groups: [{
+        id: "category-actions",
+        items: [
+          { id: "edit", label: "Editar categoria" },
+          { id: "delete", label: "Eliminar categoria", danger: true }
+        ]
+      }],
+      onClose: () => setCategoryMenu(null),
+      onAction: (action) => {
+        if (action.id === "edit") {
           handleOpenCategoryBuilder({
             id: categoryMenu.option.id,
             name: categoryMenu.option.label,
             iconId: categoryMenu.option.iconId,
             color: categoryMenu.option.color
           });
+          return;
         }
-      },
-      "Editar categoria"
-    ),
-    /* @__PURE__ */ React11.createElement(
-      "button",
-      {
-        type: "button",
-        className: "context-menu-item",
-        onClick: () => {
+        if (action.id === "delete") {
           void handleDeleteCategory(categoryMenu.option);
         }
-      },
-      "Eliminar categoria"
-    )
+      }
+    }
   ) : null, /* @__PURE__ */ React11.createElement(
     FloatingWorkbenchModal,
     {
@@ -103343,7 +103728,7 @@ function LifeTrackerView({ ctx, input = null }) {
 // ../nexus-plugins/life-tracker/src/training/TrainingHostSettingsSection.jsx
 init_define_process();
 var React12 = window.React;
-var { useEffect: useEffect9, useMemo: useMemo7, useState: useState9 } = React12;
+var { useEffect: useEffect11, useMemo: useMemo7, useState: useState12 } = React12;
 var ipcRenderer6 = window.nexus.ipc;
 var LIFE_TRACKER_TRAINING_CHANNEL_PREFIX3 = "life-tracker:training";
 var TRAINING_MANAGED_DOC_GROUP_ORDER = ["Ejercicios", "Musculos"];
@@ -103376,21 +103761,21 @@ function formatImportSummary(result) {
   ].join(" | ");
 }
 function TrainingHostSettingsSection() {
-  const [library, setLibrary] = useState9({
+  const [library, setLibrary] = useState12({
     exercises: [],
     muscles: [],
     routines: []
   });
-  const [managedDocs, setManagedDocs] = useState9([]);
-  const [libraryLoading, setLibraryLoading] = useState9(true);
-  const [managedDocsLoading, setManagedDocsLoading] = useState9(true);
-  const [busy, setBusy] = useState9(false);
-  const [error3, setError] = useState9("");
-  const [notice, setNotice] = useState9("");
-  const [warnings, setWarnings] = useState9([]);
-  const [singleKind, setSingleKind] = useState9("exercise");
-  const [singleId, setSingleId] = useState9("");
-  const [importText, setImportText] = useState9("");
+  const [managedDocs, setManagedDocs] = useState12([]);
+  const [libraryLoading, setLibraryLoading] = useState12(true);
+  const [managedDocsLoading, setManagedDocsLoading] = useState12(true);
+  const [busy, setBusy] = useState12(false);
+  const [error3, setError] = useState12("");
+  const [notice, setNotice] = useState12("");
+  const [warnings, setWarnings] = useState12([]);
+  const [singleKind, setSingleKind] = useState12("exercise");
+  const [singleId, setSingleId] = useState12("");
+  const [importText, setImportText] = useState12("");
   const singleOptions = useMemo7(() => {
     if (singleKind === "muscle") {
       return (library.muscles || []).map((muscle) => ({
@@ -103423,7 +103808,7 @@ function TrainingHostSettingsSection() {
       docs: groups.get(group) || []
     })).filter((entry) => entry.docs.length > 0);
   }, [managedDocs]);
-  useEffect9(() => {
+  useEffect11(() => {
     if (singleId && singleOptions.some((option) => option.id === singleId)) {
       return;
     }
@@ -103459,7 +103844,7 @@ function TrainingHostSettingsSection() {
       setError(loadError instanceof Error ? loadError.message : "No se pudieron cargar los ajustes de entrenamiento.");
     }
   };
-  useEffect9(() => {
+  useEffect11(() => {
     void loadAll2();
   }, []);
   const handleCopyAll = async () => {

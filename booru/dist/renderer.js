@@ -1,6 +1,77 @@
 const React = window.React;
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __commonJS = (cb, mod) => function __require() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// <define:process>
+var init_define_process = __esm({
+  "<define:process>"() {
+  }
+});
+
+// scripts/plugins/shims/react.cjs
+var require_react = __commonJS({
+  "scripts/plugins/shims/react.cjs"(exports, module) {
+    init_define_process();
+    function requireReact() {
+      const hostReact = globalThis?.window?.__NEXUS_HOST_REACT__ || globalThis?.window?.React;
+      if (!hostReact) {
+        throw new Error("Nexus plugins renderer no encontro el React del host en window.__NEXUS_HOST_REACT__.");
+      }
+      return hostReact;
+    }
+    module.exports = requireReact();
+  }
+});
+
+// scripts/plugins/shims/react-dom.cjs
+var require_react_dom = __commonJS({
+  "scripts/plugins/shims/react-dom.cjs"(exports, module) {
+    init_define_process();
+    function requireReactDom() {
+      const hostReactDom = globalThis?.window?.__NEXUS_HOST_REACT_DOM__;
+      if (!hostReactDom) {
+        throw new Error("Nexus plugins renderer no encontro react-dom del host en window.__NEXUS_HOST_REACT_DOM__.");
+      }
+      return hostReactDom;
+    }
+    module.exports = requireReactDom();
+  }
+});
+
+// ../nexus-plugins/booru/src/renderer.js
+init_define_process();
+
+// ../nexus-plugins/booru/src/BooruWorkspaceView.jsx
+init_define_process();
 
 // ../nexus-plugins/booru/src/constants.js
+init_define_process();
 var BOORU_PLUGIN_ID = "nexus.booru";
 var BOORU_WORKSPACE_VIEW_ID = "nexus.booru.workspace";
 var BOORU_DEFAULT_SECTION = "media";
@@ -40,6 +111,7 @@ var BOORU_ENTITY_KIND_LABELS = Object.freeze({
 });
 
 // ../nexus-frontend/src/utils/devLog.js
+init_define_process();
 var DEV_LOG_BATCH_CHANNEL = "dev-log:append-batch";
 var ipcRenderer = window.nexus.ipc;
 var rendererDevLoggingEnabled = window.location.protocol !== "file:";
@@ -225,6 +297,7 @@ function createRendererDevLogger(scope) {
 }
 
 // ../nexus-plugins/booru/src/icons.jsx
+init_define_process();
 function BaseIcon({ children, size = 18, strokeWidth = 1.8 }) {
   return /* @__PURE__ */ React.createElement(
     "svg",
@@ -245,86 +318,29 @@ function BaseIcon({ children, size = 18, strokeWidth = 1.8 }) {
 function BooruIcon(props) {
   return /* @__PURE__ */ React.createElement(BaseIcon, { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "4.5", y: "5", width: "15", height: "14", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "m8 14 2.7-2.7a1.3 1.3 0 0 1 1.8 0L16 14.8" }), /* @__PURE__ */ React.createElement("path", { d: "m13 11.5 1.2-1.2a1.3 1.3 0 0 1 1.8 0l2 2" }), /* @__PURE__ */ React.createElement("circle", { cx: "9", cy: "9.2", r: "1.1" }));
 }
-function RefreshIcon(props) {
-  return /* @__PURE__ */ React.createElement(BaseIcon, { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M20 6v5h-5" }), /* @__PURE__ */ React.createElement("path", { d: "M4 18v-5h5" }), /* @__PURE__ */ React.createElement("path", { d: "M18 11a7 7 0 0 0-12-3" }), /* @__PURE__ */ React.createElement("path", { d: "M6 13a7 7 0 0 0 12 3" }));
-}
 function FolderIcon(props) {
   return /* @__PURE__ */ React.createElement(BaseIcon, { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M4.75 7.25h4l1.8 1.9h8.7A1.75 1.75 0 0 1 21 10.9v6.35A1.75 1.75 0 0 1 19.25 19H4.75A1.75 1.75 0 0 1 3 17.25V9A1.75 1.75 0 0 1 4.75 7.25Z" }));
 }
 function DownloadIcon(props) {
   return /* @__PURE__ */ React.createElement(BaseIcon, { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 3.8v10.1" }), /* @__PURE__ */ React.createElement("path", { d: "m8.4 10.6 3.6 3.7 3.6-3.7" }), /* @__PURE__ */ React.createElement("path", { d: "M5 18.4v1.1A1.7 1.7 0 0 0 6.7 21h10.6a1.7 1.7 0 0 0 1.7-1.5v-1.1" }));
 }
-function PulseIcon(props) {
-  return /* @__PURE__ */ React.createElement(BaseIcon, { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M3.5 12h3.1l1.8-3.4 3.1 7 2.6-5h6.4" }));
-}
-function AlertIcon(props) {
-  return /* @__PURE__ */ React.createElement(BaseIcon, { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 4.7 19 18H5l7-13.3Z" }), /* @__PURE__ */ React.createElement("path", { d: "M12 9.4v3.9" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "15.9", r: ".75", fill: "currentColor", stroke: "none" }));
-}
 
-// ../nexus-frontend/src/ui/cx.js
+// ../packages/nexus-ui/src/index.js
+init_define_process();
+
+// ../packages/nexus-ui/src/components/Button/Button.jsx
+init_define_process();
+
+// ../packages/nexus-ui/src/utils/cx.js
+init_define_process();
 function cx(...values) {
   return values.filter(Boolean).join(" ");
 }
 
-// ../nexus-frontend/src/ui/WorkspacePage.jsx
-function WorkspacePage({ className = "", children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-page", className) }, children);
-}
-function WorkspaceBody({ className = "", children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-body", className) }, children);
-}
-function SplitLayout({ className = "", variant = "main-aside", children }) {
-  return /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      className: cx(
-        "nexus-ui-split",
-        variant === "sidebar-detail" ? "nexus-ui-split--sidebar-detail" : "nexus-ui-split--main-aside",
-        className
-      )
-    },
-    children
-  );
-}
-function SplitSidebar({ className = "", children }) {
-  return /* @__PURE__ */ React.createElement("aside", { className: cx("nexus-ui-split__sidebar", className) }, children);
-}
-function SplitDetail({ className = "", children }) {
-  return /* @__PURE__ */ React.createElement("main", { className: cx("nexus-ui-split__detail", className) }, children);
-}
-function ScrollRegion({ className = "", children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-scroll-region", className) }, children);
-}
-
-// ../nexus-frontend/src/ui/SectionPanel.jsx
-function SectionPanel({
-  className = "",
-  tone = "default",
-  padding = "default",
-  children
-}) {
-  return /* @__PURE__ */ React.createElement(
-    "section",
-    {
-      className: cx(
-        "nexus-ui-panel",
-        tone !== "default" && `nexus-ui-panel--${tone}`,
-        padding !== "default" && `nexus-ui-panel--padding-${padding}`,
-        className
-      )
-    },
-    children
-  );
-}
-function PanelStack({ className = "", children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-stack", className) }, children);
-}
-
-// ../nexus-frontend/src/ui/Actions.jsx
+// ../packages/nexus-ui/src/components/Button/Button.jsx
 function Button({
   className = "",
   tone = "secondary",
-  iconOnly = false,
   children,
   ...props
 }) {
@@ -335,91 +351,487 @@ function Button({
       className: cx(
         "nexus-ui-button",
         tone !== "secondary" && `nexus-ui-button--${tone}`,
-        iconOnly && "nexus-ui-button--icon",
         className
       )
     },
     children
   );
 }
+
+// ../packages/nexus-ui/src/components/SegmentedControl/SegmentedControl.jsx
+init_define_process();
+function readOptionValue(option) {
+  return option?.value ?? option?.id;
+}
 function SegmentedControl({
-  className = "",
-  options = [],
-  value,
-  onChange,
   ariaLabel = "Selector",
+  className = "",
+  flush = false,
+  iconOnly = false,
+  onChange,
+  options = [],
+  orientation = "horizontal",
+  renderIcon,
+  value,
   variant = "default"
 }) {
   const normalizedOptions = Array.isArray(options) ? options.filter(Boolean) : [];
-  const activeIndex = normalizedOptions.findIndex((option) => option.value === value);
-  const style = variant === "compact" ? {
-    "--segment-count": Math.max(1, normalizedOptions.length),
-    "--active-index": Math.max(0, activeIndex)
-  } : void 0;
+  const activeIndex = Math.max(
+    0,
+    normalizedOptions.findIndex((option) => readOptionValue(option) === value)
+  );
+  const isCyber = variant === "cyber" || iconOnly;
   return /* @__PURE__ */ React.createElement(
     "div",
     {
+      "aria-label": ariaLabel,
       className: cx(
         "nexus-ui-segmented",
+        `nexus-ui-segmented--${orientation}`,
         variant !== "default" && `nexus-ui-segmented--${variant}`,
-        activeIndex >= 0 && "has-active",
+        isCyber && "nexus-ui-segmented--icon-only",
+        flush && "nexus-ui-segmented--flush",
+        normalizedOptions.length && "has-active",
         className
       ),
-      role: "tablist",
-      "aria-label": ariaLabel,
-      style
+      role: "radiogroup",
+      style: {
+        "--segment-count": Math.max(1, normalizedOptions.length),
+        "--active-index": activeIndex
+      }
     },
+    /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__highlight", "aria-hidden": "true" }),
     normalizedOptions.map((option) => {
-      const optionValue = option.value;
+      const optionValue = readOptionValue(option);
       const active = optionValue === value;
       const disabled = Boolean(option.disabled);
+      const icon = renderIcon?.(option) ?? option.icon ?? null;
       return /* @__PURE__ */ React.createElement(
         "button",
         {
-          key: optionValue,
-          type: "button",
-          role: "tab",
-          "aria-selected": active,
-          "aria-disabled": disabled,
-          disabled,
+          "aria-checked": active,
+          "aria-label": iconOnly ? option.label : void 0,
           className: cx(
             "nexus-ui-segmented__button",
             active && "is-active",
             disabled && "is-disabled"
           ),
+          disabled,
+          key: optionValue,
+          role: "radio",
+          type: "button",
           onClick: () => {
             if (!disabled) {
               onChange?.(optionValue);
             }
           }
         },
-        option.icon ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__icon" }, option.icon) : null,
-        /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__label" }, option.label)
+        icon ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__icon" }, icon) : null,
+        isCyber ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__glare", "aria-hidden": "true" }) : null,
+        !iconOnly ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__label" }, option.label) : null,
+        iconOnly ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-tooltip" }, option.label) : null
       );
     })
   );
 }
 
-// ../nexus-frontend/src/ui/Fields.jsx
-function Field({
+// ../packages/nexus-ui/src/components/ActionMenu/ActionMenu.jsx
+init_define_process();
+var import_react = __toESM(require_react(), 1);
+var import_react_dom = __toESM(require_react_dom(), 1);
+var VIEWPORT_MARGIN = 8;
+function ActionMenu({
+  align = "end",
+  anchorRef,
+  ariaLabel,
   className = "",
-  label = "",
-  description = "",
-  wide = false,
-  children
+  groups = [],
+  onAction,
+  onClose,
+  x,
+  y
 }) {
+  const menuRef = (0, import_react.useRef)(null);
+  const [position, setPosition] = (0, import_react.useState)({
+    ready: false,
+    submenusLeft: false,
+    x: x ?? 0,
+    y: y ?? 0
+  });
+  (0, import_react.useEffect)(() => {
+    const handlePointerDown = (event) => {
+      const clickedAnchor = anchorRef?.current?.contains?.(event.target);
+      if (!menuRef.current?.contains(event.target) && !clickedAnchor) {
+        onClose?.();
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose?.();
+    };
+    const closeOnViewportChange = () => onClose?.();
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", closeOnViewportChange);
+    window.addEventListener("scroll", closeOnViewportChange, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", closeOnViewportChange);
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+    };
+  }, [anchorRef, onClose]);
+  (0, import_react.useLayoutEffect)(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const menuRect = menu.getBoundingClientRect();
+    const anchorRect = anchorRef?.current?.getBoundingClientRect();
+    const requestedX = Number.isFinite(x) ? x : align === "start" ? anchorRect?.left ?? VIEWPORT_MARGIN : (anchorRect?.right ?? VIEWPORT_MARGIN) - menuRect.width;
+    const requestedY = Number.isFinite(y) ? y : (anchorRect?.bottom ?? VIEWPORT_MARGIN) + 7;
+    setPosition({
+      ready: true,
+      submenusLeft: requestedX + menuRect.width + 224 > window.innerWidth,
+      x: Math.max(
+        VIEWPORT_MARGIN,
+        Math.min(requestedX, window.innerWidth - menuRect.width - VIEWPORT_MARGIN)
+      ),
+      y: Math.max(
+        VIEWPORT_MARGIN,
+        Math.min(requestedY, window.innerHeight - menuRect.height - VIEWPORT_MARGIN)
+      )
+    });
+  }, [align, anchorRef, groups, x, y]);
+  const renderActions = (actions, depth = 0) => actions.map((action) => {
+    const children = Array.isArray(action.children) ? action.children : [];
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: cx(
+          "nexus-ui-action-menu__item",
+          children.length && "has-children"
+        ),
+        key: action.id
+      },
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          "aria-checked": action.checked,
+          "aria-haspopup": children.length ? "menu" : void 0,
+          className: cx(
+            action.danger && "is-danger",
+            action.checked && "is-selected"
+          ),
+          disabled: action.disabled,
+          role: action.role || "menuitem",
+          type: "button",
+          onClick: () => {
+            if (children.length) return;
+            onAction?.(action);
+            action.onClick?.();
+            if (!action.keepOpen) onClose?.();
+          }
+        },
+        action.icon ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-action-menu__icon" }, action.icon) : null,
+        /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-action-menu__copy" }, /* @__PURE__ */ React.createElement("strong", null, action.label), action.description ? /* @__PURE__ */ React.createElement("small", null, action.description) : null),
+        /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-action-menu__end" }, children.length ? "\u203A" : action.end)
+      ),
+      children.length ? /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          "aria-label": action.label,
+          className: "nexus-ui-action-menu nexus-ui-action-menu__submenu",
+          role: "menu",
+          style: { "--submenu-depth": depth + 1 }
+        },
+        renderActions(children, depth + 1)
+      ) : null
+    );
+  });
+  return (0, import_react_dom.createPortal)(
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        "aria-label": ariaLabel,
+        className: cx(
+          "nexus-ui-action-menu",
+          position.submenusLeft && "has-submenus-left",
+          className
+        ),
+        ref: menuRef,
+        role: "menu",
+        style: {
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          visibility: position.ready ? "visible" : "hidden"
+        }
+      },
+      groups.map((group, groupIndex) => /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-action-menu__group", key: group.id || groupIndex }, renderActions(group.items || [])))
+    ),
+    document.body
+  );
+}
+
+// ../packages/nexus-ui/src/components/Input/Input.jsx
+init_define_process();
+var import_react2 = __toESM(require_react(), 1);
+var Input = (0, import_react2.forwardRef)(function Input2({ className = "", type = "text", ...props }, ref) {
+  return /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      ...props,
+      ref,
+      className: cx("nexus-ui-input", className),
+      type
+    }
+  );
+});
+
+// ../packages/nexus-ui/src/components/Select/Select.jsx
+init_define_process();
+var import_react3 = __toESM(require_react(), 1);
+var Select = (0, import_react3.forwardRef)(function Select2({ className = "", children, ...props }, ref) {
+  return /* @__PURE__ */ React.createElement(
+    "select",
+    {
+      ...props,
+      ref,
+      className: cx("nexus-ui-select", className)
+    },
+    children
+  );
+});
+
+// ../packages/nexus-ui/src/components/SearchField/SearchField.jsx
+init_define_process();
+var import_react4 = __toESM(require_react(), 1);
+function DefaultSearchIcon() {
+  return /* @__PURE__ */ React.createElement("svg", { "aria-hidden": "true", fill: "none", viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "10.5", cy: "10.5", r: "6.5" }), /* @__PURE__ */ React.createElement("path", { d: "m15.5 15.5 4 4" }));
+}
+var SearchField = (0, import_react4.forwardRef)(function SearchField2({
+  className = "",
+  endAction = null,
+  icon,
+  inputClassName = "",
+  ...props
+}, ref) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-search-field", className) }, icon !== null ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-search-field__icon" }, icon === void 0 ? /* @__PURE__ */ React.createElement(DefaultSearchIcon, null) : icon) : null, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      ...props,
+      ref,
+      className: cx("nexus-ui-search-field__input", inputClassName),
+      type: "search"
+    }
+  ), endAction ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-search-field__action" }, endAction) : null);
+});
+
+// ../packages/nexus-ui/src/components/Gallery/Gallery.jsx
+init_define_process();
+var import_react5 = __toESM(require_react(), 1);
+function normalizeColumnCount(value, fallback = null) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) && numericValue > 0 ? Math.round(numericValue) : fallback;
+}
+function assignRef(ref, value) {
+  if (typeof ref === "function") {
+    ref(value);
+  } else if (ref && typeof ref === "object") {
+    ref.current = value;
+  }
+}
+var GalleryGrid = (0, import_react5.forwardRef)(function GalleryGrid2({
+  as: Component = "div",
+  className = "",
+  compact = false,
+  virtual = false,
+  columns,
+  defaultColumns,
+  minColumns = 1,
+  maxColumns = 12,
+  adjustableColumns = true,
+  onColumnsChange,
+  style,
+  children,
+  ...props
+}, ref) {
+  const nodeRef = (0, import_react5.useRef)(null);
+  const leftControlPressedRef = (0, import_react5.useRef)(false);
+  const [uncontrolledColumns, setUncontrolledColumns] = (0, import_react5.useState)(
+    () => normalizeColumnCount(defaultColumns)
+  );
+  const controlledColumns = normalizeColumnCount(columns);
+  const activeColumns = controlledColumns ?? uncontrolledColumns;
+  const normalizedMinColumns = normalizeColumnCount(minColumns, 1);
+  const normalizedMaxColumns = Math.max(
+    normalizedMinColumns,
+    normalizeColumnCount(maxColumns, 12)
+  );
+  const setNodeRef = (0, import_react5.useCallback)((node) => {
+    nodeRef.current = node;
+    assignRef(ref, node);
+  }, [ref]);
+  (0, import_react5.useEffect)(() => {
+    if (!adjustableColumns || !activeColumns || !nodeRef.current) {
+      return void 0;
+    }
+    const handleKeyDown = (event) => {
+      if (event.code === "ControlLeft") {
+        leftControlPressedRef.current = true;
+      }
+    };
+    const handleKeyUp = (event) => {
+      if (event.code === "ControlLeft") {
+        leftControlPressedRef.current = false;
+      }
+    };
+    const handleBlur = () => {
+      leftControlPressedRef.current = false;
+    };
+    const handleWheel = (event) => {
+      if (!leftControlPressedRef.current || !Number(event.deltaY)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const direction = Number(event.deltaY) < 0 ? -1 : 1;
+      const nextColumns = Math.min(
+        normalizedMaxColumns,
+        Math.max(normalizedMinColumns, activeColumns + direction)
+      );
+      if (nextColumns === activeColumns) {
+        return;
+      }
+      if (controlledColumns == null) {
+        setUncontrolledColumns(nextColumns);
+      }
+      onColumnsChange?.(nextColumns);
+    };
+    const node = nodeRef.current;
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlur);
+    node.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlur);
+      node.removeEventListener("wheel", handleWheel);
+    };
+  }, [
+    activeColumns,
+    adjustableColumns,
+    controlledColumns,
+    normalizedMaxColumns,
+    normalizedMinColumns,
+    onColumnsChange
+  ]);
+  const resolvedStyle = activeColumns && !virtual ? {
+    ...style,
+    gridTemplateColumns: `repeat(${activeColumns}, minmax(0, 1fr))`
+  } : style;
+  return /* @__PURE__ */ React.createElement(
+    Component,
+    {
+      ...props,
+      ref: setNodeRef,
+      "data-gallery-columns": activeColumns || void 0,
+      style: resolvedStyle,
+      className: cx(
+        "nexus-ui-gallery",
+        activeColumns && adjustableColumns && "nexus-ui-gallery--columns-adjustable",
+        compact && "nexus-ui-gallery--compact",
+        virtual && "nexus-ui-gallery--virtual",
+        className
+      )
+    },
+    children
+  );
+});
+var GalleryCard = (0, import_react5.forwardRef)(function GalleryCard2({
+  as: Component = "article",
+  className = "",
+  interactive,
+  selected = false,
+  children,
+  ...props
+}, ref) {
+  const isInteractive = interactive ?? (Component === "button" || Component === "a");
+  return /* @__PURE__ */ React.createElement(
+    Component,
+    {
+      ...props,
+      ref,
+      className: cx(
+        "nexus-ui-gallery-card",
+        isInteractive && "nexus-ui-gallery-card--interactive",
+        selected && "is-selected",
+        className
+      )
+    },
+    children
+  );
+});
+function GalleryCardMedia({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-gallery-card__media", className) }, children);
+}
+function GalleryCardBody({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-gallery-card__body", className) }, children);
+}
+function GalleryCardTitle({ as: Component = "strong", className = "", children }) {
+  return /* @__PURE__ */ React.createElement(Component, { className: cx("nexus-ui-gallery-card__title", className) }, children);
+}
+function GalleryCardMeta({ as: Component = "span", className = "", children }) {
+  return /* @__PURE__ */ React.createElement(Component, { className: cx("nexus-ui-gallery-card__meta", className) }, children);
+}
+
+// ../packages/nexus-ui/src/components/ReloadIcon/ReloadIcon.jsx
+init_define_process();
+function ReloadIcon({ size = 18, className = "" }) {
+  return /* @__PURE__ */ React.createElement(
+    "svg",
+    {
+      "aria-hidden": "true",
+      className,
+      viewBox: "0 0 24 24",
+      width: size,
+      height: size,
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "1.8",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    },
+    /* @__PURE__ */ React.createElement("path", { d: "M20 6v5h-5" }),
+    /* @__PURE__ */ React.createElement("path", { d: "M4 18v-5h5" }),
+    /* @__PURE__ */ React.createElement("path", { d: "M18 11a7 7 0 0 0-12-3" }),
+    /* @__PURE__ */ React.createElement("path", { d: "M6 13a7 7 0 0 0 12 3" })
+  );
+}
+
+// ../packages/nexus-ui/src/legacy/Fields.jsx
+init_define_process();
+function Field({ className = "", label = "", description = "", wide = false, children }) {
   return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-field", wide && "nexus-ui-field--wide", className) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-field__label" }, label), description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-field__description" }, description) : null, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-field__control" }, children));
 }
-function InlineField({
-  className = "",
-  label = "",
-  children,
-  grow = false
-}) {
+function InlineField({ className = "", label = "", children, grow = false }) {
   return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-inline-field", grow && "nexus-ui-inline-field--grow", className) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-inline-field__label" }, label), /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-inline-field__control" }, children));
 }
 
-// ../nexus-frontend/src/ui/States.jsx
+// ../packages/nexus-ui/src/legacy/Panels.jsx
+init_define_process();
+function SectionPanel({ className = "", tone = "default", padding = "default", children }) {
+  return /* @__PURE__ */ React.createElement("section", { className: cx(
+    "nexus-ui-panel",
+    tone !== "default" && `nexus-ui-panel--${tone}`,
+    padding !== "default" && `nexus-ui-panel--padding-${padding}`,
+    className
+  ) }, children);
+}
+function PanelStack({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-stack", className) }, children);
+}
+
+// ../packages/nexus-ui/src/legacy/States.jsx
+init_define_process();
 function Notice({ className = "", tone = "info", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-notice", `nexus-ui-notice--${tone}`, className) }, children);
 }
@@ -432,21 +844,12 @@ function StateBlock({
   centered = false,
   children = null
 }) {
-  return /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      className: cx(
-        "nexus-ui-state",
-        tone !== "default" && `nexus-ui-state--${tone}`,
-        centered && "nexus-ui-state--centered",
-        className
-      )
-    },
-    eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null,
-    title ? /* @__PURE__ */ React.createElement("strong", null, title) : null,
-    description ? /* @__PURE__ */ React.createElement("p", null, description) : null,
-    children
-  );
+  return /* @__PURE__ */ React.createElement("div", { className: cx(
+    "nexus-ui-state",
+    tone !== "default" && `nexus-ui-state--${tone}`,
+    centered && "nexus-ui-state--centered",
+    className
+  ) }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null, children);
 }
 function MetricCard({
   className = "",
@@ -456,10 +859,40 @@ function MetricCard({
   description = "",
   children = null
 }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-metric", tone !== "default" && `nexus-ui-metric--${tone}`, className) }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, /* @__PURE__ */ React.createElement("strong", null, value), description ? /* @__PURE__ */ React.createElement("p", null, description) : null, children);
+  return /* @__PURE__ */ React.createElement("div", { className: cx(
+    "nexus-ui-metric",
+    tone !== "default" && `nexus-ui-metric--${tone}`,
+    className
+  ) }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, /* @__PURE__ */ React.createElement("strong", null, value), description ? /* @__PURE__ */ React.createElement("p", null, description) : null, children);
+}
+
+// ../packages/nexus-ui/src/legacy/Workspace.jsx
+init_define_process();
+function WorkspacePage({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-page", className) }, children);
+}
+function WorkspaceBody({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-body", className) }, children);
+}
+function SplitLayout({ className = "", variant = "main-aside", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx(
+    "nexus-ui-split",
+    variant === "sidebar-detail" ? "nexus-ui-split--sidebar-detail" : "nexus-ui-split--main-aside",
+    className
+  ) }, children);
+}
+function SplitSidebar({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("aside", { className: cx("nexus-ui-split__sidebar", className) }, children);
+}
+function SplitDetail({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("main", { className: cx("nexus-ui-split__detail", className) }, children);
+}
+function ScrollRegion({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-scroll-region", className) }, children);
 }
 
 // ../nexus-plugins/booru/src/booru-utils.js
+init_define_process();
 function normalizeBooruText(value) {
   return String(value ?? "").trim();
 }
@@ -792,6 +1225,7 @@ function parseBooruSearchSyntax(value) {
 }
 
 // ../nexus-plugins/booru/src/domain/classification-policy.js
+init_define_process();
 var BOORU_REALITY_AUTO = "auto";
 var BOORU_REALITY_MANUAL = "manual";
 var BOORU_CLASSIFICATION_KINDS = Object.freeze([
@@ -880,6 +1314,7 @@ function getBooruRecommendationKindOrder(context = null) {
 }
 
 // ../nexus-plugins/booru/src/domain/details-policy.js
+init_define_process();
 var DETAILS_FIELD_CONFIG = Object.freeze({
   author: Object.freeze({
     kind: "author",
@@ -995,7 +1430,11 @@ function getBooruDetailsRealityState(draft = null) {
   };
 }
 
+// ../nexus-plugins/booru/src/domain/entity-relations.js
+init_define_process();
+
 // ../nexus-plugins/booru/src/domain/contextual-browse.js
+init_define_process();
 var BOORU_BROWSE_DIRECTIONS = Object.freeze({ ASC: "asc", DESC: "desc" });
 var BOORU_BROWSE_GROUPINGS = Object.freeze({ CONTINUOUS: "continuous", SECTIONED: "sectioned" });
 var BOORU_RESOURCE_SORT_OPTIONS = Object.freeze([
@@ -1100,6 +1539,7 @@ function getBooruEntityProfileTabOptions(sourceKind) {
 }
 
 // ../nexus-plugins/booru/src/domain/resource-actions.js
+init_define_process();
 var UNIVERSAL_IMAGE_ACTIONS = Object.freeze([
   { id: "copy", label: "Copiar al portapapeles" },
   { id: "google", label: "Buscar en Google" }
@@ -1141,6 +1581,7 @@ function buildBooruResourceActions({
 }
 
 // ../nexus-plugins/booru/src/domain/contextual-paste.js
+init_define_process();
 var ASSOCIATION_KINDS = /* @__PURE__ */ new Set(["author", "artist", "character", "universe", "tag"]);
 function normalizeBooruClipboardAssociation(value) {
   const kind = String(value?.kind || "").trim();
@@ -1170,6 +1611,7 @@ function mergeBooruClipboardAssociations(...sources) {
 }
 
 // ../nexus-plugins/booru/src/domain/floating-details.js
+init_define_process();
 var BOORU_FLOATING_DETAILS_MIN_WIDTH = 360;
 var BOORU_FLOATING_DETAILS_MIN_HEIGHT = 320;
 function createBooruFloatingDetailsGeometry(viewport = {}) {
@@ -1204,6 +1646,7 @@ function clampBooruFloatingDetailsGeometry(value, viewport = {}) {
 }
 
 // ../nexus-plugins/booru/src/domain/workspace-navigation.js
+init_define_process();
 var BOORU_WORKSPACE_SECTIONS = Object.freeze([
   "media",
   "pending",
@@ -1357,17 +1800,6 @@ function normalizeBooruGridPreferences(value = null) {
     ])
   );
 }
-function stepBooruGridColumns(value, family, deltaY) {
-  const preferences = normalizeBooruGridPreferences(value);
-  if (!Object.hasOwn(BOORU_DEFAULT_GRID_COLUMNS, family) || !Number(deltaY)) {
-    return preferences;
-  }
-  const direction = Number(deltaY) < 0 ? -1 : 1;
-  return {
-    ...preferences,
-    [family]: clampColumns(preferences[family] + direction, BOORU_DEFAULT_GRID_COLUMNS[family])
-  };
-}
 function createEmptyBooruRouteSession() {
   return {
     query: null,
@@ -1411,6 +1843,7 @@ function resolveBooruProfileForRoute(routeValue, sessionProfile = null, currentP
 }
 
 // ../nexus-plugins/booru/src/domain/pending-workflow.js
+init_define_process();
 var BOORU_NO_MISSING_FILTER = "none";
 var BOORU_RECOMMENDATION_SCOPES = Object.freeze({
   ALL: "all",
@@ -1558,6 +1991,7 @@ function isBooruMissingFilterCompatible(missingFilter, options = []) {
 }
 
 // ../nexus-plugins/booru/src/domain/resource-mutations.js
+init_define_process();
 function normalizeBooruResourceMutationResult(value) {
   const source = value && typeof value === "object" ? value : {};
   const legacyResources = Array.isArray(source.resource) ? source.resource : [source.resource].filter(Boolean);
@@ -1647,7 +2081,14 @@ function isBooruResourceWindowContextCurrent(requestContext, currentContext) {
   return Boolean(currentContext.showResourceWorkspace) && String(currentContext.activeResourceSection || "") === String(requestContext.activeResourceSection || "") && String(currentContext.querySignature || "") === String(requestContext.querySignature || "") && Number(currentContext.currentResourcePage || 1) === Number(requestContext.currentResourcePage || 1) && Number(currentContext.itemCount || 0) === Number(requestContext.itemCount || 0);
 }
 
+// ../nexus-plugins/booru/src/components/index.js
+init_define_process();
+
+// ../nexus-plugins/booru/src/components/EntityVisualCropper.jsx
+init_define_process();
+
 // ../nexus-plugins/booru/src/domain/entity-visual-policy.js
+init_define_process();
 var DEFAULT_ENTITY_VISUAL_LAYOUT = Object.freeze({
   scale: 1,
   offsetX: 0,
@@ -1694,7 +2135,7 @@ function getBooruEntityVisualRenderProps(visual = null) {
 
 // ../nexus-plugins/booru/src/components/EntityVisualCropper.jsx
 var React2 = window.React;
-var { useEffect, useMemo, useRef, useState } = React2;
+var { useEffect: useEffect3, useMemo, useRef: useRef3, useState: useState3 } = React2;
 async function invoke(channel, payload) {
   const response = await window.nexus.ipc.invoke(channel, payload);
   if (!response?.ok) {
@@ -1719,12 +2160,12 @@ function EntityVisualCropper({
   onSaved,
   onCancel
 }) {
-  const frameRef = useRef(null);
-  const pointerRef = useRef(null);
-  const [layout, setLayout] = useState(() => normalizeBooruEntityVisualLayout(initialLayout));
-  const [saving, setSaving] = useState(false);
+  const frameRef = useRef3(null);
+  const pointerRef = useRef3(null);
+  const [layout, setLayout] = useState3(() => normalizeBooruEntityVisualLayout(initialLayout));
+  const [saving, setSaving] = useState3(false);
   const isBanner = role === "banner";
-  useEffect(() => {
+  useEffect3(() => {
     setLayout(normalizeBooruEntityVisualLayout(initialLayout));
   }, [entityId, initialLayout?.offsetX, initialLayout?.offsetY, initialLayout?.scale, role]);
   const mediaStyle = useMemo(() => getBooruEntityVisualMediaStyle(layout), [layout]);
@@ -1808,8 +2249,9 @@ function EntityVisualCropper({
 }
 
 // ../nexus-plugins/booru/src/components/ClipboardAssociationComposer.jsx
+init_define_process();
 var React3 = window.React;
-var { useEffect: useEffect2, useState: useState2 } = React3;
+var { useEffect: useEffect4, useState: useState4 } = React3;
 var KIND_OPTIONS = [
   ["author", "Persona"],
   ["artist", "Artist"],
@@ -1822,8 +2264,8 @@ async function invoke2(channel, payload) {
   return response.data;
 }
 function EntityField({ kind, value, onChange, onSelect, label }) {
-  const [items, setItems] = useState2([]);
-  useEffect2(() => {
+  const [items, setItems] = useState4([]);
+  useEffect4(() => {
     const query = String(value || "").trim();
     if (!query) {
       setItems([]);
@@ -1839,12 +2281,12 @@ function EntityField({ kind, value, onChange, onSelect, label }) {
   return /* @__PURE__ */ React3.createElement("label", { className: "booruClipboardComposer__field" }, /* @__PURE__ */ React3.createElement("span", null, label), /* @__PURE__ */ React3.createElement("input", { value, onChange: (event) => onChange(event.target.value), autoFocus: label !== "Universe" }), items.length ? /* @__PURE__ */ React3.createElement("div", { className: "booruClipboardComposer__suggestions" }, items.map((item) => /* @__PURE__ */ React3.createElement("button", { key: item.id, type: "button", onClick: () => onSelect(item) }, item.displayName))) : null);
 }
 function ClipboardAssociationComposer({ defaultKind = "author", onCancel, onConfirm }) {
-  const [kind, setKind] = useState2(defaultKind);
-  const [entityName, setEntityName] = useState2("");
-  const [entityId, setEntityId] = useState2("");
-  const [universeName, setUniverseName] = useState2("");
-  const [universeId, setUniverseId] = useState2("");
-  const [busy, setBusy] = useState2(false);
+  const [kind, setKind] = useState4(defaultKind);
+  const [entityName, setEntityName] = useState4("");
+  const [entityId, setEntityId] = useState4("");
+  const [universeName, setUniverseName] = useState4("");
+  const [universeId, setUniverseId] = useState4("");
+  const [busy, setBusy] = useState4(false);
   const submit = async () => {
     if (!entityId && !entityName.trim() || kind === "character" && !universeId && !universeName.trim()) return;
     setBusy(true);
@@ -1874,8 +2316,9 @@ function ClipboardAssociationComposer({ defaultKind = "author", onCancel, onConf
 }
 
 // ../nexus-plugins/booru/src/components/entities/CharacterCreationDialog.jsx
+init_define_process();
 var React4 = window.React;
-var { useState: useState3 } = React4;
+var { useState: useState5 } = React4;
 function CharacterCreationDialog({
   name,
   invoke: invoke7,
@@ -1883,9 +2326,9 @@ function CharacterCreationDialog({
   onCancel,
   onCreated
 }) {
-  const [universe, setUniverse] = useState3(null);
-  const [busy, setBusy] = useState3(false);
-  const [error, setError] = useState3("");
+  const [universe, setUniverse] = useState5(null);
+  const [busy, setBusy] = useState5(false);
+  const [error, setError] = useState5("");
   const submit = async () => {
     if (!universe?.id || busy) return;
     setBusy(true);
@@ -1924,8 +2367,9 @@ function CharacterCreationDialog({
 }
 
 // ../nexus-plugins/booru/src/components/settings/SettingsSection.jsx
+init_define_process();
 var React5 = window.React;
-var { useEffect: useEffect3, useState: useState4 } = React5;
+var { useEffect: useEffect5, useState: useState6 } = React5;
 async function invoke3(channel, payload) {
   const response = await window.nexus.ipc.invoke(channel, payload);
   if (!response?.ok) throw new Error(response?.error || "No se pudo actualizar las plataformas.");
@@ -1942,19 +2386,19 @@ function SettingsSection({
   onOpenTrash,
   onOpenPath
 }) {
-  const [platforms, setPlatforms] = useState4([]);
-  const [platformName, setPlatformName] = useState4("");
-  const [iconResourceId, setIconResourceId] = useState4("");
-  const [resources, setResources] = useState4([]);
-  const [platformError, setPlatformError] = useState4("");
+  const [platforms, setPlatforms] = useState6([]);
+  const [platformName, setPlatformName] = useState6("");
+  const [iconResourceId, setIconResourceId] = useState6("");
+  const [resources, setResources] = useState6([]);
+  const [platformError, setPlatformError] = useState6("");
   const loadPlatforms = async () => {
     const result = await invoke3("booru:list-social-platforms");
     setPlatforms(Array.isArray(result?.items) ? result.items : []);
   };
-  useEffect3(() => {
+  useEffect5(() => {
     void loadPlatforms().catch((error) => setPlatformError(error.message));
   }, []);
-  useEffect3(() => {
+  useEffect5(() => {
     void invoke3("booru:list-resources", { section: "media", limit: 80 }).then((result) => {
       setResources(Array.isArray(result?.items) ? result.items : []);
     }).catch(() => setResources([]));
@@ -1986,7 +2430,7 @@ function SettingsSection({
       await loadPlatforms();
     }
   };
-  return /* @__PURE__ */ React5.createElement("div", { className: "booruView__content booruView__content--metrics" }, /* @__PURE__ */ React5.createElement("div", { className: "booruView__metrics" }, /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Total", value: String(snapshot?.stats?.totalCount || 0), description: "Catalogo" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Pendientes", value: String(snapshot?.stats?.pendingCount || 0), description: "Cola real" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Duplicados", value: String(snapshot?.stats?.duplicateCount || 0), description: "Revision exacta" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Papelera", value: String(snapshot?.stats?.trashCount || 0), description: "Interna" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Basico", value: String(snapshot?.stats?.classifiedBasicCount || 0), description: "Completos" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Image", value: String(snapshot?.stats?.imageCount || 0), description: "Preview" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Video/GIF", value: String((snapshot?.stats?.videoCount || 0) + (snapshot?.stats?.gifCount || 0)), description: "Animados" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Thumbs ready", value: String(snapshot?.stats?.thumbnailReadyCount || 0), description: "Derivados listos" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Thumbs backlog", value: String(snapshot?.stats?.thumbnailBacklogCount || 0), description: "Pendientes o error" })), /* @__PURE__ */ React5.createElement("div", { className: "booruView__metricsPanels" }, /* @__PURE__ */ React5.createElement(SectionPanel, { className: "booruView__panel" }, /* @__PURE__ */ React5.createElement("div", { className: "booruView__statusStack" }, /* @__PURE__ */ React5.createElement("span", { className: "booruView__groupLabel" }, "Ajustes"), /* @__PURE__ */ React5.createElement("div", { className: "booruView__settingsActions" }, /* @__PURE__ */ React5.createElement(Button, { type: "button", onClick: () => onOpenDuplicates?.() }, /* @__PURE__ */ React5.createElement("span", null, "Duplicados"), /* @__PURE__ */ React5.createElement("small", null, snapshot?.stats?.duplicateCount || 0)), /* @__PURE__ */ React5.createElement(Button, { type: "button", onClick: () => onOpenTrash?.() }, /* @__PURE__ */ React5.createElement("span", null, "Papelera"), /* @__PURE__ */ React5.createElement("small", null, snapshot?.stats?.trashCount || 0))), /* @__PURE__ */ React5.createElement("span", { className: "booruView__suggestionsHint" }, "La busqueda principal ahora compone chips de tags y filtros estructurados; no busca por filename."))), /* @__PURE__ */ React5.createElement(SectionPanel, { className: "booruView__panel" }, /* @__PURE__ */ React5.createElement("div", { className: "booruView__statusStack" }, /* @__PURE__ */ React5.createElement("span", { className: "booruView__groupLabel" }, "Plataformas de redes"), /* @__PURE__ */ React5.createElement(Field, { label: "Nueva plataforma", className: "booruView__field" }, /* @__PURE__ */ React5.createElement("div", { className: "booruView__entityInputRow" }, /* @__PURE__ */ React5.createElement("input", { value: platformName, onChange: (event) => setPlatformName(event.target.value), placeholder: "Nombre de la red" }), /* @__PURE__ */ React5.createElement(Button, { type: "button", onClick: () => void pasteIcon(), title: "Pegar icono desde portapapeles" }, "Pegar icono"), /* @__PURE__ */ React5.createElement("label", { className: "nexus-ui-button" }, /* @__PURE__ */ React5.createElement("span", null, "Elegir archivo"), /* @__PURE__ */ React5.createElement("input", { type: "file", accept: "image/png,image/svg+xml,image/*", onChange: (event) => void importFileIcon(event), hidden: true })), /* @__PURE__ */ React5.createElement(Button, { type: "button", tone: "primary", onClick: () => void savePlatform(), disabled: !platformName.trim() }, "Guardar"))), /* @__PURE__ */ React5.createElement(Field, { label: "O usar recurso existente", className: "booruView__field" }, /* @__PURE__ */ React5.createElement("select", { value: iconResourceId, onChange: (event) => setIconResourceId(event.target.value) }, /* @__PURE__ */ React5.createElement("option", { value: "" }, "Sin icono"), resources.map((resource) => /* @__PURE__ */ React5.createElement("option", { key: resource.id, value: resource.id }, resource.originalFilename)))), iconResourceId ? /* @__PURE__ */ React5.createElement("span", { className: "booruView__suggestionsHint" }, "Icono preparado desde recurso ", iconResourceId.slice(0, 8), ".") : null, platformError ? /* @__PURE__ */ React5.createElement(Notice, { tone: "danger" }, platformError) : null, /* @__PURE__ */ React5.createElement("div", { className: "booruView__tagRow" }, platforms.length ? platforms.map((platform) => /* @__PURE__ */ React5.createElement("span", { key: platform.id, className: "booruView__selectionChip" }, /* @__PURE__ */ React5.createElement("span", null, platform.displayName, platform.profileCount ? ` (${platform.profileCount})` : ""), /* @__PURE__ */ React5.createElement("button", { type: "button", className: "booruView__selectionChipRemove", onClick: () => void deletePlatform(platform), "aria-label": `Eliminar ${platform.displayName}` }, "x"))) : /* @__PURE__ */ React5.createElement("span", { className: "booruView__suggestionsHint" }, "Todavia no hay plataformas registradas.")))), /* @__PURE__ */ React5.createElement(SectionPanel, { className: "booruView__panel" }, /* @__PURE__ */ React5.createElement("div", { className: "booruView__statusStack" }, /* @__PURE__ */ React5.createElement("span", { className: "booruView__groupLabel" }, "Watcher y runtime"), /* @__PURE__ */ React5.createElement(
+  return /* @__PURE__ */ React5.createElement("div", { className: "booruView__content booruView__content--metrics" }, /* @__PURE__ */ React5.createElement("div", { className: "booruView__metrics" }, /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Total", value: String(snapshot?.stats?.totalCount || 0), description: "Catalogo" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Pendientes", value: String(snapshot?.stats?.pendingCount || 0), description: "Cola real" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Duplicados", value: String(snapshot?.stats?.duplicateCount || 0), description: "Revision exacta" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Papelera", value: String(snapshot?.stats?.trashCount || 0), description: "Interna" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Basico", value: String(snapshot?.stats?.classifiedBasicCount || 0), description: "Completos" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Image", value: String(snapshot?.stats?.imageCount || 0), description: "Preview" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Video/GIF", value: String((snapshot?.stats?.videoCount || 0) + (snapshot?.stats?.gifCount || 0)), description: "Animados" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Thumbs ready", value: String(snapshot?.stats?.thumbnailReadyCount || 0), description: "Derivados listos" }), /* @__PURE__ */ React5.createElement(MetricCard, { eyebrow: "Thumbs backlog", value: String(snapshot?.stats?.thumbnailBacklogCount || 0), description: "Pendientes o error" })), /* @__PURE__ */ React5.createElement("div", { className: "booruView__metricsPanels" }, /* @__PURE__ */ React5.createElement(SectionPanel, { className: "booruView__panel" }, /* @__PURE__ */ React5.createElement("div", { className: "booruView__statusStack" }, /* @__PURE__ */ React5.createElement("span", { className: "booruView__groupLabel" }, "Ajustes"), /* @__PURE__ */ React5.createElement("div", { className: "booruView__settingsActions" }, /* @__PURE__ */ React5.createElement(Button, { type: "button", onClick: () => onOpenDuplicates?.() }, /* @__PURE__ */ React5.createElement("span", null, "Duplicados"), /* @__PURE__ */ React5.createElement("small", null, snapshot?.stats?.duplicateCount || 0)), /* @__PURE__ */ React5.createElement(Button, { type: "button", onClick: () => onOpenTrash?.() }, /* @__PURE__ */ React5.createElement("span", null, "Papelera"), /* @__PURE__ */ React5.createElement("small", null, snapshot?.stats?.trashCount || 0))), /* @__PURE__ */ React5.createElement("span", { className: "booruView__suggestionsHint" }, "La busqueda principal ahora compone chips de tags y filtros estructurados; no busca por filename."))), /* @__PURE__ */ React5.createElement(SectionPanel, { className: "booruView__panel" }, /* @__PURE__ */ React5.createElement("div", { className: "booruView__statusStack" }, /* @__PURE__ */ React5.createElement("span", { className: "booruView__groupLabel" }, "Plataformas de redes"), /* @__PURE__ */ React5.createElement(Field, { label: "Nueva plataforma", className: "booruView__field" }, /* @__PURE__ */ React5.createElement("div", { className: "booruView__entityInputRow" }, /* @__PURE__ */ React5.createElement(Input, { value: platformName, onChange: (event) => setPlatformName(event.target.value), placeholder: "Nombre de la red" }), /* @__PURE__ */ React5.createElement(Button, { type: "button", onClick: () => void pasteIcon() }, "Pegar icono"), /* @__PURE__ */ React5.createElement("label", { className: "nexus-ui-button" }, /* @__PURE__ */ React5.createElement("span", null, "Elegir archivo"), /* @__PURE__ */ React5.createElement("input", { type: "file", accept: "image/png,image/svg+xml,image/*", onChange: (event) => void importFileIcon(event), hidden: true })), /* @__PURE__ */ React5.createElement(Button, { type: "button", tone: "primary", onClick: () => void savePlatform(), disabled: !platformName.trim() }, "Guardar"))), /* @__PURE__ */ React5.createElement(Field, { label: "O usar recurso existente", className: "booruView__field" }, /* @__PURE__ */ React5.createElement(Select, { value: iconResourceId, onChange: (event) => setIconResourceId(event.target.value) }, /* @__PURE__ */ React5.createElement("option", { value: "" }, "Sin icono"), resources.map((resource) => /* @__PURE__ */ React5.createElement("option", { key: resource.id, value: resource.id }, resource.originalFilename)))), iconResourceId ? /* @__PURE__ */ React5.createElement("span", { className: "booruView__suggestionsHint" }, "Icono preparado desde recurso ", iconResourceId.slice(0, 8), ".") : null, platformError ? /* @__PURE__ */ React5.createElement(Notice, { tone: "danger" }, platformError) : null, /* @__PURE__ */ React5.createElement("div", { className: "booruView__tagRow" }, platforms.length ? platforms.map((platform) => /* @__PURE__ */ React5.createElement("span", { key: platform.id, className: "booruView__selectionChip" }, /* @__PURE__ */ React5.createElement("span", null, platform.displayName, platform.profileCount ? ` (${platform.profileCount})` : ""), /* @__PURE__ */ React5.createElement("button", { type: "button", className: "booruView__selectionChipRemove", onClick: () => void deletePlatform(platform), "aria-label": `Eliminar ${platform.displayName}` }, "x"))) : /* @__PURE__ */ React5.createElement("span", { className: "booruView__suggestionsHint" }, "Todavia no hay plataformas registradas.")))), /* @__PURE__ */ React5.createElement(SectionPanel, { className: "booruView__panel" }, /* @__PURE__ */ React5.createElement("div", { className: "booruView__statusStack" }, /* @__PURE__ */ React5.createElement("span", { className: "booruView__groupLabel" }, "Watcher y runtime"), /* @__PURE__ */ React5.createElement(
     StateBlock,
     {
       title: snapshot?.watcher?.active ? "Watcher activo" : "Watcher inactivo",
@@ -2015,7 +2459,7 @@ function SettingsSection({
       onClick: () => void onRefresh?.(),
       disabled: loading
     },
-    /* @__PURE__ */ React5.createElement(RefreshIcon, { size: 15 }),
+    /* @__PURE__ */ React5.createElement(ReloadIcon, { size: 15 }),
     /* @__PURE__ */ React5.createElement("span", null, "Actualizar")
   ), /* @__PURE__ */ React5.createElement(
     Button,
@@ -2051,7 +2495,11 @@ function SettingsSection({
   ].map((example) => /* @__PURE__ */ React5.createElement("span", { key: example, className: "booruView__selectionChip booruView__selectionChip--syntax" }, example)))))));
 }
 
+// ../nexus-plugins/booru/src/components/entities/EntityGrid.jsx
+init_define_process();
+
 // ../nexus-plugins/booru/src/components/entities/EntityVisualMedia.jsx
+init_define_process();
 function EntityVisualMedia({
   visual,
   alt = "",
@@ -2071,46 +2519,20 @@ function EntityVisualMedia({
   );
 }
 
-// ../nexus-plugins/booru/src/components/shared/useGalleryColumnWheel.js
-var React6 = window.React;
-var { useCallback, useEffect: useEffect4, useRef: useRef2 } = React6;
-function useGalleryColumnWheel(onColumnWheel) {
-  const handlerRef = useRef2(onColumnWheel);
-  const detachRef = useRef2(null);
-  useEffect4(() => {
-    handlerRef.current = onColumnWheel;
-  }, [onColumnWheel]);
-  const attachColumnWheel = useCallback((node) => {
-    detachRef.current?.();
-    detachRef.current = null;
-    if (!node) return;
-    const handleWheel = (event) => {
-      if (!(event.ctrlKey || event.metaKey) || typeof handlerRef.current !== "function") {
-        return;
-      }
-      event.preventDefault();
-      handlerRef.current(event);
-    };
-    node.addEventListener("wheel", handleWheel, { passive: false });
-    detachRef.current = () => node.removeEventListener("wheel", handleWheel);
-  }, []);
-  useEffect4(() => () => detachRef.current?.(), []);
-  return attachColumnWheel;
-}
-
 // ../nexus-plugins/booru/src/components/shared/CollapsibleGalleryGroup.jsx
-var React7 = window.React;
-var { useState: useState5 } = React7;
+init_define_process();
+var React6 = window.React;
+var { useState: useState7 } = React6;
 function CollapsibleGalleryGroup({ label, association = null, onAssociationHover, children }) {
-  const [collapsed, setCollapsed] = useState5(false);
-  return /* @__PURE__ */ React7.createElement(
+  const [collapsed, setCollapsed] = useState7(false);
+  return /* @__PURE__ */ React6.createElement(
     "section",
     {
       className: ["booruView__galleryGroup", collapsed ? "is-collapsed" : ""].filter(Boolean).join(" "),
       onPointerEnter: () => onAssociationHover?.(association),
       onPointerLeave: () => onAssociationHover?.(null)
     },
-    /* @__PURE__ */ React7.createElement(
+    /* @__PURE__ */ React6.createElement(
       Button,
       {
         type: "button",
@@ -2118,17 +2540,17 @@ function CollapsibleGalleryGroup({ label, association = null, onAssociationHover
         "aria-expanded": !collapsed,
         onClick: () => setCollapsed((currentValue) => !currentValue)
       },
-      /* @__PURE__ */ React7.createElement("span", { className: "booruView__galleryGroupChevron", "aria-hidden": "true" }),
-      /* @__PURE__ */ React7.createElement("span", null, label),
-      /* @__PURE__ */ React7.createElement("span", { className: "booruView__galleryGroupDivider", "aria-hidden": "true" })
+      /* @__PURE__ */ React6.createElement("span", { className: "booruView__galleryGroupChevron", "aria-hidden": "true" }),
+      /* @__PURE__ */ React6.createElement("span", null, label),
+      /* @__PURE__ */ React6.createElement("span", { className: "booruView__galleryGroupDivider", "aria-hidden": "true" })
     ),
     collapsed ? null : children
   );
 }
 
 // ../nexus-plugins/booru/src/components/entities/EntityGrid.jsx
-var React8 = window.React;
-var { useCallback: useCallback2, useEffect: useEffect5, useMemo: useMemo2, useRef: useRef3 } = React8;
+var React7 = window.React;
+var { useEffect: useEffect6, useMemo: useMemo2, useRef: useRef4 } = React7;
 function EntityGrid({
   kind,
   items,
@@ -2146,18 +2568,13 @@ function EntityGrid({
   getInitials: getInitials2,
   embedded = false,
   columns = 5,
-  onColumnWheel,
+  onColumnsChange,
   onGroupAssociationHover,
   scrollKey,
   scrollTop = 0,
   onScrollStateChange
 }) {
-  const contentRef = useRef3(null);
-  const attachColumnWheel = useGalleryColumnWheel(onColumnWheel);
-  const setContentNode = useCallback2((node) => {
-    contentRef.current = node;
-    attachColumnWheel(node);
-  }, [attachColumnWheel]);
+  const contentRef = useRef4(null);
   const groupedSections = useMemo2(() => {
     if (!Array.isArray(placements) || !placements.length) return [];
     const itemById = new Map(items.map((item) => [item.id, item]));
@@ -2176,7 +2593,7 @@ function EntityGrid({
     });
     return groups;
   }, [items, placements]);
-  useEffect5(() => {
+  useEffect6(() => {
     const node = contentRef.current;
     if (!node || embedded) return void 0;
     const frameId = window.requestAnimationFrame(() => {
@@ -2184,10 +2601,10 @@ function EntityGrid({
     });
     return () => window.cancelAnimationFrame(frameId);
   }, [embedded, scrollKey, scrollTop]);
-  const content = /* @__PURE__ */ React8.createElement(React8.Fragment, null, items.length ? /* @__PURE__ */ React8.createElement(
+  const content = /* @__PURE__ */ React7.createElement(React7.Fragment, null, items.length ? /* @__PURE__ */ React7.createElement(
     "div",
     {
-      ref: setContentNode,
+      ref: contentRef,
       className: "booruView__resourcePanelBody",
       onScroll: (event) => {
         if (!embedded) onScrollStateChange?.(event.currentTarget.scrollTop || 0);
@@ -2196,16 +2613,27 @@ function EntityGrid({
         }
       }
     },
-    groupedSections.length ? /* @__PURE__ */ React8.createElement("div", { className: "booruView__groupedGallery" }, groupedSections.map((group) => /* @__PURE__ */ React8.createElement(CollapsibleGalleryGroup, { key: group.key, label: group.label, association: group.association, onAssociationHover: onGroupAssociationHover }, /* @__PURE__ */ React8.createElement("div", { className: "booruView__entityGrid", style: { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } }, group.items.map(({ placement, item }) => /* @__PURE__ */ React8.createElement(EntityCard, { key: placement.placementId, item })))))) : /* @__PURE__ */ React8.createElement(
-      "div",
+    groupedSections.length ? /* @__PURE__ */ React7.createElement("div", { className: "booruView__groupedGallery" }, groupedSections.map((group) => /* @__PURE__ */ React7.createElement(CollapsibleGalleryGroup, { key: group.key, label: group.label, association: group.association, onAssociationHover: onGroupAssociationHover }, /* @__PURE__ */ React7.createElement(
+      GalleryGrid,
       {
         className: "booruView__entityGrid",
-        style: { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }
+        columns,
+        minColumns: 2,
+        onColumnsChange
       },
-      items.map((item) => /* @__PURE__ */ React8.createElement(EntityCard, { key: item.id, item }))
+      group.items.map(({ placement, item }) => /* @__PURE__ */ React7.createElement(EntityCard, { key: placement.placementId, item }))
+    )))) : /* @__PURE__ */ React7.createElement(
+      GalleryGrid,
+      {
+        className: "booruView__entityGrid",
+        columns,
+        minColumns: 2,
+        onColumnsChange
+      },
+      items.map((item) => /* @__PURE__ */ React7.createElement(EntityCard, { key: item.id, item }))
     ),
-    loading && items.length ? /* @__PURE__ */ React8.createElement("span", { className: "booruView__resourceLoadingMore" }, "Actualizando seccion...") : null
-  ) : /* @__PURE__ */ React8.createElement(
+    loading && items.length ? /* @__PURE__ */ React7.createElement("span", { className: "booruView__resourceLoadingMore" }, "Actualizando seccion...") : null
+  ) : /* @__PURE__ */ React7.createElement(
     StateBlock,
     {
       centered: true,
@@ -2214,41 +2642,43 @@ function EntityGrid({
     }
   ));
   function EntityCard({ item }) {
-    return /* @__PURE__ */ React8.createElement(
-      "button",
+    return /* @__PURE__ */ React7.createElement(
+      GalleryCard,
       {
+        as: "button",
         type: "button",
         className: "booruView__entityCard",
         onClick: () => onOpenEntity?.(kind, item),
         onPointerEnter: () => onEntityHover?.(kind, item),
         onPointerLeave: () => onEntityHover?.(null)
       },
-      /* @__PURE__ */ React8.createElement(
-        "div",
+      /* @__PURE__ */ React7.createElement(
+        GalleryCardMedia,
         {
           className: "booruView__entityCardPreview",
           onContextMenu: (event) => onPreviewContextMenu?.(item, event)
         },
-        /* @__PURE__ */ React8.createElement(
+        /* @__PURE__ */ React7.createElement(
           EntityVisualMedia,
           {
             visual: item.visual,
             alt: item.displayName,
             MediaPreview,
-            fallback: /* @__PURE__ */ React8.createElement("div", { className: "booruView__entityVisualFallback" }, /* @__PURE__ */ React8.createElement("span", null, getInitials2?.(item.displayName) || "?"))
+            fallback: /* @__PURE__ */ React7.createElement("div", { className: "booruView__entityVisualFallback" }, /* @__PURE__ */ React7.createElement("span", null, getInitials2?.(item.displayName) || "?"))
           }
         )
       ),
-      /* @__PURE__ */ React8.createElement("div", { className: "booruView__entityCardBody" }, /* @__PURE__ */ React8.createElement("strong", null, item.displayName), kind === "character" && item?.universe?.displayName ? /* @__PURE__ */ React8.createElement("div", { className: "booruView__entityCardMeta" }, /* @__PURE__ */ React8.createElement("span", null, item.universe.displayName)) : null, /* @__PURE__ */ React8.createElement("div", { className: "booruView__entityCardMeta" }, /* @__PURE__ */ React8.createElement("span", null, item.resourceCount, " recursos"), /* @__PURE__ */ React8.createElement("span", null, entityKindLabels[kind] || kind)))
+      /* @__PURE__ */ React7.createElement(GalleryCardBody, { className: "booruView__entityCardBody" }, /* @__PURE__ */ React7.createElement(GalleryCardTitle, null, item.displayName), kind === "character" && item?.universe?.displayName ? /* @__PURE__ */ React7.createElement(GalleryCardMeta, { as: "div", className: "booruView__entityCardMeta" }, /* @__PURE__ */ React7.createElement("span", null, item.universe.displayName)) : null, /* @__PURE__ */ React7.createElement(GalleryCardMeta, { as: "div", className: "booruView__entityCardMeta" }, /* @__PURE__ */ React7.createElement("span", null, item.resourceCount, " recursos"), /* @__PURE__ */ React7.createElement("span", null, entityKindLabels[kind] || kind)))
     );
   }
   if (embedded) {
     return content;
   }
-  return /* @__PURE__ */ React8.createElement(SectionPanel, { className: "booruView__panel booruView__panel--fill" }, content);
+  return /* @__PURE__ */ React7.createElement(SectionPanel, { className: "booruView__panel booruView__panel--fill" }, content);
 }
 
 // ../nexus-plugins/booru/src/components/entities/EntityNavigationBar.jsx
+init_define_process();
 function EntityNavigationBar({
   kind,
   contextLabel,
@@ -2268,17 +2698,16 @@ function EntityNavigationBar({
 }) {
   const kindLabel = entityKindLabels[kind] || kind || "Entidad";
   return /* @__PURE__ */ React.createElement("nav", { className: "booruView__entityNavbar", "aria-label": "Navegacion de entidades" }, /* @__PURE__ */ React.createElement("div", { className: "booruView__entityNavbarContext" }, profileOpen ? /* @__PURE__ */ React.createElement(Button, { type: "button", onClick: () => onBack?.() }, "Volver") : null, /* @__PURE__ */ React.createElement("div", { className: "booruView__entityNavbarTitle" }, /* @__PURE__ */ React.createElement("span", null, kindLabel), profileOpen && contextLabel ? /* @__PURE__ */ React.createElement("strong", null, contextLabel) : null), profileOpen ? /* @__PURE__ */ React.createElement(Button, { type: "button", onClick: () => onOpenInMedia?.() }, "Abrir en Media") : null), searchable ? searchContent || /* @__PURE__ */ React.createElement(InlineField, { label: "Buscar", grow: true, className: "booruView__entityNavbarSearch" }, /* @__PURE__ */ React.createElement(
-    "input",
+    SearchField,
     {
-      type: "text",
       value: searchValue,
       onChange: (event) => onSearchChange?.(event.target.value),
-      placeholder: profileOpen ? "Buscar en esta seccion" : `Buscar ${kindLabel.toLowerCase()}`
+      placeholder: profileOpen ? "Buscar en esta seccion" : `Buscar ${kindLabel.toLowerCase()}`,
+      "aria-label": `Buscar ${kindLabel.toLowerCase()}`
     }
   )) : null, browseControls, /* @__PURE__ */ React.createElement("div", { className: "booruView__entityNavbarCreate" }, /* @__PURE__ */ React.createElement(InlineField, { label: "Crear", grow: true }, /* @__PURE__ */ React.createElement(
-    "input",
+    Input,
     {
-      type: "text",
       value: createValue,
       onChange: (event) => onCreateChange?.(event.target.value),
       onKeyDown: (event) => {
@@ -2302,8 +2731,9 @@ function EntityNavigationBar({
 }
 
 // ../nexus-plugins/booru/src/components/entities/EntityRelationsGrid.jsx
-var React9 = window.React;
-var { useEffect: useEffect6, useRef: useRef4 } = React9;
+init_define_process();
+var React8 = window.React;
+var { useEffect: useEffect7, useRef: useRef5 } = React8;
 function EntityRelationsGrid({
   kind,
   state,
@@ -2316,13 +2746,13 @@ function EntityRelationsGrid({
   entityKindLabels,
   getInitials: getInitials2,
   columns,
-  onColumnWheel,
+  onColumnsChange,
   onEntityHover,
   onGroupAssociationHover
 }) {
-  const sentinelRef = useRef4(null);
+  const sentinelRef = useRef5(null);
   const items = Array.isArray(state?.items) ? state.items : [];
-  useEffect6(() => {
+  useEffect7(() => {
     if (!state?.hasMore || loading || !sentinelRef.current || typeof IntersectionObserver !== "function") {
       return void 0;
     }
@@ -2333,9 +2763,9 @@ function EntityRelationsGrid({
     return () => observer.disconnect();
   }, [loading, onLoadMore, state?.hasMore]);
   if (loading && !items.length) {
-    return /* @__PURE__ */ React9.createElement(StateBlock, { centered: true, title: "Cargando relaciones", description: "Leyendo perfiles relacionados desde Booru." });
+    return /* @__PURE__ */ React8.createElement(StateBlock, { centered: true, title: "Cargando relaciones", description: "Leyendo perfiles relacionados desde Booru." });
   }
-  return /* @__PURE__ */ React9.createElement("div", { className: "booruView__entityRelations" }, /* @__PURE__ */ React9.createElement(
+  return /* @__PURE__ */ React8.createElement("div", { className: "booruView__entityRelations" }, /* @__PURE__ */ React8.createElement(
     EntityGrid2,
     {
       embedded: true,
@@ -2350,16 +2780,41 @@ function EntityRelationsGrid({
       entityKindLabels,
       getInitials: getInitials2,
       columns,
-      onColumnWheel,
+      onColumnsChange,
       onEntityHover,
       onGroupAssociationHover
     }
-  ), state?.hasMore ? /* @__PURE__ */ React9.createElement("div", { ref: sentinelRef, className: "booruView__resourceLoadSentinel", "aria-hidden": "true" }) : null, loading && items.length ? /* @__PURE__ */ React9.createElement("span", { className: "booruView__resourceLoadingMore" }, "Cargando mas perfiles...") : null);
+  ), state?.hasMore ? /* @__PURE__ */ React8.createElement("div", { ref: sentinelRef, className: "booruView__resourceLoadSentinel", "aria-hidden": "true" }) : null, loading && items.length ? /* @__PURE__ */ React8.createElement("span", { className: "booruView__resourceLoadingMore" }, "Cargando mas perfiles...") : null);
 }
 
 // ../nexus-plugins/booru/src/components/entities/EntityProfileGallery.jsx
-var React10 = window.React;
-var { useCallback: useCallback3, useEffect: useEffect7, useMemo: useMemo3, useRef: useRef5, useState: useState6 } = React10;
+init_define_process();
+
+// ../nexus-plugins/booru/src/domain/video-preview-policy.js
+init_define_process();
+var BOORU_VIDEO_AUTOPLAY_MAX_ORIGINAL_MS = 15e3;
+var BOORU_VIDEO_SHORT_VARIANT = "first-15s-muted-v2";
+function resolveBooruVideoAutoplay({
+  mediaKind,
+  durationMs,
+  autoplayStoragePath,
+  videoShortStatus,
+  videoShortVariant
+} = {}) {
+  if (mediaKind !== "video") return { autoplay: false, autoplayPath: "", source: "none" };
+  const hasDuration = durationMs !== null && durationMs !== void 0 && durationMs !== "";
+  const duration = Number(durationMs);
+  if (hasDuration && Number.isFinite(duration) && duration >= 0 && duration <= BOORU_VIDEO_AUTOPLAY_MAX_ORIGINAL_MS) {
+    return { autoplay: true, autoplayPath: "", source: "original" };
+  }
+  const shortPath = String(autoplayStoragePath || "").trim();
+  const validShort = shortPath && String(videoShortStatus || "").trim() === "ready" && String(videoShortVariant || "").trim() === BOORU_VIDEO_SHORT_VARIANT;
+  return validShort ? { autoplay: true, autoplayPath: shortPath, source: "derivative" } : { autoplay: false, autoplayPath: "", source: "pending" };
+}
+
+// ../nexus-plugins/booru/src/components/entities/EntityProfileGallery.jsx
+var React9 = window.React;
+var { useEffect: useEffect8, useMemo: useMemo3, useRef: useRef6, useState: useState8 } = React9;
 function EntityProfileGalleryGrid({
   items,
   placements = [],
@@ -2373,17 +2828,11 @@ function EntityProfileGalleryGrid({
   resourceGridColumns,
   selectedIds,
   onSelectionChange,
-  onColumnWheel,
+  onColumnsChange,
   onGroupAssociationHover
 }) {
-  const sentinelRef = useRef5(null);
-  const galleryRef = useRef5(null);
-  const attachColumnWheel = useGalleryColumnWheel(onColumnWheel);
-  const setGalleryNode = useCallback3((node) => {
-    galleryRef.current = node;
-    attachColumnWheel(node);
-  }, [attachColumnWheel]);
-  const [localSelectedIds, setLocalSelectedIds] = useState6([]);
+  const sentinelRef = useRef6(null);
+  const [localSelectedIds, setLocalSelectedIds] = useState8([]);
   const activeSelectedIds = Array.isArray(selectedIds) ? selectedIds : localSelectedIds;
   const setActiveSelectedIds = (updater) => {
     const nextValue = typeof updater === "function" ? updater(activeSelectedIds) : updater;
@@ -2408,11 +2857,11 @@ function EntityProfileGalleryGrid({
     });
     return groups;
   }, [items, placements]);
-  useEffect7(() => {
+  useEffect8(() => {
     const availableIds = new Set(items.map((item) => item.id));
     setActiveSelectedIds((current) => current.filter((id) => availableIds.has(id)));
   }, [items]);
-  useEffect7(() => {
+  useEffect8(() => {
     if (!hasMore || loading || !sentinelRef.current || typeof IntersectionObserver !== "function") return void 0;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) onLoadMore?.();
@@ -2421,64 +2870,89 @@ function EntityProfileGalleryGrid({
     return () => observer.disconnect();
   }, [hasMore, loading, onLoadMore]);
   if (loading && !items.length) {
-    return /* @__PURE__ */ React10.createElement(StateBlock, { centered: true, title: "Cargando galeria", description: "Leyendo recursos consumidores desde Booru." });
+    return /* @__PURE__ */ React9.createElement(StateBlock, { centered: true, title: "Cargando galeria", description: "Leyendo recursos consumidores desde Booru." });
   }
   if (!items.length) {
-    return /* @__PURE__ */ React10.createElement(StateBlock, { centered: true, title: "Sin recursos todavia", description: "Cuando esta entidad consuma media real, aparecera aqui. Ctrl/Cmd+V pega una imagen del portapapeles y la asigna a este perfil." });
+    return /* @__PURE__ */ React9.createElement(StateBlock, { centered: true, title: "Sin recursos todavia", description: "Cuando esta entidad consuma media real, aparecera aqui. Ctrl/Cmd+V pega una imagen del portapapeles y la asigna a este perfil." });
   }
-  const renderCard = (item, absoluteIndex, key) => /* @__PURE__ */ React10.createElement(
-    "div",
-    {
-      key,
-      className: [
-        "booruView__mediaCard",
-        "booruView__mediaCard--static",
-        canUseVisual(item) ? "booruView__mediaCard--contextual" : "",
-        activeSelectedIds.includes(item.id) ? "is-multi-selected" : ""
-      ].filter(Boolean).join(" "),
-      role: "button",
-      tabIndex: 0,
-      onClick: (event) => {
-        if (event.ctrlKey || event.metaKey) {
-          setActiveSelectedIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id]);
-          return;
-        }
-        onOpenResource?.(item, items);
-      },
-      onKeyDown: (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpenResource?.(item, items);
-        }
-      },
-      onContextMenu: (event) => {
-        const contextIds = activeSelectedIds.includes(item.id) ? activeSelectedIds : [item.id];
-        if (!activeSelectedIds.includes(item.id)) setActiveSelectedIds([item.id]);
-        onContextMenu?.(item, event, contextIds);
-      }
-    },
-    /* @__PURE__ */ React10.createElement("div", { className: "booruView__mediaCardPreview" }, /* @__PURE__ */ React10.createElement(
-      MediaPreview,
+  const renderCard = (item, absoluteIndex, key) => {
+    const videoAutoplay = resolveBooruVideoAutoplay(item);
+    return /* @__PURE__ */ React9.createElement(
+      GalleryCard,
       {
-        pathValue: item.storagePath,
-        mediaKind: item.mediaKind,
-        alt: item.originalFilename,
-        thumbnail: item.thumbnail,
-        highPriority: absoluteIndex < resourceGridColumns,
-        preferOriginalWhenThumbnailMissing: true,
-        autoplay: item.mediaKind === "video" && (Number(item.durationMs || 0) <= 6e4 || Boolean(item.autoplayStoragePath)),
-        loop: item.mediaKind === "video",
-        autoplayPath: item.autoplayStoragePath,
-        hoverPlayable: item.mediaKind === "gif"
-      }
-    ))
-  );
-  return /* @__PURE__ */ React10.createElement("div", { ref: setGalleryNode, className: "booruView__entityProfileGallery" }, groupedSections.length ? /* @__PURE__ */ React10.createElement("div", { className: "booruView__groupedGallery" }, groupedSections.map((group) => /* @__PURE__ */ React10.createElement(CollapsibleGalleryGroup, { key: group.key, label: group.label, association: group.association, onAssociationHover: onGroupAssociationHover }, /* @__PURE__ */ React10.createElement("div", { className: "booruView__mediaGrid", style: { gridTemplateColumns: `repeat(${resourceGridColumns}, minmax(0, 1fr))` } }, group.entries.map(({ placement, item }, index) => renderCard(item, index, placement.placementId)))))) : /* @__PURE__ */ React10.createElement("div", { className: "booruView__mediaGrid booruView__mediaGrid--infinite", style: { gridTemplateColumns: `repeat(${resourceGridColumns}, minmax(0, 1fr))` } }, items.map((item, index) => renderCard(item, index, item.id))), hasMore ? /* @__PURE__ */ React10.createElement("div", { ref: sentinelRef, className: "booruView__resourceLoadSentinel", "aria-hidden": "true" }) : null, loading && items.length ? /* @__PURE__ */ React10.createElement("span", { className: "booruView__resourceLoadingMore" }, "Cargando mas recursos...") : null);
+        as: "div",
+        key,
+        interactive: true,
+        selected: activeSelectedIds.includes(item.id),
+        className: [
+          "booruView__mediaCard",
+          "booruView__mediaCard--static",
+          canUseVisual(item) ? "booruView__mediaCard--contextual" : "",
+          activeSelectedIds.includes(item.id) ? "is-multi-selected" : ""
+        ].filter(Boolean).join(" "),
+        role: "button",
+        tabIndex: 0,
+        onClick: (event) => {
+          if (event.ctrlKey || event.metaKey) {
+            setActiveSelectedIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id]);
+            return;
+          }
+          onOpenResource?.(item, items);
+        },
+        onKeyDown: (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onOpenResource?.(item, items);
+          }
+        },
+        onContextMenu: (event) => {
+          const contextIds = activeSelectedIds.includes(item.id) ? activeSelectedIds : [item.id];
+          if (!activeSelectedIds.includes(item.id)) setActiveSelectedIds([item.id]);
+          onContextMenu?.(item, event, contextIds);
+        }
+      },
+      /* @__PURE__ */ React9.createElement(GalleryCardMedia, { className: "booruView__mediaCardPreview" }, /* @__PURE__ */ React9.createElement(
+        MediaPreview,
+        {
+          pathValue: item.storagePath,
+          mediaKind: item.mediaKind,
+          alt: item.originalFilename,
+          thumbnail: item.thumbnail,
+          highPriority: absoluteIndex < resourceGridColumns,
+          preferOriginalWhenThumbnailMissing: true,
+          autoplay: videoAutoplay.autoplay,
+          loop: item.mediaKind === "video",
+          autoplayPath: videoAutoplay.autoplayPath,
+          hoverPlayable: item.mediaKind === "gif"
+        }
+      ))
+    );
+  };
+  return /* @__PURE__ */ React9.createElement("div", { className: "booruView__entityProfileGallery" }, groupedSections.length ? /* @__PURE__ */ React9.createElement("div", { className: "booruView__groupedGallery" }, groupedSections.map((group) => /* @__PURE__ */ React9.createElement(CollapsibleGalleryGroup, { key: group.key, label: group.label, association: group.association, onAssociationHover: onGroupAssociationHover }, /* @__PURE__ */ React9.createElement(
+    GalleryGrid,
+    {
+      className: "booruView__mediaGrid",
+      columns: resourceGridColumns,
+      minColumns: 2,
+      onColumnsChange
+    },
+    group.entries.map(({ placement, item }, index) => renderCard(item, index, placement.placementId))
+  )))) : /* @__PURE__ */ React9.createElement(
+    GalleryGrid,
+    {
+      className: "booruView__mediaGrid booruView__mediaGrid--infinite",
+      columns: resourceGridColumns,
+      minColumns: 2,
+      onColumnsChange
+    },
+    items.map((item, index) => renderCard(item, index, item.id))
+  ), hasMore ? /* @__PURE__ */ React9.createElement("div", { ref: sentinelRef, className: "booruView__resourceLoadSentinel", "aria-hidden": "true" }) : null, loading && items.length ? /* @__PURE__ */ React9.createElement("span", { className: "booruView__resourceLoadingMore" }, "Cargando mas recursos...") : null);
 }
 
 // ../nexus-plugins/booru/src/components/media/ResourceHeroOverlay.jsx
-var React11 = window.React;
-var { useEffect: useEffect8 } = React11;
+init_define_process();
+var React10 = window.React;
+var { useEffect: useEffect9 } = React10;
 function ResourceHeroOverlay({
   item,
   index = 0,
@@ -2489,7 +2963,7 @@ function ResourceHeroOverlay({
   MediaPreview,
   mediaKindLabels
 }) {
-  useEffect8(() => {
+  useEffect9(() => {
     const handleKeyDown = (event) => {
       if (event.key === "Escape") onClose?.();
       if (event.key === "ArrowLeft") onPrev?.();
@@ -2498,7 +2972,7 @@ function ResourceHeroOverlay({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, onNext, onPrev]);
-  useEffect8(() => {
+  useEffect9(() => {
     if (!item || item.mediaKind !== "video") return void 0;
     const pausedByHero = Array.from(document.querySelectorAll("video:not(.booruView__heroMedia)")).filter((video) => !video.paused).map((video) => {
       video.pause();
@@ -2509,7 +2983,7 @@ function ResourceHeroOverlay({
     };
   }, [item?.id, item?.mediaKind]);
   if (!item) return null;
-  return /* @__PURE__ */ React11.createElement("div", { className: "booruView__heroOverlay", onClick: () => onClose?.() }, /* @__PURE__ */ React11.createElement("div", { className: "booruView__heroShell", onClick: (event) => event.stopPropagation() }, /* @__PURE__ */ React11.createElement("button", { type: "button", className: "booruView__heroNav booruView__heroNav--prev", onClick: () => onPrev?.(), "aria-label": "Recurso anterior" }, "<"), /* @__PURE__ */ React11.createElement("div", { className: "booruView__heroStage" }, /* @__PURE__ */ React11.createElement(
+  return /* @__PURE__ */ React10.createElement("div", { className: "booruView__heroOverlay", onClick: () => onClose?.() }, /* @__PURE__ */ React10.createElement("div", { className: "booruView__heroShell", onClick: (event) => event.stopPropagation() }, /* @__PURE__ */ React10.createElement("button", { type: "button", className: "booruView__heroNav booruView__heroNav--prev", onClick: () => onPrev?.(), "aria-label": "Recurso anterior" }, "<"), /* @__PURE__ */ React10.createElement("div", { className: "booruView__heroStage" }, /* @__PURE__ */ React10.createElement(
     MediaPreview,
     {
       pathValue: item.storagePath,
@@ -2523,18 +2997,19 @@ function ResourceHeroOverlay({
       objectFit: "contain",
       className: "booruView__heroMedia"
     }
-  ), /* @__PURE__ */ React11.createElement("div", { className: "booruView__heroMeta" }, /* @__PURE__ */ React11.createElement("strong", null, item.originalFilename), /* @__PURE__ */ React11.createElement("span", null, mediaKindLabels[item.mediaKind] || item.mediaKind, " \xB7 ", index + 1, " / ", Math.max(1, totalCount)))), /* @__PURE__ */ React11.createElement("button", { type: "button", className: "booruView__heroNav booruView__heroNav--next", onClick: () => onNext?.(), "aria-label": "Siguiente recurso" }, ">")));
+  ), /* @__PURE__ */ React10.createElement("div", { className: "booruView__heroMeta" }, /* @__PURE__ */ React10.createElement("strong", null, item.originalFilename), /* @__PURE__ */ React10.createElement("span", null, mediaKindLabels[item.mediaKind] || item.mediaKind, " \xB7 ", index + 1, " / ", Math.max(1, totalCount)))), /* @__PURE__ */ React10.createElement("button", { type: "button", className: "booruView__heroNav booruView__heroNav--next", onClick: () => onNext?.(), "aria-label": "Siguiente recurso" }, ">")));
 }
 
 // ../nexus-plugins/booru/src/components/resources/FloatingDetailsWindow.jsx
-var React12 = window.React;
-var { useEffect: useEffect9, useRef: useRef6 } = React12;
+init_define_process();
+var React11 = window.React;
+var { useEffect: useEffect10, useRef: useRef7 } = React11;
 function getViewport() {
   return { width: window.innerWidth, height: window.innerHeight };
 }
 function FloatingDetailsWindow({ geometry, onGeometryChange, onClose, children }) {
-  const dragRef = useRef6(null);
-  useEffect9(() => {
+  const dragRef = useRef7(null);
+  useEffect10(() => {
     const handleResize = () => onGeometryChange?.(clampBooruFloatingDetailsGeometry(geometry, getViewport()));
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -2564,14 +3039,14 @@ function FloatingDetailsWindow({ geometry, onGeometryChange, onClose, children }
     dragRef.current = null;
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   };
-  return /* @__PURE__ */ React12.createElement(
+  return /* @__PURE__ */ React11.createElement(
     "aside",
     {
       className: "booruView__floatingDetails",
       "aria-label": "Detalles del recurso",
       style: { left: geometry.x, top: geometry.y, width: geometry.width, height: geometry.height }
     },
-    /* @__PURE__ */ React12.createElement(
+    /* @__PURE__ */ React11.createElement(
       "div",
       {
         className: "booruView__floatingDetailsBar",
@@ -2580,11 +3055,11 @@ function FloatingDetailsWindow({ geometry, onGeometryChange, onClose, children }
         onPointerUp: finishPointerOperation,
         onPointerCancel: finishPointerOperation
       },
-      /* @__PURE__ */ React12.createElement("strong", null, "Detalles"),
-      /* @__PURE__ */ React12.createElement(Button, { type: "button", onPointerDown: (event) => event.stopPropagation(), onClick: onClose }, "Cerrar")
+      /* @__PURE__ */ React11.createElement("strong", null, "Detalles"),
+      /* @__PURE__ */ React11.createElement(Button, { type: "button", onPointerDown: (event) => event.stopPropagation(), onClick: onClose }, "Cerrar")
     ),
-    /* @__PURE__ */ React12.createElement("div", { className: "booruView__floatingDetailsContent" }, children),
-    /* @__PURE__ */ React12.createElement(
+    /* @__PURE__ */ React11.createElement("div", { className: "booruView__floatingDetailsContent" }, children),
+    /* @__PURE__ */ React11.createElement(
       "div",
       {
         className: "booruView__floatingDetailsResize",
@@ -2602,27 +3077,24 @@ function FloatingDetailsWindow({ geometry, onGeometryChange, onClose, children }
 }
 
 // ../nexus-plugins/booru/src/components/shared/FloatingContextMenu.jsx
-var React13 = window.React;
-var { useEffect: useEffect10 } = React13;
+init_define_process();
 function FloatingContextMenu({ state, onClose, onAction }) {
-  useEffect10(() => {
-    if (!state) return void 0;
-    const close = () => onClose?.();
-    const escape = (event) => {
-      if (event.key === "Escape") onClose?.();
-    };
-    window.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", escape);
-    return () => {
-      window.removeEventListener("pointerdown", close);
-      window.removeEventListener("keydown", escape);
-    };
-  }, [onClose, state]);
   if (!state?.items?.length) return null;
-  return /* @__PURE__ */ React13.createElement("div", { className: "booruView__contextMenu", style: { left: Math.max(8, state.x), top: Math.max(8, state.y) }, onPointerDown: (event) => event.stopPropagation() }, state.items.map((item) => /* @__PURE__ */ React13.createElement("button", { key: item.id, type: "button", className: ["booruView__contextMenuItem", item.danger ? "is-danger" : ""].filter(Boolean).join(" "), onClick: () => onAction?.(item.id), disabled: item.disabled }, item.label)));
+  return /* @__PURE__ */ React.createElement(
+    ActionMenu,
+    {
+      ariaLabel: "Acciones de Booru",
+      groups: [{ id: "booru-actions", items: state.items }],
+      x: state.x,
+      y: state.y,
+      onAction: (action) => onAction?.(action.id),
+      onClose
+    }
+  );
 }
 
 // ../nexus-plugins/booru/src/components/shared/ContextBrowseControls.jsx
+init_define_process();
 function ContextBrowseControls({
   value,
   options,
@@ -2710,12 +3182,13 @@ function ContextBrowseControls({
 }
 
 // ../nexus-plugins/booru/src/components/media/BooruDragPreviewLayer.jsx
-var React14 = window.React;
-var { useMemo: useMemo4 } = React14;
+init_define_process();
+var React12 = window.React;
+var { useMemo: useMemo4 } = React12;
 function BooruDragPreviewLayer({ resourcesById, customDragState = null, MediaPreview, getPreviewStyles, resolveDragIds, useDragLayer: useDragLayer2, dndType }) {
   if (customDragState?.active) {
     const primaryResource = resourcesById.get(customDragState.primaryId) || customDragState.primaryResource || null;
-    return /* @__PURE__ */ React14.createElement("div", { className: "booruView__dragPreviewLayer" }, /* @__PURE__ */ React14.createElement(
+    return /* @__PURE__ */ React12.createElement("div", { className: "booruView__dragPreviewLayer" }, /* @__PURE__ */ React12.createElement(
       "div",
       {
         className: [
@@ -2727,7 +3200,7 @@ function BooruDragPreviewLayer({ resourcesById, customDragState = null, MediaPre
           y: customDragState.y
         })
       },
-      /* @__PURE__ */ React14.createElement("div", { className: "booruView__dragPreviewThumb" }, primaryResource ? /* @__PURE__ */ React14.createElement(
+      /* @__PURE__ */ React12.createElement("div", { className: "booruView__dragPreviewThumb" }, primaryResource ? /* @__PURE__ */ React12.createElement(
         MediaPreview,
         {
           pathValue: primaryResource.storagePath,
@@ -2736,8 +3209,8 @@ function BooruDragPreviewLayer({ resourcesById, customDragState = null, MediaPre
           thumbnail: primaryResource.thumbnail,
           preferOriginalWhenThumbnailMissing: true
         }
-      ) : /* @__PURE__ */ React14.createElement("div", { className: "booruView__previewFallback" }, "Media")),
-      /* @__PURE__ */ React14.createElement("div", { className: "booruView__dragPreviewCopy" }, /* @__PURE__ */ React14.createElement("span", null, primaryResource?.originalFilename || "Moviendo recurso"), /* @__PURE__ */ React14.createElement("small", null, customDragState.overTarget?.label ? `Soltar en ${customDragState.overTarget.label}` : customDragState.resourceIds?.length > 1 ? `${customDragState.resourceIds.length} recursos` : "Arrastra hacia una asignacion rapida"))
+      ) : /* @__PURE__ */ React12.createElement("div", { className: "booruView__previewFallback" }, "Media")),
+      /* @__PURE__ */ React12.createElement("div", { className: "booruView__dragPreviewCopy" }, /* @__PURE__ */ React12.createElement("span", null, primaryResource?.originalFilename || "Moviendo recurso"), /* @__PURE__ */ React12.createElement("small", null, customDragState.overTarget?.label ? `Soltar en ${customDragState.overTarget.label}` : customDragState.resourceIds?.length > 1 ? `${customDragState.resourceIds.length} recursos` : "Arrastra hacia una asignacion rapida"))
     ));
   }
   const dragLayerState = useDragLayer2((monitor) => ({
@@ -2762,7 +3235,7 @@ function BooruDragPreviewLayer({ resourcesById, customDragState = null, MediaPre
   if (!dragLayerState.isDragging || dragLayerState.itemType !== dndType || !dragSummary) {
     return null;
   }
-  return /* @__PURE__ */ React14.createElement("div", { className: "booruView__dragPreviewLayer" }, /* @__PURE__ */ React14.createElement(
+  return /* @__PURE__ */ React12.createElement("div", { className: "booruView__dragPreviewLayer" }, /* @__PURE__ */ React12.createElement(
     "div",
     {
       className: [
@@ -2771,7 +3244,7 @@ function BooruDragPreviewLayer({ resourcesById, customDragState = null, MediaPre
       ].filter(Boolean).join(" "),
       style: getPreviewStyles(dragLayerState.currentOffset)
     },
-    /* @__PURE__ */ React14.createElement("div", { className: "booruView__dragPreviewThumb" }, dragSummary.primaryResource ? /* @__PURE__ */ React14.createElement(
+    /* @__PURE__ */ React12.createElement("div", { className: "booruView__dragPreviewThumb" }, dragSummary.primaryResource ? /* @__PURE__ */ React12.createElement(
       MediaPreview,
       {
         pathValue: dragSummary.primaryResource.storagePath,
@@ -2780,14 +3253,15 @@ function BooruDragPreviewLayer({ resourcesById, customDragState = null, MediaPre
         thumbnail: dragSummary.primaryResource.thumbnail,
         preferOriginalWhenThumbnailMissing: true
       }
-    ) : /* @__PURE__ */ React14.createElement("div", { className: "booruView__previewFallback" }, "Media")),
-    /* @__PURE__ */ React14.createElement("div", { className: "booruView__dragPreviewCopy" }, /* @__PURE__ */ React14.createElement("span", null, dragSummary.label), dragSummary.count > 1 ? /* @__PURE__ */ React14.createElement("small", null, dragSummary.count, " recursos") : null)
+    ) : /* @__PURE__ */ React12.createElement("div", { className: "booruView__previewFallback" }, "Media")),
+    /* @__PURE__ */ React12.createElement("div", { className: "booruView__dragPreviewCopy" }, /* @__PURE__ */ React12.createElement("span", null, dragSummary.label), dragSummary.count > 1 ? /* @__PURE__ */ React12.createElement("small", null, dragSummary.count, " recursos") : null)
   ));
 }
 
 // ../nexus-plugins/booru/src/components/media/MediaThumbnail.jsx
-var React15 = window.React;
-var { useEffect: useEffect11, useRef: useRef7, useState: useState7 } = React15;
+init_define_process();
+var React13 = window.React;
+var { useEffect: useEffect11, useRef: useRef8, useState: useState9 } = React13;
 function MediaThumbnail({
   pathValue,
   mediaKind,
@@ -2812,15 +3286,15 @@ function MediaThumbnail({
   const originalUrl = toFileUrl3(pathValue);
   const autoplayUrl = toFileUrl3(autoplayPath);
   const isAnimatedImage = mediaKind === "gif" || /\.webp(?:$|[?#])/i.test(String(pathValue || ""));
-  const [hoverActive, setHoverActive] = useState7(false);
-  const hoverTimerRef = useRef7(0);
+  const [hoverActive, setHoverActive] = useState9(false);
+  const hoverTimerRef = useRef8(0);
   const thumbnailUrl = !controls && thumbnail?.status === "ready" ? toFileUrl3(thumbnail?.storagePath) : "";
   const canUseOriginalPreview = preferOriginalWhenThumbnailMissing && mediaKind !== "video";
   const shouldUseOriginal = forceOriginal || isAnimatedImage || hoverActive && hoverPlayable && mediaKind !== "video";
   const imageUrl = controls || shouldUseOriginal ? originalUrl : thumbnailUrl || (canUseOriginalPreview ? originalUrl : "");
   const pendingThumbnail = !controls && !thumbnailUrl && !canUseOriginalPreview && (!thumbnail || thumbnail?.status === "pending");
   const erroredThumbnail = !controls && thumbnail?.status === "error";
-  const lastErrorSignatureRef = useRef7("");
+  const lastErrorSignatureRef = useRef8("");
   const previewSource = controls || shouldUseOriginal ? mediaKind === "video" ? "original-video" : "original-image" : thumbnailUrl ? "thumbnail" : canUseOriginalPreview ? "original-fallback" : "placeholder";
   const resolvedMediaStyle = {
     ...objectFit ? { objectFit } : {},
@@ -2878,7 +3352,7 @@ function MediaThumbnail({
     );
   };
   if ((controls || autoplay) && mediaKind === "video" && originalUrl) {
-    return /* @__PURE__ */ React15.createElement(
+    return /* @__PURE__ */ React13.createElement(
       "video",
       {
         className: [
@@ -2901,7 +3375,7 @@ function MediaThumbnail({
     );
   }
   if (imageUrl) {
-    return /* @__PURE__ */ React15.createElement(
+    return /* @__PURE__ */ React13.createElement(
       "img",
       {
         className: [
@@ -2923,14 +3397,15 @@ function MediaThumbnail({
     );
   }
   if (pendingThumbnail) {
-    return /* @__PURE__ */ React15.createElement("div", { className: ["booruView__previewPlaceholder", large ? "is-large" : "", className].filter(Boolean).join(" ") }, /* @__PURE__ */ React15.createElement("span", { className: "booruView__previewPlaceholderShimmer" }));
+    return /* @__PURE__ */ React13.createElement("div", { className: ["booruView__previewPlaceholder", large ? "is-large" : "", className].filter(Boolean).join(" ") }, /* @__PURE__ */ React13.createElement("span", { className: "booruView__previewPlaceholderShimmer" }));
   }
-  return /* @__PURE__ */ React15.createElement("div", { className: ["booruView__previewFallback", large ? "is-large" : "", className].filter(Boolean).join(" ") }, /* @__PURE__ */ React15.createElement("span", null, erroredThumbnail ? "Preview" : mediaKindLabels[mediaKind] || "Media"));
+  return /* @__PURE__ */ React13.createElement("div", { className: ["booruView__previewFallback", large ? "is-large" : "", className].filter(Boolean).join(" ") }, /* @__PURE__ */ React13.createElement("span", null, erroredThumbnail ? "Preview" : mediaKindLabels[mediaKind] || "Media"));
 }
 
 // ../nexus-plugins/booru/src/components/search/ResourceSearchComposer.jsx
-var React16 = window.React;
-var { useCallback: useCallback4, useEffect: useEffect12, useMemo: useMemo5, useState: useState8 } = React16;
+init_define_process();
+var React14 = window.React;
+var { useCallback: useCallback2, useEffect: useEffect12, useMemo: useMemo5, useState: useState10 } = React14;
 function ResourceSearchComposer({
   tokens,
   onChange,
@@ -2944,10 +3419,10 @@ function ResourceSearchComposer({
   allowedKinds = null
 }) {
   const { normalizeResourceSearchTokens: normalizeResourceSearchTokens2, buildResourceSearchTokenKey: buildResourceSearchTokenKey2, parseResourceSearchDraft: parseResourceSearchDraft2, normalizeSearchText: normalizeSearchText2, normalizeResourceSearchToken: normalizeResourceSearchToken2, createResourceSearchTokenFromSuggestion: createResourceSearchTokenFromSuggestion2, getResourceQueryTokenClass: getResourceQueryTokenClass2, buildResourceQueryTokenLabel: buildResourceQueryTokenLabel2, stepSuggestionIndex: stepSuggestionIndex2 } = helpers;
-  const [suggestions, setSuggestions] = useState8([]);
-  const [loading, setLoading] = useState8(false);
-  const [error, setError] = useState8("");
-  const [highlightedIndex, setHighlightedIndex] = useState8(-1);
+  const [suggestions, setSuggestions] = useState10([]);
+  const [loading, setLoading] = useState10(false);
+  const [error, setError] = useState10("");
+  const [highlightedIndex, setHighlightedIndex] = useState10(-1);
   const tokensSignature = useMemo5(
     () => normalizeResourceSearchTokens2(tokens).map((token) => buildResourceSearchTokenKey2(token)).join("|"),
     [tokens]
@@ -3056,7 +3531,7 @@ function ResourceSearchComposer({
   useEffect12(() => {
     setHighlightedIndex(-1);
   }, [suggestions, draftValue]);
-  const handleCommitToken = useCallback4((nextToken) => {
+  const handleCommitToken = useCallback2((nextToken) => {
     const normalizedToken = normalizeResourceSearchToken2(nextToken);
     if (!normalizedToken) {
       return false;
@@ -3074,7 +3549,7 @@ function ResourceSearchComposer({
     setError("");
     return true;
   }, [draftValue, freeText, onChange, onFreeTextChange, tokens]);
-  const handleCommitRawToken = useCallback4((rawToken, suggestion) => {
+  const handleCommitRawToken = useCallback2((rawToken, suggestion) => {
     const nextToken = suggestion ? createResourceSearchTokenFromSuggestion2(rawToken, suggestion) : null;
     return handleCommitToken(nextToken);
   }, [handleCommitToken]);
@@ -3082,14 +3557,14 @@ function ResourceSearchComposer({
     onFreeTextChange?.(String(event.target.value || ""));
     setError("");
   };
-  return /* @__PURE__ */ React16.createElement("div", { className: "booruView__searchComposer" }, normalizeResourceSearchTokens2(tokens).length ? /* @__PURE__ */ React16.createElement("div", { className: "booruView__searchCriteria" }, /* @__PURE__ */ React16.createElement("span", { className: "booruView__groupLabel" }, "Buscando"), /* @__PURE__ */ React16.createElement("div", { className: "booruView__entitySelection booruView__entitySelection--composer" }, normalizeResourceSearchTokens2(tokens).map((token) => /* @__PURE__ */ React16.createElement(
+  return /* @__PURE__ */ React14.createElement("div", { className: "booruView__searchComposer" }, normalizeResourceSearchTokens2(tokens).length ? /* @__PURE__ */ React14.createElement("div", { className: "booruView__searchCriteria" }, /* @__PURE__ */ React14.createElement("span", { className: "booruView__groupLabel" }, "Buscando"), /* @__PURE__ */ React14.createElement("div", { className: "booruView__entitySelection booruView__entitySelection--composer" }, normalizeResourceSearchTokens2(tokens).map((token) => /* @__PURE__ */ React14.createElement(
     "span",
     {
       key: buildResourceSearchTokenKey2(token),
       className: ["booruView__selectionChip", getResourceQueryTokenClass2(token)].filter(Boolean).join(" ")
     },
-    /* @__PURE__ */ React16.createElement("span", null, buildResourceQueryTokenLabel2(token)),
-    /* @__PURE__ */ React16.createElement(
+    /* @__PURE__ */ React14.createElement("span", null, buildResourceQueryTokenLabel2(token)),
+    /* @__PURE__ */ React14.createElement(
       "button",
       {
         type: "button",
@@ -3106,10 +3581,9 @@ function ResourceSearchComposer({
       },
       "x"
     )
-  )))) : null, /* @__PURE__ */ React16.createElement("div", { className: "booruView__searchComposerShell" }, /* @__PURE__ */ React16.createElement("div", { className: "booruView__entitySelection booruView__entitySelection--composer" }, /* @__PURE__ */ React16.createElement(
-    "input",
+  )))) : null, /* @__PURE__ */ React14.createElement("div", { className: "booruView__searchComposerShell" }, /* @__PURE__ */ React14.createElement("div", { className: "booruView__entitySelection booruView__entitySelection--composer" }, /* @__PURE__ */ React14.createElement(
+    SearchField,
     {
-      type: "text",
       value: freeText,
       onChange: handleChange,
       onKeyDown: (event) => {
@@ -3149,11 +3623,10 @@ function ResourceSearchComposer({
         }
       },
       placeholder: "Buscar tags, personas, characters, artists o universes",
-      className: "booruView__searchComposerInput",
       disabled,
       "aria-label": "Buscar por texto libre o filtros exactos"
     }
-  ))), error ? /* @__PURE__ */ React16.createElement("p", { className: "booruView__fieldError" }, error) : null, String(draftValue || "").trim() ? /* @__PURE__ */ React16.createElement("div", { className: "booruView__suggestions booruView__suggestions--stacked" }, loading ? /* @__PURE__ */ React16.createElement("span", { className: "booruView__suggestionsHint" }, "Buscando sugerencias...") : suggestions.length ? suggestions.map((item, index) => /* @__PURE__ */ React16.createElement(
+  ))), error ? /* @__PURE__ */ React14.createElement("p", { className: "booruView__fieldError" }, error) : null, String(draftValue || "").trim() ? /* @__PURE__ */ React14.createElement("div", { className: "booruView__suggestions booruView__suggestions--stacked" }, loading ? /* @__PURE__ */ React14.createElement("span", { className: "booruView__suggestionsHint" }, "Buscando sugerencias...") : suggestions.length ? suggestions.map((item, index) => /* @__PURE__ */ React14.createElement(
     "button",
     {
       key: `${item.id}:${tokensSignature}`,
@@ -3166,14 +3639,15 @@ function ResourceSearchComposer({
         void handleCommitRawToken(draftValue, item);
       }
     },
-    /* @__PURE__ */ React16.createElement("span", null, item.label),
-    item.detail ? /* @__PURE__ */ React16.createElement("small", null, item.detail) : null
-  )) : /* @__PURE__ */ React16.createElement("span", { className: "booruView__suggestionsHint" }, "Enter conserva el texto libre. Elige una sugerencia para filtrar por su ID exacto.")) : null);
+    /* @__PURE__ */ React14.createElement("span", null, item.label),
+    item.detail ? /* @__PURE__ */ React14.createElement("small", null, item.detail) : null
+  )) : /* @__PURE__ */ React14.createElement("span", { className: "booruView__suggestionsHint" }, "Enter conserva el texto libre. Elige una sugerencia para filtrar por su ID exacto.")) : null);
 }
 
 // ../nexus-plugins/booru/src/components/search/SingleEntityAutocompleteField.jsx
-var React17 = window.React;
-var { useEffect: useEffect13, useMemo: useMemo6, useState: useState9 } = React17;
+init_define_process();
+var React15 = window.React;
+var { useEffect: useEffect13, useMemo: useMemo6, useState: useState11 } = React15;
 function SingleEntityAutocompleteField({
   kind,
   label,
@@ -3189,11 +3663,11 @@ function SingleEntityAutocompleteField({
   allowClear = true
 }) {
   const { findExactEntityMatch: findExactEntityMatch2, stepSuggestionIndex: stepSuggestionIndex2 } = helpers;
-  const [query, setQuery] = useState9("");
-  const [suggestions, setSuggestions] = useState9([]);
-  const [loading, setLoading] = useState9(false);
-  const [error, setError] = useState9("");
-  const [highlightedIndex, setHighlightedIndex] = useState9(-1);
+  const [query, setQuery] = useState11("");
+  const [suggestions, setSuggestions] = useState11([]);
+  const [loading, setLoading] = useState11(false);
+  const [error, setError] = useState11("");
+  const [highlightedIndex, setHighlightedIndex] = useState11(-1);
   useEffect13(() => {
     let cancelled = false;
     const trimmedQuery = String(query || "").trim();
@@ -3263,7 +3737,7 @@ function SingleEntityAutocompleteField({
       setLoading(false);
     }
   };
-  return /* @__PURE__ */ React17.createElement("div", { className: "booruView__entityInlineEditor" }, value ? /* @__PURE__ */ React17.createElement("div", { className: "booruView__entitySelection" }, /* @__PURE__ */ React17.createElement("span", { className: "booruView__selectionChip" }, /* @__PURE__ */ React17.createElement("span", null, value.displayName), allowClear ? /* @__PURE__ */ React17.createElement(
+  return /* @__PURE__ */ React15.createElement("div", { className: "booruView__entityInlineEditor" }, value ? /* @__PURE__ */ React15.createElement("div", { className: "booruView__entitySelection" }, /* @__PURE__ */ React15.createElement("span", { className: "booruView__selectionChip" }, /* @__PURE__ */ React15.createElement("span", null, value.displayName), allowClear ? /* @__PURE__ */ React15.createElement(
     "button",
     {
       type: "button",
@@ -3273,10 +3747,9 @@ function SingleEntityAutocompleteField({
       "aria-label": `Quitar ${value.displayName}`
     },
     "x"
-  ) : null)) : null, /* @__PURE__ */ React17.createElement("div", { className: "booruView__entityInputRow" }, /* @__PURE__ */ React17.createElement(
-    "input",
+  ) : null)) : null, /* @__PURE__ */ React15.createElement("div", { className: "booruView__entityInputRow" }, /* @__PURE__ */ React15.createElement(
+    SearchField,
     {
-      type: "text",
       value: query,
       onChange: (event) => setQuery(event.target.value),
       onKeyDown: (event) => {
@@ -3309,7 +3782,7 @@ function SingleEntityAutocompleteField({
       disabled,
       "aria-label": label
     }
-  ), /* @__PURE__ */ React17.createElement(
+  ), /* @__PURE__ */ React15.createElement(
     Button,
     {
       type: "button",
@@ -3317,7 +3790,7 @@ function SingleEntityAutocompleteField({
       disabled: !String(query || "").trim() || disabled
     },
     buttonLabel
-  )), error ? /* @__PURE__ */ React17.createElement("p", { className: "booruView__fieldError" }, error) : null, String(query || "").trim() ? /* @__PURE__ */ React17.createElement("div", { className: "booruView__suggestions" }, loading ? /* @__PURE__ */ React17.createElement("span", { className: "booruView__suggestionsHint" }, "Buscando sugerencias...") : suggestions.length ? suggestions.map((item, index) => /* @__PURE__ */ React17.createElement(
+  )), error ? /* @__PURE__ */ React15.createElement("p", { className: "booruView__fieldError" }, error) : null, String(query || "").trim() ? /* @__PURE__ */ React15.createElement("div", { className: "booruView__suggestions" }, loading ? /* @__PURE__ */ React15.createElement("span", { className: "booruView__suggestionsHint" }, "Buscando sugerencias...") : suggestions.length ? suggestions.map((item, index) => /* @__PURE__ */ React15.createElement(
     "button",
     {
       key: item.id,
@@ -3328,14 +3801,15 @@ function SingleEntityAutocompleteField({
       ].filter(Boolean).join(" "),
       onClick: () => handleSelectEntity(item)
     },
-    /* @__PURE__ */ React17.createElement("span", null, item.displayName),
-    /* @__PURE__ */ React17.createElement("small", null, item.resourceCount, " recursos")
-  )) : /* @__PURE__ */ React17.createElement("span", { className: "booruView__suggestionsHint" }, "Sin coincidencias. Enter crea ", entityKindLabels[kind]?.toLowerCase() || "la entidad", ".")) : null);
+    /* @__PURE__ */ React15.createElement("span", null, item.displayName),
+    /* @__PURE__ */ React15.createElement("small", null, item.resourceCount, " recursos")
+  )) : /* @__PURE__ */ React15.createElement("span", { className: "booruView__suggestionsHint" }, "Sin coincidencias. Enter crea ", entityKindLabels[kind]?.toLowerCase() || "la entidad", ".")) : null);
 }
 
 // ../nexus-plugins/booru/src/components/search/EntityAutocompleteField.jsx
-var React18 = window.React;
-var { useEffect: useEffect14, useMemo: useMemo7, useState: useState10 } = React18;
+init_define_process();
+var React16 = window.React;
+var { useEffect: useEffect14, useMemo: useMemo7, useState: useState12 } = React16;
 function EntityAutocompleteField({
   kind,
   label,
@@ -3351,11 +3825,11 @@ function EntityAutocompleteField({
   priorityEntity = null
 }) {
   const { normalizeSelectedEntities: normalizeSelectedEntities2, findExactEntityMatch: findExactEntityMatch2, stepSuggestionIndex: stepSuggestionIndex2 } = helpers;
-  const [query, setQuery] = useState10("");
-  const [suggestions, setSuggestions] = useState10([]);
-  const [loading, setLoading] = useState10(false);
-  const [error, setError] = useState10("");
-  const [highlightedIndex, setHighlightedIndex] = useState10(-1);
+  const [query, setQuery] = useState12("");
+  const [suggestions, setSuggestions] = useState12([]);
+  const [loading, setLoading] = useState12(false);
+  const [error, setError] = useState12("");
+  const [highlightedIndex, setHighlightedIndex] = useState12(-1);
   useEffect14(() => {
     let cancelled = false;
     const trimmedQuery = String(query || "").trim();
@@ -3431,14 +3905,14 @@ function EntityAutocompleteField({
       setLoading(false);
     }
   };
-  return /* @__PURE__ */ React18.createElement(
+  return /* @__PURE__ */ React16.createElement(
     Field,
     {
       label: required ? `${label} (requerido)` : label,
       description,
       className: "booruView__field"
     },
-    /* @__PURE__ */ React18.createElement("div", { className: "booruView__entityEditor" }, Array.isArray(selectedItems) && selectedItems.length ? /* @__PURE__ */ React18.createElement("div", { className: "booruView__entitySelection" }, selectedItems.map((item) => /* @__PURE__ */ React18.createElement("span", { key: item.id, className: "booruView__selectionChip" }, /* @__PURE__ */ React18.createElement("span", null, item.displayName), /* @__PURE__ */ React18.createElement(
+    /* @__PURE__ */ React16.createElement("div", { className: "booruView__entityEditor" }, Array.isArray(selectedItems) && selectedItems.length ? /* @__PURE__ */ React16.createElement("div", { className: "booruView__entitySelection" }, selectedItems.map((item) => /* @__PURE__ */ React16.createElement("span", { key: item.id, className: "booruView__selectionChip" }, /* @__PURE__ */ React16.createElement("span", null, item.displayName), /* @__PURE__ */ React16.createElement(
       "button",
       {
         type: "button",
@@ -3448,10 +3922,9 @@ function EntityAutocompleteField({
         "aria-label": `Quitar ${item.displayName}`
       },
       "x"
-    )))) : null, /* @__PURE__ */ React18.createElement("div", { className: "booruView__entityInputRow" }, /* @__PURE__ */ React18.createElement(
-      "input",
+    )))) : null, /* @__PURE__ */ React16.createElement("div", { className: "booruView__entityInputRow" }, /* @__PURE__ */ React16.createElement(
+      SearchField,
       {
-        type: "text",
         value: query,
         onChange: (event) => setQuery(event.target.value),
         onKeyDown: (event) => {
@@ -3481,9 +3954,10 @@ function EntityAutocompleteField({
           }
         },
         placeholder: `Buscar ${label.toLowerCase()} o crear uno nuevo`,
-        disabled
+        disabled,
+        "aria-label": `Buscar ${label.toLowerCase()}`
       }
-    ), /* @__PURE__ */ React18.createElement(
+    ), /* @__PURE__ */ React16.createElement(
       Button,
       {
         type: "button",
@@ -3491,7 +3965,7 @@ function EntityAutocompleteField({
         disabled: !String(query || "").trim() || disabled
       },
       "Agregar"
-    )), error ? /* @__PURE__ */ React18.createElement("p", { className: "booruView__fieldError" }, error) : null, String(query || "").trim() ? /* @__PURE__ */ React18.createElement("div", { className: "booruView__suggestions" }, loading ? /* @__PURE__ */ React18.createElement("span", { className: "booruView__suggestionsHint" }, "Buscando sugerencias...") : suggestions.length ? suggestions.map((item, index) => /* @__PURE__ */ React18.createElement(
+    )), error ? /* @__PURE__ */ React16.createElement("p", { className: "booruView__fieldError" }, error) : null, String(query || "").trim() ? /* @__PURE__ */ React16.createElement("div", { className: "booruView__suggestions" }, loading ? /* @__PURE__ */ React16.createElement("span", { className: "booruView__suggestionsHint" }, "Buscando sugerencias...") : suggestions.length ? suggestions.map((item, index) => /* @__PURE__ */ React16.createElement(
       "button",
       {
         key: item.id,
@@ -3502,15 +3976,16 @@ function EntityAutocompleteField({
         ].filter(Boolean).join(" "),
         onClick: () => handleSelectEntity(item)
       },
-      /* @__PURE__ */ React18.createElement("span", null, item.displayName),
-      /* @__PURE__ */ React18.createElement("small", null, item.resourceCount, " recursos")
-    )) : /* @__PURE__ */ React18.createElement("span", { className: "booruView__suggestionsHint" }, "Sin coincidencias. Enter crea ", entityKindLabels[kind]?.toLowerCase() || "la entidad", ".")) : null)
+      /* @__PURE__ */ React16.createElement("span", null, item.displayName),
+      /* @__PURE__ */ React16.createElement("small", null, item.resourceCount, " recursos")
+    )) : /* @__PURE__ */ React16.createElement("span", { className: "booruView__suggestionsHint" }, "Sin coincidencias. Enter crea ", entityKindLabels[kind]?.toLowerCase() || "la entidad", ".")) : null)
   );
 }
 
 // ../nexus-plugins/booru/src/components/search/TagAutocompleteField.jsx
-var React19 = window.React;
-var { useEffect: useEffect15, useMemo: useMemo8, useState: useState11 } = React19;
+init_define_process();
+var React17 = window.React;
+var { useEffect: useEffect15, useMemo: useMemo8, useState: useState13 } = React17;
 function TagAutocompleteField({
   label,
   description,
@@ -3521,11 +3996,11 @@ function TagAutocompleteField({
   helpers
 }) {
   const { normalizeSelectedTags: normalizeSelectedTags2, findExactTagMatch: findExactTagMatch2, stepSuggestionIndex: stepSuggestionIndex2 } = helpers;
-  const [query, setQuery] = useState11("");
-  const [suggestions, setSuggestions] = useState11([]);
-  const [loading, setLoading] = useState11(false);
-  const [error, setError] = useState11("");
-  const [highlightedIndex, setHighlightedIndex] = useState11(-1);
+  const [query, setQuery] = useState13("");
+  const [suggestions, setSuggestions] = useState13([]);
+  const [loading, setLoading] = useState13(false);
+  const [error, setError] = useState13("");
+  const [highlightedIndex, setHighlightedIndex] = useState13(-1);
   useEffect15(() => {
     let cancelled = false;
     const trimmedQuery = String(query || "").trim();
@@ -3602,14 +4077,14 @@ function TagAutocompleteField({
       setLoading(false);
     }
   };
-  return /* @__PURE__ */ React19.createElement(
+  return /* @__PURE__ */ React17.createElement(
     Field,
     {
       label,
       description,
       className: "booruView__field"
     },
-    /* @__PURE__ */ React19.createElement("div", { className: "booruView__entityEditor" }, Array.isArray(selectedItems) && selectedItems.length ? /* @__PURE__ */ React19.createElement("div", { className: "booruView__entitySelection" }, selectedItems.map((item) => /* @__PURE__ */ React19.createElement("span", { key: item.id, className: "booruView__selectionChip" }, /* @__PURE__ */ React19.createElement("span", null, item.name), /* @__PURE__ */ React19.createElement(
+    /* @__PURE__ */ React17.createElement("div", { className: "booruView__entityEditor" }, Array.isArray(selectedItems) && selectedItems.length ? /* @__PURE__ */ React17.createElement("div", { className: "booruView__entitySelection" }, selectedItems.map((item) => /* @__PURE__ */ React17.createElement("span", { key: item.id, className: "booruView__selectionChip" }, /* @__PURE__ */ React17.createElement("span", null, item.name), /* @__PURE__ */ React17.createElement(
       "button",
       {
         type: "button",
@@ -3619,10 +4094,9 @@ function TagAutocompleteField({
         "aria-label": `Quitar ${item.name}`
       },
       "x"
-    )))) : null, /* @__PURE__ */ React19.createElement("div", { className: "booruView__entityInputRow" }, /* @__PURE__ */ React19.createElement(
-      "input",
+    )))) : null, /* @__PURE__ */ React17.createElement("div", { className: "booruView__entityInputRow" }, /* @__PURE__ */ React17.createElement(
+      SearchField,
       {
-        type: "text",
         value: query,
         onChange: (event) => setQuery(event.target.value),
         onKeyDown: (event) => {
@@ -3652,9 +4126,10 @@ function TagAutocompleteField({
           }
         },
         placeholder: "Buscar tag o crear una nueva",
-        disabled
+        disabled,
+        "aria-label": "Buscar tag"
       }
-    ), /* @__PURE__ */ React19.createElement(
+    ), /* @__PURE__ */ React17.createElement(
       Button,
       {
         type: "button",
@@ -3662,7 +4137,7 @@ function TagAutocompleteField({
         disabled: !String(query || "").trim() || disabled
       },
       "Agregar"
-    )), error ? /* @__PURE__ */ React19.createElement("p", { className: "booruView__fieldError" }, error) : null, String(query || "").trim() ? /* @__PURE__ */ React19.createElement("div", { className: "booruView__suggestions" }, loading ? /* @__PURE__ */ React19.createElement("span", { className: "booruView__suggestionsHint" }, "Buscando tags...") : suggestions.length ? suggestions.map((item, index) => /* @__PURE__ */ React19.createElement(
+    )), error ? /* @__PURE__ */ React17.createElement("p", { className: "booruView__fieldError" }, error) : null, String(query || "").trim() ? /* @__PURE__ */ React17.createElement("div", { className: "booruView__suggestions" }, loading ? /* @__PURE__ */ React17.createElement("span", { className: "booruView__suggestionsHint" }, "Buscando tags...") : suggestions.length ? suggestions.map((item, index) => /* @__PURE__ */ React17.createElement(
       "button",
       {
         key: item.id,
@@ -3673,15 +4148,16 @@ function TagAutocompleteField({
         ].filter(Boolean).join(" "),
         onClick: () => handleSelectTag(item)
       },
-      /* @__PURE__ */ React19.createElement("span", null, item.name),
-      /* @__PURE__ */ React19.createElement("small", null, item.resourceCount, " recursos")
-    )) : /* @__PURE__ */ React19.createElement("span", { className: "booruView__suggestionsHint" }, "Sin coincidencias. Enter crea la tag manual.")) : null)
+      /* @__PURE__ */ React17.createElement("span", null, item.name),
+      /* @__PURE__ */ React17.createElement("small", null, item.resourceCount, " recursos")
+    )) : /* @__PURE__ */ React17.createElement("span", { className: "booruView__suggestionsHint" }, "Sin coincidencias. Enter crea la tag manual.")) : null)
   );
 }
 
 // ../nexus-plugins/booru/src/components/recommendations/RecommendationKindBadge.jsx
-var React20 = window.React;
-var { useCallback: useCallback5, useEffect: useEffect16, useRef: useRef8, useState: useState12 } = React20;
+init_define_process();
+var React18 = window.React;
+var { useCallback: useCallback3, useEffect: useEffect16, useRef: useRef9, useState: useState14 } = React18;
 function RecommendationKindBadge({
   item,
   tooltip = "",
@@ -3689,15 +4165,15 @@ function RecommendationKindBadge({
   helpers
 }) {
   const { getRecommendationKindBadgeLabel: getRecommendationKindBadgeLabel2 } = helpers;
-  const [visible, setVisible] = useState12(false);
-  const hoverTimerRef = useRef8(null);
-  const clearHoverTimer = useCallback5(() => {
+  const [visible, setVisible] = useState14(false);
+  const hoverTimerRef = useRef9(null);
+  const clearHoverTimer = useCallback3(() => {
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
     }
   }, []);
-  const startTooltipTimer = useCallback5(() => {
+  const startTooltipTimer = useCallback3(() => {
     clearHoverTimer();
     if (!tooltip) {
       return;
@@ -3706,14 +4182,14 @@ function RecommendationKindBadge({
       setVisible(true);
     }, 1e3);
   }, [clearHoverTimer, tooltip]);
-  const stopTooltip = useCallback5(() => {
+  const stopTooltip = useCallback3(() => {
     clearHoverTimer();
     setVisible(false);
   }, [clearHoverTimer]);
   useEffect16(() => () => {
     clearHoverTimer();
   }, [clearHoverTimer]);
-  return /* @__PURE__ */ React20.createElement(
+  return /* @__PURE__ */ React18.createElement(
     "span",
     {
       className: [
@@ -3725,14 +4201,15 @@ function RecommendationKindBadge({
       onMouseEnter: startTooltipTimer,
       onMouseLeave: stopTooltip
     },
-    /* @__PURE__ */ React20.createElement("span", null, getRecommendationKindBadgeLabel2(item)),
-    visible && tooltip ? /* @__PURE__ */ React20.createElement("span", { className: "booruView__kindTooltip", role: "tooltip" }, tooltip) : null
+    /* @__PURE__ */ React18.createElement("span", null, getRecommendationKindBadgeLabel2(item)),
+    visible && tooltip ? /* @__PURE__ */ React18.createElement("span", { className: "booruView__kindTooltip", role: "tooltip" }, tooltip) : null
   );
 }
 
 // ../nexus-plugins/booru/src/components/recommendations/RecommendationEntityDropTarget.jsx
-var React21 = window.React;
-var { useCallback: useCallback6, useEffect: useEffect17, useMemo: useMemo9, useRef: useRef9 } = React21;
+init_define_process();
+var React19 = window.React;
+var { useCallback: useCallback4, useEffect: useEffect17, useMemo: useMemo9, useRef: useRef10 } = React19;
 function RecommendationEntityDropTarget({
   item,
   kind,
@@ -3758,8 +4235,8 @@ function RecommendationEntityDropTarget({
     () => uniqueIds2(manualAssignResourceIds),
     [manualAssignResourceIds]
   );
-  const hoverSignatureRef = useRef9("");
-  const dragOverLogAtRef = useRef9(0);
+  const hoverSignatureRef = useRef10("");
+  const dragOverLogAtRef = useRef10(0);
   const [{ isOver, canDrop }, dropRef] = useDrop2(() => ({
     accept: dndType,
     canDrop: (draggedItem) => {
@@ -3820,11 +4297,11 @@ function RecommendationEntityDropTarget({
       hoverSignatureRef.current = "";
     }
   }, [isOver]);
-  const handleDropRef = useCallback6((node) => {
+  const handleDropRef = useCallback4((node) => {
     dropRef(node);
   }, [dropRef]);
   const kindTooltip = getRecommendationKindTooltip2(item);
-  return /* @__PURE__ */ React21.createElement(
+  return /* @__PURE__ */ React19.createElement(
     "div",
     {
       ref: handleDropRef,
@@ -3876,15 +4353,15 @@ function RecommendationEntityDropTarget({
         );
       }
     },
-    /* @__PURE__ */ React21.createElement("div", { className: "booruView__recommendationCopy" }, /* @__PURE__ */ React21.createElement("span", null, item.label || item.displayName), /* @__PURE__ */ React21.createElement("small", null, item.detail || `${item.resourceCount || 0} recursos`)),
-    /* @__PURE__ */ React21.createElement("div", { className: "booruView__recommendationActions" }, /* @__PURE__ */ React21.createElement(
+    /* @__PURE__ */ React19.createElement("div", { className: "booruView__recommendationCopy" }, /* @__PURE__ */ React19.createElement("span", null, item.label || item.displayName), /* @__PURE__ */ React19.createElement("small", null, item.detail || `${item.resourceCount || 0} recursos`)),
+    /* @__PURE__ */ React19.createElement("div", { className: "booruView__recommendationActions" }, /* @__PURE__ */ React19.createElement(
       KindBadge,
       {
         item,
         className: getRecommendationItemKindClass2(item),
         tooltip: kindTooltip
       }
-    ), /* @__PURE__ */ React21.createElement(
+    ), /* @__PURE__ */ React19.createElement(
       Button2,
       {
         type: "button",
@@ -3897,8 +4374,9 @@ function RecommendationEntityDropTarget({
 }
 
 // ../nexus-plugins/booru/src/components/media/ResourceGrid.jsx
-var React22 = window.React;
-var { useCallback: useCallback7, useEffect: useEffect18, useMemo: useMemo10, useRef: useRef10, useState: useState13 } = React22;
+init_define_process();
+var React20 = window.React;
+var { useEffect: useEffect18, useMemo: useMemo10, useRef: useRef11, useState: useState15 } = React20;
 function ResourceGrid({
   items,
   placements = [],
@@ -3913,7 +4391,7 @@ function ResourceGrid({
   defaultColumns,
   scrollTop = 0,
   onScrollStateChange,
-  onColumnWheel,
+  onColumnsChange,
   columns = defaultColumns,
   infinite = false,
   hasMore = false,
@@ -3933,22 +4411,17 @@ function ResourceGrid({
   Pagination,
   getVirtualRange
 }) {
-  const contentRef = useRef10(null);
-  const gridRef = useRef10(null);
-  const loadMoreSentinelRef = useRef10(null);
-  const loadMoreRef = useRef10(onLoadMore);
-  const attachColumnWheel = useGalleryColumnWheel(onColumnWheel);
-  const setContentNode = useCallback7((node) => {
-    contentRef.current = node;
-    attachColumnWheel(node);
-  }, [attachColumnWheel]);
-  const [virtualLayout, setVirtualLayout] = useState13({
+  const contentRef = useRef11(null);
+  const gridRef = useRef11(null);
+  const loadMoreSentinelRef = useRef11(null);
+  const loadMoreRef = useRef11(onLoadMore);
+  const [virtualLayout, setVirtualLayout] = useState15({
     gridWidth: 0,
     viewportHeight: 0,
     columns: defaultColumns,
     gap: 8
   });
-  const [virtualRange, setVirtualRange] = useState13({
+  const [virtualRange, setVirtualRange] = useState15({
     startIndex: 0,
     endIndex: 0
   });
@@ -4090,17 +4563,17 @@ function ResourceGrid({
     observer.observe(sentinelNode);
     return () => observer.disconnect();
   }, [hasMore, infinite, isVirtualized, loading, totalGridHeight]);
-  return /* @__PURE__ */ React22.createElement(SectionPanel, { className: "booruView__panel booruView__panel--fill" }, loading && !items.length ? /* @__PURE__ */ React22.createElement(
+  return /* @__PURE__ */ React20.createElement(SectionPanel, { className: "booruView__panel booruView__panel--fill" }, loading && !items.length ? /* @__PURE__ */ React20.createElement(
     StateBlock,
     {
       centered: true,
       title: "Cargando media",
       description: "Leyendo la pagina actual de Booru."
     }
-  ) : items.length ? /* @__PURE__ */ React22.createElement(
+  ) : items.length ? /* @__PURE__ */ React20.createElement(
     "div",
     {
-      ref: setContentNode,
+      ref: contentRef,
       className: "booruView__resourcePanelBody",
       onPointerDown: (event) => {
         if (event.target === event.currentTarget) {
@@ -4108,25 +4581,34 @@ function ResourceGrid({
         }
       }
     },
-    /* @__PURE__ */ React22.createElement("div", { className: "booruView__resourcePanelContent" }, grouped ? /* @__PURE__ */ React22.createElement("div", { ref: gridRef, className: "booruView__groupedGallery" }, groupedSections.map((group) => /* @__PURE__ */ React22.createElement(CollapsibleGalleryGroup, { key: group.key, label: group.label, association: group.association, onAssociationHover: onGroupAssociationHover }, /* @__PURE__ */ React22.createElement("div", { className: "booruView__mediaGrid", style: { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } }, group.entries.map(({ placement, item }, index) => /* @__PURE__ */ React22.createElement(
-      ResourceCard,
+    /* @__PURE__ */ React20.createElement("div", { className: "booruView__resourcePanelContent" }, grouped ? /* @__PURE__ */ React20.createElement("div", { ref: gridRef, className: "booruView__groupedGallery" }, groupedSections.map((group) => /* @__PURE__ */ React20.createElement(CollapsibleGalleryGroup, { key: group.key, label: group.label, association: group.association, onAssociationHover: onGroupAssociationHover }, /* @__PURE__ */ React20.createElement(
+      GalleryGrid,
       {
-        key: placement.placementId,
-        item,
-        absoluteIndex: index,
-        selected: selectedIds.includes(item.id),
-        multiSelected: selectedIds.includes(item.id) && selectionMode === "multi",
-        dragResourceIds: selectedIds.includes(item.id) ? selectedIds : [item.id],
-        customDragActive: Boolean(customDragState?.active && customDragState.resourceIds?.includes(item.id)),
-        onCustomDragPointerDown,
-        shouldSuppressClick,
-        onSelect,
-        onOpen,
-        onContextMenu,
-        columns
-      }
-    )))))) : /* @__PURE__ */ React22.createElement(
-      "div",
+        className: "booruView__mediaGrid",
+        columns,
+        minColumns: 2,
+        onColumnsChange
+      },
+      group.entries.map(({ placement, item }, index) => /* @__PURE__ */ React20.createElement(
+        ResourceCard,
+        {
+          key: placement.placementId,
+          item,
+          absoluteIndex: index,
+          selected: selectedIds.includes(item.id),
+          multiSelected: selectedIds.includes(item.id) && selectionMode === "multi",
+          dragResourceIds: selectedIds.includes(item.id) ? selectedIds : [item.id],
+          customDragActive: Boolean(customDragState?.active && customDragState.resourceIds?.includes(item.id)),
+          onCustomDragPointerDown,
+          shouldSuppressClick,
+          onSelect,
+          onOpen,
+          onContextMenu,
+          columns
+        }
+      ))
+    )))) : /* @__PURE__ */ React20.createElement(
+      GalleryGrid,
       {
         ref: gridRef,
         className: [
@@ -4134,8 +4616,11 @@ function ResourceGrid({
           infinite ? "booruView__mediaGrid--infinite" : "booruView__mediaGrid--paged",
           isVirtualized ? "is-virtualized" : ""
         ].filter(Boolean).join(" "),
+        virtual: isVirtualized,
+        columns,
+        minColumns: 2,
+        onColumnsChange,
         style: {
-          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
           ...isVirtualized ? { height: `${totalGridHeight}px` } : {}
         },
         onPointerDown: (event) => {
@@ -4154,7 +4639,7 @@ function ResourceGrid({
           width: `${gridMetrics.cardSize}px`,
           height: `${gridMetrics.cardSize}px`
         } : void 0;
-        return /* @__PURE__ */ React22.createElement(
+        return /* @__PURE__ */ React20.createElement(
           ResourceCard,
           {
             key: item.id,
@@ -4174,7 +4659,7 @@ function ResourceGrid({
           }
         );
       }),
-      infinite && hasMore ? /* @__PURE__ */ React22.createElement(
+      infinite && hasMore ? /* @__PURE__ */ React20.createElement(
         "div",
         {
           ref: loadMoreSentinelRef,
@@ -4183,7 +4668,7 @@ function ResourceGrid({
           style: isVirtualized ? { top: `${Math.max(0, totalGridHeight - 1)}px` } : void 0
         }
       ) : null
-    ), grouped && infinite && hasMore ? /* @__PURE__ */ React22.createElement("div", { ref: loadMoreSentinelRef, className: "booruView__resourceLoadSentinel", "aria-hidden": "true" }) : null, infinite ? loading ? /* @__PURE__ */ React22.createElement("span", { className: "booruView__resourceLoadingMore" }, "Cargando m\xE1s media...") : null : /* @__PURE__ */ React22.createElement(
+    ), grouped && infinite && hasMore ? /* @__PURE__ */ React20.createElement("div", { ref: loadMoreSentinelRef, className: "booruView__resourceLoadSentinel", "aria-hidden": "true" }) : null, infinite ? loading ? /* @__PURE__ */ React20.createElement("span", { className: "booruView__resourceLoadingMore" }, "Cargando m\xE1s media...") : null : /* @__PURE__ */ React20.createElement(
       Pagination,
       {
         currentPage,
@@ -4192,7 +4677,7 @@ function ResourceGrid({
         onPageChange
       }
     ))
-  ) : /* @__PURE__ */ React22.createElement(
+  ) : /* @__PURE__ */ React20.createElement(
     StateBlock,
     {
       centered: true,
@@ -4203,8 +4688,9 @@ function ResourceGrid({
 }
 
 // ../nexus-plugins/booru/src/components/media/ResourcePagination.jsx
-var React23 = window.React;
-var { useEffect: useEffect19, useState: useState14 } = React23;
+init_define_process();
+var React21 = window.React;
+var { useEffect: useEffect19, useState: useState16 } = React21;
 function ResourcePagination({
   currentPage,
   totalCount,
@@ -4215,7 +4701,7 @@ function ResourcePagination({
   getPageWindow
 }) {
   const totalPages = Math.max(1, Math.ceil(Number(totalCount || 0) / Math.max(1, Number(pageSize || 1))));
-  const [pageInputValue, setPageInputValue] = useState14(String(currentPage || 1));
+  const [pageInputValue, setPageInputValue] = useState16(String(currentPage || 1));
   useEffect19(() => {
     setPageInputValue(String(currentPage || 1));
   }, [currentPage]);
@@ -4227,7 +4713,7 @@ function ResourcePagination({
   const commitPageInput = () => {
     onPageChange?.(clampPage(pageInputValue, totalPages));
   };
-  return /* @__PURE__ */ React23.createElement("div", { className: "booruView__pagination" }, /* @__PURE__ */ React23.createElement("div", { className: "booruView__paginationButtons" }, /* @__PURE__ */ React23.createElement(
+  return /* @__PURE__ */ React21.createElement("div", { className: "booruView__pagination" }, /* @__PURE__ */ React21.createElement("div", { className: "booruView__paginationButtons" }, /* @__PURE__ */ React21.createElement(
     Button2,
     {
       type: "button",
@@ -4237,7 +4723,7 @@ function ResourcePagination({
       "aria-label": "Ir a la primera pagina"
     },
     "<<"
-  ), /* @__PURE__ */ React23.createElement(
+  ), /* @__PURE__ */ React21.createElement(
     Button2,
     {
       type: "button",
@@ -4247,7 +4733,7 @@ function ResourcePagination({
       "aria-label": "Ir a la pagina anterior"
     },
     "<"
-  ), pageWindow.map((pageNumber) => /* @__PURE__ */ React23.createElement(
+  ), pageWindow.map((pageNumber) => /* @__PURE__ */ React21.createElement(
     Button2,
     {
       key: pageNumber,
@@ -4258,7 +4744,7 @@ function ResourcePagination({
       "aria-label": `Ir a la pagina ${pageNumber}`
     },
     pageNumber
-  )), /* @__PURE__ */ React23.createElement(
+  )), /* @__PURE__ */ React21.createElement(
     Button2,
     {
       type: "button",
@@ -4268,7 +4754,7 @@ function ResourcePagination({
       "aria-label": "Ir a la pagina siguiente"
     },
     ">"
-  ), /* @__PURE__ */ React23.createElement(
+  ), /* @__PURE__ */ React21.createElement(
     Button2,
     {
       type: "button",
@@ -4278,7 +4764,7 @@ function ResourcePagination({
       "aria-label": "Ir a la ultima pagina"
     },
     ">>"
-  )), /* @__PURE__ */ React23.createElement("div", { className: "booruView__paginationJump" }, /* @__PURE__ */ React23.createElement(
+  )), /* @__PURE__ */ React21.createElement("div", { className: "booruView__paginationJump" }, /* @__PURE__ */ React21.createElement(
     "input",
     {
       type: "number",
@@ -4294,7 +4780,7 @@ function ResourcePagination({
       },
       "aria-label": "Numero de pagina"
     }
-  ), /* @__PURE__ */ React23.createElement(
+  ), /* @__PURE__ */ React21.createElement(
     Button2,
     {
       type: "button",
@@ -4306,8 +4792,9 @@ function ResourcePagination({
 }
 
 // ../nexus-plugins/booru/src/components/media/ResourceGridCard.jsx
-var React24 = window.React;
-var { useCallback: useCallback8, useEffect: useEffect20, useMemo: useMemo11 } = React24;
+init_define_process();
+var React22 = window.React;
+var { useCallback: useCallback5, useEffect: useEffect20, useMemo: useMemo11 } = React22;
 function ResourceGridCard({
   item,
   absoluteIndex,
@@ -4329,6 +4816,7 @@ function ResourceGridCard({
   MediaPreview,
   defaultColumns
 }) {
+  const videoAutoplay = resolveBooruVideoAutoplay(item);
   const normalizedDragResourceIds = useMemo11(
     () => uniqueIds2(Array.isArray(dragResourceIds) ? dragResourceIds : [item.id]),
     [dragResourceIds, item.id]
@@ -4378,7 +4866,7 @@ function ResourceGridCard({
       });
     }
   }, [previewRef]);
-  const handleDragRef = useCallback8((node) => {
+  const handleDragRef = useCallback5((node) => {
     dragRef(node);
   }, [dragRef]);
   const handleKeyDown = (event) => {
@@ -4406,12 +4894,14 @@ function ResourceGridCard({
     }
     onOpen?.(item, event);
   };
-  return /* @__PURE__ */ React24.createElement(
-    "div",
+  return /* @__PURE__ */ React22.createElement(
+    GalleryCard,
     {
+      as: "div",
       ref: handleDragRef,
       role: "button",
       tabIndex: 0,
+      interactive: true,
       className: [
         "booruView__mediaCard",
         selected ? "is-selected" : "",
@@ -4419,6 +4909,7 @@ function ResourceGridCard({
         customDragActive ? "is-custom-dragging" : "",
         isDragging ? "is-dragging" : ""
       ].filter(Boolean).join(" "),
+      selected,
       style,
       onClick: handleClick,
       onDoubleClick: handleDoubleClick,
@@ -4452,7 +4943,7 @@ function ResourceGridCard({
       "aria-label": item.originalFilename,
       "aria-selected": selected
     },
-    /* @__PURE__ */ React24.createElement("div", { className: "booruView__mediaCardPreview" }, /* @__PURE__ */ React24.createElement(
+    /* @__PURE__ */ React22.createElement(GalleryCardMedia, { className: "booruView__mediaCardPreview" }, /* @__PURE__ */ React22.createElement(
       MediaPreview,
       {
         pathValue: item.storagePath,
@@ -4461,9 +4952,9 @@ function ResourceGridCard({
         thumbnail: item.thumbnail,
         highPriority: absoluteIndex < defaultColumns || selected,
         preferOriginalWhenThumbnailMissing: true,
-        autoplay: item.mediaKind === "video" && (Number(item.durationMs || 0) <= 6e4 || Boolean(item.autoplayStoragePath)),
+        autoplay: videoAutoplay.autoplay,
         loop: item.mediaKind === "video",
-        autoplayPath: item.autoplayStoragePath,
+        autoplayPath: videoAutoplay.autoplayPath,
         hoverPlayable: item.mediaKind === "gif"
       }
     ))
@@ -4471,8 +4962,9 @@ function ResourceGridCard({
 }
 
 // ../nexus-plugins/booru/src/components/recommendations/RecommendationPanel.jsx
-var React25 = window.React;
-var { useCallback: useCallback9, useDeferredValue, useEffect: useEffect21, useMemo: useMemo12, useRef: useRef11, useState: useState15 } = React25;
+init_define_process();
+var React23 = window.React;
+var { useCallback: useCallback6, useDeferredValue, useEffect: useEffect21, useMemo: useMemo12, useRef: useRef12, useState: useState17 } = React23;
 function RecommendationPanel({
   selectedResourceIds = [],
   customDragState = null,
@@ -4498,13 +4990,13 @@ function RecommendationPanel({
   helpers
 }) {
   const { getRecommendationItemKindClass: getRecommendationItemKindClass2, getRecommendationKindTooltip: getRecommendationKindTooltip2 } = helpers;
-  const [query, setQuery] = useState15("");
-  const [items, setItems] = useState15([]);
-  const [loading, setLoading] = useState15(false);
-  const [error, setError] = useState15("");
-  const [highlightedIndex, setHighlightedIndex] = useState15(-1);
-  const [totalCount, setTotalCount] = useState15(0);
-  const [hasMore, setHasMore] = useState15(false);
+  const [query, setQuery] = useState17("");
+  const [items, setItems] = useState17([]);
+  const [loading, setLoading] = useState17(false);
+  const [error, setError] = useState17("");
+  const [highlightedIndex, setHighlightedIndex] = useState17(-1);
+  const [totalCount, setTotalCount] = useState17(0);
+  const [hasMore, setHasMore] = useState17(false);
   const selectedResourceIdsSignature = JSON.stringify(Array.isArray(selectedResourceIds) ? selectedResourceIds.filter(Boolean) : []);
   const normalizedSelectedResourceIds = useMemo12(
     () => normalizeIds(selectedResourceIds),
@@ -4514,8 +5006,8 @@ function RecommendationPanel({
   const manualAssignDisabled = Boolean(manualAssignDisabledReason) || assigning || !selectionCount;
   const searchDisabled = assigning;
   const showBlockingLoading = loading && items.length === 0;
-  const listRef = useRef11(null);
-  const requestVersionRef = useRef11(0);
+  const listRef = useRef12(null);
+  const requestVersionRef = useRef12(0);
   const deferredQuery = useDeferredValue(query);
   const draftSignature = JSON.stringify({
     reality: draft?.reality || null,
@@ -4526,7 +5018,7 @@ function RecommendationPanel({
     manualTags: summarizeIds(draft?.manualTags)
   });
   const resourceQuerySignature = JSON.stringify(resourceQuery || {});
-  const loadRecommendations = useCallback9(async ({
+  const loadRecommendations = useCallback6(async ({
     append = false,
     requestedOffset = 0
   } = {}) => {
@@ -4642,7 +5134,7 @@ function RecommendationPanel({
       );
     }
   };
-  const handleListScroll = useCallback9((event) => {
+  const handleListScroll = useCallback6((event) => {
     const target = event.currentTarget;
     if (!target || loading || !hasMore) {
       return;
@@ -4655,10 +5147,9 @@ function RecommendationPanel({
       });
     }
   }, [hasMore, items.length, loadRecommendations, loading]);
-  return /* @__PURE__ */ React25.createElement("div", { className: "booruView__quickAssign" }, /* @__PURE__ */ React25.createElement("span", { className: "booruView__groupLabel" }, recommendationScope === "tags" ? "Tags" : "Recomendaciones"), /* @__PURE__ */ React25.createElement("div", { className: "booruView__entityInputRow" }, /* @__PURE__ */ React25.createElement(
-    "input",
+  return /* @__PURE__ */ React23.createElement("div", { className: "booruView__quickAssign" }, /* @__PURE__ */ React23.createElement("span", { className: "booruView__groupLabel" }, recommendationScope === "tags" ? "Tags" : "Recomendaciones"), /* @__PURE__ */ React23.createElement("div", { className: "booruView__entityInputRow" }, /* @__PURE__ */ React23.createElement(
+    SearchField,
     {
-      type: "text",
       value: query,
       onChange: (event) => setQuery(event.target.value),
       onKeyDown: (event) => {
@@ -4686,22 +5177,23 @@ function RecommendationPanel({
         }
       },
       placeholder: recommendationScope === "tags" ? "Buscar o crear tags" : recommendationScope === "essential" ? "Buscar persona, char, artist o universe" : "Buscar recomendaciones o usar persona:, char:, artist:, universe:, tag:",
-      disabled: searchDisabled
+      disabled: searchDisabled,
+      "aria-label": recommendationScope === "tags" ? "Buscar tags" : "Buscar recomendaciones"
     }
-  )), /* @__PURE__ */ React25.createElement("span", { className: "booruView__suggestionsHint" }, manualAssignDisabledReason || (selectionCount > 1 ? `Aplicara la recomendacion elegida a ${selectionCount} recursos seleccionados cuando corresponda.` : "Click aplica sobre el draft actual. Drag/drop conserva la asignacion rapida directa para entidades.")), error ? /* @__PURE__ */ React25.createElement("p", { className: "booruView__fieldError" }, error) : null, /* @__PURE__ */ React25.createElement(
+  )), /* @__PURE__ */ React23.createElement("span", { className: "booruView__suggestionsHint" }, manualAssignDisabledReason || (selectionCount > 1 ? `Aplicara la recomendacion elegida a ${selectionCount} recursos seleccionados cuando corresponda.` : "Click aplica sobre el draft actual. Drag/drop conserva la asignacion rapida directa para entidades.")), error ? /* @__PURE__ */ React23.createElement("p", { className: "booruView__fieldError" }, error) : null, /* @__PURE__ */ React23.createElement(
     "div",
     {
       ref: listRef,
       className: "booruView__quickAssignList",
       onScroll: handleListScroll
     },
-    showBlockingLoading ? /* @__PURE__ */ React25.createElement("span", { className: "booruView__suggestionsHint" }, "Cargando recomendaciones...") : items.length ? /* @__PURE__ */ React25.createElement(React25.Fragment, null, items.map((item, index) => /* @__PURE__ */ React25.createElement(
+    showBlockingLoading ? /* @__PURE__ */ React23.createElement("span", { className: "booruView__suggestionsHint" }, "Cargando recomendaciones...") : items.length ? /* @__PURE__ */ React23.createElement(React23.Fragment, null, items.map((item, index) => /* @__PURE__ */ React23.createElement(
       "div",
       {
         key: item.id,
         className: highlightedIndex === index ? "booruView__quickAssignRow is-highlighted" : "booruView__quickAssignRow"
       },
-      item.type === "entity" ? /* @__PURE__ */ React25.createElement(
+      item.type === "entity" ? /* @__PURE__ */ React23.createElement(
         EntityDropTarget,
         {
           item,
@@ -4717,14 +5209,14 @@ function RecommendationPanel({
           onAssign: onAssignEntity,
           onApply: handleTriggerItem
         }
-      ) : /* @__PURE__ */ React25.createElement("div", { className: ["booruView__suggestion", "booruView__recommendationCard"].join(" ") }, /* @__PURE__ */ React25.createElement("div", { className: "booruView__recommendationCopy" }, /* @__PURE__ */ React25.createElement("span", null, item.label), /* @__PURE__ */ React25.createElement("small", null, item.detail || "")), /* @__PURE__ */ React25.createElement("div", { className: "booruView__recommendationActions" }, /* @__PURE__ */ React25.createElement(
+      ) : /* @__PURE__ */ React23.createElement("div", { className: ["booruView__suggestion", "booruView__recommendationCard"].join(" ") }, /* @__PURE__ */ React23.createElement("div", { className: "booruView__recommendationCopy" }, /* @__PURE__ */ React23.createElement("span", null, item.label), /* @__PURE__ */ React23.createElement("small", null, item.detail || "")), /* @__PURE__ */ React23.createElement("div", { className: "booruView__recommendationActions" }, /* @__PURE__ */ React23.createElement(
         KindBadge,
         {
           item,
           className: getRecommendationItemKindClass2(item),
           tooltip: getRecommendationKindTooltip2(item)
         }
-      ), /* @__PURE__ */ React25.createElement(
+      ), /* @__PURE__ */ React23.createElement(
         Button2,
         {
           type: "button",
@@ -4733,11 +5225,12 @@ function RecommendationPanel({
         },
         item.actionLabel || "Aplicar"
       )))
-    )), loading ? /* @__PURE__ */ React25.createElement("span", { className: "booruView__suggestionsHint" }, "Actualizando recomendaciones...") : null, !loading && hasMore ? /* @__PURE__ */ React25.createElement("span", { className: "booruView__suggestionsHint" }, "Scroll para seguir cargando. ", items.length, " de ", totalCount, " visibles.") : null) : /* @__PURE__ */ React25.createElement("span", { className: "booruView__suggestionsHint" }, "Sin recomendaciones por ahora. Ajusta el contexto o escribe una busqueda.")
+    )), loading ? /* @__PURE__ */ React23.createElement("span", { className: "booruView__suggestionsHint" }, "Actualizando recomendaciones...") : null, !loading && hasMore ? /* @__PURE__ */ React23.createElement("span", { className: "booruView__suggestionsHint" }, "Scroll para seguir cargando. ", items.length, " de ", totalCount, " visibles.") : null) : /* @__PURE__ */ React23.createElement("span", { className: "booruView__suggestionsHint" }, "Sin recomendaciones por ahora. Ajusta el contexto o escribe una busqueda.")
   ));
 }
 
 // ../nexus-plugins/booru/src/components/resources/ResourceInspector.jsx
+init_define_process();
 function formatDuration(value) {
   if (value == null || value === "") {
     return "\u2014";
@@ -4952,8 +5445,9 @@ function ResourceInspector({
 }
 
 // ../nexus-plugins/booru/src/components/entities/EntityProfileView.jsx
-var React26 = window.React;
-var { useEffect: useEffect22, useRef: useRef12, useState: useState16 } = React26;
+init_define_process();
+var React24 = window.React;
+var { useEffect: useEffect22, useRef: useRef13, useState: useState18 } = React24;
 function EntityProfileView({
   kind,
   profile,
@@ -4982,7 +5476,7 @@ function EntityProfileView({
   canUseVisual,
   DataTab,
   TagsTab,
-  GalleryGrid,
+  GalleryGrid: GalleryGrid3,
   RelationsGrid,
   DownloadIcon: DownloadIcon2,
   helpers,
@@ -4994,15 +5488,15 @@ function EntityProfileView({
   onScrollStateChange,
   gallerySelectedIds,
   onGallerySelectionChange,
-  onResourceColumnWheel,
-  onEntityColumnWheel,
+  onResourceColumnsChange,
+  onEntityColumnsChange,
   onEntityHover,
   onGroupAssociationHover
 }) {
   const { getInitials: getInitials2, entityKindLabels, isTextEntryElement: isTextEntryElement2 } = helpers;
-  const entityProfileRootRef = useRef12(null);
-  const fastScopeRef = useRef12(`booru-profile-${globalThis.crypto?.randomUUID?.() || Date.now()}`);
-  const [fastClassificationActive, setFastClassificationActive] = useState16(false);
+  const entityProfileRootRef = useRef13(null);
+  const fastScopeRef = useRef13(`booru-profile-${globalThis.crypto?.randomUUID?.() || Date.now()}`);
+  const [fastClassificationActive, setFastClassificationActive] = useState18(false);
   const avatarVisual = profile?.visuals?.avatar || profile?.visual || null;
   const bannerVisual = profile?.visuals?.banner || null;
   const profileMeta = [
@@ -5049,7 +5543,7 @@ function EntityProfileView({
     event.stopPropagation();
     void onPasteClipboardImage();
   };
-  return /* @__PURE__ */ React26.createElement(SectionPanel, { className: "booruView__panel booruView__panel--fill booruView__entityProfile" }, /* @__PURE__ */ React26.createElement(
+  return /* @__PURE__ */ React24.createElement(SectionPanel, { className: "booruView__panel booruView__panel--fill booruView__entityProfile" }, /* @__PURE__ */ React24.createElement(
     "div",
     {
       ref: entityProfileRootRef,
@@ -5058,37 +5552,37 @@ function EntityProfileView({
       onKeyDownCapture: handleKeyDownCapture,
       onScroll: (event) => onScrollStateChange?.(event.currentTarget.scrollTop || 0)
     },
-    /* @__PURE__ */ React26.createElement("div", { className: "booruView__resourcePanelContent booruView__entityProfileContent" }, /* @__PURE__ */ React26.createElement("div", { className: "booruView__entityProfileHero" }, /* @__PURE__ */ React26.createElement(
+    /* @__PURE__ */ React24.createElement("div", { className: "booruView__resourcePanelContent booruView__entityProfileContent" }, /* @__PURE__ */ React24.createElement("div", { className: "booruView__entityProfileHero" }, /* @__PURE__ */ React24.createElement(
       "div",
       {
         className: "booruView__entityProfileBanner",
         onContextMenu: (event) => onVisualContextMenu?.("banner", bannerVisual, event)
       },
-      /* @__PURE__ */ React26.createElement(
+      /* @__PURE__ */ React24.createElement(
         EntityVisualMedia,
         {
           visual: bannerVisual,
           alt: profile?.displayName || "",
           MediaPreview,
-          fallback: /* @__PURE__ */ React26.createElement("div", { className: "booruView__entityProfileBannerFallback" }, /* @__PURE__ */ React26.createElement("span", null, entityKindLabels[kind] || kind))
+          fallback: /* @__PURE__ */ React24.createElement("div", { className: "booruView__entityProfileBannerFallback" }, /* @__PURE__ */ React24.createElement("span", null, entityKindLabels[kind] || kind))
         }
       )
-    ), /* @__PURE__ */ React26.createElement("div", { className: "booruView__entityProfileIdentity" }, /* @__PURE__ */ React26.createElement(
+    ), /* @__PURE__ */ React24.createElement("div", { className: "booruView__entityProfileIdentity" }, /* @__PURE__ */ React24.createElement(
       "div",
       {
         className: "booruView__entityProfileAvatar",
         onContextMenu: (event) => onVisualContextMenu?.("avatar", avatarVisual, event)
       },
-      /* @__PURE__ */ React26.createElement(
+      /* @__PURE__ */ React24.createElement(
         EntityVisualMedia,
         {
           visual: avatarVisual,
           alt: profile?.displayName || "",
           MediaPreview,
-          fallback: /* @__PURE__ */ React26.createElement("div", { className: "booruView__entityVisualFallback" }, /* @__PURE__ */ React26.createElement("span", null, getInitials2(profile?.displayName)))
+          fallback: /* @__PURE__ */ React24.createElement("div", { className: "booruView__entityVisualFallback" }, /* @__PURE__ */ React24.createElement("span", null, getInitials2(profile?.displayName)))
         }
       )
-    ), /* @__PURE__ */ React26.createElement("div", { className: "booruView__entityProfileCopy" }, /* @__PURE__ */ React26.createElement("span", { className: "booruView__groupLabel" }, entityKindLabels[kind] || kind), /* @__PURE__ */ React26.createElement("h2", null, profile?.displayName || "Entidad"), /* @__PURE__ */ React26.createElement("div", { className: "booruView__entityProfileMeta" }, profileMeta.map((entry) => /* @__PURE__ */ React26.createElement("span", { key: entry, className: "booruView__titlePill" }, entry))))), /* @__PURE__ */ React26.createElement("div", { className: "booruView__entityProfileTabs" }, /* @__PURE__ */ React26.createElement(
+    ), /* @__PURE__ */ React24.createElement("div", { className: "booruView__entityProfileCopy" }, /* @__PURE__ */ React24.createElement("span", { className: "booruView__groupLabel" }, entityKindLabels[kind] || kind), /* @__PURE__ */ React24.createElement("h2", null, profile?.displayName || "Entidad"), /* @__PURE__ */ React24.createElement("div", { className: "booruView__entityProfileMeta" }, profileMeta.map((entry) => /* @__PURE__ */ React24.createElement("span", { key: entry, className: "booruView__titlePill" }, entry))))), /* @__PURE__ */ React24.createElement("div", { className: "booruView__entityProfileTabs" }, /* @__PURE__ */ React24.createElement(
       SegmentedControl,
       {
         options: profileTabOptions,
@@ -5096,7 +5590,7 @@ function EntityProfileView({
         onChange: (value) => onTabChange?.(value),
         ariaLabel: "Seccion del perfil"
       }
-    ), /* @__PURE__ */ React26.createElement(
+    ), /* @__PURE__ */ React24.createElement(
       Button,
       {
         type: "button",
@@ -5109,8 +5603,8 @@ function EntityProfileView({
         "data-tooltip": "Clasificacion rapida: mientras este perfil siga abierto, los recursos nuevos se asignan automaticamente a esta entidad. Se apaga al salir del perfil.",
         onClick: () => void toggleFastClassification()
       },
-      /* @__PURE__ */ React26.createElement(DownloadIcon2, { size: 15 })
-    ))), activeTab === "data" ? /* @__PURE__ */ React26.createElement(
+      /* @__PURE__ */ React24.createElement(DownloadIcon2, { size: 15 })
+    ))), activeTab === "data" ? /* @__PURE__ */ React24.createElement(
       DataTab,
       {
         kind,
@@ -5122,7 +5616,7 @@ function EntityProfileView({
         onChangeCharacterUniverse,
         onProfileChange
       }
-    ) : activeTab === "tags" ? /* @__PURE__ */ React26.createElement(
+    ) : activeTab === "tags" ? /* @__PURE__ */ React24.createElement(
       TagsTab,
       {
         kind,
@@ -5130,7 +5624,7 @@ function EntityProfileView({
         busy: entityMutationBusy,
         onProfileChange
       }
-    ) : relationKind ? /* @__PURE__ */ React26.createElement(
+    ) : relationKind ? /* @__PURE__ */ React24.createElement(
       RelationsGrid,
       {
         kind: relationKind,
@@ -5141,12 +5635,12 @@ function EntityProfileView({
         onPreviewContextMenu: onRelatedEntityContextMenu,
         MediaPreview,
         columns: entityGridColumns,
-        onColumnWheel: onEntityColumnWheel,
+        onColumnsChange: onEntityColumnsChange,
         onEntityHover,
         onGroupAssociationHover
       }
-    ) : /* @__PURE__ */ React26.createElement(
-      GalleryGrid,
+    ) : /* @__PURE__ */ React24.createElement(
+      GalleryGrid3,
       {
         items: Array.isArray(galleryState?.items) ? galleryState.items : [],
         placements: Array.isArray(galleryState?.placements) ? galleryState.placements : [],
@@ -5160,7 +5654,7 @@ function EntityProfileView({
         resourceGridColumns,
         selectedIds: gallerySelectedIds,
         onSelectionChange: onGallerySelectionChange,
-        onColumnWheel: onResourceColumnWheel,
+        onColumnsChange: onResourceColumnsChange,
         onGroupAssociationHover
       }
     ))
@@ -5168,8 +5662,9 @@ function EntityProfileView({
 }
 
 // ../nexus-plugins/booru/src/components/entities/EntityProfileDataTab.jsx
-var React27 = window.React;
-var { useEffect: useEffect23, useState: useState17 } = React27;
+init_define_process();
+var React25 = window.React;
+var { useEffect: useEffect23, useState: useState19 } = React25;
 async function invoke4(channel, payload) {
   const response = await window.nexus.ipc.invoke(channel, payload);
   if (!response?.ok) throw new Error(response?.error || "No se pudo guardar el perfil.");
@@ -5189,10 +5684,10 @@ function EntityProfileDataTab({
 }) {
   const { formatDate: formatDate2 } = helpers;
   const metadata = profile?.metadata || {};
-  const [aliases, setAliases] = useState17(() => (profile?.aliases || []).join("\n"));
-  const [socialLinks, setSocialLinks] = useState17(() => profile?.socialLinks || []);
-  const [platforms, setPlatforms] = useState17([]);
-  const [saving, setSaving] = useState17(false);
+  const [aliases, setAliases] = useState19(() => (profile?.aliases || []).join("\n"));
+  const [socialLinks, setSocialLinks] = useState19(() => profile?.socialLinks || []);
+  const [platforms, setPlatforms] = useState19([]);
+  const [saving, setSaving] = useState19(false);
   const facts = [
     { label: "Slug", value: profile?.slug || "Sin slug" },
     { label: "Recursos", value: String(profile?.resourceCount || 0) },
@@ -5234,17 +5729,18 @@ function EntityProfileDataTab({
       setSaving(false);
     }
   };
-  return /* @__PURE__ */ React27.createElement("div", { className: "booruView__entityProfileData" }, /* @__PURE__ */ React27.createElement("div", { className: "booruView__entityProfileFacts" }, facts.map((fact) => /* @__PURE__ */ React27.createElement("div", { key: fact.label, className: "booruView__entityProfileFact" }, /* @__PURE__ */ React27.createElement("span", null, fact.label), /* @__PURE__ */ React27.createElement("strong", null, fact.value)))), kind === "character" ? /* @__PURE__ */ React27.createElement(Field, { label: "Universe", description: "Busca uno existente o crea uno nuevo para este character.", className: "booruView__field" }, /* @__PURE__ */ React27.createElement(SingleEntityField, { kind: "universe", label: "Universe", value: profile?.universe || null, onChange: (value) => onChangeCharacterUniverse?.(value), disabled: busy, allowClear: false, placeholder: "Buscar universe o crear uno nuevo" })) : null, kind === "universe" ? /* @__PURE__ */ React27.createElement(Field, { label: "Crear character", description: "El character nuevo queda asignado automaticamente a este universe.", className: "booruView__field" }, /* @__PURE__ */ React27.createElement("div", { className: "booruView__entityInputRow" }, /* @__PURE__ */ React27.createElement("input", { type: "text", value: universeCharacterCreateValue, onChange: (event) => onUniverseCharacterCreateValueChange?.(event.target.value), onKeyDown: (event) => {
+  return /* @__PURE__ */ React25.createElement("div", { className: "booruView__entityProfileData" }, /* @__PURE__ */ React25.createElement("div", { className: "booruView__entityProfileFacts" }, facts.map((fact) => /* @__PURE__ */ React25.createElement("div", { key: fact.label, className: "booruView__entityProfileFact" }, /* @__PURE__ */ React25.createElement("span", null, fact.label), /* @__PURE__ */ React25.createElement("strong", null, fact.value)))), kind === "character" ? /* @__PURE__ */ React25.createElement(Field, { label: "Universe", description: "Busca uno existente o crea uno nuevo para este character.", className: "booruView__field" }, /* @__PURE__ */ React25.createElement(SingleEntityField, { kind: "universe", label: "Universe", value: profile?.universe || null, onChange: (value) => onChangeCharacterUniverse?.(value), disabled: busy, allowClear: false, placeholder: "Buscar universe o crear uno nuevo" })) : null, kind === "universe" ? /* @__PURE__ */ React25.createElement(Field, { label: "Crear character", description: "El character nuevo queda asignado automaticamente a este universe.", className: "booruView__field" }, /* @__PURE__ */ React25.createElement("div", { className: "booruView__entityInputRow" }, /* @__PURE__ */ React25.createElement("input", { type: "text", value: universeCharacterCreateValue, onChange: (event) => onUniverseCharacterCreateValueChange?.(event.target.value), onKeyDown: (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
       void onCreateCharacterInUniverse?.();
     }
-  }, placeholder: "Crear character para este universe", disabled: busy }), /* @__PURE__ */ React27.createElement(Button, { type: "button", onClick: () => void onCreateCharacterInUniverse?.(), disabled: !String(universeCharacterCreateValue || "").trim() || busy }, "Crear"))) : null, kind === "author" || kind === "artist" ? /* @__PURE__ */ React27.createElement(React27.Fragment, null, /* @__PURE__ */ React27.createElement(Field, { label: "Aliases", description: "Un nombre por linea. Tambien resuelven esta entidad en el buscador.", className: "booruView__field" }, /* @__PURE__ */ React27.createElement("textarea", { value: aliases, onChange: (event) => setAliases(event.target.value), placeholder: "Otro nombre conocido", disabled: busy || saving })), /* @__PURE__ */ React27.createElement(Field, { label: "Redes", description: "Elige una plataforma registrada y pega su enlace.", className: "booruView__field" }, /* @__PURE__ */ React27.createElement("div", { className: "booruView__entityProfileLinks" }, socialLinks.map((link, index) => /* @__PURE__ */ React27.createElement("div", { key: `${link?.id || index}`, className: "booruView__entityInputRow" }, /* @__PURE__ */ React27.createElement("select", { value: link?.platform?.id || link?.platformId || "", onChange: (event) => setSocialLinks((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, platformId: event.target.value, platform: platforms.find((platform) => platform.id === event.target.value) || item.platform } : item)), disabled: busy || saving }, /* @__PURE__ */ React27.createElement("option", { value: "" }, "Plataforma"), platforms.map((platform) => /* @__PURE__ */ React27.createElement("option", { key: platform.id, value: platform.id }, platform.displayName))), /* @__PURE__ */ React27.createElement("input", { type: "url", value: link?.url || "", onChange: (event) => setSocialLinks((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, url: event.target.value } : item)), placeholder: "https://", disabled: busy || saving }), /* @__PURE__ */ React27.createElement(Button, { type: "button", onClick: () => setSocialLinks((items) => items.filter((_item, itemIndex) => itemIndex !== index)), disabled: busy || saving }, "Quitar"))), /* @__PURE__ */ React27.createElement(Button, { type: "button", onClick: () => setSocialLinks((items) => [...items, { platformId: "", url: "" }]), disabled: busy || saving || !platforms.length }, "Anadir red"))), /* @__PURE__ */ React27.createElement(Button, { type: "button", tone: "primary", onClick: () => void saveIdentity(), disabled: busy || saving }, saving ? "Guardando" : "Guardar datos")) : null);
+  }, placeholder: "Crear character para este universe", disabled: busy }), /* @__PURE__ */ React25.createElement(Button, { type: "button", onClick: () => void onCreateCharacterInUniverse?.(), disabled: !String(universeCharacterCreateValue || "").trim() || busy }, "Crear"))) : null, kind === "author" || kind === "artist" ? /* @__PURE__ */ React25.createElement(React25.Fragment, null, /* @__PURE__ */ React25.createElement(Field, { label: "Aliases", description: "Un nombre por linea. Tambien resuelven esta entidad en el buscador.", className: "booruView__field" }, /* @__PURE__ */ React25.createElement("textarea", { value: aliases, onChange: (event) => setAliases(event.target.value), placeholder: "Otro nombre conocido", disabled: busy || saving })), /* @__PURE__ */ React25.createElement(Field, { label: "Redes", description: "Elige una plataforma registrada y pega su enlace.", className: "booruView__field" }, /* @__PURE__ */ React25.createElement("div", { className: "booruView__entityProfileLinks" }, socialLinks.map((link, index) => /* @__PURE__ */ React25.createElement("div", { key: `${link?.id || index}`, className: "booruView__entityInputRow" }, /* @__PURE__ */ React25.createElement("select", { value: link?.platform?.id || link?.platformId || "", onChange: (event) => setSocialLinks((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, platformId: event.target.value, platform: platforms.find((platform) => platform.id === event.target.value) || item.platform } : item)), disabled: busy || saving }, /* @__PURE__ */ React25.createElement("option", { value: "" }, "Plataforma"), platforms.map((platform) => /* @__PURE__ */ React25.createElement("option", { key: platform.id, value: platform.id }, platform.displayName))), /* @__PURE__ */ React25.createElement("input", { type: "url", value: link?.url || "", onChange: (event) => setSocialLinks((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, url: event.target.value } : item)), placeholder: "https://", disabled: busy || saving }), /* @__PURE__ */ React25.createElement(Button, { type: "button", onClick: () => setSocialLinks((items) => items.filter((_item, itemIndex) => itemIndex !== index)), disabled: busy || saving }, "Quitar"))), /* @__PURE__ */ React25.createElement(Button, { type: "button", onClick: () => setSocialLinks((items) => [...items, { platformId: "", url: "" }]), disabled: busy || saving || !platforms.length }, "Anadir red"))), /* @__PURE__ */ React25.createElement(Button, { type: "button", tone: "primary", onClick: () => void saveIdentity(), disabled: busy || saving }, saving ? "Guardando" : "Guardar datos")) : null);
 }
 
 // ../nexus-plugins/booru/src/components/entities/EntityProfileTagsTab.jsx
-var React28 = window.React;
-var { useEffect: useEffect24, useState: useState18 } = React28;
+init_define_process();
+var React26 = window.React;
+var { useEffect: useEffect24, useState: useState20 } = React26;
 async function invoke5(channel, payload) {
   const response = await window.nexus.ipc.invoke(channel, payload);
   if (!response?.ok) throw new Error(response?.error || "No se pudo guardar las tags.");
@@ -5257,8 +5753,8 @@ function EntityProfileTagsTab({
   onProfileChange,
   TagField
 }) {
-  const [tags, setTags] = useState18(() => Array.isArray(profile?.tags) ? profile.tags : []);
-  const [saving, setSaving] = useState18(false);
+  const [tags, setTags] = useState20(() => Array.isArray(profile?.tags) ? profile.tags : []);
+  const [saving, setSaving] = useState20(false);
   useEffect24(() => {
     setTags(Array.isArray(profile?.tags) ? profile.tags : []);
   }, [profile?.id, profile?.tags]);
@@ -5281,14 +5777,14 @@ function EntityProfileTagsTab({
       setSaving(false);
     }
   };
-  return /* @__PURE__ */ React28.createElement("div", { className: "booruView__entityProfileData" }, /* @__PURE__ */ React28.createElement(
+  return /* @__PURE__ */ React26.createElement("div", { className: "booruView__entityProfileData" }, /* @__PURE__ */ React26.createElement(
     Field,
     {
       label: "Tags",
       description: "Se heredan automaticamente a los recursos asociados a esta entidad.",
       className: "booruView__field"
     },
-    /* @__PURE__ */ React28.createElement(
+    /* @__PURE__ */ React26.createElement(
       TagField,
       {
         label: "Tags de entidad",
@@ -5297,14 +5793,14 @@ function EntityProfileTagsTab({
         disabled: busy || saving
       }
     )
-  ), saving ? /* @__PURE__ */ React28.createElement("span", { className: "booruView__suggestionsHint" }, "Sincronizando tags heredadas...") : null);
+  ), saving ? /* @__PURE__ */ React26.createElement("span", { className: "booruView__suggestionsHint" }, "Sincronizando tags heredadas...") : null);
 }
 
 // ../nexus-plugins/booru/src/BooruWorkspaceView.jsx
 var ipcRenderer2 = window.nexus.ipc;
 var { pathToFileUrl } = window.nexus.urls;
-var React29 = window.React;
-var { useCallback: useCallback10, useDeferredValue: useDeferredValue2, useEffect: useEffect25, useMemo: useMemo13, useRef: useRef13, useState: useState19 } = React29;
+var React27 = window.React;
+var { useCallback: useCallback7, useDeferredValue: useDeferredValue2, useEffect: useEffect25, useMemo: useMemo13, useRef: useRef14, useState: useState21 } = React27;
 var ReactDnd = window.__NEXUS_HOST_REACT_DND__ || {};
 var ReactDndHtml5Backend = window.__NEXUS_HOST_REACT_DND_HTML5_BACKEND__ || {};
 var { useDrag, useDragLayer, useDrop } = ReactDnd;
@@ -5409,7 +5905,7 @@ async function invoke6(channel, payload) {
   return response.data;
 }
 function MediaThumbnail2(props) {
-  return /* @__PURE__ */ React29.createElement(
+  return /* @__PURE__ */ React27.createElement(
     MediaThumbnail,
     {
       ...props,
@@ -5420,46 +5916,46 @@ function MediaThumbnail2(props) {
   );
 }
 function SingleEntityAutocompleteField2(props) {
-  return /* @__PURE__ */ React29.createElement(SingleEntityAutocompleteField, { ...props, invoke: invoke6, helpers: { findExactEntityMatch, stepSuggestionIndex }, entityKindLabels: BOORU_ENTITY_KIND_LABELS });
+  return /* @__PURE__ */ React27.createElement(SingleEntityAutocompleteField, { ...props, invoke: invoke6, helpers: { findExactEntityMatch, stepSuggestionIndex }, entityKindLabels: BOORU_ENTITY_KIND_LABELS });
 }
 function EntityAutocompleteField2(props) {
-  return /* @__PURE__ */ React29.createElement(EntityAutocompleteField, { ...props, invoke: invoke6, helpers: { normalizeSelectedEntities, findExactEntityMatch, stepSuggestionIndex }, entityKindLabels: BOORU_ENTITY_KIND_LABELS });
+  return /* @__PURE__ */ React27.createElement(EntityAutocompleteField, { ...props, invoke: invoke6, helpers: { normalizeSelectedEntities, findExactEntityMatch, stepSuggestionIndex }, entityKindLabels: BOORU_ENTITY_KIND_LABELS });
 }
 function TagAutocompleteField2(props) {
-  return /* @__PURE__ */ React29.createElement(TagAutocompleteField, { ...props, invoke: invoke6, helpers: { normalizeSelectedTags, findExactTagMatch, stepSuggestionIndex } });
+  return /* @__PURE__ */ React27.createElement(TagAutocompleteField, { ...props, invoke: invoke6, helpers: { normalizeSelectedTags, findExactTagMatch, stepSuggestionIndex } });
 }
 function RecommendationKindBadge2(props) {
-  return /* @__PURE__ */ React29.createElement(RecommendationKindBadge, { ...props, helpers: { getRecommendationKindBadgeLabel } });
+  return /* @__PURE__ */ React27.createElement(RecommendationKindBadge, { ...props, helpers: { getRecommendationKindBadgeLabel } });
 }
 function RecommendationEntityDropTarget2(props) {
-  return /* @__PURE__ */ React29.createElement(RecommendationEntityDropTarget, { ...props, useDrop: safeUseDrop, dndType: BOORU_RESOURCE_DND_TYPE, resolveDragIds: resolveDraggedResourceIds, logger: booruViewLogger, uniqueIds, KindBadge: RecommendationKindBadge2, Button, helpers: { getRecommendationItemKindClass, getRecommendationKindTooltip } });
+  return /* @__PURE__ */ React27.createElement(RecommendationEntityDropTarget, { ...props, useDrop: safeUseDrop, dndType: BOORU_RESOURCE_DND_TYPE, resolveDragIds: resolveDraggedResourceIds, logger: booruViewLogger, uniqueIds, KindBadge: RecommendationKindBadge2, Button, helpers: { getRecommendationItemKindClass, getRecommendationKindTooltip } });
 }
 function ResourceGrid2(props) {
-  return /* @__PURE__ */ React29.createElement(ResourceGrid, { ...props, ResourceCard: ResourceGridCard2, Pagination: ResourcePagination2, getVirtualRange: getResourceVirtualRange, defaultColumns: RESOURCE_GRID_COLUMNS });
+  return /* @__PURE__ */ React27.createElement(ResourceGrid, { ...props, ResourceCard: ResourceGridCard2, Pagination: ResourcePagination2, getVirtualRange: getResourceVirtualRange, defaultColumns: RESOURCE_GRID_COLUMNS });
 }
 function ResourcePagination2(props) {
-  return /* @__PURE__ */ React29.createElement(ResourcePagination, { ...props, Button, clampPage: clampPageNumber, getPageWindow: getResourcePageWindow });
+  return /* @__PURE__ */ React27.createElement(ResourcePagination, { ...props, Button, clampPage: clampPageNumber, getPageWindow: getResourcePageWindow });
 }
 function ResourceGridCard2(props) {
-  return /* @__PURE__ */ React29.createElement(ResourceGridCard, { ...props, useDrag: safeUseDrag, dndType: BOORU_RESOURCE_DND_TYPE, emptyImage: getEmptyImage, logger: booruViewLogger, uniqueIds, MediaPreview: MediaThumbnail2, defaultColumns: props.columns || RESOURCE_GRID_COLUMNS });
+  return /* @__PURE__ */ React27.createElement(ResourceGridCard, { ...props, useDrag: safeUseDrag, dndType: BOORU_RESOURCE_DND_TYPE, emptyImage: getEmptyImage, logger: booruViewLogger, uniqueIds, MediaPreview: MediaThumbnail2, defaultColumns: props.columns || RESOURCE_GRID_COLUMNS });
 }
 function RecommendationPanel2(props) {
-  return /* @__PURE__ */ React29.createElement(RecommendationPanel, { ...props, invoke: invoke6, stepSuggestionIndex, normalizeIds: uniqueIds, EntityDropTarget: RecommendationEntityDropTarget2, KindBadge: RecommendationKindBadge2, Button, StateBlock, logger: booruViewLogger, logDuration: logRendererDuration, summarizeIds: summarizeIdsForLog, pageSize: RECOMMENDATION_PAGE_SIZE, helpers: { getRecommendationItemKindClass, getRecommendationKindTooltip } });
+  return /* @__PURE__ */ React27.createElement(RecommendationPanel, { ...props, invoke: invoke6, stepSuggestionIndex, normalizeIds: uniqueIds, EntityDropTarget: RecommendationEntityDropTarget2, KindBadge: RecommendationKindBadge2, Button, StateBlock, logger: booruViewLogger, logDuration: logRendererDuration, summarizeIds: summarizeIdsForLog, pageSize: RECOMMENDATION_PAGE_SIZE, helpers: { getRecommendationItemKindClass, getRecommendationKindTooltip } });
 }
 function ResourceInspector2(props) {
-  return /* @__PURE__ */ React29.createElement(ResourceInspector, { ...props, helpers: { applyClassificationPolicyToDraft, canSaveDraftProgress, formatFileSize, getCharacterUniverse, getDraftUniverseForCharacter, markDraftDirty, pruneCharacterUniverseAssignments }, MediaPreview: MediaThumbnail2, EntityField: EntityAutocompleteField2, TagField: TagAutocompleteField2, SingleEntityField: SingleEntityAutocompleteField2, mediaKindLabels: BOORU_MEDIA_KIND_LABELS, realityOptions: BOORU_REALITY_OPTIONS });
+  return /* @__PURE__ */ React27.createElement(ResourceInspector, { ...props, helpers: { applyClassificationPolicyToDraft, canSaveDraftProgress, formatFileSize, getCharacterUniverse, getDraftUniverseForCharacter, markDraftDirty, pruneCharacterUniverseAssignments }, MediaPreview: MediaThumbnail2, EntityField: EntityAutocompleteField2, TagField: TagAutocompleteField2, SingleEntityField: SingleEntityAutocompleteField2, mediaKindLabels: BOORU_MEDIA_KIND_LABELS, realityOptions: BOORU_REALITY_OPTIONS });
 }
 function EntityProfileView2(props) {
-  return /* @__PURE__ */ React29.createElement(EntityProfileView, { ...props, MediaPreview: MediaThumbnail2, canUseVisual: canUseResourceAsEntityVisual, DataTab: EntityProfileDataTab2, TagsTab: EntityProfileTagsTab2, GalleryGrid: EntityProfileGalleryGrid, RelationsGrid: EntityRelationsGrid2, DownloadIcon, profileTabOptions: getBooruEntityProfileTabOptions(props.kind), helpers: { getInitials, entityKindLabels: BOORU_ENTITY_KIND_LABELS, isTextEntryElement } });
+  return /* @__PURE__ */ React27.createElement(EntityProfileView, { ...props, MediaPreview: MediaThumbnail2, canUseVisual: canUseResourceAsEntityVisual, DataTab: EntityProfileDataTab2, TagsTab: EntityProfileTagsTab2, GalleryGrid: EntityProfileGalleryGrid, RelationsGrid: EntityRelationsGrid2, DownloadIcon, profileTabOptions: getBooruEntityProfileTabOptions(props.kind), helpers: { getInitials, entityKindLabels: BOORU_ENTITY_KIND_LABELS, isTextEntryElement } });
 }
 function EntityRelationsGrid2(props) {
-  return /* @__PURE__ */ React29.createElement(EntityRelationsGrid, { ...props, EntityGrid, entityKindLabels: BOORU_ENTITY_KIND_LABELS, getInitials });
+  return /* @__PURE__ */ React27.createElement(EntityRelationsGrid, { ...props, EntityGrid, entityKindLabels: BOORU_ENTITY_KIND_LABELS, getInitials });
 }
 function EntityProfileDataTab2(props) {
-  return /* @__PURE__ */ React29.createElement(EntityProfileDataTab, { ...props, SingleEntityField: SingleEntityAutocompleteField2, helpers: { formatDate, entityKindLabels: BOORU_ENTITY_KIND_LABELS } });
+  return /* @__PURE__ */ React27.createElement(EntityProfileDataTab, { ...props, SingleEntityField: SingleEntityAutocompleteField2, helpers: { formatDate, entityKindLabels: BOORU_ENTITY_KIND_LABELS } });
 }
 function EntityProfileTagsTab2(props) {
-  return /* @__PURE__ */ React29.createElement(EntityProfileTagsTab, { ...props, TagField: TagAutocompleteField2 });
+  return /* @__PURE__ */ React27.createElement(EntityProfileTagsTab, { ...props, TagField: TagAutocompleteField2 });
 }
 function normalizeSearchText(value) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
@@ -6313,47 +6809,6 @@ function isTextInputTarget(target) {
   }
   return nodeName === "input" || nodeName === "textarea" || nodeName === "select" || nodeName === "button";
 }
-function composeFrameStatusTitle(snapshot, { loading, busyAction, savingClassification, resourceLoading }) {
-  const watcher = snapshot?.watcher || null;
-  const pendingCount = Number(watcher?.pendingCount || 0);
-  const thumbnailBacklogCount = Number(snapshot?.stats?.thumbnailBacklogCount || 0);
-  const thumbnailReadyCount = Number(snapshot?.stats?.thumbnailReadyCount || 0);
-  const thumbnailErrorCount = Number(snapshot?.stats?.thumbnailErrorCount || 0);
-  const thumbnailActiveCount = Number(snapshot?.derivatives?.activeCount || 0);
-  const working = loading || resourceLoading || Boolean(busyAction) || savingClassification || pendingCount > 0 || thumbnailActiveCount > 0 || thumbnailBacklogCount > 0;
-  const blocked = watcher?.stage === "error" || String(watcher?.stage || "").startsWith("blocked");
-  if (!working && !blocked) {
-    return "";
-  }
-  const lines = [];
-  if (blocked) {
-    lines.push("Booru necesita atencion.");
-  } else if (pendingCount > 0) {
-    lines.push(`Booru esta procesando ${pendingCount} archivo${pendingCount === 1 ? "" : "s"}.`);
-  } else if (thumbnailActiveCount > 0 || thumbnailBacklogCount > 0) {
-    lines.push(`Booru esta generando previews (${thumbnailReadyCount} listas, ${thumbnailBacklogCount} pendientes).`);
-  } else if (busyAction === "rescan") {
-    lines.push("Booru esta releyendo la carpeta vigilada.");
-  } else if (busyAction === "restart") {
-    lines.push("Booru esta reiniciando el watcher.");
-  } else if (savingClassification) {
-    lines.push("Booru esta guardando cambios en la seleccion.");
-  } else {
-    lines.push("Booru esta actualizando su estado.");
-  }
-  if (watcher?.lastError) {
-    lines.push(watcher.lastError);
-  } else if (snapshot?.derivatives?.lastError) {
-    lines.push(snapshot.derivatives.lastError);
-  } else if (watcher?.lastIngestedOriginalFilename) {
-    lines.push(`Ultimo importado: ${watcher.lastIngestedOriginalFilename}`);
-  }
-  if (thumbnailErrorCount > 0) {
-    lines.push(`${thumbnailErrorCount} thumbnail${thumbnailErrorCount === 1 ? "" : "s"} con error.`);
-  }
-  lines.push("Click para abrir Metricas.");
-  return lines.join("\n");
-}
 function mergeSnapshotQueueRequest(currentRequest, nextRequest) {
   const normalizedCurrent = currentRequest && typeof currentRequest === "object" ? currentRequest : {
     silent: true,
@@ -6509,24 +6964,24 @@ function BooruWorkspaceView({ input = null, ctx }) {
     () => normalizeBooruGridPreferences(persistedUiPreferences?.gridColumns),
     [persistedUiPreferences?.gridColumns]
   );
-  const [snapshot, setSnapshot] = useState19(null);
-  const [loading, setLoading] = useState19(true);
-  const [resourceLoading, setResourceLoading] = useState19(false);
-  const [busyAction, setBusyAction] = useState19("");
-  const [savingClassification, setSavingClassification] = useState19(false);
-  const [error, setError] = useState19("");
-  const [resourceSearchTokens, setResourceSearchTokens] = useState19(() => buildResourceSearchInputTokens(input));
-  const [resourceSearchText, setResourceSearchText] = useState19("");
-  const [entitySearchValue, setEntitySearchValue] = useState19("");
-  const [entitySearchTokens, setEntitySearchTokens] = useState19([]);
-  const [resourceBrowse, setResourceBrowse] = useState19(() => normalizeBooruBrowseQuery(null, "resource"));
-  const [entityBrowse, setEntityBrowse] = useState19(() => normalizeBooruBrowseQuery(null, "entity"));
-  const [entityCreateValue, setEntityCreateValue] = useState19("");
-  const [resourceMediaKindFilter, setResourceMediaKindFilter] = useState19("all");
-  const [resourceRealityFilter, setResourceRealityFilter] = useState19("all");
-  const [resourceMissingFilter, setResourceMissingFilter] = useState19(BOORU_NO_MISSING_FILTER);
-  const [resourcePendingMode, setResourcePendingMode] = useState19("essential");
-  const [resourceState, setResourceState] = useState19({
+  const [snapshot, setSnapshot] = useState21(null);
+  const [loading, setLoading] = useState21(true);
+  const [resourceLoading, setResourceLoading] = useState21(false);
+  const [busyAction, setBusyAction] = useState21("");
+  const [savingClassification, setSavingClassification] = useState21(false);
+  const [error, setError] = useState21("");
+  const [resourceSearchTokens, setResourceSearchTokens] = useState21(() => buildResourceSearchInputTokens(input));
+  const [resourceSearchText, setResourceSearchText] = useState21("");
+  const [entitySearchValue, setEntitySearchValue] = useState21("");
+  const [entitySearchTokens, setEntitySearchTokens] = useState21([]);
+  const [resourceBrowse, setResourceBrowse] = useState21(() => normalizeBooruBrowseQuery(null, "resource"));
+  const [entityBrowse, setEntityBrowse] = useState21(() => normalizeBooruBrowseQuery(null, "entity"));
+  const [entityCreateValue, setEntityCreateValue] = useState21("");
+  const [resourceMediaKindFilter, setResourceMediaKindFilter] = useState21("all");
+  const [resourceRealityFilter, setResourceRealityFilter] = useState21("all");
+  const [resourceMissingFilter, setResourceMissingFilter] = useState21(BOORU_NO_MISSING_FILTER);
+  const [resourcePendingMode, setResourcePendingMode] = useState21("essential");
+  const [resourceState, setResourceState] = useState21({
     items: [],
     placements: [],
     totalCount: 0,
@@ -6534,55 +6989,55 @@ function BooruWorkspaceView({ input = null, ctx }) {
     hasMore: false,
     querySignature: ""
   });
-  const [resourcePageState, setResourcePageState] = useState19(RESOURCE_PAGE_SECTIONS);
-  const [selectedResourceState, setSelectedResourceState] = useState19(RESOURCE_SELECTION_SECTIONS);
-  const [classificationDraft, setClassificationDraft] = useState19(buildClassificationDraft([]));
-  const [entityItems, setEntityItems] = useState19([]);
-  const [entityPlacements, setEntityPlacements] = useState19([]);
-  const [entityTotalCount, setEntityTotalCount] = useState19(0);
-  const [entityHasMore, setEntityHasMore] = useState19(false);
-  const [entityLoading, setEntityLoading] = useState19(false);
-  const [entityBusy, setEntityBusy] = useState19(false);
-  const [entityError, setEntityError] = useState19("");
-  const [entityProfile, setEntityProfile] = useState19(null);
-  const [entityProfileLoading, setEntityProfileLoading] = useState19(false);
-  const [entityProfileError, setEntityProfileError] = useState19("");
-  const [entityProfileGalleryState, setEntityProfileGalleryState] = useState19({ items: [], placements: [], totalCount: 0, placementCount: 0, hasMore: false });
-  const [entityProfileGalleryLoading, setEntityProfileGalleryLoading] = useState19(false);
-  const [entityProfileRelationState, setEntityProfileRelationState] = useState19({ items: [], placements: [], totalCount: 0, placementCount: 0, hasMore: false, relationKind: null });
-  const [entityProfileRelationLoading, setEntityProfileRelationLoading] = useState19(false);
-  const [entityProfilePageState, setEntityProfilePageState] = useState19(ENTITY_PROFILE_PAGE_SECTIONS);
-  const [universeCharacterCreateValue, setUniverseCharacterCreateValue] = useState19("");
-  const [entityRevision, setEntityRevision] = useState19(0);
-  const [contextMenuState, setContextMenuState] = useState19(null);
-  const [customDragState, setCustomDragState] = useState19(null);
-  const [inspectorOpen, setInspectorOpen] = useState19(false);
-  const [detailsContext, setDetailsContext] = useState19(null);
-  const [anchoredResources, setAnchoredResources] = useState19([]);
-  const [floatingDetailsGeometry, setFloatingDetailsGeometry] = useState19(() => createBooruFloatingDetailsGeometry({
+  const [resourcePageState, setResourcePageState] = useState21(RESOURCE_PAGE_SECTIONS);
+  const [selectedResourceState, setSelectedResourceState] = useState21(RESOURCE_SELECTION_SECTIONS);
+  const [classificationDraft, setClassificationDraft] = useState21(buildClassificationDraft([]));
+  const [entityItems, setEntityItems] = useState21([]);
+  const [entityPlacements, setEntityPlacements] = useState21([]);
+  const [entityTotalCount, setEntityTotalCount] = useState21(0);
+  const [entityHasMore, setEntityHasMore] = useState21(false);
+  const [entityLoading, setEntityLoading] = useState21(false);
+  const [entityBusy, setEntityBusy] = useState21(false);
+  const [entityError, setEntityError] = useState21("");
+  const [entityProfile, setEntityProfile] = useState21(null);
+  const [entityProfileLoading, setEntityProfileLoading] = useState21(false);
+  const [entityProfileError, setEntityProfileError] = useState21("");
+  const [entityProfileGalleryState, setEntityProfileGalleryState] = useState21({ items: [], placements: [], totalCount: 0, placementCount: 0, hasMore: false });
+  const [entityProfileGalleryLoading, setEntityProfileGalleryLoading] = useState21(false);
+  const [entityProfileRelationState, setEntityProfileRelationState] = useState21({ items: [], placements: [], totalCount: 0, placementCount: 0, hasMore: false, relationKind: null });
+  const [entityProfileRelationLoading, setEntityProfileRelationLoading] = useState21(false);
+  const [entityProfilePageState, setEntityProfilePageState] = useState21(ENTITY_PROFILE_PAGE_SECTIONS);
+  const [universeCharacterCreateValue, setUniverseCharacterCreateValue] = useState21("");
+  const [entityRevision, setEntityRevision] = useState21(0);
+  const [contextMenuState, setContextMenuState] = useState21(null);
+  const [customDragState, setCustomDragState] = useState21(null);
+  const [inspectorOpen, setInspectorOpen] = useState21(false);
+  const [detailsContext, setDetailsContext] = useState21(null);
+  const [anchoredResources, setAnchoredResources] = useState21([]);
+  const [floatingDetailsGeometry, setFloatingDetailsGeometry] = useState21(() => createBooruFloatingDetailsGeometry({
     width: window.innerWidth,
     height: window.innerHeight
   }));
-  const [resourceHeroState, setResourceHeroState] = useState19(null);
-  const [entityVisualCropState, setEntityVisualCropState] = useState19(null);
-  const [clipboardAssociationState, setClipboardAssociationState] = useState19(null);
-  const [characterCreationName, setCharacterCreationName] = useState19("");
-  const [activeRouteScrollTop, setActiveRouteScrollTop] = useState19(0);
-  const [profileGallerySelectedIds, setProfileGallerySelectedIds] = useState19([]);
-  const characterCreationResolverRef = useRef13(null);
-  const hoveredEntityRef = useRef13(null);
-  const hoveredGroupAssociationRef = useRef13(null);
-  const routeSessionsRef = useRef13(/* @__PURE__ */ new Map());
-  const sectionLastRouteRef = useRef13(/* @__PURE__ */ new Map());
-  const sectionNavigationRef = useRef13(/* @__PURE__ */ new Map());
-  const activeRouteScrollTopRef = useRef13(0);
-  const finishCharacterCreation = useCallback10((result = null) => {
+  const [resourceHeroState, setResourceHeroState] = useState21(null);
+  const [entityVisualCropState, setEntityVisualCropState] = useState21(null);
+  const [clipboardAssociationState, setClipboardAssociationState] = useState21(null);
+  const [characterCreationName, setCharacterCreationName] = useState21("");
+  const [activeRouteScrollTop, setActiveRouteScrollTop] = useState21(0);
+  const [profileGallerySelectedIds, setProfileGallerySelectedIds] = useState21([]);
+  const characterCreationResolverRef = useRef14(null);
+  const hoveredEntityRef = useRef14(null);
+  const hoveredGroupAssociationRef = useRef14(null);
+  const routeSessionsRef = useRef14(/* @__PURE__ */ new Map());
+  const sectionLastRouteRef = useRef14(/* @__PURE__ */ new Map());
+  const sectionNavigationRef = useRef14(/* @__PURE__ */ new Map());
+  const activeRouteScrollTopRef = useRef14(0);
+  const finishCharacterCreation = useCallback7((result = null) => {
     const resolveRequest = characterCreationResolverRef.current;
     characterCreationResolverRef.current = null;
     setCharacterCreationName("");
     resolveRequest?.(result);
   }, []);
-  const ensureEntityFromUi = useCallback10((kind, name) => {
+  const ensureEntityFromUi = useCallback7((kind, name) => {
     if (kind !== "character") {
       return invoke6("booru:ensure-entity", { kind, name });
     }
@@ -6642,7 +7097,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
     [activeEntityKind, activeEntityRelationKind, entityBrowseUsesResources]
   );
   const resourceItems = Array.isArray(resourceState?.items) ? resourceState.items : [];
-  const [visibleResourceIds, setVisibleResourceIds] = useState19([]);
+  const [visibleResourceIds, setVisibleResourceIds] = useState21([]);
   const entityProfileGalleryItems = Array.isArray(entityProfileGalleryState?.items) ? entityProfileGalleryState.items : [];
   const resourceQuery = useMemo13(() => buildBooruResourceQuery({
     searchTokens: resourceQuerySearchTokens,
@@ -6699,24 +7154,24 @@ function BooruWorkspaceView({ input = null, ctx }) {
     [activeResourceSection, thumbnailPrimingItems]
   );
   const currentEntityProfilePage = activeEntityKind ? clampPageNumber(entityProfilePageState?.[activeSection]?.page, Number.MAX_SAFE_INTEGER) : 1;
-  const visibleThumbnailPrimingUnavailableRef = useRef13(false);
-  const primedResourcePageSignatureRef = useRef13("");
-  const primedMediaThumbnailIdsRef = useRef13(/* @__PURE__ */ new Set());
-  const visibleResourceIdsRef = useRef13([]);
-  const mediaLoadMoreLockedRef = useRef13(false);
-  const mediaResourceRequestRef = useRef13(null);
-  const mediaThumbnailRefreshRef = useRef13({
+  const visibleThumbnailPrimingUnavailableRef = useRef14(false);
+  const primedResourcePageSignatureRef = useRef14("");
+  const primedMediaThumbnailIdsRef = useRef14(/* @__PURE__ */ new Set());
+  const visibleResourceIdsRef = useRef14([]);
+  const mediaLoadMoreLockedRef = useRef14(false);
+  const mediaResourceRequestRef = useRef14(null);
+  const mediaThumbnailRefreshRef = useRef14({
     inFlight: false,
     queued: false
   });
-  const classificationDraftRef = useRef13(classificationDraft);
-  const resourceRequestVersionRef = useRef13(0);
-  const entitySectionRequestVersionRef = useRef13(0);
-  const entityProfileRequestVersionRef = useRef13(0);
-  const entityProfileGalleryRequestVersionRef = useRef13(0);
-  const entityProfileRelationRequestVersionRef = useRef13(0);
-  const latestInputRef = useRef13(input);
-  const diagnosticsContextRef = useRef13({
+  const classificationDraftRef = useRef14(classificationDraft);
+  const resourceRequestVersionRef = useRef14(0);
+  const entitySectionRequestVersionRef = useRef14(0);
+  const entityProfileRequestVersionRef = useRef14(0);
+  const entityProfileGalleryRequestVersionRef = useRef14(0);
+  const entityProfileRelationRequestVersionRef = useRef14(0);
+  const latestInputRef = useRef14(input);
+  const diagnosticsContextRef = useRef14({
     activeSection,
     showResourceWorkspace,
     showEntityProfile,
@@ -6730,32 +7185,32 @@ function BooruWorkspaceView({ input = null, ctx }) {
     entityLoading: false,
     busyAction: ""
   });
-  const renderBurstRef = useRef13({
+  const renderBurstRef = useRef14({
     windowStartedAt: performance.now(),
     renderCount: 0,
     lastLoggedAt: 0
   });
-  const snapshotRequestStateRef = useRef13({
+  const snapshotRequestStateRef = useRef14({
     inFlight: false,
     queuedRequest: null
   });
-  const autosaveTimerRef = useRef13(0);
-  const autosaveStateRef = useRef13({
+  const autosaveTimerRef = useRef14(0);
+  const autosaveStateRef = useRef14({
     inFlight: false,
     queued: false
   });
-  const customDragSessionRef = useRef13(null);
-  const customDragTimerRef = useRef13(0);
-  const suppressNextResourceClickRef = useRef13(false);
-  const handleQuickAssignEntityRef = useRef13(null);
-  const lastSectionNonceRef = useRef13(String(input?.[WORKSPACE_FRAME_SECTION_NONCE_KEY] || "").trim());
-  const currentWorkspaceRouteRef = useRef13(workspaceRoute);
-  const latestWorkspaceSessionStateRef = useRef13(null);
-  const anchoredResourcesRef = useRef13([]);
-  const detailsAnchorRef = useRef13({ open: false, section: "", ids: [], activeId: "" });
-  const detailsAnchorRequestVersionRef = useRef13(0);
-  const resourceWindowContextRef = useRef13(null);
-  const resourceWindowRequestVersionRef = useRef13(0);
+  const customDragSessionRef = useRef14(null);
+  const customDragTimerRef = useRef14(0);
+  const suppressNextResourceClickRef = useRef14(false);
+  const handleQuickAssignEntityRef = useRef14(null);
+  const lastSectionNonceRef = useRef14(String(input?.[WORKSPACE_FRAME_SECTION_NONCE_KEY] || "").trim());
+  const currentWorkspaceRouteRef = useRef14(workspaceRoute);
+  const latestWorkspaceSessionStateRef = useRef14(null);
+  const anchoredResourcesRef = useRef14([]);
+  const detailsAnchorRef = useRef14({ open: false, section: "", ids: [], activeId: "" });
+  const detailsAnchorRequestVersionRef = useRef14(0);
+  const resourceWindowContextRef = useRef14(null);
+  const resourceWindowRequestVersionRef = useRef14(0);
   const currentResourcePage = showResourceWorkspace ? normalizeResourcePageState(resourcePageState[activeResourceSection], resourceQuerySignature).page : 1;
   const currentResourcePageMatchesQuery = !showResourceWorkspace || String(resourcePageState?.[activeResourceSection]?.querySignature || "") === resourceQuerySignature;
   resourceWindowContextRef.current = {
@@ -6790,7 +7245,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
     entityProfilePageState,
     profileGallerySelectedIds
   };
-  const handleVisibleResourceIdsChange = useCallback10((nextIds) => {
+  const handleVisibleResourceIdsChange = useCallback7((nextIds) => {
     const normalizedIds = uniqueIds(nextIds);
     setVisibleResourceIds((currentIds) => arraysEqual2(currentIds, normalizedIds) ? currentIds : normalizedIds);
   }, []);
@@ -6822,7 +7277,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
     hoveredEntityRef.current = null;
     hoveredGroupAssociationRef.current = null;
   }, [workspaceRouteKey]);
-  const captureWorkspaceRouteSession = useCallback10((routeValue) => {
+  const captureWorkspaceRouteSession = useCallback7((routeValue) => {
     const route = normalizeBooruWorkspaceRoute(routeValue);
     const routeKey = createBooruWorkspaceRouteKey(route);
     const state = latestWorkspaceSessionStateRef.current;
@@ -6883,7 +7338,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
     routeSessionsRef.current.set(routeKey, session);
     sectionLastRouteRef.current.set(route.section, route);
   }, []);
-  const restoreWorkspaceRouteSession = useCallback10((routeValue, routeInput = null) => {
+  const restoreWorkspaceRouteSession = useCallback7((routeValue, routeInput = null) => {
     const route = normalizeBooruWorkspaceRoute(routeValue);
     const routeKey = createBooruWorkspaceRouteKey(route);
     const session = routeSessionsRef.current.get(routeKey) || null;
@@ -6954,7 +7409,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
       }
     }
   }, []);
-  const openWorkspaceRoute = useCallback10((routeValue, navigationValue, baseInput = latestInputRef.current) => {
+  const openWorkspaceRoute = useCallback7((routeValue, navigationValue, baseInput = latestInputRef.current) => {
     const route = normalizeBooruWorkspaceRoute(routeValue);
     void ctx.openView({
       viewId: BOORU_WORKSPACE_VIEW_ID,
@@ -6962,7 +7417,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
       input: routeToBooruWorkspaceInput(route, baseInput, navigationValue)
     });
   }, [ctx]);
-  const handleRouteScrollStateChange = useCallback10((nextScrollTop) => {
+  const handleRouteScrollStateChange = useCallback7((nextScrollTop) => {
     const normalizedScrollTop = Math.max(0, Number(nextScrollTop) || 0);
     activeRouteScrollTopRef.current = normalizedScrollTop;
     const route = currentWorkspaceRouteRef.current;
@@ -6972,15 +7427,17 @@ function BooruWorkspaceView({ input = null, ctx }) {
       routeSessionsRef.current.set(routeKey, { ...currentSession, scrollTop: normalizedScrollTop });
     }
   }, []);
-  const handleGridColumnWheel = useCallback10((family, event) => {
-    const nextColumns = stepBooruGridColumns(gridColumns, family, event?.deltaY);
-    if (nextColumns[family] === gridColumns[family]) return;
+  const handleGridColumnsChange = useCallback7((family, nextColumnCount) => {
+    if (nextColumnCount === gridColumns[family]) return;
     void uiPreferencesApi.set({
       ...persistedUiPreferences && typeof persistedUiPreferences === "object" ? persistedUiPreferences : {},
-      gridColumns: nextColumns
+      gridColumns: {
+        ...gridColumns,
+        [family]: nextColumnCount
+      }
     });
   }, [gridColumns, persistedUiPreferences, uiPreferencesApi]);
-  const updateResourceBrowse = useCallback10((nextValue) => {
+  const updateResourceBrowse = useCallback7((nextValue) => {
     setResourceBrowse((currentValue) => {
       const enteringRandom = nextValue?.sortBy === "random" && currentValue?.sortBy !== "random";
       return normalizeBooruBrowseQuery({
@@ -6990,7 +7447,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
       }, "resource");
     });
   }, []);
-  const updateEntityBrowse = useCallback10((nextValue) => {
+  const updateEntityBrowse = useCallback7((nextValue) => {
     setEntityBrowse((currentValue) => {
       const enteringRandom = nextValue?.sortBy === "random" && currentValue?.sortBy !== "random";
       return normalizeBooruBrowseQuery({
@@ -7989,88 +8446,6 @@ function BooruWorkspaceView({ input = null, ctx }) {
     }
     void loadEntitySection({ append: false });
   }, [activeEntityKind, deferredEntitySearchValue, entityBrowse, entityRevision, normalizedEntitySearchTokens, showEntityProfile]);
-  const frameStatusTitle = useMemo13(() => composeFrameStatusTitle(snapshot, {
-    loading,
-    busyAction,
-    savingClassification,
-    resourceLoading
-  }), [
-    busyAction,
-    loading,
-    resourceLoading,
-    savingClassification,
-    snapshot?.derivatives?.activeCount,
-    snapshot?.derivatives?.lastError,
-    snapshot?.stats?.thumbnailBacklogCount,
-    snapshot?.stats?.thumbnailErrorCount,
-    snapshot?.stats?.thumbnailReadyCount,
-    snapshot?.watcher?.lastError,
-    snapshot?.watcher?.lastIngestedOriginalFilename,
-    snapshot?.watcher?.pendingCount,
-    snapshot?.watcher?.stage
-  ]);
-  const watcherStage = String(snapshot?.watcher?.stage || "");
-  useEffect25(() => {
-    if (!ctx?.setWorkspaceFrameActions || !ctx?.clearWorkspaceFrameActions) {
-      return void 0;
-    }
-    const statusIcon = watcherStage === "error" || watcherStage.startsWith("blocked") ? AlertIcon : PulseIcon;
-    const actions = [];
-    if (frameStatusTitle) {
-      actions.push({
-        id: "booru-runtime-status",
-        icon: statusIcon,
-        title: frameStatusTitle,
-        active: true,
-        onClick: () => {
-          void ctx.openView({
-            viewId: BOORU_WORKSPACE_VIEW_ID,
-            reuse: true,
-            input: {
-              ...latestInputRef.current && typeof latestInputRef.current === "object" ? latestInputRef.current : {},
-              section: "settings",
-              settingsSubview: "overview"
-            }
-          });
-        }
-      });
-    }
-    actions.push({
-      id: "booru-refresh",
-      icon: RefreshIcon,
-      title: loading || resourceLoading || entityLoading ? "Actualizando..." : "Actualizar",
-      disabled: loading || resourceLoading || entityLoading,
-      onClick: () => {
-        void loadSnapshot({ silent: false, reason: "frame-refresh" });
-        if (showResourceWorkspace) {
-          if (activeResourceSection === "media") {
-            setResourcePageForSection(activeResourceSection, 1);
-            void loadResources({ requestedPage: 1 });
-          } else {
-            void loadResources({ requestedPage: currentResourcePage });
-          }
-        } else if (activeEntityKind) {
-          setEntityRevision((currentValue) => currentValue + 1);
-        }
-      }
-    });
-    ctx.setWorkspaceFrameActions(BOORU_WORKSPACE_VIEW_ID, actions);
-    return () => {
-      ctx.clearWorkspaceFrameActions(BOORU_WORKSPACE_VIEW_ID);
-    };
-  }, [
-    activeEntityKind,
-    busyAction,
-    ctx,
-    entityLoading,
-    frameStatusTitle,
-    loading,
-    currentResourcePage,
-    resourceLoading,
-    savingClassification,
-    showResourceWorkspace,
-    watcherStage
-  ]);
   const currentSelection = useMemo13(() => {
     if (!showResourceWorkspace) {
       return EMPTY_SELECTION_STATE;
@@ -8192,14 +8567,14 @@ function BooruWorkspaceView({ input = null, ctx }) {
     }
     return mutation;
   };
-  const consumeSuppressedResourceClick = useCallback10(() => {
+  const consumeSuppressedResourceClick = useCallback7(() => {
     if (!suppressNextResourceClickRef.current) {
       return false;
     }
     suppressNextResourceClickRef.current = false;
     return true;
   }, []);
-  const clearCustomDragSession = useCallback10(() => {
+  const clearCustomDragSession = useCallback7(() => {
     if (customDragTimerRef.current) {
       window.clearTimeout(customDragTimerRef.current);
       customDragTimerRef.current = 0;
@@ -8211,7 +8586,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
       customDragSessionRef.current = null;
     }
   }, []);
-  const handleCustomDragPointerDown = useCallback10(({ event, item, resourceIds }) => {
+  const handleCustomDragPointerDown = useCallback7(({ event, item, resourceIds }) => {
     if (!showResourceWorkspace || activeResourceSection === "trash") {
       return;
     }
@@ -9715,14 +10090,14 @@ function BooruWorkspaceView({ input = null, ctx }) {
     openWorkspaceRoute(nextRoute, navigation, input);
   };
   if (activeSection === "settings" && settingsSubview === NO_SETTINGS_SUBVIEW) {
-    return /* @__PURE__ */ React29.createElement(WorkspacePage, { className: "booruView" }, /* @__PURE__ */ React29.createElement(WorkspaceBody, { className: "booruView__body" }, /* @__PURE__ */ React29.createElement(ScrollRegion, { className: "booruView__detailScroll" }, loading && !snapshot ? /* @__PURE__ */ React29.createElement(
+    return /* @__PURE__ */ React27.createElement(WorkspacePage, { className: "booruView" }, /* @__PURE__ */ React27.createElement(WorkspaceBody, { className: "booruView__body" }, /* @__PURE__ */ React27.createElement(ScrollRegion, { className: "booruView__detailScroll" }, loading && !snapshot ? /* @__PURE__ */ React27.createElement(
       StateBlock,
       {
         centered: true,
         title: "Cargando plugin",
         description: "Leyendo biblioteca, entidades y runtime local."
       }
-    ) : /* @__PURE__ */ React29.createElement("div", { className: "booruView__content" }, error ? /* @__PURE__ */ React29.createElement(Notice, { tone: "danger" }, error) : null, !snapshot?.settings?.watchFolderPath ? /* @__PURE__ */ React29.createElement(Notice, { tone: "warning" }, "Booru todavia no tiene una carpeta vigilada configurada.") : null, snapshot?.settings?.watchFolderPath && !snapshot?.python?.available ? /* @__PURE__ */ React29.createElement(Notice, { tone: "danger" }, snapshot?.python?.error || "No se encontro Python para Booru.") : null, /* @__PURE__ */ React29.createElement(
+    ) : /* @__PURE__ */ React27.createElement("div", { className: "booruView__content" }, error ? /* @__PURE__ */ React27.createElement(Notice, { tone: "danger" }, error) : null, !snapshot?.settings?.watchFolderPath ? /* @__PURE__ */ React27.createElement(Notice, { tone: "warning" }, "Booru todavia no tiene una carpeta vigilada configurada.") : null, snapshot?.settings?.watchFolderPath && !snapshot?.python?.available ? /* @__PURE__ */ React27.createElement(Notice, { tone: "danger" }, snapshot?.python?.error || "No se encontro Python para Booru.") : null, /* @__PURE__ */ React27.createElement(
       SettingsSection,
       {
         snapshot,
@@ -9737,13 +10112,13 @@ function BooruWorkspaceView({ input = null, ctx }) {
       }
     )))));
   }
-  return /* @__PURE__ */ React29.createElement(WorkspacePage, { className: "booruView", onKeyDownCapture: handleClipboardPasteShortcut }, /* @__PURE__ */ React29.createElement(WorkspaceBody, { className: "booruView__body" }, /* @__PURE__ */ React29.createElement(
+  return /* @__PURE__ */ React27.createElement(WorkspacePage, { className: "booruView", onKeyDownCapture: handleClipboardPasteShortcut }, /* @__PURE__ */ React27.createElement(WorkspaceBody, { className: "booruView__body" }, /* @__PURE__ */ React27.createElement(
     SplitLayout,
     {
       variant: "sidebar-detail",
       className: ["booruView__layout", activeEntityKind ? "booruView__layout--entity" : ""].filter(Boolean).join(" ")
     },
-    showResourceWorkspace ? /* @__PURE__ */ React29.createElement(SplitSidebar, { className: "booruView__sidebar" }, /* @__PURE__ */ React29.createElement(ScrollRegion, { className: "booruView__sidebarScroll" }, /* @__PURE__ */ React29.createElement(PanelStack, { className: "booruView__sidebarStack" }, /* @__PURE__ */ React29.createElement(SectionPanel, { className: "booruView__panel booruView__panel--compact booruView__panel--fill" }, /* @__PURE__ */ React29.createElement(React29.Fragment, null, /* @__PURE__ */ React29.createElement(Field, { label: "Buscar", className: "booruView__field" }, /* @__PURE__ */ React29.createElement(
+    showResourceWorkspace ? /* @__PURE__ */ React27.createElement(SplitSidebar, { className: "booruView__sidebar" }, /* @__PURE__ */ React27.createElement(ScrollRegion, { className: "booruView__sidebarScroll" }, /* @__PURE__ */ React27.createElement(PanelStack, { className: "booruView__sidebarStack" }, /* @__PURE__ */ React27.createElement(SectionPanel, { className: "booruView__panel booruView__panel--compact booruView__panel--fill" }, /* @__PURE__ */ React27.createElement(React27.Fragment, null, /* @__PURE__ */ React27.createElement(Field, { label: "Buscar", className: "booruView__field" }, /* @__PURE__ */ React27.createElement(
       ResourceSearchComposer,
       {
         tokens: normalizedResourceSearchTokens,
@@ -9767,7 +10142,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
           stepSuggestionIndex
         }
       }
-    )), showClassificationSidebar ? /* @__PURE__ */ React29.createElement("div", { className: "booruView__filterStack" }, activeResourceSection === "pending" ? /* @__PURE__ */ React29.createElement("div", { className: "booruView__filterGroup" }, /* @__PURE__ */ React29.createElement("span", { className: "booruView__groupLabel" }, "Pendientes"), /* @__PURE__ */ React29.createElement(
+    )), showClassificationSidebar ? /* @__PURE__ */ React27.createElement("div", { className: "booruView__filterStack" }, activeResourceSection === "pending" ? /* @__PURE__ */ React27.createElement("div", { className: "booruView__filterGroup" }, /* @__PURE__ */ React27.createElement("span", { className: "booruView__groupLabel" }, "Pendientes"), /* @__PURE__ */ React27.createElement(
       SegmentedControl,
       {
         className: "booruView__filterSegmented",
@@ -9784,7 +10159,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
         },
         ariaLabel: "Modo de pendientes"
       }
-    )) : null, /* @__PURE__ */ React29.createElement("div", { className: "booruView__filterGroup" }, /* @__PURE__ */ React29.createElement("span", { className: "booruView__groupLabel" }, "Media"), /* @__PURE__ */ React29.createElement(
+    )) : null, /* @__PURE__ */ React27.createElement("div", { className: "booruView__filterGroup" }, /* @__PURE__ */ React27.createElement("span", { className: "booruView__groupLabel" }, "Media"), /* @__PURE__ */ React27.createElement(
       SegmentedControl,
       {
         className: "booruView__filterSegmented",
@@ -9794,7 +10169,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
         onChange: (value) => setResourceMediaKindFilter(value || "all"),
         ariaLabel: "Filtro de media"
       }
-    )), /* @__PURE__ */ React29.createElement("div", { className: "booruView__filterGroup" }, /* @__PURE__ */ React29.createElement("span", { className: "booruView__groupLabel" }, "Tipo"), /* @__PURE__ */ React29.createElement(
+    )), /* @__PURE__ */ React27.createElement("div", { className: "booruView__filterGroup" }, /* @__PURE__ */ React27.createElement("span", { className: "booruView__groupLabel" }, "Tipo"), /* @__PURE__ */ React27.createElement(
       SegmentedControl,
       {
         className: "booruView__filterSegmented",
@@ -9804,7 +10179,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
         onChange: (value) => setResourceRealityFilter(value || "all"),
         ariaLabel: "Filtro de tipo"
       }
-    )), supportsMissingResourceFilters && hasContextualMissingFilters ? /* @__PURE__ */ React29.createElement("div", { className: "booruView__filterGroup" }, /* @__PURE__ */ React29.createElement("span", { className: "booruView__groupLabel" }, "Faltantes"), /* @__PURE__ */ React29.createElement(
+    )), supportsMissingResourceFilters && hasContextualMissingFilters ? /* @__PURE__ */ React27.createElement("div", { className: "booruView__filterGroup" }, /* @__PURE__ */ React27.createElement("span", { className: "booruView__groupLabel" }, "Faltantes"), /* @__PURE__ */ React27.createElement(
       SegmentedControl,
       {
         className: "booruView__filterSegmented",
@@ -9817,7 +10192,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
         },
         ariaLabel: "Filtro de datos faltantes"
       }
-    )) : null) : null, showClassificationSidebar ? /* @__PURE__ */ React29.createElement(
+    )) : null) : null, showClassificationSidebar ? /* @__PURE__ */ React27.createElement(
       RecommendationPanel2,
       {
         selectedResourceIds: selectedResources.map((resource) => resource.id),
@@ -9832,7 +10207,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
         onApplyRecommendation: handleApplyRecommendation
       }
     ) : null))))) : null,
-    /* @__PURE__ */ React29.createElement(SplitDetail, { className: "booruView__detail" }, activeEntityKind ? /* @__PURE__ */ React29.createElement(
+    /* @__PURE__ */ React27.createElement(SplitDetail, { className: "booruView__detail" }, activeEntityKind ? /* @__PURE__ */ React27.createElement(
       EntityNavigationBar,
       {
         kind: activeEntityKind,
@@ -9842,7 +10217,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
         createValue: entityCreateValue,
         busy: entityBusy,
         searchable: !showEntityProfile || activeEntityProfileBrowseTab,
-        searchContent: !showEntityProfile || activeEntityProfileBrowseTab ? /* @__PURE__ */ React29.createElement(
+        searchContent: !showEntityProfile || activeEntityProfileBrowseTab ? /* @__PURE__ */ React27.createElement(
           ResourceSearchComposer,
           {
             tokens: normalizedEntitySearchTokens,
@@ -9866,7 +10241,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
             }
           }
         ) : null,
-        browseControls: activeEntityProfileBrowseTab || !showEntityProfile ? /* @__PURE__ */ React29.createElement(
+        browseControls: activeEntityProfileBrowseTab || !showEntityProfile ? /* @__PURE__ */ React27.createElement(
           ContextBrowseControls,
           {
             compact: true,
@@ -9885,14 +10260,14 @@ function BooruWorkspaceView({ input = null, ctx }) {
         onCreate: () => void handleEnsureSectionEntity(),
         entityKindLabels: BOORU_ENTITY_KIND_LABELS
       }
-    ) : null, loading && !snapshot ? /* @__PURE__ */ React29.createElement(
+    ) : null, loading && !snapshot ? /* @__PURE__ */ React27.createElement(
       StateBlock,
       {
         centered: true,
         title: "Cargando plugin",
         description: "Leyendo biblioteca, entidades y runtime local."
       }
-    ) : showResourceWorkspace ? /* @__PURE__ */ React29.createElement("div", { className: "booruView__content booruView__content--workspace" }, error ? /* @__PURE__ */ React29.createElement(Notice, { tone: "danger" }, error) : null, entityError ? /* @__PURE__ */ React29.createElement(Notice, { tone: "danger" }, entityError) : null, hasBlockingSetupWarning && (activeResourceSection === "media" || activeResourceSection === "pending") ? !snapshot?.settings?.watchFolderPath ? /* @__PURE__ */ React29.createElement(Notice, { tone: "warning" }, "Booru todavia no tiene una carpeta vigilada configurada.") : /* @__PURE__ */ React29.createElement(Notice, { tone: "danger" }, snapshot?.python?.error || "No se encontro Python para Booru.") : null, /* @__PURE__ */ React29.createElement(
+    ) : showResourceWorkspace ? /* @__PURE__ */ React27.createElement("div", { className: "booruView__content booruView__content--workspace" }, error ? /* @__PURE__ */ React27.createElement(Notice, { tone: "danger" }, error) : null, entityError ? /* @__PURE__ */ React27.createElement(Notice, { tone: "danger" }, entityError) : null, hasBlockingSetupWarning && (activeResourceSection === "media" || activeResourceSection === "pending") ? !snapshot?.settings?.watchFolderPath ? /* @__PURE__ */ React27.createElement(Notice, { tone: "warning" }, "Booru todavia no tiene una carpeta vigilada configurada.") : /* @__PURE__ */ React27.createElement(Notice, { tone: "danger" }, snapshot?.python?.error || "No se encontro Python para Booru.") : null, /* @__PURE__ */ React27.createElement(
       ContextBrowseControls,
       {
         value: resourceBrowse,
@@ -9902,10 +10277,10 @@ function BooruWorkspaceView({ input = null, ctx }) {
         onChange: updateResourceBrowse,
         onRegenerateRandom: () => updateResourceBrowse({ randomSeed: createBooruRandomSeed() })
       }
-    ), /* @__PURE__ */ React29.createElement("div", { className: [
+    ), /* @__PURE__ */ React27.createElement("div", { className: [
       "booruView__workspaceGrid",
       !showInspector ? "booruView__workspaceGrid--single" : ""
-    ].filter(Boolean).join(" ") }, /* @__PURE__ */ React29.createElement(
+    ].filter(Boolean).join(" ") }, /* @__PURE__ */ React27.createElement(
       ResourceGrid2,
       {
         items: resourceItems,
@@ -9921,7 +10296,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
         scrollTop: activeRouteScrollTop,
         onScrollStateChange: handleRouteScrollStateChange,
         columns: gridColumns[BOORU_GRID_FAMILIES.RESOURCES],
-        onColumnWheel: (event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.RESOURCES, event),
+        onColumnsChange: (nextColumns) => handleGridColumnsChange(BOORU_GRID_FAMILIES.RESOURCES, nextColumns),
         infinite: true,
         hasMore: resourceState.hasMore,
         onLoadMore: loadNextMediaPage,
@@ -9936,7 +10311,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
         emptyTitle: activeResourceSection === "pending" ? "No hay pendientes" : activeResourceSection === "duplicates" ? "No hay duplicados" : activeResourceSection === "trash" ? "La papelera esta vacia" : "Todavia no hay media",
         emptyDescription: activeResourceSection === "pending" ? "Cuando Booru detecte recursos incompletos, apareceran aqui por prioridad." : activeResourceSection === "duplicates" ? "No se detectaron duplicados exactos en esta tanda." : activeResourceSection === "trash" ? "Los recursos eliminados desde Booru apareceran aqui." : "Cuando Booru detecte archivos soportados, apareceran aqui."
       }
-    ), showInspector ? /* @__PURE__ */ React29.createElement(
+    ), showInspector ? /* @__PURE__ */ React27.createElement(
       ResourceInspector2,
       {
         section: activeResourceSection,
@@ -9956,14 +10331,14 @@ function BooruWorkspaceView({ input = null, ctx }) {
         },
         onEnsureEntity: ensureEntityFromUi
       }
-    ) : null)) : /* @__PURE__ */ React29.createElement(ScrollRegion, { className: "booruView__detailScroll" }, /* @__PURE__ */ React29.createElement("div", { className: "booruView__content" }, error ? /* @__PURE__ */ React29.createElement(Notice, { tone: "danger" }, error) : null, entityError ? /* @__PURE__ */ React29.createElement(Notice, { tone: "danger" }, entityError) : null, entityProfileError ? /* @__PURE__ */ React29.createElement(Notice, { tone: "danger" }, entityProfileError) : null, activeEntityKind ? showEntityProfile ? entityProfileLoading && !entityProfile ? /* @__PURE__ */ React29.createElement(
+    ) : null)) : /* @__PURE__ */ React27.createElement(ScrollRegion, { className: "booruView__detailScroll" }, /* @__PURE__ */ React27.createElement("div", { className: "booruView__content" }, error ? /* @__PURE__ */ React27.createElement(Notice, { tone: "danger" }, error) : null, entityError ? /* @__PURE__ */ React27.createElement(Notice, { tone: "danger" }, entityError) : null, entityProfileError ? /* @__PURE__ */ React27.createElement(Notice, { tone: "danger" }, entityProfileError) : null, activeEntityKind ? showEntityProfile ? entityProfileLoading && !entityProfile ? /* @__PURE__ */ React27.createElement(
       StateBlock,
       {
         centered: true,
         title: "Cargando perfil",
         description: `Preparando ${BOORU_ENTITY_KIND_LABELS[activeEntityKind]?.toLowerCase() || "la entidad"} desde Booru.`
       }
-    ) : entityProfile ? /* @__PURE__ */ React29.createElement(
+    ) : entityProfile ? /* @__PURE__ */ React27.createElement(
       EntityProfileView2,
       {
         kind: activeEntityKind,
@@ -9996,8 +10371,8 @@ function BooruWorkspaceView({ input = null, ctx }) {
         onScrollStateChange: handleRouteScrollStateChange,
         gallerySelectedIds: profileGallerySelectedIds,
         onGallerySelectionChange: setProfileGallerySelectedIds,
-        onResourceColumnWheel: (event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.PROFILE_RESOURCES, event),
-        onEntityColumnWheel: (event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.ENTITIES, event),
+        onResourceColumnsChange: (nextColumns) => handleGridColumnsChange(BOORU_GRID_FAMILIES.PROFILE_RESOURCES, nextColumns),
+        onEntityColumnsChange: (nextColumns) => handleGridColumnsChange(BOORU_GRID_FAMILIES.ENTITIES, nextColumns),
         onEntityHover: (kind, item) => {
           hoveredEntityRef.current = item ? { kind, id: item.id } : null;
         },
@@ -10005,14 +10380,14 @@ function BooruWorkspaceView({ input = null, ctx }) {
           hoveredGroupAssociationRef.current = association;
         }
       }
-    ) : /* @__PURE__ */ React29.createElement(
+    ) : /* @__PURE__ */ React27.createElement(
       StateBlock,
       {
         centered: true,
         title: "Perfil no disponible",
         description: "La entidad solicitada ya no esta disponible o su perfil no pudo cargarse."
       }
-    ) : entityLoading ? entityItems.length ? /* @__PURE__ */ React29.createElement("div", { className: "booruView__entitySectionContent" }, /* @__PURE__ */ React29.createElement(
+    ) : entityLoading ? entityItems.length ? /* @__PURE__ */ React27.createElement("div", { className: "booruView__entitySectionContent" }, /* @__PURE__ */ React27.createElement(
       EntityGrid,
       {
         kind: activeEntityKind,
@@ -10032,7 +10407,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
         entityKindLabels: BOORU_ENTITY_KIND_LABELS,
         getInitials,
         columns: gridColumns[BOORU_GRID_FAMILIES.ENTITIES],
-        onColumnWheel: (event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.ENTITIES, event),
+        onColumnsChange: (nextColumns) => handleGridColumnsChange(BOORU_GRID_FAMILIES.ENTITIES, nextColumns),
         onGroupAssociationHover: (association) => {
           hoveredGroupAssociationRef.current = association;
         },
@@ -10040,14 +10415,14 @@ function BooruWorkspaceView({ input = null, ctx }) {
         scrollTop: activeRouteScrollTop,
         onScrollStateChange: handleRouteScrollStateChange
       }
-    )) : /* @__PURE__ */ React29.createElement(
+    )) : /* @__PURE__ */ React27.createElement(
       StateBlock,
       {
         centered: true,
         title: "Cargando seccion",
         description: `Leyendo ${BOORU_ENTITY_KIND_LABELS[activeEntityKind]?.toLowerCase() || "entidades"} desde Booru.`
       }
-    ) : /* @__PURE__ */ React29.createElement(
+    ) : /* @__PURE__ */ React27.createElement(
       EntityGrid,
       {
         kind: activeEntityKind,
@@ -10067,7 +10442,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
         entityKindLabels: BOORU_ENTITY_KIND_LABELS,
         getInitials,
         columns: gridColumns[BOORU_GRID_FAMILIES.ENTITIES],
-        onColumnWheel: (event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.ENTITIES, event),
+        onColumnsChange: (nextColumns) => handleGridColumnsChange(BOORU_GRID_FAMILIES.ENTITIES, nextColumns),
         onGroupAssociationHover: (association) => {
           hoveredGroupAssociationRef.current = association;
         },
@@ -10076,14 +10451,14 @@ function BooruWorkspaceView({ input = null, ctx }) {
         onScrollStateChange: handleRouteScrollStateChange
       }
     ) : null)))
-  ), /* @__PURE__ */ React29.createElement(
+  ), /* @__PURE__ */ React27.createElement(
     FloatingContextMenu,
     {
       state: contextMenuState,
       onClose: () => setContextMenuState(null),
       onAction: (actionId) => void handleContextMenuAction(actionId)
     }
-  ), showFloatingInspector ? /* @__PURE__ */ React29.createElement(
+  ), showFloatingInspector ? /* @__PURE__ */ React27.createElement(
     FloatingDetailsWindow,
     {
       geometry: floatingDetailsGeometry,
@@ -10094,7 +10469,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
         setAnchoredResources([]);
       }
     },
-    /* @__PURE__ */ React29.createElement(
+    /* @__PURE__ */ React27.createElement(
       ResourceInspector2,
       {
         section: "profile",
@@ -10114,7 +10489,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
         priorityEntity: detailsContext?.profileContext || null
       }
     )
-  ) : null, /* @__PURE__ */ React29.createElement(
+  ) : null, /* @__PURE__ */ React27.createElement(
     ResourceHeroOverlay,
     {
       item: activeHeroItem,
@@ -10126,7 +10501,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
       MediaPreview: MediaThumbnail2,
       mediaKindLabels: BOORU_MEDIA_KIND_LABELS
     }
-  ), entityVisualCropState ? /* @__PURE__ */ React29.createElement("div", { className: "booruView__cropOverlay" }, /* @__PURE__ */ React29.createElement(
+  ), entityVisualCropState ? /* @__PURE__ */ React27.createElement("div", { className: "booruView__cropOverlay" }, /* @__PURE__ */ React27.createElement(
     EntityVisualCropper,
     {
       ...entityVisualCropState,
@@ -10136,7 +10511,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
       },
       onCancel: () => setEntityVisualCropState(null)
     }
-  )) : null, /* @__PURE__ */ React29.createElement(
+  )) : null, /* @__PURE__ */ React27.createElement(
     BooruDragPreviewLayer,
     {
       resourcesById: dragPreviewResourcesById,
@@ -10147,14 +10522,14 @@ function BooruWorkspaceView({ input = null, ctx }) {
       useDragLayer: safeUseDragLayer,
       dndType: BOORU_RESOURCE_DND_TYPE
     }
-  ), clipboardAssociationState ? /* @__PURE__ */ React29.createElement(
+  ), clipboardAssociationState ? /* @__PURE__ */ React27.createElement(
     ClipboardAssociationComposer,
     {
       defaultKind: clipboardAssociationState.defaultKind,
       onCancel: () => setClipboardAssociationState(null),
       onConfirm: importClipboardMedia
     }
-  ) : null, characterCreationName ? /* @__PURE__ */ React29.createElement("div", { className: "booruView__cropOverlay" }, /* @__PURE__ */ React29.createElement(
+  ) : null, characterCreationName ? /* @__PURE__ */ React27.createElement("div", { className: "booruView__cropOverlay" }, /* @__PURE__ */ React27.createElement(
     CharacterCreationDialog,
     {
       name: characterCreationName,

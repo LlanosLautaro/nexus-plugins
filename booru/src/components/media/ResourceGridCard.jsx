@@ -1,3 +1,5 @@
+import { resolveBooruVideoAutoplay } from "../../domain/video-preview-policy.js";
+import { GalleryCard, GalleryCardMedia } from "@nexus/ui";
 const React = window.React;
 const { useCallback, useEffect, useMemo } = React;
 
@@ -22,6 +24,7 @@ export default function ResourceGridCard({
   MediaPreview,
   defaultColumns,
 }) {
+  const videoAutoplay = resolveBooruVideoAutoplay(item);
   const normalizedDragResourceIds = useMemo(
     () => uniqueIds(Array.isArray(dragResourceIds) ? dragResourceIds : [item.id]),
     [dragResourceIds, item.id],
@@ -111,10 +114,12 @@ export default function ResourceGridCard({
   };
 
   return (
-    <div
+    <GalleryCard
+      as="div"
       ref={handleDragRef}
       role="button"
       tabIndex={0}
+      interactive
       className={[
         "booruView__mediaCard",
         selected ? "is-selected" : "",
@@ -122,6 +127,7 @@ export default function ResourceGridCard({
         customDragActive ? "is-custom-dragging" : "",
         isDragging ? "is-dragging" : "",
       ].filter(Boolean).join(" ")}
+      selected={selected}
       style={style}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
@@ -155,7 +161,7 @@ export default function ResourceGridCard({
       aria-label={item.originalFilename}
       aria-selected={selected}
     >
-      <div className="booruView__mediaCardPreview">
+      <GalleryCardMedia className="booruView__mediaCardPreview">
         <MediaPreview
           pathValue={item.storagePath}
           mediaKind={item.mediaKind}
@@ -163,12 +169,12 @@ export default function ResourceGridCard({
           thumbnail={item.thumbnail}
           highPriority={absoluteIndex < defaultColumns || selected}
           preferOriginalWhenThumbnailMissing
-          autoplay={item.mediaKind === "video" && (Number(item.durationMs || 0) <= 60000 || Boolean(item.autoplayStoragePath))}
+          autoplay={videoAutoplay.autoplay}
           loop={item.mediaKind === "video"}
-          autoplayPath={item.autoplayStoragePath}
+          autoplayPath={videoAutoplay.autoplayPath}
           hoverPlayable={item.mediaKind === "gif"}
         />
-      </div>
-    </div>
+      </GalleryCardMedia>
+    </GalleryCard>
   );
 }

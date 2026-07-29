@@ -2804,6 +2804,54 @@ function isBooruResourceWindowContextCurrent(requestContext, currentContext) {
   return Boolean(currentContext.showResourceWorkspace) && String(currentContext.activeResourceSection || "") === String(requestContext.activeResourceSection || "") && String(currentContext.querySignature || "") === String(requestContext.querySignature || "") && Number(currentContext.currentResourcePage || 1) === Number(requestContext.currentResourcePage || 1) && Number(currentContext.itemCount || 0) === Number(requestContext.itemCount || 0);
 }
 
+// ../nexus-plugins/booru/src/domain/duplicate-ingest.js
+function createBooruKeyedSerialExecutor() {
+  const pendingByKey = /* @__PURE__ */ new Map();
+  return async function runBooruKeyedTask(rawKey, task) {
+    const key = String(rawKey || "").trim();
+    if (!key) throw new Error("La clave de ingestion es obligatoria.");
+    if (typeof task !== "function") throw new Error("La tarea de ingestion es obligatoria.");
+    const previous = pendingByKey.get(key) || Promise.resolve();
+    let releaseCurrent;
+    const current = new Promise((resolve3) => {
+      releaseCurrent = resolve3;
+    });
+    pendingByKey.set(key, current);
+    await previous.catch(() => void 0);
+    try {
+      return await task();
+    } finally {
+      releaseCurrent();
+      if (pendingByKey.get(key) === current) pendingByKey.delete(key);
+    }
+  };
+}
+function createBooruIngestMutation({
+  resource,
+  createdResourceId = null,
+  reusedCanonical = false
+} = {}) {
+  const resourceId = String(resource?.id || "").trim();
+  const createdId = String(createdResourceId || "").trim() || null;
+  return {
+    reason: reusedCanonical ? "duplicate-reintegrated" : "resource-created",
+    resource,
+    createdResourceId: createdId,
+    reusedCanonical: Boolean(reusedCanonical),
+    updatedResourceIds: resourceId ? [resourceId] : [],
+    createdResourceIds: createdId ? [createdId] : []
+  };
+}
+
+// ../nexus-plugins/booru/src/domain/video-preview-policy.js
+var BOORU_VIDEO_AUTOPLAY_MAX_ORIGINAL_MS = 15e3;
+var BOORU_VIDEO_SHORT_DURATION_SECONDS = 15;
+var BOORU_VIDEO_SHORT_VARIANT = "first-15s-muted-v2";
+function shouldGenerateBooruVideoShort(mediaKind, durationMs) {
+  const duration = Number(durationMs);
+  return mediaKind === "video" && Number.isFinite(duration) && duration > BOORU_VIDEO_AUTOPLAY_MAX_ORIGINAL_MS;
+}
+
 // ../nexus-plugins/booru/src/booru-utils.js
 function normalizeBooruText(value) {
   return String(value ?? "").trim();
@@ -3500,6 +3548,7 @@ function ensureCatalogSchema(db) {
       resource_id TEXT PRIMARY KEY NOT NULL REFERENCES booru_resources(id) ON DELETE CASCADE,
       storage_path TEXT,
       status TEXT NOT NULL DEFAULT 'pending',
+      variant TEXT NOT NULL DEFAULT 'legacy-60s-v1',
       generated_at TEXT,
       error_message TEXT
     );
@@ -3664,6 +3713,12 @@ function ensureCatalogSchema(db) {
   }
   if (!resourceColumns.has("media_info_error")) {
     db.exec(`ALTER TABLE booru_resources ADD COLUMN media_info_error TEXT`);
+  }
+  const videoShortColumns = new Set(
+    db.prepare(`PRAGMA table_info(booru_resource_video_shorts)`).all().map((row) => String(row?.name || ""))
+  );
+  if (!videoShortColumns.has("variant")) {
+    db.exec(`ALTER TABLE booru_resource_video_shorts ADD COLUMN variant TEXT NOT NULL DEFAULT 'legacy-60s-v1'`);
   }
   for (const entityTable of Object.values(ENTITY_TABLES)) {
     const entityColumns = new Set(
@@ -4039,6 +4094,7 @@ function normalizeResourceRow(db, row) {
     mediaInfoError: normalizeBooruOptionalText(row.media_info_error),
     autoplayStoragePath: normalizeBooruOptionalText(row.video_short_storage_path),
     videoShortStatus: normalizeBooruOptionalText(row.video_short_status),
+    videoShortVariant: normalizeBooruOptionalText(row.video_short_variant),
     thumbnail,
     contentHash: String(row.content_hash || ""),
     reality: normalizeBooruReality(row.reality),
@@ -4070,7 +4126,7 @@ function getCanonicalResourceByHash(db, contentHash) {
     WHERE content_hash = ?
       AND classification_state != 'duplicate-review'
       AND trashed_at IS NULL
-    ORDER BY imported_at ASC
+    ORDER BY rowid ASC
     LIMIT 1
   `);
   return statement.get(contentHash) || null;
@@ -4092,6 +4148,7 @@ function getResourceByIdSync(db, resourceId) {
       th.frame_timestamp_ms AS thumbnail_frame_timestamp_ms
       ,vs.storage_path AS video_short_storage_path
       ,vs.status AS video_short_status
+      ,vs.variant AS video_short_variant
     FROM booru_resources r
     LEFT JOIN booru_resources c ON c.id = r.canonical_resource_id
     LEFT JOIN booru_resource_thumbnails th ON th.resource_id = r.id
@@ -4611,6 +4668,7 @@ function getResourceRowsByIdsSync(db, resourceIds) {
       th.frame_timestamp_ms AS thumbnail_frame_timestamp_ms
       ,vs.storage_path AS video_short_storage_path
       ,vs.status AS video_short_status
+      ,vs.variant AS video_short_variant
     FROM booru_resources r
     LEFT JOIN booru_resources c ON c.id = r.canonical_resource_id
     LEFT JOIN booru_resource_thumbnails th ON th.resource_id = r.id
@@ -4950,6 +5008,14 @@ function getThumbnailRowSync(db, resourceId) {
     LIMIT 1
   `).get(resourceId) || null;
 }
+function getVideoShortRowSync(db, resourceId) {
+  return db.prepare(`
+    SELECT *
+    FROM booru_resource_video_shorts
+    WHERE resource_id = ?
+    LIMIT 1
+  `).get(resourceId) || null;
+}
 function ensureThumbnailPendingRowSync(db, resourceId, sourceHash) {
   db.prepare(`
     INSERT INTO booru_resource_thumbnails (
@@ -4971,7 +5037,7 @@ function ensureThumbnailPendingRowSync(db, resourceId, sourceHash) {
       error_message = NULL
   `).run(resourceId, sourceHash);
 }
-function shouldGenerateThumbnailSync(resource, thumbnailRow) {
+function shouldGenerateThumbnailSync(resource, thumbnailRow, videoShortRow = null) {
   if (!resource?.id || !resource?.storagePath || !resource?.contentHash) {
     return false;
   }
@@ -4992,20 +5058,45 @@ function shouldGenerateThumbnailSync(resource, thumbnailRow) {
   if (!metadataReady) {
     return true;
   }
-  return !storagePath || !import_node_fs3.default.existsSync(storagePath);
+  if (!storagePath || !import_node_fs3.default.existsSync(storagePath)) return true;
+  if (shouldGenerateBooruVideoShort(resource.mediaKind, resource.durationMs)) {
+    const shortPath = normalizeBooruOptionalText(videoShortRow?.storage_path);
+    return normalizeBooruOptionalText(videoShortRow?.variant) !== BOORU_VIDEO_SHORT_VARIANT || normalizeThumbnailStatus(videoShortRow?.status) !== "ready" || !shortPath || !import_node_fs3.default.existsSync(shortPath);
+  }
+  return false;
 }
 function listThumbnailBacklogResourceIdsSync(db) {
   return db.prepare(`
-    SELECT r.id
+    SELECT
+      r.id,
+      r.media_kind,
+      r.duration_ms,
+      r.media_info_status,
+      r.content_hash,
+      th.resource_id AS thumbnail_resource_id,
+      th.source_hash AS thumbnail_source_hash,
+      th.status AS thumbnail_status,
+      vs.resource_id AS short_resource_id,
+      vs.storage_path AS short_storage_path,
+      vs.status AS short_status,
+      vs.variant AS short_variant
     FROM booru_resources r
     LEFT JOIN booru_resource_thumbnails th ON th.resource_id = r.id
+    LEFT JOIN booru_resource_video_shorts vs ON vs.resource_id = r.id
     WHERE th.resource_id IS NULL
        OR th.source_hash IS NULL
        OR th.source_hash != r.content_hash
        OR th.status != 'ready'
        OR r.media_info_status != 'ready'
+       OR (r.media_kind = 'video' AND r.duration_ms > 15000)
     ORDER BY r.imported_at DESC, r.id ASC
-  `).all().map((row) => String(row?.id || "")).filter(Boolean);
+  `).all().filter((row) => {
+    const thumbnailPending = !row?.thumbnail_resource_id || !row?.thumbnail_source_hash || row.thumbnail_source_hash !== row.content_hash || normalizeThumbnailStatus(row?.thumbnail_status) !== "ready" || normalizeMediaInfoStatus(row?.media_info_status) !== "ready";
+    if (thumbnailPending) return true;
+    if (!shouldGenerateBooruVideoShort(row?.media_kind, row?.duration_ms)) return false;
+    const shortPath = normalizeBooruOptionalText(row?.short_storage_path);
+    return !row?.short_resource_id || normalizeThumbnailStatus(row?.short_status) !== "ready" || normalizeBooruOptionalText(row?.short_variant) !== BOORU_VIDEO_SHORT_VARIANT || !shortPath || !import_node_fs3.default.existsSync(shortPath);
+  }).map((row) => String(row?.id || "")).filter(Boolean);
 }
 async function readSpawnedJson(state, command, args) {
   assertRuntimeStateActive(state);
@@ -5111,7 +5202,7 @@ async function runThumbnailWorkerForResource(state, resource) {
     throw new Error(`No se encontro ffprobe para Booru en ${ffprobePath}.`);
   }
   const outputPaths = getThumbnailOutputPaths(state.thumbsRoot, resource.id);
-  const shortPath = import_node_path2.default.join(state.shortsRoot, `${resource.id}.mp4`);
+  const shortPath = import_node_path2.default.join(state.shortsRoot, `${resource.id}.${BOORU_VIDEO_SHORT_VARIANT}.mp4`);
   await import_promises4.default.mkdir(import_node_path2.default.dirname(outputPaths.webpPath), { recursive: true });
   await import_promises4.default.mkdir(import_node_path2.default.dirname(shortPath), { recursive: true });
   return readSpawnedJson(state, getWorkerPythonCommand(state), [
@@ -5130,6 +5221,8 @@ async function runThumbnailWorkerForResource(state, resource) {
     outputPaths.jpegPath,
     "--video-short-path",
     shortPath,
+    "--video-short-duration-seconds",
+    String(BOORU_VIDEO_SHORT_DURATION_SECONDS),
     "--max-side",
     String(THUMBNAIL_MAX_SIDE_PX)
   ]);
@@ -5191,16 +5284,26 @@ function persistThumbnailSuccessSync(db, resourceId, sourceHash, workerResult) {
   );
   const shortPath = normalizeBooruOptionalText(workerResult?.shortPath);
   const shortError = normalizeBooruOptionalText(workerResult?.shortError);
-  if (shortPath || shortError || Number(workerResult?.durationMs || 0) > 6e4) {
+  if (shouldGenerateBooruVideoShort("video", workerResult?.durationMs)) {
     db.prepare(`
-      INSERT INTO booru_resource_video_shorts (resource_id, storage_path, status, generated_at, error_message)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO booru_resource_video_shorts (resource_id, storage_path, status, variant, generated_at, error_message)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(resource_id) DO UPDATE SET
         storage_path = excluded.storage_path,
         status = excluded.status,
+        variant = excluded.variant,
         generated_at = excluded.generated_at,
         error_message = excluded.error_message
-    `).run(resourceId, shortPath, shortPath ? "ready" : shortError ? "error" : "pending", generatedAt, shortError);
+    `).run(
+      resourceId,
+      shortPath,
+      shortPath ? "ready" : shortError ? "error" : "pending",
+      BOORU_VIDEO_SHORT_VARIANT,
+      generatedAt,
+      shortError
+    );
+  } else {
+    db.prepare(`DELETE FROM booru_resource_video_shorts WHERE resource_id = ?`).run(resourceId);
   }
 }
 function persistThumbnailErrorSync(db, resourceId, sourceHash, errorMessage) {
@@ -5239,6 +5342,7 @@ function queueThumbnailGeneration(resourceIds, priority = "low") {
     return;
   }
   let queuedAny = false;
+  let queuedCount = 0;
   for (const resourceId of uniqueBooruIds(resourceIds)) {
     if (!resourceId || state.thumbnailProcessingIds.has(resourceId)) {
       continue;
@@ -5253,18 +5357,48 @@ function queueThumbnailGeneration(resourceIds, priority = "low") {
       continue;
     }
     const resource = getResourceByIdSync(state.db, resourceId);
-    if (!resource || !shouldGenerateThumbnailSync(resource, getThumbnailRowSync(state.db, resourceId))) {
+    if (!resource || !shouldGenerateThumbnailSync(
+      resource,
+      getThumbnailRowSync(state.db, resourceId),
+      getVideoShortRowSync(state.db, resourceId)
+    )) {
       continue;
     }
     state.thumbnailQueuedIds.add(resourceId);
     queuedAny = true;
+    queuedCount += 1;
     if (priority === "high") {
       state.thumbnailHighPriorityIds.unshift(resourceId);
     } else {
       state.thumbnailLowPriorityIds.push(resourceId);
     }
   }
-  if (queuedAny) {
+  if (queuedAny && state.python.available) {
+    if (!state.thumbnailTaskActive) {
+      state.thumbnailTaskActive = true;
+      state.thumbnailTaskTotal = 0;
+      state.thumbnailTaskCompleted = 0;
+      state.thumbnailTaskFailed = 0;
+      state.ctx.tasks.start({
+        id: "booru.thumbnails",
+        title: "Creando thumbnails",
+        detail: "Preparando previews de Booru",
+        progress: {
+          current: 0,
+          total: queuedCount,
+          label: "previews"
+        }
+      });
+    }
+    state.thumbnailTaskTotal += queuedCount;
+    state.ctx.tasks.update("booru.thumbnails", {
+      detail: `${state.thumbnailTaskTotal - state.thumbnailTaskCompleted - state.thumbnailTaskFailed} pendientes`,
+      progress: {
+        current: state.thumbnailTaskCompleted + state.thumbnailTaskFailed,
+        total: state.thumbnailTaskTotal,
+        label: "previews"
+      }
+    });
     booruBackendLogger.debug(
       "booru.thumbnail.queue.enqueued",
       "Booru encolo recursos para generar thumbnails.",
@@ -5298,11 +5432,12 @@ async function processThumbnailQueueEntry(state, resourceId) {
   assertRuntimeStateActive(state);
   const resource = getResourceByIdSync(state.db, resourceId);
   if (!resource) {
-    return;
+    return true;
   }
   const thumbnailRow = getThumbnailRowSync(state.db, resourceId);
-  if (!shouldGenerateThumbnailSync(resource, thumbnailRow)) {
-    return;
+  const previousVideoShortRow = getVideoShortRowSync(state.db, resourceId);
+  if (!shouldGenerateThumbnailSync(resource, thumbnailRow, previousVideoShortRow)) {
+    return true;
   }
   ensureThumbnailPendingRowSync(state.db, resourceId, resource.contentHash);
   const outputPaths = getThumbnailOutputPaths(state.thumbsRoot, resourceId);
@@ -5335,6 +5470,11 @@ async function processThumbnailQueueEntry(state, resourceId) {
     if (thumbnailPath !== outputPaths.jpegPath) {
       await removeFileIfExists(outputPaths.jpegPath);
     }
+    const nextShortPath = normalizeBooruOptionalText(workerResult?.shortPath);
+    const previousShortPath = normalizeBooruOptionalText(previousVideoShortRow?.storage_path);
+    if (previousShortPath && previousShortPath !== nextShortPath) {
+      await removeFileIfExists(previousShortPath);
+    }
     logBackendDuration(
       "booru.thumbnail.worker.done",
       "Booru resolvio el worker de thumbnail para un recurso.",
@@ -5354,9 +5494,10 @@ async function processThumbnailQueueEntry(state, resourceId) {
         stderrSnippet: /error|invalid|decode|cannot/i.test(workerExecution.stderr || "") ? truncateDiagnosticText(workerExecution.stderr) : ""
       }
     );
+    return true;
   } catch (error) {
     if (isRuntimeCancellation(error) || !isRuntimeStateActive(state)) {
-      return;
+      return false;
     }
     const errorMessage = error instanceof Error ? error.message : "No se pudo generar la thumbnail de Booru.";
     withTransaction(state.db, () => {
@@ -5384,13 +5525,59 @@ async function processThumbnailQueueEntry(state, resourceId) {
       "Booru no pudo generar la thumbnail de un recurso.",
       workerFailurePayload
     );
+    return false;
   }
-  scheduleRuntimeInvalidationForState(state, "thumbnailsVersion");
+}
+function syncThumbnailRuntimeTask(state) {
+  if (!state.thumbnailTaskActive || !isRuntimeStateActive(state)) {
+    return;
+  }
+  const processedCount = state.thumbnailTaskCompleted + state.thumbnailTaskFailed;
+  const pendingCount = Math.max(0, state.thumbnailTaskTotal - processedCount);
+  const patch = {
+    detail: pendingCount > 0 ? `${pendingCount} ${pendingCount === 1 ? "preview pendiente" : "previews pendientes"}` : state.thumbnailTaskFailed > 0 ? `${state.thumbnailTaskFailed} ${state.thumbnailTaskFailed === 1 ? "preview con error" : "previews con error"}` : "Finalizando previews",
+    progress: {
+      current: processedCount,
+      total: state.thumbnailTaskTotal,
+      label: "previews"
+    }
+  };
+  state.ctx.tasks.update("booru.thumbnails", patch);
+  if (state.thumbnailTaskFailed > 0) {
+    state.ctx.tasks.fail("booru.thumbnails", {
+      message: "Algunas thumbnails no pudieron crearse.",
+      detail: patch.detail
+    });
+  }
+  const queueEmpty = state.thumbnailHighPriorityIds.length === 0 && state.thumbnailLowPriorityIds.length === 0 && state.thumbnailProcessingIds.size === 0;
+  if (!queueEmpty) {
+    return;
+  }
+  if (state.thumbnailTaskFailed === 0) {
+    state.ctx.tasks.complete("booru.thumbnails");
+  }
+  state.thumbnailTaskActive = false;
 }
 async function pumpThumbnailQueue() {
   const state = runtimeState;
   if (!isRuntimeStateActive(state) || !state.python.available) {
     return;
+  }
+  if (!state.thumbnailTaskActive && (state.thumbnailHighPriorityIds.length || state.thumbnailLowPriorityIds.length)) {
+    state.thumbnailTaskActive = true;
+    state.thumbnailTaskTotal = state.thumbnailHighPriorityIds.length + state.thumbnailLowPriorityIds.length;
+    state.thumbnailTaskCompleted = 0;
+    state.thumbnailTaskFailed = 0;
+    state.ctx.tasks.start({
+      id: "booru.thumbnails",
+      title: "Creando thumbnails",
+      detail: `${state.thumbnailTaskTotal} ${state.thumbnailTaskTotal === 1 ? "preview pendiente" : "previews pendientes"}`,
+      progress: {
+        current: 0,
+        total: state.thumbnailTaskTotal,
+        label: "previews"
+      }
+    });
   }
   while (state.thumbnailProcessingIds.size < THUMBNAIL_CONCURRENCY && (state.thumbnailHighPriorityIds.length || state.thumbnailLowPriorityIds.length)) {
     const nextResourceId = dequeueNextThumbnailResourceId(state);
@@ -5399,7 +5586,10 @@ async function pumpThumbnailQueue() {
     }
     state.thumbnailProcessingIds.add(nextResourceId);
     scheduleRuntimeInvalidationForState(state, "metricsVersion");
-    const task = processThumbnailQueueEntry(state, nextResourceId).catch((error) => {
+    let workerSucceeded = false;
+    const task = processThumbnailQueueEntry(state, nextResourceId).then((succeeded) => {
+      workerSucceeded = Boolean(succeeded);
+    }).catch((error) => {
       if (!isRuntimeCancellation(error) && isRuntimeStateActive(state)) {
         booruBackendLogger.error(
           "booru.thumbnail.worker.unhandled",
@@ -5408,7 +5598,14 @@ async function pumpThumbnailQueue() {
         );
       }
     }).finally(() => {
+      if (workerSucceeded) {
+        state.thumbnailTaskCompleted += 1;
+      } else {
+        state.thumbnailTaskFailed += 1;
+      }
       state.thumbnailProcessingIds.delete(nextResourceId);
+      syncThumbnailRuntimeTask(state);
+      scheduleRuntimeInvalidationForState(state, "thumbnailsVersion");
       scheduleRuntimeInvalidationForState(state, "metricsVersion");
       if (isRuntimeStateActive(state)) {
         void pumpThumbnailQueue();
@@ -5451,11 +5648,20 @@ function createRuntimeState(ctx) {
     },
     queue: Promise.resolve(),
     queuedPaths: /* @__PURE__ */ new Set(),
+    ingestByContentHash: createBooruKeyedSerialExecutor(),
     thumbnailHighPriorityIds: [],
     thumbnailLowPriorityIds: [],
     thumbnailQueuedIds: /* @__PURE__ */ new Set(),
     thumbnailProcessingIds: /* @__PURE__ */ new Set(),
     thumbnailLastError: "",
+    thumbnailTaskActive: false,
+    thumbnailTaskTotal: 0,
+    thumbnailTaskCompleted: 0,
+    thumbnailTaskFailed: 0,
+    ingestTaskActive: false,
+    ingestTaskTotal: 0,
+    ingestTaskCompleted: 0,
+    ingestTaskFailed: 0,
     invalidationVersion: 1,
     pendingInvalidations: /* @__PURE__ */ new Set(),
     invalidationTimer: null,
@@ -7723,7 +7929,6 @@ async function pasteClipboardImageToEntitySync(ctx, db, payload) {
   }
   try {
     const ingestResult = await ingestFile(ctx, tempFilePath, {
-      duplicateMode: "reuse-canonical",
       updateWatcherState: false,
       sourcePathOverride: "clipboard://image",
       originalFilenameOverride: buildClipboardImportedFilename()
@@ -7744,7 +7949,10 @@ async function pasteClipboardImageToEntitySync(ctx, db, payload) {
       profile,
       resource,
       reusedCanonical: ingestResult.reusedCanonical,
-      createdResourceId: ingestResult.createdResourceId
+      createdResourceId: ingestResult.createdResourceId,
+      reason: ingestResult.reason,
+      updatedResourceIds: ingestResult.updatedResourceIds,
+      createdResourceIds: ingestResult.createdResourceIds
     };
   } finally {
     await removeFileIfExists(tempFilePath);
@@ -7813,7 +8021,6 @@ async function pasteClipboardMediaSync(ctx, db, payload) {
   const associations = resolveClipboardAssociationsSync(db, payload);
   try {
     const ingestResult = await ingestFile(ctx, tempFilePath, {
-      duplicateMode: "reuse-canonical",
       updateWatcherState: false,
       sourcePathOverride: "clipboard://image",
       originalFilenameOverride: buildClipboardImportedFilename()
@@ -7828,7 +8035,10 @@ async function pasteClipboardMediaSync(ctx, db, payload) {
       resource,
       associations,
       reusedCanonical: ingestResult.reusedCanonical,
-      createdResourceId: ingestResult.createdResourceId
+      createdResourceId: ingestResult.createdResourceId,
+      reason: ingestResult.reason,
+      updatedResourceIds: ingestResult.updatedResourceIds,
+      createdResourceIds: ingestResult.createdResourceIds
     };
   } finally {
     await removeFileIfExists(tempFilePath);
@@ -7995,44 +8205,79 @@ async function openResourceInBraveSync(db, payload) {
     `No se pudo abrir Brave con el perfil ${BRAVE_PROFILE_DIRECTORY}. ${spawnErrors.join(" | ")}`.trim()
   );
 }
-async function ingestFile(ctx, filePath, options = {}) {
-  const state = runtimeState;
-  if (!state || !state.db) {
-    return null;
+function addResourceEntityAssignmentSync(db, resourceId, kind, entityId) {
+  const relationTable = kind === "universe" ? "booru_resource_universes" : getResourceRelationTable(kind);
+  const relationEntityIdColumn = kind === "universe" ? "universe_id" : getResourceRelationEntityIdColumn(kind);
+  if (!relationTable || !relationEntityIdColumn) throw new Error("El tipo de clasificacion rapida no existe.");
+  db.prepare(`
+    INSERT OR IGNORE INTO ${relationTable} (
+      resource_id,
+      ${relationEntityIdColumn},
+      sort_order,
+      created_at
+    ) VALUES (
+      ?, ?,
+      COALESCE((SELECT MAX(sort_order) + 1 FROM ${relationTable} WHERE resource_id = ?), 0),
+      ?
+    )
+  `).run(resourceId, entityId, resourceId, nowIso());
+  if (kind === "universe") {
+    db.prepare(`DELETE FROM booru_resource_universe_exclusions WHERE resource_id = ? AND universe_id = ?`).run(resourceId, entityId);
   }
-  const absoluteFilePath = import_node_path2.default.resolve(filePath);
-  const mediaDescriptor = resolveMediaDescriptor(absoluteFilePath);
-  const duplicateMode = options.duplicateMode || "create-review";
-  const updateWatcherState = options.updateWatcherState !== false;
-  if (!mediaDescriptor) {
-    return null;
+}
+function reintegrateCanonicalResourceSync(db, resourceId, importedAt, fastTarget = null) {
+  const canonical = getResourceByIdSync(db, resourceId);
+  if (!canonical || canonical.classificationState === "duplicate-review" || canonical.trashedAt) {
+    throw new Error("No se pudo reintegrar el recurso canonico detectado en Booru.");
   }
-  if (!import_node_fs3.default.existsSync(absoluteFilePath)) {
-    return null;
-  }
-  const contentHash = await computeFileHash(absoluteFilePath);
+  withTransaction(db, () => {
+    db.prepare(`
+      UPDATE booru_resources
+      SET imported_at = ?, last_seen_at = ?
+      WHERE id = ?
+    `).run(importedAt, importedAt, resourceId);
+    if (fastTarget && findEntityByIdSync(db, fastTarget.kind, fastTarget.entityId)) {
+      addResourceEntityAssignmentSync(db, resourceId, fastTarget.kind, fastTarget.entityId);
+    }
+    syncResourceInheritanceSync(db, resourceId);
+    reconcileResourceClassificationSync(db, resourceId);
+  });
+  return getResourceByIdSync(db, resourceId);
+}
+async function ingestHashedFile(state, absoluteFilePath, mediaDescriptor, contentHash, options) {
   assertRuntimeStateCurrent(state);
   const canonicalResource = getCanonicalResourceByHash(state.db, contentHash);
-  if (canonicalResource && duplicateMode === "reuse-canonical") {
-    const reusedResource = getResourceByIdSync(state.db, String(canonicalResource.id || ""));
-    if (!reusedResource) {
-      throw new Error("No se pudo reutilizar el recurso canonico detectado en Booru.");
-    }
-    queueThumbnailGeneration([reusedResource.id], "high");
-    return {
-      resource: reusedResource,
-      createdResourceId: null,
-      reusedCanonical: true
-    };
-  }
   const importedAt = nowIso();
-  const resourceId = import_node_crypto.default.randomUUID();
   const originalFilename = String(
     options.originalFilenameOverride || import_node_path2.default.basename(absoluteFilePath)
   ).trim() || import_node_path2.default.basename(absoluteFilePath);
-  const targetRoot = canonicalResource ? state.duplicatesRoot : state.mediaRoot;
+  const updateWatcherState = options.updateWatcherState !== false;
+  if (canonicalResource) {
+    const canonicalId = String(canonicalResource.id || "");
+    const reusedResource = reintegrateCanonicalResourceSync(
+      state.db,
+      canonicalId,
+      importedAt,
+      state.fastClassification
+    );
+    if (!reusedResource) throw new Error("No se pudo reutilizar el recurso canonico detectado en Booru.");
+    if (import_node_path2.default.resolve(reusedResource.storagePath) !== absoluteFilePath) {
+      await removeFileIfExists(absoluteFilePath);
+      assertRuntimeStateCurrent(state);
+    }
+    if (updateWatcherState) {
+      state.watcherState.lastIngestedAt = importedAt;
+      state.watcherState.lastIngestedOriginalFilename = originalFilename;
+      state.watcherState.lastIngestedStoragePath = reusedResource.storagePath;
+      state.watcherState.lastError = "";
+    }
+    queueThumbnailGeneration([canonicalId], "high");
+    scheduleRuntimeInvalidationForState(state, "resourcesVersion", "entitiesVersion", "watcherVersion");
+    return createBooruIngestMutation({ resource: reusedResource, reusedCanonical: true });
+  }
+  const resourceId = import_node_crypto.default.randomUUID();
   const storageFilename = `${resourceId}${mediaDescriptor.extension}`;
-  const storagePath = import_node_path2.default.join(targetRoot, storageFilename);
+  const storagePath = import_node_path2.default.join(state.mediaRoot, storageFilename);
   const sourcePath = options.sourcePathOverride === void 0 ? absoluteFilePath : options.sourcePathOverride || null;
   await moveFile(absoluteFilePath, storagePath);
   assertRuntimeStateCurrent(state);
@@ -8040,29 +8285,11 @@ async function ingestFile(ctx, filePath, options = {}) {
   assertRuntimeStateCurrent(state);
   state.db.prepare(`
     INSERT INTO booru_resources (
-      id,
-      storage_filename,
-      storage_path,
-      original_filename,
-      extension,
-      mime_type,
-      media_kind,
-      file_size,
-      width,
-      height,
-      duration_ms,
-      content_hash,
-      reality,
-      classification_state,
-      canonical_resource_id,
-      source_path,
-      media_info_status,
-      media_info_error,
-      imported_at,
-      last_seen_at
-    ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-    )
+      id, storage_filename, storage_path, original_filename, extension, mime_type,
+      media_kind, file_size, width, height, duration_ms, content_hash, reality,
+      classification_state, canonical_resource_id, source_path, media_info_status,
+      media_info_error, imported_at, last_seen_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     resourceId,
     storageFilename,
@@ -8077,8 +8304,8 @@ async function ingestFile(ctx, filePath, options = {}) {
     null,
     contentHash,
     null,
-    canonicalResource ? "duplicate-review" : "unclassified",
-    canonicalResource ? String(canonicalResource.id || "") : null,
+    "unclassified",
+    null,
     sourcePath,
     "pending",
     null,
@@ -8086,9 +8313,8 @@ async function ingestFile(ctx, filePath, options = {}) {
     importedAt
   );
   ensureThumbnailPendingRowSync(state.db, resourceId, contentHash);
-  queueThumbnailGeneration([resourceId], "high");
   const fastTarget = state.fastClassification;
-  if (fastTarget && canonicalResource === null && findEntityByIdSync(state.db, fastTarget.kind, fastTarget.entityId)) {
+  if (fastTarget && findEntityByIdSync(state.db, fastTarget.kind, fastTarget.entityId)) {
     quickAssignEntitySync(state.db, {
       resourceId,
       kind: fastTarget.kind,
@@ -8101,17 +8327,35 @@ async function ingestFile(ctx, filePath, options = {}) {
     state.watcherState.lastIngestedStoragePath = storagePath;
     state.watcherState.lastError = "";
   }
-  scheduleRuntimeInvalidationForState(
-    state,
-    "resourcesVersion",
-    "entitiesVersion",
-    "watcherVersion"
-  );
-  return {
+  queueThumbnailGeneration([resourceId], "high");
+  scheduleRuntimeInvalidationForState(state, "resourcesVersion", "entitiesVersion", "watcherVersion");
+  return createBooruIngestMutation({
     resource: getResourceByIdSync(state.db, resourceId),
-    createdResourceId: resourceId,
-    reusedCanonical: false
-  };
+    createdResourceId: resourceId
+  });
+}
+async function ingestFile(ctx, filePath, options = {}) {
+  const state = runtimeState;
+  if (!state || !state.db) {
+    return null;
+  }
+  const absoluteFilePath = import_node_path2.default.resolve(filePath);
+  const mediaDescriptor = resolveMediaDescriptor(absoluteFilePath);
+  if (!mediaDescriptor) {
+    return null;
+  }
+  if (!import_node_fs3.default.existsSync(absoluteFilePath)) {
+    return null;
+  }
+  const contentHash = await computeFileHash(absoluteFilePath);
+  assertRuntimeStateCurrent(state);
+  return state.ingestByContentHash(contentHash, () => ingestHashedFile(
+    state,
+    absoluteFilePath,
+    mediaDescriptor,
+    contentHash,
+    options
+  ));
 }
 function queueIngest(ctx, filePath) {
   const state = runtimeState;
@@ -8124,7 +8368,33 @@ function queueIngest(ctx, filePath) {
   }
   state.queuedPaths.add(absoluteFilePath);
   state.watcherState.pendingCount += 1;
+  if (!state.ingestTaskActive) {
+    state.ingestTaskActive = true;
+    state.ingestTaskTotal = 0;
+    state.ingestTaskCompleted = 0;
+    state.ingestTaskFailed = 0;
+    state.ctx.tasks.start({
+      id: "booru.ingest",
+      title: "Importando medios",
+      detail: "Preparando archivos de Booru",
+      progress: {
+        current: 0,
+        total: 1,
+        label: "archivos"
+      }
+    });
+  }
+  state.ingestTaskTotal += 1;
+  state.ctx.tasks.update("booru.ingest", {
+    detail: `${state.watcherState.pendingCount} ${state.watcherState.pendingCount === 1 ? "archivo pendiente" : "archivos pendientes"}`,
+    progress: {
+      current: state.ingestTaskCompleted + state.ingestTaskFailed,
+      total: state.ingestTaskTotal,
+      label: "archivos"
+    }
+  });
   scheduleRuntimeInvalidationForState(state, "watcherVersion");
+  let ingestFailed = false;
   state.queue = state.queue.then(() => {
     assertRuntimeStateActive(state);
     return ingestFile(ctx, absoluteFilePath);
@@ -8133,10 +8403,41 @@ function queueIngest(ctx, filePath) {
       return;
     }
     state.watcherState.lastError = error instanceof Error ? error.message : "No se pudo ingerir el archivo.";
+    ingestFailed = true;
+    state.ingestTaskFailed += 1;
+    state.ctx.tasks.update("booru.ingest", {
+      detail: state.watcherState.lastError,
+      progress: {
+        current: state.ingestTaskCompleted + state.ingestTaskFailed,
+        total: state.ingestTaskTotal,
+        label: "archivos"
+      }
+    });
+    state.ctx.tasks.fail("booru.ingest", {
+      message: "No se pudieron importar todos los medios.",
+      detail: state.watcherState.lastError
+    });
     scheduleRuntimeInvalidationForState(state, "watcherVersion");
   }).finally(() => {
+    if (!ingestFailed) {
+      state.ingestTaskCompleted += 1;
+    }
     state.queuedPaths.delete(absoluteFilePath);
     state.watcherState.pendingCount = Math.max(0, state.watcherState.pendingCount - 1);
+    state.ctx.tasks.update("booru.ingest", {
+      detail: state.watcherState.pendingCount > 0 ? `${state.watcherState.pendingCount} ${state.watcherState.pendingCount === 1 ? "archivo pendiente" : "archivos pendientes"}` : state.ingestTaskFailed > 0 ? `${state.ingestTaskFailed} ${state.ingestTaskFailed === 1 ? "archivo con error" : "archivos con error"}` : "Finalizando importaci\xF3n",
+      progress: {
+        current: state.ingestTaskCompleted + state.ingestTaskFailed,
+        total: state.ingestTaskTotal,
+        label: "archivos"
+      }
+    });
+    if (state.watcherState.pendingCount === 0) {
+      if (state.ingestTaskFailed === 0) {
+        state.ctx.tasks.complete("booru.ingest");
+      }
+      state.ingestTaskActive = false;
+    }
     scheduleRuntimeInvalidationForState(state, "watcherVersion");
   });
 }
@@ -8167,24 +8468,52 @@ async function restartWatcher(state, ctx, settingsValue) {
   const watchFolderPath = readBooruWatchFolderPath(settingsValue);
   if (!watchFolderPath) {
     state.watcherState.stage = "idle-no-folder";
+    state.ctx.tasks.complete("booru.watcher");
     scheduleRuntimeInvalidationForState(state, "watcherVersion");
     return;
   }
   if (!state.python.available) {
     state.watcherState.stage = "blocked-python";
     state.watcherState.lastError = state.python.error || "No se encontro Python para Booru. Configura pythonExecutable o asegurate de que python este disponible en PATH.";
+    state.ctx.tasks.start({
+      id: "booru.watcher",
+      title: "Watcher de Booru",
+      detail: state.watcherState.lastError
+    });
+    state.ctx.tasks.fail("booru.watcher", {
+      message: "Booru no puede vigilar la carpeta.",
+      detail: state.watcherState.lastError
+    });
     scheduleRuntimeInvalidationForState(state, "watcherVersion");
     return;
   }
   if (!import_node_fs3.default.existsSync(watchFolderPath) || !import_node_fs3.default.statSync(watchFolderPath).isDirectory()) {
     state.watcherState.stage = "blocked-folder";
     state.watcherState.lastError = "La carpeta vigilada no existe o no es una carpeta valida.";
+    state.ctx.tasks.start({
+      id: "booru.watcher",
+      title: "Watcher de Booru",
+      detail: state.watcherState.lastError
+    });
+    state.ctx.tasks.fail("booru.watcher", {
+      message: "Booru no puede vigilar la carpeta.",
+      detail: state.watcherState.lastError
+    });
     scheduleRuntimeInvalidationForState(state, "watcherVersion");
     return;
   }
   if (watchFolderPath.startsWith(state.storageRoot)) {
     state.watcherState.stage = "blocked-folder";
     state.watcherState.lastError = "La carpeta vigilada no puede apuntar al storage interno de Booru.";
+    state.ctx.tasks.start({
+      id: "booru.watcher",
+      title: "Watcher de Booru",
+      detail: state.watcherState.lastError
+    });
+    state.ctx.tasks.fail("booru.watcher", {
+      message: "Booru no puede vigilar la carpeta.",
+      detail: state.watcherState.lastError
+    });
     scheduleRuntimeInvalidationForState(state, "watcherVersion");
     return;
   }
@@ -8209,6 +8538,7 @@ async function restartWatcher(state, ctx, settingsValue) {
     }
     state.watcherState.active = true;
     state.watcherState.stage = "watching";
+    state.ctx.tasks.complete("booru.watcher");
     scheduleRuntimeInvalidationForState(state, "watcherVersion");
   });
   state.watcher.on("error", (error) => {
@@ -8218,6 +8548,15 @@ async function restartWatcher(state, ctx, settingsValue) {
     state.watcherState.active = false;
     state.watcherState.stage = "error";
     state.watcherState.lastError = error instanceof Error ? error.message : "Error en el watcher de Booru.";
+    state.ctx.tasks.start({
+      id: "booru.watcher",
+      title: "Watcher de Booru",
+      detail: state.watcherState.lastError
+    });
+    state.ctx.tasks.fail("booru.watcher", {
+      message: "El watcher de Booru se detuvo.",
+      detail: state.watcherState.lastError
+    });
     scheduleRuntimeInvalidationForState(state, "watcherVersion");
   });
 }
@@ -8554,7 +8893,6 @@ var booruPlugin = {
       const tempFilePath = assertClipboardTempFilePath(payload?.tempFilePath);
       try {
         const result = await ingestFile(ctx, tempFilePath, {
-          duplicateMode: "reuse-canonical",
           updateWatcherState: false,
           sourcePathOverride: "clipboard://social-platform-icon",
           originalFilenameOverride: buildClipboardImportedFilename()
@@ -8575,7 +8913,6 @@ var booruPlugin = {
         await import_promises4.default.mkdir(CLIPBOARD_IMAGE_TEMP_ROOT, { recursive: true });
         await import_promises4.default.copyFile(sourcePath, tempFilePath);
         const result = await ingestFile(ctx, tempFilePath, {
-          duplicateMode: "reuse-canonical",
           updateWatcherState: false,
           sourcePathOverride: `platform-icon://${import_node_path2.default.basename(sourcePath)}`,
           originalFilenameOverride: import_node_path2.default.basename(sourcePath)
@@ -9055,6 +9392,9 @@ var __booruTestUtils = {
   quickAssignEntitySync,
   resolveClipboardAssociationsSync,
   mergeClipboardAssociationsIntoResourceSync,
+  reintegrateCanonicalResourceSync,
+  createBooruIngestMutation,
+  createBooruKeyedSerialExecutor,
   listEntitiesSync,
   listEntityRelationsSync,
   getEntityProfileSync,
@@ -9068,6 +9408,7 @@ var __booruTestUtils = {
   listPendingRows,
   listDuplicateRows,
   listTrashRows,
+  listThumbnailBacklogResourceIdsSync,
   listResourcesSync,
   listRecommendationsSync,
   setEntityVisualSync,

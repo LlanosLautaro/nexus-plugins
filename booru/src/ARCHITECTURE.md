@@ -50,6 +50,12 @@ Las reglas puras compartidas por backend y renderer viven en `domain/`.
   ventana incremental y resuelve el recurso anclado de Details por ID. La
   galeria puede retirar o mover una card sin cambiar el `activeId`; el IPC por
   IDs mantiene el inspector actualizado fuera de la consulta visible.
+- `domain/duplicate-ingest.js` serializa por hash la sección crítica de ingesta.
+  Un hash conocido actualiza y devuelve únicamente el canónico, consume el
+  entrante y fusiona la clasificación rápida antes de recalcular la política.
+- `domain/video-preview-policy.js` decide original o short con un límite único
+  de 15 segundos. La variante persistida invalida derivados legacy y el worker
+  recibe la duración desde el backend en vez de mantener otro umbral oculto.
 - `domain/details-policy.js` proyecta la matriz de prioridad sobre los campos
   cotidianos, decide si realidad es editable o de solo lectura y detecta
   relaciones mixtas sin convertir su interseccion en un reemplazo implicito.
@@ -73,7 +79,7 @@ IPC; schema, catalogo, entidades, recomendaciones e ingesta continúan siendo
 responsabilidad del backend. Las dependencias de host y helpers se inyectan
 desde el controlador para conservar esta frontera y hacer cada componente
 reutilizable. Al extraer otra pieza desde la view, mantener esa misma frontera
-y consumir primitivas de `nexus-frontend/src/ui`.
+y consumir primitivas públicas de `@nexus/ui`.
 
 Cada identificador usado por un componente debe ser local, importado o recibido
 por props. Un componente no puede referenciar helpers, constantes ni telemetria

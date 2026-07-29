@@ -9,12 +9,12 @@ import {
   Button,
   Field,
   FieldGrid,
-  IconButton,
+  CyberIconButton,
   Notice,
   PanelHeader,
   PanelTitle,
   SectionPanel,
-} from "../../../../nexus-frontend/src/ui/index.js";
+} from "@nexus/ui";
 import {
   CheckIcon,
   ChevronLeftIcon,
@@ -312,7 +312,7 @@ function ChecklistDraftEditor({
                 disabled={disabled}
               />
 
-              <IconButton
+              <CyberIconButton
                 type="button"
                 aria-label="Eliminar item"
                 tone="danger"
@@ -320,7 +320,7 @@ function ChecklistDraftEditor({
                 disabled={disabled}
               >
                 <TrashIcon />
-              </IconButton>
+              </CyberIconButton>
             </div>
           ))}
         </div>

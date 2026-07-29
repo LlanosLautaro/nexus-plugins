@@ -66,98 +66,65 @@
 }
 
 .booksPluginSettings__row select,
-.booksPluginSettings__secondaryButton,
-.booksPluginSettings__primaryButton,
 .booksLibrary__secondaryButton,
 .booksLibrary__choiceButton,
-.booksEngine__toolbar button,
-.booksEngine__choiceButton,
-.booksEngine__secondaryButton {
+.booksEngine__choiceButton {
   user-select: none;
   -webkit-user-select: none;
   -webkit-user-drag: none;
   min-height: var(--control-height-m);
-  border-radius: var(--radius-pill);
+  border-radius: var(--ui-radius-control, var(--radius-m));
   border: 1px solid var(--button-secondary-border);
   background: var(--button-secondary-bg);
   color: var(--button-secondary-text);
   transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 .booksPluginSettings__row select:hover:not(:disabled), .booksPluginSettings__row select:focus-visible:not(:disabled),
-.booksPluginSettings__secondaryButton:hover:not(:disabled),
-.booksPluginSettings__secondaryButton:focus-visible:not(:disabled),
-.booksPluginSettings__primaryButton:hover:not(:disabled),
-.booksPluginSettings__primaryButton:focus-visible:not(:disabled),
 .booksLibrary__secondaryButton:hover:not(:disabled),
 .booksLibrary__secondaryButton:focus-visible:not(:disabled),
 .booksLibrary__choiceButton:hover:not(:disabled),
 .booksLibrary__choiceButton:focus-visible:not(:disabled),
-.booksEngine__toolbar button:hover:not(:disabled),
-.booksEngine__toolbar button:focus-visible:not(:disabled),
 .booksEngine__choiceButton:hover:not(:disabled),
-.booksEngine__choiceButton:focus-visible:not(:disabled),
-.booksEngine__secondaryButton:hover:not(:disabled),
-.booksEngine__secondaryButton:focus-visible:not(:disabled) {
+.booksEngine__choiceButton:focus-visible:not(:disabled) {
   border-color: var(--color-line-strong);
-  background: var(--surface-hover);
+  background: linear-gradient(var(--ui-hover-overlay), var(--ui-hover-overlay)), var(--button-secondary-bg);
   color: var(--color-text);
   transform: translateY(-1px);
 }
 .booksPluginSettings__row select:disabled,
-.booksPluginSettings__secondaryButton:disabled,
-.booksPluginSettings__primaryButton:disabled,
 .booksLibrary__secondaryButton:disabled,
 .booksLibrary__choiceButton:disabled,
-.booksEngine__toolbar button:disabled,
-.booksEngine__choiceButton:disabled,
-.booksEngine__secondaryButton:disabled {
+.booksEngine__choiceButton:disabled {
   opacity: 0.58;
   cursor: default;
 }
 .booksPluginSettings__row select,
-.booksPluginSettings__secondaryButton,
-.booksPluginSettings__primaryButton,
 .booksLibrary__secondaryButton,
 .booksLibrary__choiceButton,
-.booksEngine__toolbar button,
-.booksEngine__choiceButton,
-.booksEngine__secondaryButton {
+.booksEngine__choiceButton {
   min-height: 30px;
   font-weight: 700;
 }
 
-.booksPluginSettings__secondaryButton,
-.booksPluginSettings__primaryButton,
 .booksLibrary__secondaryButton,
 .booksLibrary__choiceButton,
-.booksEngine__toolbar button,
-.booksEngine__choiceButton,
-.booksEngine__secondaryButton {
+.booksEngine__choiceButton {
   cursor: pointer;
 }
-.booksPluginSettings__secondaryButton:hover:not(:disabled),
-.booksPluginSettings__primaryButton:hover:not(:disabled),
 .booksLibrary__secondaryButton:hover:not(:disabled),
 .booksLibrary__choiceButton:hover:not(:disabled),
-.booksEngine__toolbar button:hover:not(:disabled),
-.booksEngine__choiceButton:hover:not(:disabled),
-.booksEngine__secondaryButton:hover:not(:disabled) {
+.booksEngine__choiceButton:hover:not(:disabled) {
   border-color: var(--color-line-strong);
   background: var(--surface-hover);
   color: var(--color-text);
 }
-.booksPluginSettings__secondaryButton:disabled,
-.booksPluginSettings__primaryButton:disabled,
 .booksLibrary__secondaryButton:disabled,
 .booksLibrary__choiceButton:disabled,
-.booksEngine__toolbar button:disabled,
-.booksEngine__choiceButton:disabled,
-.booksEngine__secondaryButton:disabled {
+.booksEngine__choiceButton:disabled {
   opacity: 0.55;
   cursor: default;
 }
 
-.booksPluginSettings__primaryButton,
 .booksLibrary__choiceButton.is-active,
 .booksEngine__choiceButton.is-active {
   background: var(--gradient-active);
@@ -202,24 +169,35 @@
   background: var(--workspace-main-bg);
 }
 
-.booksLibrary__controls {
+.booksLibrary__navbar {
+  flex: 0 0 auto;
   display: flex;
-  align-items: end;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--ui-canvas);
 }
 
-.booksLibrary__searchField input,
-.booksLibrary__sortField select {
+.booksLibrary__searchField,
+.booksLibrary__sortField {
   min-width: 0;
 }
 
-.booksLibrary__searchField input {
+.booksLibrary__searchField {
   width: min(360px, 46vw);
 }
 
-.booksLibrary__sortField select {
+.booksLibrary__sortField {
   width: 180px;
+}
+
+.booksLibrary__navbar .nexus-ui-cyber-icon-button {
+  width: var(--control-height-m);
+  min-width: var(--control-height-m);
+  height: var(--control-height-m);
+  min-height: var(--control-height-m);
 }
 
 .booksLibrary__content {
@@ -249,19 +227,6 @@
   width: 100%;
   min-width: 0;
   padding: 0;
-  border: 1px solid var(--color-line);
-  background: var(--shell-panel-soft);
-  text-align: left;
-  cursor: pointer;
-  overflow: hidden;
-  border-radius: var(--radius-m);
-  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
-}
-.booksLibrary__card:hover, .booksLibrary__card:focus-visible {
-  border-color: var(--color-line-strong);
-  background: var(--shell-panel-highlight);
-  transform: translateY(-1px);
-  box-shadow: 0 16px 32px color-mix(in srgb, var(--color-shadow, #000) 12%, transparent);
 }
 
 .booksLibrary__coverFrame {
@@ -516,15 +481,11 @@
 }
 
 @media (max-width: 1040px) {
-  .booksLibrary__topbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .booksLibrary__controls {
+  .booksLibrary__navbar {
     align-items: stretch;
   }
-  .booksLibrary__searchField input,
-  .booksLibrary__sortField select {
+  .booksLibrary__searchField,
+  .booksLibrary__sortField {
     width: 100%;
   }
   .booksEngine__body {

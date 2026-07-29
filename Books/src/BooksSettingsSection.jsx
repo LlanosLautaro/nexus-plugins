@@ -1,4 +1,5 @@
 const { useEffect, useMemo, useState } = window.React;
+import { Button, Checkbox, Notice, Select, StateBlock } from "@nexus/ui";
 import {
   buildFolderOptions,
   BOOKS_ENGINE_ID,
@@ -122,7 +123,7 @@ export default function BooksSettingsSection({ ctx }) {
               className="booksPluginSettings__row"
               key={`${assignment.rootItemId || assignment.rootPath || "empty"}-${index}`}
             >
-              <select
+              <Select
                 value={getAssignmentSelectValue(assignment)}
                 onChange={(event) =>
                   setDraftAssignments((currentValue) =>
@@ -171,12 +172,12 @@ export default function BooksSettingsSection({ ctx }) {
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </Select>
 
-              <label className="booksPluginSettings__checkbox">
-                <input
-                  type="checkbox"
+              <Checkbox
+                  className="booksPluginSettings__checkbox"
                   checked={assignment.recursive}
+                  label="Recursiva"
                   onChange={(event) =>
                     setDraftAssignments((currentValue) =>
                       currentValue.map((entry, entryIndex) =>
@@ -190,11 +191,9 @@ export default function BooksSettingsSection({ ctx }) {
                     )
                   }
                   disabled={saving}
-                />
-                <span>Recursiva</span>
-              </label>
+              />
 
-              <button
+              <Button
                 type="button"
                 className="booksPluginSettings__secondaryButton"
                 onClick={() =>
@@ -205,18 +204,20 @@ export default function BooksSettingsSection({ ctx }) {
                 disabled={saving}
               >
                 Quitar
-              </button>
+              </Button>
             </div>
           ))
         ) : (
-          <div className="booksPluginSettings__empty">
-            Sin carpetas asignadas todavia. Fuera de estas carpetas, los PDFs siguen usando el viewer host.
-          </div>
+          <StateBlock
+            className="booksPluginSettings__empty"
+            title="Sin carpetas asignadas"
+            description="Fuera de estas carpetas, los PDFs siguen usando el viewer host."
+          />
         )}
       </div>
 
       <div className="booksPluginSettings__actions">
-        <button
+        <Button
           type="button"
           className="booksPluginSettings__secondaryButton"
           onClick={() =>
@@ -225,19 +226,20 @@ export default function BooksSettingsSection({ ctx }) {
           disabled={saving}
         >
           Agregar carpeta
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          tone="primary"
           className="booksPluginSettings__primaryButton"
           onClick={() => void handleSave()}
           disabled={saving}
         >
           {saving ? "Guardando..." : "Guardar carpetas"}
-        </button>
+        </Button>
       </div>
 
-      {notice ? <div className="booksPluginSettings__notice">{notice}</div> : null}
-      {error ? <div className="booksPluginSettings__error">{error}</div> : null}
+      {notice ? <Notice tone="success" className="booksPluginSettings__notice">{notice}</Notice> : null}
+      {error ? <Notice tone="danger" className="booksPluginSettings__error">{error}</Notice> : null}
     </div>
   );
 }

@@ -24,7 +24,7 @@ import {
   Button,
   Field,
   FieldGrid,
-  IconButton,
+  CyberIconButton,
   InlineField,
   MetricCard,
   Notice,
@@ -32,7 +32,9 @@ import {
   PanelStack,
   PanelTitle,
   ScrollRegion,
+  SearchField,
   SectionPanel,
+  Select,
   SegmentedControl,
   SplitAside,
   SplitLayout,
@@ -43,7 +45,7 @@ import {
   WorkspaceTitle,
   WorkspaceTopbar,
   StateBlock,
-} from "../../../../nexus-frontend/src/ui/index.js";
+} from "@nexus/ui";
 
 const ipcRenderer = window.nexus.ipc;
 const LIFE_TRACKER_FINANCE_CHANNEL_PREFIX = "life-tracker:finance";
@@ -579,10 +581,10 @@ function MovementRow({ movement, onEdit, onDelete, deleting }) {
       </div>
 
       <div className="financeDashboard__movementActions">
-        <IconButton type="button" className="financeDashboard__iconButton" onClick={onEdit} title="Editar movimiento">
+        <CyberIconButton type="button" className="financeDashboard__iconButton" onClick={onEdit} title="Editar movimiento">
           <PencilIcon size={15} />
-        </IconButton>
-        <IconButton
+        </CyberIconButton>
+        <CyberIconButton
           type="button"
           className="financeDashboard__iconButton financeDashboard__iconButton--danger"
           tone="danger"
@@ -591,7 +593,7 @@ function MovementRow({ movement, onEdit, onDelete, deleting }) {
           title="Borrar movimiento"
         >
           <TrashIcon size={15} />
-        </IconButton>
+        </CyberIconButton>
       </div>
     </div>
   );
@@ -988,14 +990,14 @@ export default function PersonalFinanceView({
             >
               Nuevo movimiento
             </Button>
-            <IconButton
+            <CyberIconButton
               type="button"
               onClick={() => void loadMovements()}
               disabled={refreshing}
               title="Recargar movimientos"
             >
               <RefreshIcon size={16} />
-            </IconButton>
+            </CyberIconButton>
           </ToolbarActions>
         </WorkspaceTopbar>
       ) : null}
@@ -1049,38 +1051,38 @@ export default function PersonalFinanceView({
 
               <div className="financeDashboard__filtersBar">
                 <InlineField className="financeDashboard__inlineField financeDashboard__inlineField--search" label="Buscar" grow>
-                  <input
-                    type="search"
+                  <SearchField
                     value={searchValue}
                     onChange={(event) => setSearchValue(event.target.value)}
                     placeholder="Titulo, categoria, plataforma o nota"
+                    aria-label="Buscar movimientos"
                   />
                 </InlineField>
 
                 <InlineField className="financeDashboard__inlineField" label="Periodo">
-                  <select value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>
+                  <Select value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>
                     {FINANCE_PERIOD_FILTERS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </InlineField>
 
                 <InlineField className="financeDashboard__inlineField" label="Tipo">
-                  <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}>
+                  <Select value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}>
                     <option value="all">Todos</option>
                     <option value="expense">Gastos</option>
                     <option value="income">Ingresos</option>
-                  </select>
+                  </Select>
                 </InlineField>
 
                 <InlineField className="financeDashboard__inlineField" label="Estado">
-                  <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                  <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                     <option value="all">Todos</option>
                     <option value="posted">Realizados</option>
                     <option value="planned">Pendientes</option>
-                  </select>
+                  </Select>
                 </InlineField>
               </div>
 

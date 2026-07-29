@@ -1,4 +1,4 @@
-import { Button, Field, SectionPanel, SegmentedControl, StateBlock } from "../../../../../nexus-frontend/src/ui/index.js";
+import { Button, Field, SectionPanel, SegmentedControl, StateBlock } from "@nexus/ui";
 import {
   getBooruDetailsFieldSchema,
   getBooruDetailsRealityState,

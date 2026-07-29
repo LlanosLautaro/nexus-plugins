@@ -1,6 +1,17 @@
 const { startTransition, useEffect, useLayoutEffect, useRef, useState } = window.React;
 
-import { ChatIcon, ClearIcon, RefreshIcon, SendIcon } from "./icons.jsx";
+import {
+  Button,
+  LoadingIndicator,
+  Notice,
+  ReloadIcon,
+  StateBlock,
+  TextArea,
+  WorkspaceBody,
+  WorkspacePage,
+} from "@nexus/ui";
+import { ChatIcon, ClearIcon, SendIcon } from "./icons.jsx";
+import { CHAT_VIEW_ID } from "./constants.js";
 
 const ipcRenderer = window.nexus.ipc;
 
@@ -35,24 +46,13 @@ function formatStats(stats) {
 }
 
 function LoaderDots({ className = "", label = "" }) {
-  return (
-    <div
-      className={["chatbotView__inlineLoader", className].filter(Boolean).join(" ")}
-      aria-label={label || undefined}
-      role={label ? "status" : undefined}
-    >
-      <span className="chatbotView__typingDot" />
-      <span className="chatbotView__typingDot" />
-      <span className="chatbotView__typingDot" />
-    </div>
-  );
+  return <LoadingIndicator className={className} label={label || "Cargando"} />;
 }
 
-export default function ChatView() {
+export default function ChatView({ ctx }) {
   const composerRef = useRef(null);
   const messageEndRef = useRef(null);
   const modelSwitchRequestIdRef = useRef(0);
-  const [baseUrl, setBaseUrl] = useState("");
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [messages, setMessages] = useState([]);
@@ -80,11 +80,8 @@ export default function ChatView() {
       }
 
       const nextModels = Array.isArray(response?.data?.models) ? response.data.models : [];
-      const nextBaseUrl = String(response?.data?.baseUrl || "");
-
       startTransition(() => {
         setModels(nextModels);
-        setBaseUrl(nextBaseUrl);
         setSelectedModel((currentValue) => {
           if (preferredModelId && nextModels.some((entry) => entry.id === preferredModelId)) {
             return preferredModelId;
@@ -146,11 +143,8 @@ export default function ChatView() {
       }
 
       const nextModels = Array.isArray(response?.data?.models) ? response.data.models : [];
-      const nextBaseUrl = String(response?.data?.baseUrl || "");
-
       startTransition(() => {
         setModels(nextModels);
-        setBaseUrl(nextBaseUrl);
         setSelectedModel(normalizedModelId);
       });
     } catch (loadError) {
@@ -290,58 +284,65 @@ export default function ChatView() {
   const composerDisabled =
     sending || Boolean(switchingModelId) || models.length === 0 || !selectedModelRecord?.loaded;
 
+  useEffect(() => {
+    if (!ctx?.setWorkspaceFrameActions || !ctx?.clearWorkspaceFrameActions) {
+      return undefined;
+    }
+
+    ctx.setWorkspaceFrameActions(CHAT_VIEW_ID, [
+      {
+        id: "chat-model",
+        kind: "select",
+        title: "Modelo de chat",
+        value: selectedModel,
+        disabled:
+          loadingModels
+          || refreshingModels
+          || Boolean(switchingModelId)
+          || sending
+          || models.length === 0,
+        options: models.length
+          ? models.map((model) => ({ value: model.id, label: model.label }))
+          : [{ value: "", label: "Sin modelos LLM", disabled: true }],
+        onChange: (nextModelId) => {
+          void handleModelChange(nextModelId);
+        },
+      },
+      {
+        id: "chat-reload-models",
+        icon: ReloadIcon,
+        title: "Recargar modelos",
+        disabled: refreshingModels || Boolean(switchingModelId) || sending,
+        onClick: () => {
+          void loadModels();
+        },
+      },
+      {
+        id: "chat-clear-session",
+        icon: ClearIcon,
+        title: "Limpiar sesion",
+        disabled: sending || messages.length === 0,
+        onClick: () => startTransition(() => setMessages([])),
+      },
+    ]);
+
+    return () => {
+      ctx.clearWorkspaceFrameActions(CHAT_VIEW_ID);
+    };
+  }, [
+    ctx,
+    loadingModels,
+    messages.length,
+    models,
+    refreshingModels,
+    selectedModel,
+    sending,
+    switchingModelId,
+  ]);
+
   return (
-    <div className="chatbotView">
-      <div className="chatbotView__topbar">
-        <div className="chatbotView__titleBlock">
-          <span className="chatbotView__eyebrow">Plugin chat</span>
-          <strong>Chat local</strong>
-          <p>{baseUrl || "LM Studio local"}</p>
-        </div>
-
-        <div className="chatbotView__controls">
-          <label className="chatbotView__control chatbotView__control--model">
-            <span>Modelo</span>
-            <select
-              value={selectedModel}
-              onChange={(event) => void handleModelChange(event.target.value)}
-              disabled={loadingModels || refreshingModels || Boolean(switchingModelId) || sending || models.length === 0}
-            >
-              {models.length ? (
-                models.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.label}
-                  </option>
-                ))
-              ) : (
-                <option value="">Sin modelos LLM</option>
-              )}
-            </select>
-          </label>
-
-          <button
-            type="button"
-            className="chatbotView__iconButton"
-            onClick={() => void loadModels()}
-            disabled={refreshingModels || Boolean(switchingModelId) || sending}
-            title="Recargar modelos"
-          >
-            <RefreshIcon size={16} />
-          </button>
-
-          <button
-            type="button"
-            className="chatbotView__iconButton"
-            onClick={() => startTransition(() => setMessages([]))}
-            disabled={sending || messages.length === 0}
-            title="Limpiar sesion"
-          >
-            <ClearIcon size={16} />
-          </button>
-        </div>
-      </div>
-
-      <div className="chatbotView__body">
+    <WorkspacePage className="chatbotView">
+      <WorkspaceBody className="chatbotView__body">
         <div className="chatbotView__statusBar">
           {switchingModelRecord ? (
             <>
@@ -361,14 +362,14 @@ export default function ChatView() {
                 </span>
               ) : null}
               {!switchingModelId && selectedModelRecord && !selectedModelRecord.loaded ? (
-                <button
+                <Button
                   type="button"
                   className="chatbotView__statusAction"
                   onClick={() => void handleModelChange(selectedModel, { force: true })}
                   disabled={sending}
                 >
                   Cargar ahora
-                </button>
+                </Button>
               ) : null}
             </>
           ) : (
@@ -380,19 +381,23 @@ export default function ChatView() {
 
         <div className="chatbotView__messages" role="log" aria-live="polite">
           {loadingModels ? (
-            <div className="chatbotView__state">Cargando modelos de LM Studio...</div>
+            <StateBlock className="chatbotView__state" title="Cargando modelos de LM Studio" />
           ) : models.length === 0 ? (
-            <div className="chatbotView__state">
-              No hay modelos LLM listados en LM Studio. Carga uno y vuelve a refrescar.
-            </div>
+            <StateBlock
+              className="chatbotView__state"
+              title="Sin modelos disponibles"
+              description="Carga un modelo en LM Studio y vuelve a refrescar."
+            />
           ) : showEmptyState ? (
-            <div className="chatbotView__emptyState">
-              <div className="chatbotView__emptyIcon">
+            <StateBlock
+              className="chatbotView__emptyState"
+              title="Empieza una conversacion local"
+              description="Selecciona un modelo y escribe abajo. La sesion permanece mientras la view siga abierta."
+            >
+              <span className="chatbotView__emptyIcon">
                 <ChatIcon size={22} />
-              </div>
-              <strong>Empieza una conversacion local</strong>
-              <p>Selecciona un modelo y escribe abajo. Esta v1 mantiene la sesion solo mientras la view siga abierta.</p>
-            </div>
+              </span>
+            </StateBlock>
           ) : (
             messages.map((message) => (
               <article
@@ -430,8 +435,8 @@ export default function ChatView() {
           <div ref={messageEndRef} />
         </div>
 
-        <form className="chatbotView__composer" onSubmit={handleSubmit}>
-          <textarea
+        <form className="chatbotView__composer nexus-ui-panel" onSubmit={handleSubmit}>
+          <TextArea
             ref={composerRef}
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
@@ -446,19 +451,20 @@ export default function ChatView() {
               Historial local en memoria, sin persistencia extra.
             </span>
 
-            <button
+            <Button
               type="submit"
+              tone="primary"
               className="chatbotView__primaryButton"
               disabled={composerDisabled || !String(inputValue || "").trim()}
             >
               <SendIcon size={15} />
               <span>{sending ? "Enviando..." : "Enviar"}</span>
-            </button>
+            </Button>
           </div>
         </form>
 
-        {error ? <div className="chatbotView__state chatbotView__state--error">{error}</div> : null}
-      </div>
-    </div>
+        {error ? <Notice tone="danger">{error}</Notice> : null}
+      </WorkspaceBody>
+    </WorkspacePage>
   );
 }

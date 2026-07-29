@@ -1,5 +1,6 @@
 const React = window.React;
 const { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } = React;
+import { SearchField } from "@nexus/ui";
 
 export default function RecommendationPanel({
   selectedResourceIds = [],
@@ -210,8 +211,7 @@ export default function RecommendationPanel({
       </span>
 
       <div className="booruView__entityInputRow">
-        <input
-          type="text"
+        <SearchField
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
@@ -250,6 +250,7 @@ export default function RecommendationPanel({
                 : "Buscar recomendaciones o usar persona:, char:, artist:, universe:, tag:"
           }
           disabled={searchDisabled}
+          aria-label={recommendationScope === "tags" ? "Buscar tags" : "Buscar recomendaciones"}
         />
       </div>
 

@@ -1,4 +1,4 @@
-import { Button, InlineField } from "../../../../../nexus-frontend/src/ui/index.js";
+import { Button, InlineField, Input, SearchField } from "@nexus/ui";
 
 export default function EntityNavigationBar({
   kind,
@@ -41,11 +41,11 @@ export default function EntityNavigationBar({
       {searchable ? (
         searchContent || (
           <InlineField label="Buscar" grow className="booruView__entityNavbarSearch">
-            <input
-              type="text"
+            <SearchField
               value={searchValue}
               onChange={(event) => onSearchChange?.(event.target.value)}
               placeholder={profileOpen ? "Buscar en esta seccion" : `Buscar ${kindLabel.toLowerCase()}`}
+              aria-label={`Buscar ${kindLabel.toLowerCase()}`}
             />
           </InlineField>
         )
@@ -55,8 +55,7 @@ export default function EntityNavigationBar({
 
       <div className="booruView__entityNavbarCreate">
         <InlineField label="Crear" grow>
-          <input
-            type="text"
+          <Input
             value={createValue}
             onChange={(event) => onCreateChange?.(event.target.value)}
             onKeyDown={(event) => {

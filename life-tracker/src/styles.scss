@@ -2569,48 +2569,6 @@
   background: color-mix(in srgb, var(--habitos-accent) 14%, transparent);
 }
 
-.habitosView__contextMenu {
-  position: relative;
-  min-width: 188px;
-  padding: 6px;
-  overflow: hidden;
-  user-select: none;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  background:
-    radial-gradient(circle at top right, var(--fx-accent-glow-soft), transparent 42%),
-    color-mix(in srgb, var(--color-surface-1) 96%, var(--color-canvas));
-  border: 1px solid var(--color-panel-border);
-  border-radius: var(--radius-l);
-  box-shadow: var(--shadow-s);
-}
-
-.habitosView__contextMenu .context-menu-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 36px;
-  padding: 8px 12px;
-  border: none;
-  border-radius: var(--radius-m);
-  background: transparent;
-  color: var(--color-text);
-  text-align: left;
-  cursor: pointer;
-  appearance: none;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard);
-}
-
-.habitosView__contextMenu .context-menu-item + .context-menu-item {
-  margin-top: 2px;
-}
-
-.habitosView__contextMenu .context-menu-item:hover {
-  background: color-mix(in srgb, var(--color-surface-2) 88%, var(--color-accent) 12%);
-}
-
 .habitosView input,
 .habitosView select,
 .habitosView textarea {

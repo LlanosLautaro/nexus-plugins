@@ -1,4 +1,4 @@
-import { Button, SectionPanel, SegmentedControl } from "../../../../../nexus-frontend/src/ui/index.js";
+import { Button, SectionPanel, SegmentedControl } from "@nexus/ui";
 import EntityVisualMedia from "./EntityVisualMedia.jsx";
 const React = window.React;
 const { useEffect, useRef, useState } = React;
@@ -42,8 +42,8 @@ export default function EntityProfileView({
   onScrollStateChange,
   gallerySelectedIds,
   onGallerySelectionChange,
-  onResourceColumnWheel,
-  onEntityColumnWheel,
+  onResourceColumnsChange,
+  onEntityColumnsChange,
   onEntityHover,
   onGroupAssociationHover,
 }) {
@@ -219,7 +219,7 @@ export default function EntityProfileView({
               onPreviewContextMenu={onRelatedEntityContextMenu}
               MediaPreview={MediaPreview}
               columns={entityGridColumns}
-              onColumnWheel={onEntityColumnWheel}
+              onColumnsChange={onEntityColumnsChange}
               onEntityHover={onEntityHover}
               onGroupAssociationHover={onGroupAssociationHover}
             />
@@ -237,7 +237,7 @@ export default function EntityProfileView({
               resourceGridColumns={resourceGridColumns}
               selectedIds={gallerySelectedIds}
               onSelectionChange={onGallerySelectionChange}
-              onColumnWheel={onResourceColumnWheel}
+              onColumnsChange={onResourceColumnsChange}
               onGroupAssociationHover={onGroupAssociationHover}
             />
           )}

@@ -1,8 +1,7 @@
-import { SectionPanel, StateBlock } from "../../../../../nexus-frontend/src/ui/index.js";
-import useGalleryColumnWheel from "../shared/useGalleryColumnWheel.js";
+import { GalleryGrid, SectionPanel, StateBlock } from "@nexus/ui";
 import CollapsibleGalleryGroup from "../shared/CollapsibleGalleryGroup.jsx";
 const React = window.React;
-const { useCallback, useEffect, useMemo, useRef, useState } = React;
+const { useEffect, useMemo, useRef, useState } = React;
 
 export default function ResourceGrid({
   items,
@@ -18,7 +17,7 @@ export default function ResourceGrid({
   defaultColumns,
   scrollTop = 0,
   onScrollStateChange,
-  onColumnWheel,
+  onColumnsChange,
   columns = defaultColumns,
   infinite = false,
   hasMore = false,
@@ -42,11 +41,6 @@ export default function ResourceGrid({
   const gridRef = useRef(null);
   const loadMoreSentinelRef = useRef(null);
   const loadMoreRef = useRef(onLoadMore);
-  const attachColumnWheel = useGalleryColumnWheel(onColumnWheel);
-  const setContentNode = useCallback((node) => {
-    contentRef.current = node;
-    attachColumnWheel(node);
-  }, [attachColumnWheel]);
   const [virtualLayout, setVirtualLayout] = useState({
     gridWidth: 0,
     viewportHeight: 0,
@@ -259,7 +253,7 @@ export default function ResourceGrid({
         />
       ) : items.length ? (
         <div
-          ref={setContentNode}
+          ref={contentRef}
           className="booruView__resourcePanelBody"
           onPointerDown={(event) => {
             if (event.target === event.currentTarget) {
@@ -272,7 +266,12 @@ export default function ResourceGrid({
               <div ref={gridRef} className="booruView__groupedGallery">
                 {groupedSections.map((group) => (
                   <CollapsibleGalleryGroup key={group.key} label={group.label} association={group.association} onAssociationHover={onGroupAssociationHover}>
-                    <div className="booruView__mediaGrid" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+                    <GalleryGrid
+                      className="booruView__mediaGrid"
+                      columns={columns}
+                      minColumns={2}
+                      onColumnsChange={onColumnsChange}
+                    >
                       {group.entries.map(({ placement, item }, index) => (
                         <ResourceCard
                           key={placement.placementId}
@@ -290,20 +289,23 @@ export default function ResourceGrid({
                           columns={columns}
                         />
                       ))}
-                    </div>
+                    </GalleryGrid>
                   </CollapsibleGalleryGroup>
                 ))}
               </div>
             ) : (
-              <div
+              <GalleryGrid
                 ref={gridRef}
                 className={[
                   "booruView__mediaGrid",
                   infinite ? "booruView__mediaGrid--infinite" : "booruView__mediaGrid--paged",
                   isVirtualized ? "is-virtualized" : "",
                 ].filter(Boolean).join(" ")}
+                virtual={isVirtualized}
+                columns={columns}
+                minColumns={2}
+                onColumnsChange={onColumnsChange}
                 style={{
-                  gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
                   ...(isVirtualized ? { height: `${totalGridHeight}px` } : {}),
                 }}
                 onPointerDown={(event) => {
@@ -353,7 +355,7 @@ export default function ResourceGrid({
                     style={isVirtualized ? { top: `${Math.max(0, totalGridHeight - 1)}px` } : undefined}
                   />
                 ) : null}
-              </div>
+              </GalleryGrid>
             )}
 
             {grouped && infinite && hasMore ? (

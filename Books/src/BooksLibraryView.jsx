@@ -1,8 +1,23 @@
 const { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } = window.React;
-import { BookIcon, RefreshIcon } from "./icons.jsx";
+import { BookIcon } from "./icons.jsx";
 import { formatPercent, resolveVaultFilePath } from "./renderer-helpers.js";
 import { createRendererDevLogger } from "../../../nexus-frontend/src/utils/devLog.js";
-import { IconButton, InlineField, Notice, SectionPanel, StateBlock, ToolbarActions, WorkspaceBody, WorkspacePage, WorkspaceTitle, WorkspaceTopbar } from "../../../nexus-frontend/src/ui/index.js";
+import {
+  CyberIconButton,
+  GalleryCard,
+  GalleryCardBody,
+  GalleryCardMeta,
+  GalleryCardTitle,
+  GalleryGrid,
+  Notice,
+  ReloadIcon,
+  SearchField,
+  SectionPanel,
+  Select,
+  StateBlock,
+  WorkspaceBody,
+  WorkspacePage,
+} from "@nexus/ui";
 
 const ipcRenderer = window.nexus.ipc;
 const booksLibraryLogger = createRendererDevLogger("renderer.plugins.books");
@@ -119,10 +134,18 @@ function compareBooks(left, right, sortBy) {
   });
 }
 
-function getGridMetrics(containerWidth) {
+function getGridMetrics(containerWidth, requestedColumns = null) {
   const width = Math.max(0, Number(containerWidth) || 0);
-  const columns =
+  const responsiveColumns =
     width <= 430 ? 1 : width <= 760 ? 2 : width <= 1040 ? 3 : width <= 1320 ? 4 : 5;
+  const hasRequestedColumns =
+    requestedColumns !== null
+    && requestedColumns !== undefined
+    && requestedColumns !== "";
+  const normalizedRequestedColumns = Number(requestedColumns);
+  const columns = hasRequestedColumns && Number.isFinite(normalizedRequestedColumns)
+    ? Math.min(8, Math.max(1, Math.round(normalizedRequestedColumns)))
+    : responsiveColumns;
   const gap = width <= 760 ? 12 : 14;
   const cardWidth =
     columns > 0 ? Math.max(0, (width - gap * Math.max(0, columns - 1)) / columns) : 0;
@@ -388,6 +411,7 @@ export default function BooksLibraryView({ ctx }) {
   const [error, setError] = useState("");
   const [searchValue, setSearchValue] = useState("");
   const [sortBy, setSortBy] = useState("added");
+  const [columnOverride, setColumnOverride] = useState(null);
   const [virtualLayout, setVirtualLayout] = useState({
     gridWidth: 0,
     viewportHeight: 0,
@@ -474,8 +498,8 @@ export default function BooksLibraryView({ ctx }) {
   }, [books, deferredSearchValue, sortBy]);
 
   const gridMetrics = useMemo(
-    () => getGridMetrics(virtualLayout.gridWidth),
-    [virtualLayout.gridWidth],
+    () => getGridMetrics(virtualLayout.gridWidth, columnOverride),
+    [columnOverride, virtualLayout.gridWidth],
   );
   const totalRows = useMemo(
     () =>
@@ -505,7 +529,7 @@ export default function BooksLibraryView({ ctx }) {
         gridWidth: measureNode.clientWidth || 0,
         viewportHeight: contentNode.clientHeight || 0,
       };
-      const nextMetrics = getGridMetrics(nextLayout.gridWidth);
+      const nextMetrics = getGridMetrics(nextLayout.gridWidth, columnOverride);
       const nextRange = getBookVirtualRange({
         itemCount: visibleBooks.length,
         columns: nextMetrics.columns,
@@ -554,7 +578,7 @@ export default function BooksLibraryView({ ctx }) {
       resizeObserver?.disconnect();
       contentNode.removeEventListener("scroll", handleScroll);
     };
-  }, [loading, visibleBooks.length]);
+  }, [columnOverride, loading, visibleBooks.length]);
   const virtualizedBooks = useMemo(
     () =>
       visibleBooks.slice(virtualRange.startIndex, virtualRange.endIndex).map((book, index) => {
@@ -625,45 +649,39 @@ export default function BooksLibraryView({ ctx }) {
 
   return (
     <WorkspacePage className="booksLibrary">
-      <WorkspaceTopbar>
-        <WorkspaceTitle
-          eyebrow="Plugin books"
-          title="Biblioteca"
-          description="Biblioteca PDF-first con busqueda rapida, progreso simple y apertura directa al visor."
-        />
+      <WorkspaceBody>
+        <nav className="booksLibrary__navbar" aria-label="Herramientas de biblioteca">
+          <SearchField
+            className="booksLibrary__searchField"
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            placeholder="Titulo o autor"
+            aria-label="Buscar por titulo o autor"
+          />
 
-        <ToolbarActions className="booksLibrary__controls">
-          <InlineField className="booksLibrary__searchField" label="Buscar" grow>
-            <input
-              type="search"
-              value={searchValue}
-              onChange={(event) => setSearchValue(event.target.value)}
-              placeholder="Titulo o autor"
-            />
-          </InlineField>
+          <Select
+            className="booksLibrary__sortField"
+            value={sortBy}
+            aria-label="Ordenar biblioteca"
+            onChange={(event) => setSortBy(event.target.value)}
+          >
+            {BOOK_SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
 
-          <InlineField className="booksLibrary__sortField" label="Ordenar">
-            <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
-              {BOOK_SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </InlineField>
-
-          <IconButton
+          <CyberIconButton
             type="button"
             onClick={() => void loadBooks()}
             disabled={refreshing}
-            title="Recargar biblioteca"
+            label="Recargar biblioteca"
           >
-            <RefreshIcon size={16} />
-          </IconButton>
-        </ToolbarActions>
-      </WorkspaceTopbar>
+            <ReloadIcon size={16} />
+          </CyberIconButton>
+        </nav>
 
-      <WorkspaceBody>
         {error ? (
           <Notice tone="danger">{error}</Notice>
         ) : null}
@@ -691,26 +709,40 @@ export default function BooksLibraryView({ ctx }) {
             />
           ) : (
             <div ref={contentRef} className="booksLibrary__virtualViewport">
-              <div ref={gridMeasureRef} className="booksLibrary__virtualGrid" style={{ height: `${totalGridHeight}px` }}>
+              <GalleryGrid
+                ref={gridMeasureRef}
+                className="booksLibrary__virtualGrid"
+                style={{ height: `${totalGridHeight}px` }}
+                columns={gridMetrics.columns}
+                minColumns={1}
+                maxColumns={8}
+                onColumnsChange={setColumnOverride}
+                virtual
+              >
                 {virtualizedBooks.map(({ book, style }) => (
-                  <button
+                  <GalleryCard
+                    as="button"
                     type="button"
                     key={book.itemId}
                     className="booksLibrary__card"
                     style={style}
                     onClick={() => void handleOpenBook(book)}
-                    title={book.title || "Abrir PDF"}
+                    aria-label={`Abrir ${book.title || "PDF"}`}
                   >
                     <BookCoverPreview book={book} />
 
-                    <div className="booksLibrary__cardBody">
-                      <strong className="booksLibrary__cardTitle">{book.title || "Documento"}</strong>
-                      <p className="booksLibrary__cardAuthor">{book.author || "Autor sin curar"}</p>
+                    <GalleryCardBody className="booksLibrary__cardBody">
+                      <GalleryCardTitle className="booksLibrary__cardTitle">
+                        {book.title || "Documento"}
+                      </GalleryCardTitle>
+                      <GalleryCardMeta as="p" className="booksLibrary__cardAuthor">
+                        {book.author || "Autor sin curar"}
+                      </GalleryCardMeta>
                       <ProgressBar value={book.progressPercent} />
-                    </div>
-                  </button>
+                    </GalleryCardBody>
+                  </GalleryCard>
                 ))}
-              </div>
+              </GalleryGrid>
             </div>
           )}
         </SectionPanel>

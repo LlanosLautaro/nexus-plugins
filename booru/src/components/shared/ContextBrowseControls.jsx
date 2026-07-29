@@ -1,4 +1,4 @@
-import { Button, SegmentedControl } from "../../../../../nexus-frontend/src/ui/index.js";
+import { Button, SegmentedControl } from "@nexus/ui";
 
 export default function ContextBrowseControls({
   value,

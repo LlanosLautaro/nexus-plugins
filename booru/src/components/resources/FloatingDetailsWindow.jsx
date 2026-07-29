@@ -1,4 +1,4 @@
-import { Button } from "../../../../../nexus-frontend/src/ui/index.js";
+import { Button } from "@nexus/ui";
 import {
   BOORU_FLOATING_DETAILS_MIN_HEIGHT,
   BOORU_FLOATING_DETAILS_MIN_WIDTH,

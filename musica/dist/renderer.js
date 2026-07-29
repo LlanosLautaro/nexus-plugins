@@ -1,6 +1,62 @@
 const React = window.React;
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __commonJS = (cb, mod) => function __require() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// <define:process>
+var init_define_process = __esm({
+  "<define:process>"() {
+  }
+});
+
+// scripts/plugins/shims/react.cjs
+var require_react = __commonJS({
+  "scripts/plugins/shims/react.cjs"(exports, module) {
+    init_define_process();
+    function requireReact() {
+      const hostReact = globalThis?.window?.__NEXUS_HOST_REACT__ || globalThis?.window?.React;
+      if (!hostReact) {
+        throw new Error("Nexus plugins renderer no encontro el React del host en window.__NEXUS_HOST_REACT__.");
+      }
+      return hostReact;
+    }
+    module.exports = requireReact();
+  }
+});
+
+// ../nexus-plugins/musica/src/renderer.js
+init_define_process();
+
+// ../nexus-plugins/musica/src/MusicAudioEngine.jsx
+init_define_process();
 
 // ../nexus-plugins/musica/src/PluginMetadataForm.jsx
+init_define_process();
 var { useEffect, useMemo, useState } = window.React;
 var ipcRenderer = window.nexus.ipc;
 function normalizeFieldValue(field, value) {
@@ -225,7 +281,11 @@ function PluginMetadataForm({ itemId, formInstance, onSubmitted }) {
   )));
 }
 
+// ../nexus-plugins/musica/src/renderer-helpers.js
+init_define_process();
+
 // ../nexus-plugins/musica/src/plugin-settings.js
+init_define_process();
 var MUSICA_ENGINE_ID = "nexus.musica.audio";
 var MUSICA_SETTINGS_DEFAULTS = Object.freeze({
   extractEmbeddedCoverArt: true,
@@ -277,6 +337,7 @@ function writeMusicaEngineAssignments(settingsValue, assignments) {
 }
 
 // ../nexus-frontend/src/store/items/location.mjs
+init_define_process();
 function normalizeItemId2(value) {
   const normalizedValue = String(value || "").trim();
   return normalizedValue || "";
@@ -802,6 +863,70 @@ function MusicAudioEngine({
 }
 
 // ../nexus-plugins/musica/src/MusicaSettingsSection.jsx
+init_define_process();
+
+// ../packages/nexus-ui/src/index.js
+init_define_process();
+
+// ../packages/nexus-ui/src/components/Button/Button.jsx
+init_define_process();
+
+// ../packages/nexus-ui/src/utils/cx.js
+init_define_process();
+function cx(...values) {
+  return values.filter(Boolean).join(" ");
+}
+
+// ../packages/nexus-ui/src/components/Button/Button.jsx
+function Button({
+  className = "",
+  tone = "secondary",
+  iconOnly = false,
+  children,
+  ...props
+}) {
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      ...props,
+      className: cx(
+        "nexus-ui-button",
+        tone !== "secondary" && `nexus-ui-button--${tone}`,
+        iconOnly && "nexus-ui-button--icon",
+        className
+      )
+    },
+    children
+  );
+}
+
+// ../packages/nexus-ui/src/components/Select/Select.jsx
+init_define_process();
+var import_react = __toESM(require_react(), 1);
+var Select = (0, import_react.forwardRef)(function Select2({ className = "", children, ...props }, ref) {
+  return /* @__PURE__ */ React.createElement(
+    "select",
+    {
+      ...props,
+      ref,
+      className: cx("nexus-ui-select", className)
+    },
+    children
+  );
+});
+
+// ../packages/nexus-ui/src/components/Checkbox/Checkbox.jsx
+init_define_process();
+function Checkbox({
+  className = "",
+  description = "",
+  label,
+  ...props
+}) {
+  return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-checkbox", className) }, /* @__PURE__ */ React.createElement("input", { ...props, className: "nexus-ui-checkbox__input", type: "checkbox" }), /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__box", "aria-hidden": "true" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 12 10" }, /* @__PURE__ */ React.createElement("path", { d: "M1 5.1 4.2 8 11 1" }))), label || description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__copy" }, label ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__label" }, label) : null, description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__description" }, description) : null) : null);
+}
+
+// ../nexus-plugins/musica/src/MusicaSettingsSection.jsx
 var { useEffect: useEffect3, useMemo: useMemo3, useState: useState3 } = window.React;
 function createEmptyAssignment() {
   return {
@@ -889,7 +1014,7 @@ function MusicaSettingsSection({ ctx }) {
       key: `${assignment.rootItemId || assignment.rootPath || "empty"}-${index}`
     },
     /* @__PURE__ */ React.createElement(
-      "select",
+      Select,
       {
         value: getAssignmentSelectValue(assignment),
         onChange: (event) => setDraftAssignments(
@@ -925,10 +1050,10 @@ function MusicaSettingsSection({ ctx }) {
       folderOptions.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.id, value: option.id }, option.rootPath || "Vault completo")),
       legacyFolderOptions.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.key, value: option.id }, option.label))
     ),
-    /* @__PURE__ */ React.createElement("label", { className: "musicaPluginSettings__checkbox" }, /* @__PURE__ */ React.createElement(
-      "input",
+    /* @__PURE__ */ React.createElement(
+      Checkbox,
       {
-        type: "checkbox",
+        label: "Recursiva",
         checked: assignment.recursive,
         onChange: (event) => setDraftAssignments(
           (currentValue) => currentValue.map(
@@ -940,12 +1065,11 @@ function MusicaSettingsSection({ ctx }) {
         ),
         disabled: saving
       }
-    ), /* @__PURE__ */ React.createElement("span", null, "Recursiva")),
+    ),
     /* @__PURE__ */ React.createElement(
-      "button",
+      Button,
       {
         type: "button",
-        className: "musicaPluginSettings__secondaryButton",
         onClick: () => setDraftAssignments(
           (currentValue) => currentValue.filter((_entry, entryIndex) => entryIndex !== index)
         ),
@@ -954,19 +1078,18 @@ function MusicaSettingsSection({ ctx }) {
       "Quitar"
     )
   )) : /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__empty" }, "Sin carpetas asignadas todavia. Fuera de estas carpetas, los audios usaran el fallback global del host.")), /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__actions" }, /* @__PURE__ */ React.createElement(
-    "button",
+    Button,
     {
       type: "button",
-      className: "musicaPluginSettings__secondaryButton",
       onClick: () => setDraftAssignments((currentValue) => [...currentValue, createEmptyAssignment()]),
       disabled: saving
     },
     "Agregar carpeta"
   ), /* @__PURE__ */ React.createElement(
-    "button",
+    Button,
     {
       type: "button",
-      className: "musicaPluginSettings__primaryButton",
+      tone: "primary",
       onClick: () => void handleSave(),
       disabled: saving
     },

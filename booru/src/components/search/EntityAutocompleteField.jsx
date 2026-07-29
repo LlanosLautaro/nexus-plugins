@@ -1,4 +1,4 @@
-import { Button, Field } from "../../../../../nexus-frontend/src/ui/index.js";
+import { Button, Field, SearchField } from "@nexus/ui";
 
 const React = window.React;
 const { useEffect, useMemo, useState } = React;
@@ -154,8 +154,7 @@ export default function EntityAutocompleteField({
         ) : null}
 
         <div className="booruView__entityInputRow">
-          <input
-            type="text"
+          <SearchField
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
@@ -191,6 +190,7 @@ export default function EntityAutocompleteField({
             }}
             placeholder={`Buscar ${label.toLowerCase()} o crear uno nuevo`}
             disabled={disabled}
+            aria-label={`Buscar ${label.toLowerCase()}`}
           />
           <Button
             type="button"

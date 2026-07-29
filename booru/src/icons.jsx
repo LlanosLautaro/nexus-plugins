@@ -27,17 +27,6 @@ export function BooruIcon(props) {
   );
 }
 
-export function RefreshIcon(props) {
-  return (
-    <BaseIcon {...props}>
-      <path d="M20 6v5h-5" />
-      <path d="M4 18v-5h5" />
-      <path d="M18 11a7 7 0 0 0-12-3" />
-      <path d="M6 13a7 7 0 0 0 12 3" />
-    </BaseIcon>
-  );
-}
-
 export function FolderIcon(props) {
   return (
     <BaseIcon {...props}>
@@ -61,14 +50,6 @@ export function DuplicateIcon(props) {
     <BaseIcon {...props}>
       <rect x="8" y="8" width="10" height="10" rx="1.8" />
       <path d="M6.5 15H6A2 2 0 0 1 4 13V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v.5" />
-    </BaseIcon>
-  );
-}
-
-export function PulseIcon(props) {
-  return (
-    <BaseIcon {...props}>
-      <path d="M3.5 12h3.1l1.8-3.4 3.1 7 2.6-5h6.4" />
     </BaseIcon>
   );
 }

@@ -10,7 +10,7 @@ import {
   SectionPanel,
   SegmentedControl,
   StateBlock,
-} from "../../../../nexus-frontend/src/ui/index.js";
+} from "@nexus/ui";
 import { WEEKDAY_OPTIONS } from "../constants.js";
 import {
   buildTrainingMeasurementUnitSummary,

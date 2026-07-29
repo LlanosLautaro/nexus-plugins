@@ -1,5 +1,6 @@
 const React = window.React;
 const { useCallback, useEffect, useMemo, useState } = React;
+import { SearchField } from "@nexus/ui";
 
 export default function ResourceSearchComposer({
   tokens,
@@ -223,8 +224,7 @@ export default function ResourceSearchComposer({
       <div className="booruView__searchComposerShell">
         <div className="booruView__entitySelection booruView__entitySelection--composer">
 
-          <input
-            type="text"
+          <SearchField
             value={freeText}
             onChange={handleChange}
             onKeyDown={(event) => {
@@ -270,7 +270,6 @@ export default function ResourceSearchComposer({
               }
             }}
             placeholder="Buscar tags, personas, characters, artists o universes"
-            className="booruView__searchComposerInput"
             disabled={disabled}
             aria-label="Buscar por texto libre o filtros exactos"
           />

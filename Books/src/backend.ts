@@ -74,6 +74,11 @@ let activeCoverPreviewWarmQueue: ReturnType<typeof createCoverPreviewWarmQueue> 
 function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
   let stopped = false;
   let activeCount = 0;
+  let taskActive = false;
+  let taskTotal = 0;
+  let taskCompleted = 0;
+  let taskFailed = 0;
+  let taskLastError = "";
   const queuedItemIds: string[] = [];
   const skippedItemIds = new Set<string>();
   const queuedAtByItemId = new Map<string, number>();
@@ -88,6 +93,9 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
 
   const rememberWarmFailure = (itemId: string, filePath: string, error: unknown, queueWaitMs: number | null) => {
     skippedItemIds.add(itemId);
+    taskLastError = error instanceof Error
+      ? error.message
+      : "No se pudo generar una portada.";
 
     booksBackendLogger.warn("books.coverWarm.failure", "Fallo precalentando portada en backend.", {
       itemId,
@@ -103,6 +111,43 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
       queueWaitMs,
       error,
     });
+  };
+
+  const updateRuntimeTask = () => {
+    if (!taskActive || stopped) {
+      return;
+    }
+
+    const processedCount = taskCompleted + taskFailed;
+    const pendingCount = Math.max(0, taskTotal - processedCount);
+    const detail = pendingCount > 0
+      ? `${pendingCount} ${pendingCount === 1 ? "portada pendiente" : "portadas pendientes"}`
+      : taskFailed > 0
+        ? `${taskFailed} ${taskFailed === 1 ? "portada con error" : "portadas con error"}`
+        : "Finalizando portadas";
+
+    ctx.tasks.update("books.cover-previews", {
+      detail,
+      progress: {
+        current: processedCount,
+        total: taskTotal,
+        label: "portadas",
+      },
+    });
+
+    if (taskFailed > 0) {
+      ctx.tasks.fail("books.cover-previews", {
+        message: "Algunas portadas no pudieron generarse.",
+        detail: taskLastError || detail,
+      });
+    }
+
+    if (queuedItemIds.length === 0 && activeCount === 0) {
+      if (taskFailed === 0) {
+        ctx.tasks.complete("books.cover-previews");
+      }
+      taskActive = false;
+    }
   };
 
   const generateCoverPreview = async (itemId: string) => {
@@ -181,12 +226,21 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
           return false;
         })
         .then((result) => {
+          if (result) {
+            taskCompleted += 1;
+          } else {
+            taskFailed += 1;
+            if (!taskLastError) {
+              taskLastError = "No se pudo generar una portada.";
+            }
+          }
           pending.resolve(Boolean(result));
         })
         .finally(() => {
           pendingPromises.delete(itemId);
           queuedAtByItemId.delete(itemId);
           activeCount = Math.max(0, activeCount - 1);
+          updateRuntimeTask();
           pump();
         });
     }
@@ -217,6 +271,25 @@ function createCoverPreviewWarmQueue(ctx: NexusBackendPluginContext) {
       });
       queuedAtByItemId.set(normalizedItemId, Date.now());
       queuedItemIds.push(normalizedItemId);
+      if (!taskActive) {
+        taskActive = true;
+        taskTotal = 0;
+        taskCompleted = 0;
+        taskFailed = 0;
+        taskLastError = "";
+        ctx.tasks.start({
+          id: "books.cover-previews",
+          title: "Generando portadas",
+          detail: "Preparando previews de Books",
+          progress: {
+            current: 0,
+            total: 1,
+            label: "portadas",
+          },
+        });
+      }
+      taskTotal += 1;
+      updateRuntimeTask();
       pump();
       return promise;
     },

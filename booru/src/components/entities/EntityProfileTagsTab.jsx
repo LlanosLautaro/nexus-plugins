@@ -1,4 +1,4 @@
-import { Field } from "../../../../../nexus-frontend/src/ui/index.js";
+import { Field } from "@nexus/ui";
 
 const React = window.React;
 const { useEffect, useState } = React;

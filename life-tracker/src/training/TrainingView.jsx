@@ -1,4 +1,4 @@
-﻿import {
+import {
   buildTrainingExerciseTagSummary,
   buildTrainingExerciseTypeSummary,
   buildTrainingExerciseSummary,
@@ -34,13 +34,20 @@ import {
   Button,
   Field,
   FieldGrid,
-  IconButton,
+  CyberIconButton,
+  GalleryCard,
+  GalleryCardBody,
+  GalleryCardMeta,
+  GalleryCardTitle,
+  GalleryGrid,
   InlineField,
   Notice,
   PanelHeader,
   PanelStack,
   PanelTitle,
   ScrollRegion,
+  SearchField,
+  Select,
   SectionPanel,
   SplitDetail,
   SplitLayout,
@@ -51,7 +58,7 @@ import {
   WorkspacePage,
   WorkspaceTitle,
   WorkspaceTopbar,
-} from "../../../../nexus-frontend/src/ui/index.js";
+} from "@nexus/ui";
 import {
   EmbeddedMarkdownLiveEditor as MarkdownLiveEditor,
   EmbeddedMarkdownReadSurface as MarkdownReadSurface,
@@ -679,11 +686,11 @@ function TrainingGalleryHeader({
       <div className="trainingPlugin__galleryToolbar">
         {typeof onSearchChange === "function" ? (
           <InlineField className="trainingPlugin__gallerySearch" label="Buscar" grow>
-            <input
-              type="search"
+            <SearchField
               value={searchValue}
               onChange={(event) => onSearchChange(event.target.value)}
               placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
             />
           </InlineField>
         ) : null}
@@ -701,15 +708,19 @@ function TrainingGalleryCard({
   onClick,
 }) {
   return (
-    <button
+    <GalleryCard
+      as="button"
       type="button"
       className={["trainingPlugin__galleryCard", active ? "is-active" : ""].filter(Boolean).join(" ")}
+      selected={active}
       onClick={onClick}
     >
-      <strong>{title}</strong>
-      {summary ? <span className="trainingPlugin__galleryCardSummary">{summary}</span> : null}
-      {meta ? <span className="trainingPlugin__galleryCardMeta">{meta}</span> : null}
-    </button>
+      <GalleryCardBody>
+        <GalleryCardTitle>{title}</GalleryCardTitle>
+        {summary ? <GalleryCardMeta className="trainingPlugin__galleryCardSummary">{summary}</GalleryCardMeta> : null}
+        {meta ? <GalleryCardMeta className="trainingPlugin__galleryCardMeta">{meta}</GalleryCardMeta> : null}
+      </GalleryCardBody>
+    </GalleryCard>
   );
 }
 
@@ -1233,23 +1244,23 @@ function MuscleLoadEditor({
 
       <FieldGrid>
         <Field label="Buscar" wide>
-          <input type="search" value={muscleSearch} onChange={(event) => setMuscleSearch(event.target.value)} placeholder="Pecho, trapecio, core..." />
+          <SearchField value={muscleSearch} onChange={(event) => setMuscleSearch(event.target.value)} placeholder="Pecho, trapecio, core..." aria-label="Buscar musculos" />
         </Field>
         <Field label="Region">
-          <select value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)}>
+          <Select value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)}>
             <option value="">Todas</option>
             {(catalog.regions || []).map((region) => (
               <option key={region.id} value={region.id}>{region.title}</option>
             ))}
-          </select>
+          </Select>
         </Field>
         <Field label="Grupo">
-          <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
+          <Select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
             <option value="">Todos</option>
             {(catalog.groups || []).filter((group) => !regionFilter || group.regionId === regionFilter).map((group) => (
               <option key={group.id} value={group.id}>{group.title}</option>
             ))}
-          </select>
+          </Select>
         </Field>
       </FieldGrid>
 
@@ -1589,15 +1600,15 @@ function StructureStepCard({
           <span>{summary || "Sin carga definida"}</span>
         </div>
         <div className="trainingPlugin__stepActions">
-          <IconButton type="button" aria-label="Subir paso" onClick={() => onMove(-1)}>
+          <CyberIconButton type="button" aria-label="Subir paso" onClick={() => onMove(-1)}>
             <ArrowUpIcon size={14} />
-          </IconButton>
-          <IconButton type="button" aria-label="Bajar paso" onClick={() => onMove(1)}>
+          </CyberIconButton>
+          <CyberIconButton type="button" aria-label="Bajar paso" onClick={() => onMove(1)}>
             <ArrowDownIcon size={14} />
-          </IconButton>
-          <IconButton type="button" tone="danger" aria-label="Quitar paso" onClick={onRemove}>
+          </CyberIconButton>
+          <CyberIconButton type="button" tone="danger" aria-label="Quitar paso" onClick={onRemove}>
             <DeleteIcon size={14} />
-          </IconButton>
+          </CyberIconButton>
         </div>
       </div>
 
@@ -1691,15 +1702,15 @@ function StructureBlockCard({
           <span>{blockSummary}</span>
         </div>
         <div className="trainingPlugin__stepActions">
-          <IconButton type="button" aria-label="Subir bloque" onClick={(event) => { event.preventDefault(); onMove(-1); }}>
+          <CyberIconButton type="button" aria-label="Subir bloque" onClick={(event) => { event.preventDefault(); onMove(-1); }}>
             <ArrowUpIcon size={14} />
-          </IconButton>
-          <IconButton type="button" aria-label="Bajar bloque" onClick={(event) => { event.preventDefault(); onMove(1); }}>
+          </CyberIconButton>
+          <CyberIconButton type="button" aria-label="Bajar bloque" onClick={(event) => { event.preventDefault(); onMove(1); }}>
             <ArrowDownIcon size={14} />
-          </IconButton>
-          <IconButton type="button" tone="danger" aria-label="Quitar bloque" onClick={(event) => { event.preventDefault(); onRemove(); }}>
+          </CyberIconButton>
+          <CyberIconButton type="button" tone="danger" aria-label="Quitar bloque" onClick={(event) => { event.preventDefault(); onRemove(); }}>
             <DeleteIcon size={14} />
-          </IconButton>
+          </CyberIconButton>
         </div>
       </summary>
 
@@ -2641,7 +2652,7 @@ function TrainingView({
         />
 
         {filteredExercises.length ? (
-          <div className="trainingPlugin__galleryGrid">
+          <GalleryGrid className="trainingPlugin__galleryGrid">
             {filteredExercises.map((exercise) => (
               <TrainingGalleryCard
                 key={exercise.id}
@@ -2652,7 +2663,7 @@ function TrainingView({
                 onClick={() => openExercisePreviewByRecord(exercise)}
               />
             ))}
-          </div>
+          </GalleryGrid>
         ) : (
           <StateBlock centered title="Sin ejercicios" description="Crea el primero desde el boton +." />
         )}
@@ -2693,7 +2704,7 @@ function TrainingView({
         />
 
         {filteredMuscles.length ? (
-          <div className="trainingPlugin__galleryGrid">
+          <GalleryGrid className="trainingPlugin__galleryGrid">
             {filteredMuscles.map((muscle) => (
               <TrainingGalleryCard
                 key={muscle.id}
@@ -2704,7 +2715,7 @@ function TrainingView({
                 onClick={() => openMusclePreviewByRecord(muscle)}
               />
             ))}
-          </div>
+          </GalleryGrid>
         ) : (
           <StateBlock centered title="Sin musculos" description="Ajusta la busqueda o los filtros." />
         )}
@@ -2731,7 +2742,7 @@ function TrainingView({
         />
 
         {filteredRoutines.length ? (
-          <div className="trainingPlugin__galleryGrid">
+          <GalleryGrid className="trainingPlugin__galleryGrid">
             {filteredRoutines.map((routine) => (
               <TrainingGalleryCard
                 key={routine.id}
@@ -2741,7 +2752,7 @@ function TrainingView({
                 onClick={() => openRoutinePreviewByRecord(routine)}
               />
             ))}
-          </div>
+          </GalleryGrid>
         ) : (
           <StateBlock centered title="Sin rutinas" description="Crea la primera desde el boton +." />
         )}
@@ -2768,7 +2779,7 @@ function TrainingView({
         />
 
         {filteredAssignments.length ? (
-          <div className="trainingPlugin__galleryGrid">
+          <GalleryGrid className="trainingPlugin__galleryGrid">
             {filteredAssignments.map((assignment) => (
               <TrainingGalleryCard
                 key={assignment.id}
@@ -2779,7 +2790,7 @@ function TrainingView({
                 onClick={() => openAssignmentEditByRecord(assignment)}
               />
             ))}
-          </div>
+          </GalleryGrid>
         ) : (
           <StateBlock
             centered

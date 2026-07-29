@@ -8,13 +8,7 @@ import {
   BOORU_WORKSPACE_VIEW_ID,
 } from "./constants.js";
 import { createRendererDevLogger } from "../../../nexus-frontend/src/utils/devLog.js";
-import {
-  AlertIcon,
-  DownloadIcon,
-  FolderIcon,
-  PulseIcon,
-  RefreshIcon,
-} from "./icons.jsx";
+import { DownloadIcon, FolderIcon } from "./icons.jsx";
 import {
   Button,
   Field,
@@ -30,7 +24,7 @@ import {
   StateBlock,
   WorkspaceBody,
   WorkspacePage,
-} from "../../../nexus-frontend/src/ui/index.js";
+} from "@nexus/ui";
 import {
   normalizeBooruEntityPrefix,
   normalizeBooruMissingFilter,
@@ -77,7 +71,6 @@ import {
   resetBooruWorkspaceSection,
   resolveBooruProfileForRoute,
   routeToBooruWorkspaceInput,
-  stepBooruGridColumns,
 } from "./domain/workspace-navigation.js";
 import {
   BOORU_NO_MISSING_FILTER,
@@ -1492,61 +1485,6 @@ function isTextInputTarget(target) {
   return nodeName === "input" || nodeName === "textarea" || nodeName === "select" || nodeName === "button";
 }
 
-function composeFrameStatusTitle(snapshot, { loading, busyAction, savingClassification, resourceLoading }) {
-  const watcher = snapshot?.watcher || null;
-  const pendingCount = Number(watcher?.pendingCount || 0);
-  const thumbnailBacklogCount = Number(snapshot?.stats?.thumbnailBacklogCount || 0);
-  const thumbnailReadyCount = Number(snapshot?.stats?.thumbnailReadyCount || 0);
-  const thumbnailErrorCount = Number(snapshot?.stats?.thumbnailErrorCount || 0);
-  const thumbnailActiveCount = Number(snapshot?.derivatives?.activeCount || 0);
-  const working =
-    loading
-    || resourceLoading
-    || Boolean(busyAction)
-    || savingClassification
-    || pendingCount > 0
-    || thumbnailActiveCount > 0
-    || thumbnailBacklogCount > 0;
-  const blocked = watcher?.stage === "error" || String(watcher?.stage || "").startsWith("blocked");
-
-  if (!working && !blocked) {
-    return "";
-  }
-
-  const lines = [];
-
-  if (blocked) {
-    lines.push("Booru necesita atencion.");
-  } else if (pendingCount > 0) {
-    lines.push(`Booru esta procesando ${pendingCount} archivo${pendingCount === 1 ? "" : "s"}.`);
-  } else if (thumbnailActiveCount > 0 || thumbnailBacklogCount > 0) {
-    lines.push(`Booru esta generando previews (${thumbnailReadyCount} listas, ${thumbnailBacklogCount} pendientes).`);
-  } else if (busyAction === "rescan") {
-    lines.push("Booru esta releyendo la carpeta vigilada.");
-  } else if (busyAction === "restart") {
-    lines.push("Booru esta reiniciando el watcher.");
-  } else if (savingClassification) {
-    lines.push("Booru esta guardando cambios en la seleccion.");
-  } else {
-    lines.push("Booru esta actualizando su estado.");
-  }
-
-  if (watcher?.lastError) {
-    lines.push(watcher.lastError);
-  } else if (snapshot?.derivatives?.lastError) {
-    lines.push(snapshot.derivatives.lastError);
-  } else if (watcher?.lastIngestedOriginalFilename) {
-    lines.push(`Ultimo importado: ${watcher.lastIngestedOriginalFilename}`);
-  }
-
-  if (thumbnailErrorCount > 0) {
-    lines.push(`${thumbnailErrorCount} thumbnail${thumbnailErrorCount === 1 ? "" : "s"} con error.`);
-  }
-
-  lines.push("Click para abrir Metricas.");
-  return lines.join("\n");
-}
-
 function getSnapshotRefreshSignature(snapshot) {
   return JSON.stringify({
     totalCount: Number(snapshot?.stats?.totalCount || 0),
@@ -2307,12 +2245,14 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     }
   }, []);
 
-  const handleGridColumnWheel = useCallback((family, event) => {
-    const nextColumns = stepBooruGridColumns(gridColumns, family, event?.deltaY);
-    if (nextColumns[family] === gridColumns[family]) return;
+  const handleGridColumnsChange = useCallback((family, nextColumnCount) => {
+    if (nextColumnCount === gridColumns[family]) return;
     void uiPreferencesApi.set({
       ...(persistedUiPreferences && typeof persistedUiPreferences === "object" ? persistedUiPreferences : {}),
-      gridColumns: nextColumns,
+      gridColumns: {
+        ...gridColumns,
+        [family]: nextColumnCount,
+      },
     });
   }, [gridColumns, persistedUiPreferences, uiPreferencesApi]);
 
@@ -3509,96 +3449,6 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
 
     void loadEntitySection({ append: false });
   }, [activeEntityKind, deferredEntitySearchValue, entityBrowse, entityRevision, normalizedEntitySearchTokens, showEntityProfile]);
-
-  const frameStatusTitle = useMemo(() => composeFrameStatusTitle(snapshot, {
-    loading,
-    busyAction,
-    savingClassification,
-    resourceLoading,
-  }), [
-    busyAction,
-    loading,
-    resourceLoading,
-    savingClassification,
-    snapshot?.derivatives?.activeCount,
-    snapshot?.derivatives?.lastError,
-    snapshot?.stats?.thumbnailBacklogCount,
-    snapshot?.stats?.thumbnailErrorCount,
-    snapshot?.stats?.thumbnailReadyCount,
-    snapshot?.watcher?.lastError,
-    snapshot?.watcher?.lastIngestedOriginalFilename,
-    snapshot?.watcher?.pendingCount,
-    snapshot?.watcher?.stage,
-  ]);
-  const watcherStage = String(snapshot?.watcher?.stage || "");
-
-  useEffect(() => {
-    if (!ctx?.setWorkspaceFrameActions || !ctx?.clearWorkspaceFrameActions) {
-      return undefined;
-    }
-
-    const statusIcon = watcherStage === "error" || watcherStage.startsWith("blocked")
-      ? AlertIcon
-      : PulseIcon;
-    const actions = [];
-
-    if (frameStatusTitle) {
-      actions.push({
-        id: "booru-runtime-status",
-        icon: statusIcon,
-        title: frameStatusTitle,
-        active: true,
-        onClick: () => {
-          void ctx.openView({
-            viewId: BOORU_WORKSPACE_VIEW_ID,
-            reuse: true,
-            input: {
-              ...(latestInputRef.current && typeof latestInputRef.current === "object" ? latestInputRef.current : {}),
-              section: "settings",
-              settingsSubview: "overview",
-            },
-          });
-        },
-      });
-    }
-
-    actions.push({
-      id: "booru-refresh",
-      icon: RefreshIcon,
-      title: loading || resourceLoading || entityLoading ? "Actualizando..." : "Actualizar",
-      disabled: loading || resourceLoading || entityLoading,
-      onClick: () => {
-        void loadSnapshot({ silent: false, reason: "frame-refresh" });
-        if (showResourceWorkspace) {
-          if (activeResourceSection === "media") {
-            setResourcePageForSection(activeResourceSection, 1);
-            void loadResources({ requestedPage: 1 });
-          } else {
-            void loadResources({ requestedPage: currentResourcePage });
-          }
-        } else if (activeEntityKind) {
-          setEntityRevision((currentValue) => currentValue + 1);
-        }
-      },
-    });
-
-    ctx.setWorkspaceFrameActions(BOORU_WORKSPACE_VIEW_ID, actions);
-    return () => {
-      ctx.clearWorkspaceFrameActions(BOORU_WORKSPACE_VIEW_ID);
-    };
-  }, [
-    activeEntityKind,
-    busyAction,
-    ctx,
-    entityLoading,
-    frameStatusTitle,
-    loading,
-    currentResourcePage,
-    resourceLoading,
-    savingClassification,
-    showResourceWorkspace,
-    watcherStage,
-  ]);
 
   const currentSelection = useMemo(() => {
     if (!showResourceWorkspace) {
@@ -5874,7 +5724,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                     scrollTop={activeRouteScrollTop}
                     onScrollStateChange={handleRouteScrollStateChange}
                     columns={gridColumns[BOORU_GRID_FAMILIES.RESOURCES]}
-                    onColumnWheel={(event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.RESOURCES, event)}
+                    onColumnsChange={(nextColumns) => handleGridColumnsChange(BOORU_GRID_FAMILIES.RESOURCES, nextColumns)}
                     infinite
                     hasMore={resourceState.hasMore}
                     onLoadMore={loadNextMediaPage}
@@ -5979,8 +5829,8 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                           onScrollStateChange={handleRouteScrollStateChange}
                           gallerySelectedIds={profileGallerySelectedIds}
                           onGallerySelectionChange={setProfileGallerySelectedIds}
-                          onResourceColumnWheel={(event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.PROFILE_RESOURCES, event)}
-                          onEntityColumnWheel={(event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.ENTITIES, event)}
+                          onResourceColumnsChange={(nextColumns) => handleGridColumnsChange(BOORU_GRID_FAMILIES.PROFILE_RESOURCES, nextColumns)}
+                          onEntityColumnsChange={(nextColumns) => handleGridColumnsChange(BOORU_GRID_FAMILIES.ENTITIES, nextColumns)}
                           onEntityHover={(kind, item) => {
                             hoveredEntityRef.current = item ? { kind, id: item.id } : null;
                           }}
@@ -6016,7 +5866,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                             entityKindLabels={BOORU_ENTITY_KIND_LABELS}
                             getInitials={getInitials}
                             columns={gridColumns[BOORU_GRID_FAMILIES.ENTITIES]}
-                            onColumnWheel={(event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.ENTITIES, event)}
+                            onColumnsChange={(nextColumns) => handleGridColumnsChange(BOORU_GRID_FAMILIES.ENTITIES, nextColumns)}
                             onGroupAssociationHover={(association) => {
                               hoveredGroupAssociationRef.current = association;
                             }}
@@ -6051,7 +5901,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                         entityKindLabels={BOORU_ENTITY_KIND_LABELS}
                         getInitials={getInitials}
                         columns={gridColumns[BOORU_GRID_FAMILIES.ENTITIES]}
-                        onColumnWheel={(event) => handleGridColumnWheel(BOORU_GRID_FAMILIES.ENTITIES, event)}
+                        onColumnsChange={(nextColumns) => handleGridColumnsChange(BOORU_GRID_FAMILIES.ENTITIES, nextColumns)}
                         onGroupAssociationHover={(association) => {
                           hoveredGroupAssociationRef.current = association;
                         }}

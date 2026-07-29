@@ -1,4 +1,4 @@
-import { Button, Field, Notice } from "../../../../../nexus-frontend/src/ui/index.js";
+import { Button, Field, Notice } from "@nexus/ui";
 
 const React = window.React;
 const { useState } = React;

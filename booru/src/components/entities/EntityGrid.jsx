@@ -1,9 +1,17 @@
-import { SectionPanel, StateBlock } from "../../../../../nexus-frontend/src/ui/index.js";
+import {
+  GalleryCard,
+  GalleryCardBody,
+  GalleryCardMedia,
+  GalleryCardMeta,
+  GalleryCardTitle,
+  GalleryGrid,
+  SectionPanel,
+  StateBlock,
+} from "@nexus/ui";
 import EntityVisualMedia from "./EntityVisualMedia.jsx";
-import useGalleryColumnWheel from "../shared/useGalleryColumnWheel.js";
 import CollapsibleGalleryGroup from "../shared/CollapsibleGalleryGroup.jsx";
 const React = window.React;
-const { useCallback, useEffect, useMemo, useRef } = React;
+const { useEffect, useMemo, useRef } = React;
 
 export default function EntityGrid({
   kind,
@@ -22,18 +30,13 @@ export default function EntityGrid({
   getInitials,
   embedded = false,
   columns = 5,
-  onColumnWheel,
+  onColumnsChange,
   onGroupAssociationHover,
   scrollKey,
   scrollTop = 0,
   onScrollStateChange,
 }) {
   const contentRef = useRef(null);
-  const attachColumnWheel = useGalleryColumnWheel(onColumnWheel);
-  const setContentNode = useCallback((node) => {
-    contentRef.current = node;
-    attachColumnWheel(node);
-  }, [attachColumnWheel]);
   const groupedSections = useMemo(() => {
     if (!Array.isArray(placements) || !placements.length) return [];
     const itemById = new Map(items.map((item) => [item.id, item]));
@@ -66,7 +69,7 @@ export default function EntityGrid({
     <>
       {items.length ? (
         <div
-          ref={setContentNode}
+          ref={contentRef}
           className="booruView__resourcePanelBody"
           onScroll={(event) => {
             if (!embedded) onScrollStateChange?.(event.currentTarget.scrollTop || 0);
@@ -79,21 +82,28 @@ export default function EntityGrid({
             <div className="booruView__groupedGallery">
               {groupedSections.map((group) => (
                 <CollapsibleGalleryGroup key={group.key} label={group.label} association={group.association} onAssociationHover={onGroupAssociationHover}>
-                  <div className="booruView__entityGrid" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+                  <GalleryGrid
+                    className="booruView__entityGrid"
+                    columns={columns}
+                    minColumns={2}
+                    onColumnsChange={onColumnsChange}
+                  >
                     {group.items.map(({ placement, item }) => (
                       <EntityCard key={placement.placementId} item={item} />
                     ))}
-                  </div>
+                  </GalleryGrid>
                 </CollapsibleGalleryGroup>
               ))}
             </div>
           ) : (
-            <div
+            <GalleryGrid
               className="booruView__entityGrid"
-              style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+              columns={columns}
+              minColumns={2}
+              onColumnsChange={onColumnsChange}
             >
               {items.map((item) => <EntityCard key={item.id} item={item} />)}
-            </div>
+            </GalleryGrid>
           )}
           {loading && items.length ? <span className="booruView__resourceLoadingMore">Actualizando seccion...</span> : null}
         </div>
@@ -109,14 +119,15 @@ export default function EntityGrid({
 
   function EntityCard({ item }) {
     return (
-              <button
+              <GalleryCard
+                as="button"
                 type="button"
                 className="booruView__entityCard"
                 onClick={() => onOpenEntity?.(kind, item)}
                 onPointerEnter={() => onEntityHover?.(kind, item)}
                 onPointerLeave={() => onEntityHover?.(null)}
               >
-                <div
+                <GalleryCardMedia
                   className="booruView__entityCardPreview"
                   onContextMenu={(event) => onPreviewContextMenu?.(item, event)}
                 >
@@ -130,21 +141,21 @@ export default function EntityGrid({
                       </div>
                     )}
                   />
-                </div>
+                </GalleryCardMedia>
 
-                <div className="booruView__entityCardBody">
-                  <strong>{item.displayName}</strong>
+                <GalleryCardBody className="booruView__entityCardBody">
+                  <GalleryCardTitle>{item.displayName}</GalleryCardTitle>
                   {kind === "character" && item?.universe?.displayName ? (
-                    <div className="booruView__entityCardMeta">
+                    <GalleryCardMeta as="div" className="booruView__entityCardMeta">
                       <span>{item.universe.displayName}</span>
-                    </div>
+                    </GalleryCardMeta>
                   ) : null}
-                  <div className="booruView__entityCardMeta">
+                  <GalleryCardMeta as="div" className="booruView__entityCardMeta">
                     <span>{item.resourceCount} recursos</span>
                     <span>{entityKindLabels[kind] || kind}</span>
-                  </div>
-                </div>
-              </button>
+                  </GalleryCardMeta>
+                </GalleryCardBody>
+              </GalleryCard>
     );
   }
 

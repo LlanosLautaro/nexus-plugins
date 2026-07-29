@@ -169,12 +169,12 @@ def render_thumbnail(
         raise RuntimeError(message)
 
 
-def render_video_short(ffmpeg_path, source_path, output_path):
+def render_video_short(ffmpeg_path, source_path, output_path, duration_seconds):
     remove_if_exists(output_path)
     result = run_command([
         ffmpeg_path, "-hide_banner", "-loglevel", "error", "-y",
         "-i", source_path,
-        "-t", "60",
+        "-t", str(duration_seconds),
         "-an",
         "-sn",
         "-c:v", "libx264",
@@ -276,6 +276,7 @@ def main():
     parser.add_argument("--thumbnail-webp-path", required=True)
     parser.add_argument("--thumbnail-jpeg-path", required=True)
     parser.add_argument("--video-short-path")
+    parser.add_argument("--video-short-duration-seconds", type=int, default=15)
     parser.add_argument("--max-side", type=int, default=384)
     args = parser.parse_args()
 
@@ -344,10 +345,16 @@ def main():
     thumb_info = probe_generated_thumbnail(ffprobe_path, selected_output)
     short_path = None
     short_error = None
-    if args.media_kind == "video" and media_info["durationMs"] and media_info["durationMs"] > 60000 and output_short:
+    short_threshold_ms = max(1, args.video_short_duration_seconds) * 1000
+    if args.media_kind == "video" and media_info["durationMs"] and media_info["durationMs"] > short_threshold_ms and output_short:
         try:
             Path(output_short).parent.mkdir(parents=True, exist_ok=True)
-            render_video_short(ffmpeg_path, source_path, output_short)
+            render_video_short(
+                ffmpeg_path,
+                source_path,
+                output_short,
+                max(1, args.video_short_duration_seconds),
+            )
             short_path = output_short
         except Exception as error:
             short_error = str(error)

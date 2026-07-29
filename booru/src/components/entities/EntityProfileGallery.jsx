@@ -1,8 +1,13 @@
-import { StateBlock } from "../../../../../nexus-frontend/src/ui/index.js";
-import useGalleryColumnWheel from "../shared/useGalleryColumnWheel.js";
+import {
+  GalleryCard,
+  GalleryCardMedia,
+  GalleryGrid,
+  StateBlock,
+} from "@nexus/ui";
 import CollapsibleGalleryGroup from "../shared/CollapsibleGalleryGroup.jsx";
+import { resolveBooruVideoAutoplay } from "../../domain/video-preview-policy.js";
 const React = window.React;
-const { useCallback, useEffect, useMemo, useRef, useState } = React;
+const { useEffect, useMemo, useRef, useState } = React;
 
 export default function EntityProfileGalleryGrid({
   items,
@@ -17,16 +22,10 @@ export default function EntityProfileGalleryGrid({
   resourceGridColumns,
   selectedIds,
   onSelectionChange,
-  onColumnWheel,
+  onColumnsChange,
   onGroupAssociationHover,
 }) {
   const sentinelRef = useRef(null);
-  const galleryRef = useRef(null);
-  const attachColumnWheel = useGalleryColumnWheel(onColumnWheel);
-  const setGalleryNode = useCallback((node) => {
-    galleryRef.current = node;
-    attachColumnWheel(node);
-  }, [attachColumnWheel]);
   const [localSelectedIds, setLocalSelectedIds] = useState([]);
   const activeSelectedIds = Array.isArray(selectedIds) ? selectedIds : localSelectedIds;
   const setActiveSelectedIds = (updater) => {
@@ -75,9 +74,14 @@ export default function EntityProfileGalleryGrid({
     return <StateBlock centered title="Sin recursos todavia" description="Cuando esta entidad consuma media real, aparecera aqui. Ctrl/Cmd+V pega una imagen del portapapeles y la asigna a este perfil." />;
   }
 
-  const renderCard = (item, absoluteIndex, key) => (
-    <div
+  const renderCard = (item, absoluteIndex, key) => {
+    const videoAutoplay = resolveBooruVideoAutoplay(item);
+    return (
+    <GalleryCard
+      as="div"
       key={key}
+      interactive
+      selected={activeSelectedIds.includes(item.id)}
       className={[
         "booruView__mediaCard",
         "booruView__mediaCard--static",
@@ -107,7 +111,7 @@ export default function EntityProfileGalleryGrid({
         onContextMenu?.(item, event, contextIds);
       }}
     >
-      <div className="booruView__mediaCardPreview">
+      <GalleryCardMedia className="booruView__mediaCardPreview">
         <MediaPreview
           pathValue={item.storagePath}
           mediaKind={item.mediaKind}
@@ -115,31 +119,42 @@ export default function EntityProfileGalleryGrid({
           thumbnail={item.thumbnail}
           highPriority={absoluteIndex < resourceGridColumns}
           preferOriginalWhenThumbnailMissing
-          autoplay={item.mediaKind === "video" && (Number(item.durationMs || 0) <= 60000 || Boolean(item.autoplayStoragePath))}
+          autoplay={videoAutoplay.autoplay}
           loop={item.mediaKind === "video"}
-          autoplayPath={item.autoplayStoragePath}
+          autoplayPath={videoAutoplay.autoplayPath}
           hoverPlayable={item.mediaKind === "gif"}
         />
-      </div>
-    </div>
-  );
+      </GalleryCardMedia>
+    </GalleryCard>
+    );
+  };
 
   return (
-    <div ref={setGalleryNode} className="booruView__entityProfileGallery">
+    <div className="booruView__entityProfileGallery">
       {groupedSections.length ? (
         <div className="booruView__groupedGallery">
           {groupedSections.map((group) => (
             <CollapsibleGalleryGroup key={group.key} label={group.label} association={group.association} onAssociationHover={onGroupAssociationHover}>
-              <div className="booruView__mediaGrid" style={{ gridTemplateColumns: `repeat(${resourceGridColumns}, minmax(0, 1fr))` }}>
+              <GalleryGrid
+                className="booruView__mediaGrid"
+                columns={resourceGridColumns}
+                minColumns={2}
+                onColumnsChange={onColumnsChange}
+              >
                 {group.entries.map(({ placement, item }, index) => renderCard(item, index, placement.placementId))}
-              </div>
+              </GalleryGrid>
             </CollapsibleGalleryGroup>
           ))}
         </div>
       ) : (
-        <div className="booruView__mediaGrid booruView__mediaGrid--infinite" style={{ gridTemplateColumns: `repeat(${resourceGridColumns}, minmax(0, 1fr))` }}>
+        <GalleryGrid
+          className="booruView__mediaGrid booruView__mediaGrid--infinite"
+          columns={resourceGridColumns}
+          minColumns={2}
+          onColumnsChange={onColumnsChange}
+        >
           {items.map((item, index) => renderCard(item, index, item.id))}
-        </div>
+        </GalleryGrid>
       )}
       {hasMore ? <div ref={sentinelRef} className="booruView__resourceLoadSentinel" aria-hidden="true" /> : null}
       {loading && items.length ? <span className="booruView__resourceLoadingMore">Cargando mas recursos...</span> : null}

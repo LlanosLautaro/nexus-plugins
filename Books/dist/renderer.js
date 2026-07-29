@@ -1,13 +1,59 @@
 const React = window.React;
+var __create = Object.create;
 var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __esm = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __commonJS = (cb, mod) => function __require() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// <define:process>
+var define_process_default;
+var init_define_process = __esm({
+  "<define:process>"() {
+    define_process_default = { env: { NODE_ENV: "production" } };
+  }
+});
+
+// scripts/plugins/shims/react.cjs
+var require_react = __commonJS({
+  "scripts/plugins/shims/react.cjs"(exports, module) {
+    init_define_process();
+    function requireReact() {
+      const hostReact = globalThis?.window?.__NEXUS_HOST_REACT__ || globalThis?.window?.React;
+      if (!hostReact) {
+        throw new Error("Nexus plugins renderer no encontro el React del host en window.__NEXUS_HOST_REACT__.");
+      }
+      return hostReact;
+    }
+    module.exports = requireReact();
+  }
+});
 
 // node_modules/pdfjs-dist/legacy/build/pdf.mjs
 var pdf_exports = {};
@@ -714,7 +760,7 @@ function getUrlProp(val) {
       if (/^[a-z][a-z0-9\-+.]+:/i.test(val)) {
         return new URL(val);
       }
-      const url2 = process.getBuiltinModule("url");
+      const url2 = define_process_default.getBuiltinModule("url");
       return new URL(url2.pathToFileURL(val));
     }
     const url = URL.parse(val, window.location);
@@ -772,7 +818,7 @@ function wrapReason(ex) {
   return new UnknownErrorException(ex.message, ex.toString());
 }
 async function node_utils_fetchData(url) {
-  const fs = process.getBuiltinModule("fs/promises");
+  const fs = define_process_default.getBuiltinModule("fs/promises");
   const data = await fs.readFile(url);
   return new Uint8Array(data);
 }
@@ -1482,10 +1528,10 @@ function network_getArrayBuffer(val) {
   return typeof val !== "string" ? val : stringToBytes(val).buffer;
 }
 function getReadableStream(url, opts = null) {
-  const fs = process.getBuiltinModule("fs");
+  const fs = define_process_default.getBuiltinModule("fs");
   const {
     Readable
-  } = process.getBuiltinModule("stream");
+  } = define_process_default.getBuiltinModule("stream");
   const readStream = fs.createReadStream(url, opts);
   return Readable.toWeb(readStream);
 }
@@ -1663,6 +1709,7 @@ function percentage(value) {
 var __webpack_modules__, __webpack_module_cache__, es_array_includes, es_array_push, es_array_buffer_detached, es_array_buffer_transfer, es_array_buffer_transfer_to_fixed_length, es_map_get_or_insert, es_map_get_or_insert_computed, es_typed_array_with, es_uint8_array_set_from_base64, es_uint8_array_set_from_hex, es_uint8_array_to_base64, es_uint8_array_to_hex, web_url_parse, isNodeJS, BBOX_INIT, F32_BBOX_INIT, FONT_IDENTITY_MATRIX, LINE_FACTOR, LINE_DESCENT_FACTOR, BASELINE_FACTOR, RenderingIntentFlag, AnnotationMode, AnnotationEditorPrefix, AnnotationEditorType, AnnotationEditorParamsType, PermissionFlag, TextRenderingMode, ImageKind, AnnotationType, AnnotationBorderStyleType, VerbosityLevel, OPS, DrawOPS, PasswordResponses, verbosity, BaseException, PasswordException, UnknownErrorException, InvalidPDFException, ResponseException, FormatError, AbortException, FeatureTest, Util, NormalizeRegex, NormalizationMap, AnnotationPrefix, makeArr, makeMap, makeObj, es_iterator_constructor, es_iterator_map, web_url_search_params_delete, web_url_search_params_has, web_url_search_params_size, XfaText, XfaLayer, SVG_NS, PixelsPerInch, PageViewport, RenderingCancelledException, StatTimer, PDFDateString, OutputScale, SupportedImageMimeTypes, ColorScheme, CSSConstants, contrastCache, es_iterator_take, es_promise_with_resolvers, es_set_difference_v2, es_set_intersection_v2, es_set_is_disjoint_from_v2, es_set_is_subset_of_v2, es_set_is_superset_of_v2, es_set_symmetric_difference_v2, es_set_union_v2, es_weak_map_get_or_insert, es_weak_map_get_or_insert_computed, web_dom_exception_stack, es_iterator_some, es_json_stringify, es_iterator_drop, es_iterator_every, es_json_parse, EditorToolbar, FloatingToolbar, CurrentPointers, IdManager, ImageManager, CommandManager, KeyboardManager, ColorManager, AnnotationEditorUIManager, AltText, Comment, TouchManager, AnnotationEditor, FakeEditor, SEED, MASK_HIGH, MASK_LOW, MurmurHash3_64, SerializableEmpty, AnnotationStorage, PrintAnnotationStorage, es_iterator_for_each, FORCED_DEPENDENCY_LABEL, floor, ceil, EMPTY_BBOX, BBoxReader, ensureDebugMetadata, CanvasBBoxTracker, CanvasDependencyTracker, CanvasNestedDependencyTracker, Dependencies, CanvasImagesTracker, FontLoader, FontFaceObject, CSS_FONT_INFO, SYSTEM_FONT_INFO, FONT_INFO, PATTERN_INFO, CssFontInfo, SystemFontInfo, FontInfo, PatternInfo, FontPathInfo, isRefProxy, isNameProxy, isValidExplicitDest, LoopbackPort, es_promise_try, CallbackKind, StreamKind, MessageHandler, BaseBinaryDataFactory, DOMBinaryDataFactory, BaseCanvasFactory, DOMCanvasFactory, es_iterator_filter, BaseFilterFactory, DOMFilterFactory, NodeFilterFactory, NodeCanvasFactory, NodeBinaryDataFactory, MESH_WGSL, WebGPU, _webGPU, PathType, BaseShadingPattern, RadialAxialShadingPattern, MeshShadingPattern, DummyShadingPattern, PaintType, TilingPattern, MIN_FONT_SIZE, MAX_FONT_SIZE, EXECUTION_TIME, EXECUTION_STEPS, FULL_CHUNK_HEIGHT, SCALE_MATRIX, XY, CanvasExtraState, LINE_CAP_STYLES, LINE_JOIN_STYLES, NORMAL_CLIP, EO_CLIP, CanvasGraphics, BasePDFStream, BasePDFStreamReader, BasePDFStreamRangeReader, PDFFetchStream, PDFFetchStreamReader, PDFFetchStreamRangeReader, es_iterator_find, PDFDataTransportStream, PDFDataTransportStreamReader, PDFDataTransportStreamRangeReader, OK_RESPONSE, PARTIAL_CONTENT_RESPONSE, PDFNetworkStream, PDFNetworkStreamReader, PDFNetworkStreamRangeReader, PDFNodeStream, PDFNodeStreamReader, PDFNodeStreamRangeReader, GlobalWorkerOptions, Metadata, INTERNAL, OptionalContentGroup, OptionalContentConfig, PagesMapper, INITIAL_DATA, dataObj, PDFObjects, MAX_TEXT_DIVS_TO_RENDER, DEFAULT_FONT_SIZE, TextLayer, RENDERING_CANCELLED_TIMEOUT, PDFDocumentLoadingTask, PDFDataRangeTransport, PDFDocumentProxy, PDFPageProxy, PDFWorker, WorkerTransport, RenderTask, InternalRenderTask, version, build, es_math_sum_precise, ColorPicker, BasicColorPicker, es_iterator_flat_map, ColorConverters, BaseSVGFactory, DOMSVGFactory, annotation_layer_DEFAULT_FONT_SIZE, GetElementsByNameSet, TIMEZONE_OFFSET, AnnotationElementFactory, AnnotationElement, EditorAnnotationElement, LinkAnnotationElement, TextAnnotationElement, WidgetAnnotationElement, TextWidgetAnnotationElement, SignatureWidgetAnnotationElement, CheckboxWidgetAnnotationElement, RadioButtonWidgetAnnotationElement, PushButtonWidgetAnnotationElement, ChoiceWidgetAnnotationElement, PopupAnnotationElement, PopupElement, FreeTextAnnotationElement, LineAnnotationElement, SquareAnnotationElement, CircleAnnotationElement, PolylineAnnotationElement, PolygonAnnotationElement, CaretAnnotationElement, InkAnnotationElement, HighlightAnnotationElement, UnderlineAnnotationElement, SquigglyAnnotationElement, StrikeOutAnnotationElement, StampAnnotationElement, FileAttachmentAnnotationElement, AnnotationLayer, EOL_PATTERN, FreeTextEditor, Outline, FreeDrawOutliner, FreeDrawOutline, HighlightOutliner, HighlightOutline, FreeHighlightOutliner, FreeHighlightOutline, HighlightEditor, DrawingOptions, DrawingEditor, InkDrawOutliner, InkDrawOutline, InkDrawingOptions, InkEditor, ContourDrawOutline, es_uint8_array_from_base64, BASE_HEADER_LENGTH, POINTS_PROPERTIES_NUMBER, SignatureExtractor, SignatureOptions, DrawnSignatureOptions, SignatureEditor, StampEditor, AnnotationEditorLayer, DrawLayer, TextLayerImages;
 var init_pdf = __esm({
   "node_modules/pdfjs-dist/legacy/build/pdf.mjs"() {
+    init_define_process();
     __webpack_modules__ = {
       /***/
       9306(module, __unused_webpack_exports, __webpack_require__2) {
@@ -6059,7 +6106,7 @@ var init_pdf = __esm({
     es_uint8_array_to_base64 = __webpack_require__(9486);
     es_uint8_array_to_hex = __webpack_require__(456);
     web_url_parse = __webpack_require__(5781);
-    isNodeJS = typeof process === "object" && process + "" === "[object process]" && !process.versions.nw && !(process.versions.electron && process.type && process.type !== "browser");
+    isNodeJS = typeof define_process_default === "object" && define_process_default + "" === "[object process]" && !define_process_default.versions.nw && !(define_process_default.versions.electron && define_process_default.type && define_process_default.type !== "browser");
     BBOX_INIT = [Infinity, Infinity, -Infinity, -Infinity];
     F32_BBOX_INIT = new Float32Array(BBOX_INIT);
     FONT_IDENTITY_MATRIX = [1e-3, 0, 0, 1e-3, 0, 0];
@@ -14570,7 +14617,7 @@ var init_pdf = __esm({
     if (isNodeJS) {
       let canvas;
       try {
-        const require2 = process.getBuiltinModule("module").createRequire(import.meta.url);
+        const require2 = define_process_default.getBuiltinModule("module").createRequire(import.meta.url);
         try {
           canvas = require2("@napi-rs/canvas");
         } catch (ex) {
@@ -14612,7 +14659,7 @@ var init_pdf = __esm({
     };
     NodeCanvasFactory = class extends BaseCanvasFactory {
       _createCanvas(width, height) {
-        const require2 = process.getBuiltinModule("module").createRequire(import.meta.url);
+        const require2 = define_process_default.getBuiltinModule("module").createRequire(import.meta.url);
         const canvas = require2("@napi-rs/canvas");
         return canvas.createCanvas(width, height);
       }
@@ -18017,7 +18064,7 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
           url
         } = stream._source;
         this._isStreamingSupported = !disableStream;
-        const fs = process.getBuiltinModule("fs/promises");
+        const fs = define_process_default.getBuiltinModule("fs/promises");
         fs.lstat(url).then((stat) => {
           const readableStream = getReadableStream(url);
           this._reader = readableStream.getReader();
@@ -30948,7 +30995,451 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   }
 });
 
+// ../nexus-plugins/Books/src/renderer.js
+init_define_process();
+
+// ../nexus-plugins/Books/src/BooksDocumentEngine.jsx
+init_define_process();
+
+// ../packages/nexus-ui/src/index.js
+init_define_process();
+
+// ../packages/nexus-ui/src/components/Button/Button.jsx
+init_define_process();
+
+// ../packages/nexus-ui/src/utils/cx.js
+init_define_process();
+function cx(...values) {
+  return values.filter(Boolean).join(" ");
+}
+
+// ../packages/nexus-ui/src/components/Button/Button.jsx
+function Button({
+  className = "",
+  tone = "secondary",
+  children,
+  ...props
+}) {
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      ...props,
+      className: cx(
+        "nexus-ui-button",
+        tone !== "secondary" && `nexus-ui-button--${tone}`,
+        className
+      )
+    },
+    children
+  );
+}
+
+// ../packages/nexus-ui/src/components/CyberIconButton/CyberIconButton.jsx
+init_define_process();
+var import_react = __toESM(require_react(), 1);
+
+// ../packages/nexus-ui/src/components/Tooltip/Tooltip.jsx
+init_define_process();
+function Tooltip({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("span", { className: cx("nexus-ui-tooltip", className) }, children);
+}
+
+// ../packages/nexus-ui/src/components/CyberIconButton/CyberIconButton.jsx
+function CyberIconButton({
+  active = false,
+  className = "",
+  children,
+  label,
+  title,
+  tone = "neutral",
+  ref,
+  onClick,
+  onPointerLeave,
+  ...props
+}) {
+  const [tooltipDismissed, setTooltipDismissed] = (0, import_react.useState)(false);
+  const accessibleLabel = props["aria-label"] || label || title;
+  const tooltipLabel = label || title;
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      ...props,
+      ref,
+      type: props.type || "button",
+      className: cx(
+        "nexus-ui-cyber-icon-button",
+        active && "is-active",
+        tone !== "neutral" && `nexus-ui-cyber-icon-button--${tone}`,
+        tooltipDismissed && "is-tooltip-dismissed",
+        className
+      ),
+      "aria-label": accessibleLabel,
+      onClick: (event) => {
+        setTooltipDismissed(true);
+        onClick?.(event);
+      },
+      onPointerLeave: (event) => {
+        setTooltipDismissed(false);
+        onPointerLeave?.(event);
+      }
+    },
+    /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-cyber-icon-button__icon" }, children),
+    /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-cyber-icon-button__glare", "aria-hidden": "true" }),
+    tooltipLabel ? /* @__PURE__ */ React.createElement(Tooltip, null, tooltipLabel) : null
+  );
+}
+
+// ../packages/nexus-ui/src/components/SegmentedControl/SegmentedControl.jsx
+init_define_process();
+function readOptionValue(option) {
+  return option?.value ?? option?.id;
+}
+function SegmentedControl({
+  ariaLabel = "Selector",
+  className = "",
+  flush = false,
+  iconOnly = false,
+  onChange,
+  options = [],
+  orientation = "horizontal",
+  renderIcon,
+  value,
+  variant = "default"
+}) {
+  const normalizedOptions = Array.isArray(options) ? options.filter(Boolean) : [];
+  const activeIndex = Math.max(
+    0,
+    normalizedOptions.findIndex((option) => readOptionValue(option) === value)
+  );
+  const isCyber = variant === "cyber" || iconOnly;
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "aria-label": ariaLabel,
+      className: cx(
+        "nexus-ui-segmented",
+        `nexus-ui-segmented--${orientation}`,
+        variant !== "default" && `nexus-ui-segmented--${variant}`,
+        isCyber && "nexus-ui-segmented--icon-only",
+        flush && "nexus-ui-segmented--flush",
+        normalizedOptions.length && "has-active",
+        className
+      ),
+      role: "radiogroup",
+      style: {
+        "--segment-count": Math.max(1, normalizedOptions.length),
+        "--active-index": activeIndex
+      }
+    },
+    /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__highlight", "aria-hidden": "true" }),
+    normalizedOptions.map((option) => {
+      const optionValue = readOptionValue(option);
+      const active = optionValue === value;
+      const disabled = Boolean(option.disabled);
+      const icon = renderIcon?.(option) ?? option.icon ?? null;
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          "aria-checked": active,
+          "aria-label": iconOnly ? option.label : void 0,
+          className: cx(
+            "nexus-ui-segmented__button",
+            active && "is-active",
+            disabled && "is-disabled"
+          ),
+          disabled,
+          key: optionValue,
+          role: "radio",
+          type: "button",
+          onClick: () => {
+            if (!disabled) {
+              onChange?.(optionValue);
+            }
+          }
+        },
+        icon ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__icon" }, icon) : null,
+        isCyber ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__glare", "aria-hidden": "true" }) : null,
+        !iconOnly ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-segmented__label" }, option.label) : null,
+        iconOnly ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-tooltip" }, option.label) : null
+      );
+    })
+  );
+}
+
+// ../packages/nexus-ui/src/components/Select/Select.jsx
+init_define_process();
+var import_react2 = __toESM(require_react(), 1);
+var Select = (0, import_react2.forwardRef)(function Select2({ className = "", children, ...props }, ref) {
+  return /* @__PURE__ */ React.createElement(
+    "select",
+    {
+      ...props,
+      ref,
+      className: cx("nexus-ui-select", className)
+    },
+    children
+  );
+});
+
+// ../packages/nexus-ui/src/components/Checkbox/Checkbox.jsx
+init_define_process();
+function Checkbox({
+  className = "",
+  description = "",
+  label,
+  ...props
+}) {
+  return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-checkbox", className) }, /* @__PURE__ */ React.createElement("input", { ...props, className: "nexus-ui-checkbox__input", type: "checkbox" }), /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__box", "aria-hidden": "true" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 12 10" }, /* @__PURE__ */ React.createElement("path", { d: "M1 5.1 4.2 8 11 1" }))), label || description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__copy" }, label ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__label" }, label) : null, description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__description" }, description) : null) : null);
+}
+
+// ../packages/nexus-ui/src/components/SearchField/SearchField.jsx
+init_define_process();
+var import_react3 = __toESM(require_react(), 1);
+function DefaultSearchIcon() {
+  return /* @__PURE__ */ React.createElement("svg", { "aria-hidden": "true", fill: "none", viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "10.5", cy: "10.5", r: "6.5" }), /* @__PURE__ */ React.createElement("path", { d: "m15.5 15.5 4 4" }));
+}
+var SearchField = (0, import_react3.forwardRef)(function SearchField2({
+  className = "",
+  endAction = null,
+  icon,
+  inputClassName = "",
+  ...props
+}, ref) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-search-field", className) }, icon !== null ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-search-field__icon" }, icon === void 0 ? /* @__PURE__ */ React.createElement(DefaultSearchIcon, null) : icon) : null, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      ...props,
+      ref,
+      className: cx("nexus-ui-search-field__input", inputClassName),
+      type: "search"
+    }
+  ), endAction ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-search-field__action" }, endAction) : null);
+});
+
+// ../packages/nexus-ui/src/components/Gallery/Gallery.jsx
+init_define_process();
+var import_react4 = __toESM(require_react(), 1);
+function normalizeColumnCount(value, fallback = null) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) && numericValue > 0 ? Math.round(numericValue) : fallback;
+}
+function assignRef(ref, value) {
+  if (typeof ref === "function") {
+    ref(value);
+  } else if (ref && typeof ref === "object") {
+    ref.current = value;
+  }
+}
+var GalleryGrid = (0, import_react4.forwardRef)(function GalleryGrid2({
+  as: Component = "div",
+  className = "",
+  compact = false,
+  virtual = false,
+  columns,
+  defaultColumns,
+  minColumns = 1,
+  maxColumns = 12,
+  adjustableColumns = true,
+  onColumnsChange,
+  style,
+  children,
+  ...props
+}, ref) {
+  const nodeRef = (0, import_react4.useRef)(null);
+  const leftControlPressedRef = (0, import_react4.useRef)(false);
+  const [uncontrolledColumns, setUncontrolledColumns] = (0, import_react4.useState)(
+    () => normalizeColumnCount(defaultColumns)
+  );
+  const controlledColumns = normalizeColumnCount(columns);
+  const activeColumns = controlledColumns ?? uncontrolledColumns;
+  const normalizedMinColumns = normalizeColumnCount(minColumns, 1);
+  const normalizedMaxColumns = Math.max(
+    normalizedMinColumns,
+    normalizeColumnCount(maxColumns, 12)
+  );
+  const setNodeRef = (0, import_react4.useCallback)((node) => {
+    nodeRef.current = node;
+    assignRef(ref, node);
+  }, [ref]);
+  (0, import_react4.useEffect)(() => {
+    if (!adjustableColumns || !activeColumns || !nodeRef.current) {
+      return void 0;
+    }
+    const handleKeyDown = (event) => {
+      if (event.code === "ControlLeft") {
+        leftControlPressedRef.current = true;
+      }
+    };
+    const handleKeyUp = (event) => {
+      if (event.code === "ControlLeft") {
+        leftControlPressedRef.current = false;
+      }
+    };
+    const handleBlur = () => {
+      leftControlPressedRef.current = false;
+    };
+    const handleWheel = (event) => {
+      if (!leftControlPressedRef.current || !Number(event.deltaY)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const direction = Number(event.deltaY) < 0 ? -1 : 1;
+      const nextColumns = Math.min(
+        normalizedMaxColumns,
+        Math.max(normalizedMinColumns, activeColumns + direction)
+      );
+      if (nextColumns === activeColumns) {
+        return;
+      }
+      if (controlledColumns == null) {
+        setUncontrolledColumns(nextColumns);
+      }
+      onColumnsChange?.(nextColumns);
+    };
+    const node = nodeRef.current;
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlur);
+    node.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlur);
+      node.removeEventListener("wheel", handleWheel);
+    };
+  }, [
+    activeColumns,
+    adjustableColumns,
+    controlledColumns,
+    normalizedMaxColumns,
+    normalizedMinColumns,
+    onColumnsChange
+  ]);
+  const resolvedStyle = activeColumns && !virtual ? {
+    ...style,
+    gridTemplateColumns: `repeat(${activeColumns}, minmax(0, 1fr))`
+  } : style;
+  return /* @__PURE__ */ React.createElement(
+    Component,
+    {
+      ...props,
+      ref: setNodeRef,
+      "data-gallery-columns": activeColumns || void 0,
+      style: resolvedStyle,
+      className: cx(
+        "nexus-ui-gallery",
+        activeColumns && adjustableColumns && "nexus-ui-gallery--columns-adjustable",
+        compact && "nexus-ui-gallery--compact",
+        virtual && "nexus-ui-gallery--virtual",
+        className
+      )
+    },
+    children
+  );
+});
+var GalleryCard = (0, import_react4.forwardRef)(function GalleryCard2({
+  as: Component = "article",
+  className = "",
+  interactive,
+  selected = false,
+  children,
+  ...props
+}, ref) {
+  const isInteractive = interactive ?? (Component === "button" || Component === "a");
+  return /* @__PURE__ */ React.createElement(
+    Component,
+    {
+      ...props,
+      ref,
+      className: cx(
+        "nexus-ui-gallery-card",
+        isInteractive && "nexus-ui-gallery-card--interactive",
+        selected && "is-selected",
+        className
+      )
+    },
+    children
+  );
+});
+function GalleryCardBody({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-gallery-card__body", className) }, children);
+}
+function GalleryCardTitle({ as: Component = "strong", className = "", children }) {
+  return /* @__PURE__ */ React.createElement(Component, { className: cx("nexus-ui-gallery-card__title", className) }, children);
+}
+function GalleryCardMeta({ as: Component = "span", className = "", children }) {
+  return /* @__PURE__ */ React.createElement(Component, { className: cx("nexus-ui-gallery-card__meta", className) }, children);
+}
+
+// ../packages/nexus-ui/src/components/ReloadIcon/ReloadIcon.jsx
+init_define_process();
+function ReloadIcon({ size = 18, className = "" }) {
+  return /* @__PURE__ */ React.createElement(
+    "svg",
+    {
+      "aria-hidden": "true",
+      className,
+      viewBox: "0 0 24 24",
+      width: size,
+      height: size,
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "1.8",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    },
+    /* @__PURE__ */ React.createElement("path", { d: "M20 6v5h-5" }),
+    /* @__PURE__ */ React.createElement("path", { d: "M4 18v-5h5" }),
+    /* @__PURE__ */ React.createElement("path", { d: "M18 11a7 7 0 0 0-12-3" }),
+    /* @__PURE__ */ React.createElement("path", { d: "M6 13a7 7 0 0 0 12 3" })
+  );
+}
+
+// ../packages/nexus-ui/src/legacy/Panels.jsx
+init_define_process();
+function SectionPanel({ className = "", tone = "default", padding = "default", children }) {
+  return /* @__PURE__ */ React.createElement("section", { className: cx(
+    "nexus-ui-panel",
+    tone !== "default" && `nexus-ui-panel--${tone}`,
+    padding !== "default" && `nexus-ui-panel--padding-${padding}`,
+    className
+  ) }, children);
+}
+
+// ../packages/nexus-ui/src/legacy/States.jsx
+init_define_process();
+function Notice({ className = "", tone = "info", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-notice", `nexus-ui-notice--${tone}`, className) }, children);
+}
+function StateBlock({
+  className = "",
+  tone = "default",
+  eyebrow = "",
+  title = "",
+  description = "",
+  centered = false,
+  children = null
+}) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx(
+    "nexus-ui-state",
+    tone !== "default" && `nexus-ui-state--${tone}`,
+    centered && "nexus-ui-state--centered",
+    className
+  ) }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null, children);
+}
+
+// ../packages/nexus-ui/src/legacy/Workspace.jsx
+init_define_process();
+function WorkspacePage({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-page", className) }, children);
+}
+function WorkspaceBody({ className = "", children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-body", className) }, children);
+}
+
 // ../nexus-plugins/Books/src/icons.jsx
+init_define_process();
 var React2 = window.React;
 function BaseIcon({ children, size = 18, strokeWidth = 1.8 }) {
   return /* @__PURE__ */ React2.createElement(
@@ -30983,7 +31474,11 @@ function ZoomOutIcon(props) {
   return /* @__PURE__ */ React2.createElement(BaseIcon, { ...props }, /* @__PURE__ */ React2.createElement("circle", { cx: "11", cy: "11", r: "6.5" }), /* @__PURE__ */ React2.createElement("path", { d: "M8 11h6" }), /* @__PURE__ */ React2.createElement("path", { d: "m16 16 4 4" }));
 }
 
+// ../nexus-plugins/Books/src/BooksPdfViewer.jsx
+init_define_process();
+
 // ../nexus-plugins/Books/src/pdfjs-runtime.js
+init_define_process();
 var pdfJsRuntimePromise = null;
 async function loadBooksPdfJsRuntime() {
   if (!pdfJsRuntimePromise) {
@@ -31003,7 +31498,11 @@ async function loadBooksPdfJsRuntime() {
   return pdfJsRuntimePromise;
 }
 
+// ../nexus-plugins/Books/src/renderer-helpers.js
+init_define_process();
+
 // ../nexus-plugins/Books/src/constants.js
+init_define_process();
 var BOOKS_ENGINE_ID = "nexus.books.document";
 var BOOKS_LIBRARY_VIEW_ID = "nexus.books.library";
 var BOOK_READING_STATUSES = [
@@ -31014,6 +31513,7 @@ var BOOK_READING_STATUSES = [
 ];
 
 // ../nexus-plugins/Books/src/plugin-settings.js
+init_define_process();
 var BOOKS_SETTINGS_DEFAULTS = Object.freeze({
   engineAssignments: []
 });
@@ -31061,6 +31561,7 @@ function writeBooksEngineAssignments(settingsValue, assignments) {
 }
 
 // ../nexus-frontend/src/store/items/location.mjs
+init_define_process();
 function normalizeItemId2(value) {
   const normalizedValue = String(value || "").trim();
   return normalizedValue || "";
@@ -31293,7 +31794,7 @@ function queueBooksEditorLogEvent(event, message, data = null, level = "info") {
 }
 
 // ../nexus-plugins/Books/src/BooksPdfViewer.jsx
-var { useEffect, useMemo, useRef, useState } = window.React;
+var { useEffect: useEffect2, useMemo, useRef: useRef2, useState: useState3 } = window.React;
 var PAGE_OBSERVER_ROOT_MARGIN = "1200px 0px";
 var DEFAULT_PAGE_ASPECT_RATIO = 1.414;
 var VIEWER_HORIZONTAL_PADDING = 32;
@@ -31323,16 +31824,16 @@ function BooksPdfPage({
   documentKey,
   onFirstPageRendered
 }) {
-  const wrapperRef = useRef(null);
-  const canvasRef = useRef(null);
-  const firstPageReportedRef = useRef(false);
-  const [shouldRender, setShouldRender] = useState(pageNumber === 1);
-  const [pageAspectRatio, setPageAspectRatio] = useState(defaultAspectRatio || DEFAULT_PAGE_ASPECT_RATIO);
-  const [renderState, setRenderState] = useState({
+  const wrapperRef = useRef2(null);
+  const canvasRef = useRef2(null);
+  const firstPageReportedRef = useRef2(false);
+  const [shouldRender, setShouldRender] = useState3(pageNumber === 1);
+  const [pageAspectRatio, setPageAspectRatio] = useState3(defaultAspectRatio || DEFAULT_PAGE_ASPECT_RATIO);
+  const [renderState, setRenderState] = useState3({
     status: pageNumber === 1 ? "loading" : "idle",
     error: ""
   });
-  useEffect(() => {
+  useEffect2(() => {
     setShouldRender(pageNumber === 1);
     setPageAspectRatio(defaultAspectRatio || DEFAULT_PAGE_ASPECT_RATIO);
     setRenderState({
@@ -31341,7 +31842,7 @@ function BooksPdfPage({
     });
     firstPageReportedRef.current = false;
   }, [defaultAspectRatio, documentKey, pageNumber]);
-  useEffect(() => {
+  useEffect2(() => {
     const wrapperNode = wrapperRef.current;
     if (!wrapperNode || shouldRender) {
       return void 0;
@@ -31363,7 +31864,7 @@ function BooksPdfPage({
       observer.disconnect();
     };
   }, [shouldRender, viewportRootRef]);
-  useEffect(() => {
+  useEffect2(() => {
     if (!pdfDocument || !shouldRender || !canvasRef.current || !containerWidth) {
       return void 0;
     }
@@ -31499,12 +32000,12 @@ function BooksPdfViewer({
   reloadToken,
   closing = false
 }) {
-  const viewportRef = useRef(null);
-  const firstPageLoggedRef = useRef(false);
-  const activeLoadingTaskRef = useRef(null);
-  const activeDocumentRef = useRef(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const [viewerState, setViewerState] = useState({
+  const viewportRef = useRef2(null);
+  const firstPageLoggedRef = useRef2(false);
+  const activeLoadingTaskRef = useRef2(null);
+  const activeDocumentRef = useRef2(null);
+  const [containerWidth, setContainerWidth] = useState3(0);
+  const [viewerState, setViewerState] = useState3({
     status: filePath ? "loading" : "idle",
     error: "",
     pageCount: 0,
@@ -31512,7 +32013,7 @@ function BooksPdfViewer({
     defaultAspectRatio: DEFAULT_PAGE_ASPECT_RATIO,
     documentKey: ""
   });
-  useEffect(() => {
+  useEffect2(() => {
     const viewportNode = viewportRef.current;
     if (!viewportNode) {
       return void 0;
@@ -31526,7 +32027,7 @@ function BooksPdfViewer({
       resizeObserver.disconnect();
     };
   }, []);
-  useEffect(() => {
+  useEffect2(() => {
     let cancelled = false;
     let loadingTask = null;
     let pdfDocument = null;
@@ -31687,7 +32188,7 @@ function BooksPdfViewer({
 }
 
 // ../nexus-plugins/Books/src/BooksDocumentEngine.jsx
-var { useCallback, useEffect: useEffect2, useMemo: useMemo2, useRef: useRef2, useState: useState2 } = window.React;
+var { useCallback: useCallback2, useEffect: useEffect3, useMemo: useMemo2, useRef: useRef3, useState: useState4 } = window.React;
 var ipcRenderer = window.nexus.ipc;
 var PDF_VIEWER_CLOSE_SETTLE_MS = 32;
 function clampZoom(value) {
@@ -31709,15 +32210,15 @@ function StatePill({ status }) {
   return /* @__PURE__ */ React.createElement("span", { className: `booksEngine__status booksEngine__status--${status || "pending"}` }, getReadingStatusLabel(status));
 }
 function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
-  const [book, setBook] = useState2(null);
-  const [loading, setLoading] = useState2(true);
-  const [saving, setSaving] = useState2(false);
-  const [error, setError] = useState2("");
-  const [reloadToken, setReloadToken] = useState2(0);
-  const [zoom, setZoom] = useState2(100);
-  const [isClosingViewer, setIsClosingViewer] = useState2(false);
-  const preclosePromiseRef = useRef2(null);
-  const latestPayloadRef = useRef2({
+  const [book, setBook] = useState4(null);
+  const [loading, setLoading] = useState4(true);
+  const [saving, setSaving] = useState4(false);
+  const [error, setError] = useState4("");
+  const [reloadToken, setReloadToken] = useState4(0);
+  const [zoom, setZoom] = useState4(100);
+  const [isClosingViewer, setIsClosingViewer] = useState4(false);
+  const preclosePromiseRef = useRef3(null);
+  const latestPayloadRef = useRef3({
     filePath,
     tabId: tabId || null
   });
@@ -31726,7 +32227,7 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
     filePath: resolvedFilePath || filePath,
     tabId: tabId || null
   };
-  const prepareViewerForClose = useCallback((reason = "unknown") => {
+  const prepareViewerForClose = useCallback2((reason = "unknown") => {
     if (preclosePromiseRef.current) {
       return preclosePromiseRef.current;
     }
@@ -31760,7 +32261,7 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
     });
     return preclosePromiseRef.current;
   }, []);
-  useEffect2(() => {
+  useEffect3(() => {
     if (!tabId || typeof hostApi?.registerTabCloseHandler !== "function") {
       return void 0;
     }
@@ -31769,7 +32270,7 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
       () => prepareViewerForClose("tab-close-handler")
     );
   }, [hostApi, tabId, prepareViewerForClose]);
-  useEffect2(() => {
+  useEffect3(() => {
     if (!itemId) {
       return void 0;
     }
@@ -31833,10 +32334,10 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
     }
     await window.nexus.desktop.openPath(resolvedFilePath);
   };
-  return /* @__PURE__ */ React.createElement("section", { className: "booksEngine" }, /* @__PURE__ */ React.createElement("div", { className: "booksEngine__toolbar" }, /* @__PURE__ */ React.createElement("div", { className: "booksEngine__toolbarGroup" }, /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => setZoom((currentValue) => clampZoom(currentValue - 10)) }, /* @__PURE__ */ React.createElement(ZoomOutIcon, { size: 16 })), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => setZoom(100) }, zoom, "%"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => setZoom((currentValue) => clampZoom(currentValue + 10)) }, /* @__PURE__ */ React.createElement(ZoomInIcon, { size: 16 }))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__toolbarGroup" }, /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => setReloadToken((currentValue) => currentValue + 1) }, /* @__PURE__ */ React.createElement(RefreshIcon, { size: 16 })), /* @__PURE__ */ React.createElement(
-    "button",
+  return /* @__PURE__ */ React.createElement("section", { className: "booksEngine" }, /* @__PURE__ */ React.createElement("div", { className: "booksEngine__toolbar" }, /* @__PURE__ */ React.createElement("div", { className: "booksEngine__toolbarGroup" }, /* @__PURE__ */ React.createElement(CyberIconButton, { label: "Reducir zoom", onClick: () => setZoom((currentValue) => clampZoom(currentValue - 10)) }, /* @__PURE__ */ React.createElement(ZoomOutIcon, { size: 16 })), /* @__PURE__ */ React.createElement(Button, { type: "button", onClick: () => setZoom(100) }, zoom, "%"), /* @__PURE__ */ React.createElement(CyberIconButton, { label: "Aumentar zoom", onClick: () => setZoom((currentValue) => clampZoom(currentValue + 10)) }, /* @__PURE__ */ React.createElement(ZoomInIcon, { size: 16 }))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__toolbarGroup" }, /* @__PURE__ */ React.createElement(CyberIconButton, { label: "Recargar documento", onClick: () => setReloadToken((currentValue) => currentValue + 1) }, /* @__PURE__ */ React.createElement(RefreshIcon, { size: 16 })), /* @__PURE__ */ React.createElement(
+    CyberIconButton,
     {
-      type: "button",
+      label: "Abrir biblioteca",
       onClick: () => void hostApi.openView({
         viewId: BOOKS_LIBRARY_VIEW_ID,
         reuse: true,
@@ -31844,7 +32345,7 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
       })
     },
     /* @__PURE__ */ React.createElement(BookIcon, { size: 16 })
-  ), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => void openExternal() }, /* @__PURE__ */ React.createElement(ExternalIcon, { size: 16 })))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__body" }, /* @__PURE__ */ React.createElement("div", { className: "booksEngine__viewerShell" }, /* @__PURE__ */ React.createElement(
+  ), /* @__PURE__ */ React.createElement(CyberIconButton, { label: "Abrir externamente", onClick: () => void openExternal() }, /* @__PURE__ */ React.createElement(ExternalIcon, { size: 16 })))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__body" }, /* @__PURE__ */ React.createElement("div", { className: "booksEngine__viewerShell" }, /* @__PURE__ */ React.createElement(
     BooksPdfViewer,
     {
       filePath: resolvedFilePath,
@@ -31852,20 +32353,20 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
       reloadToken,
       closing: isClosingViewer
     }
-  )), /* @__PURE__ */ React.createElement("aside", { className: "booksEngine__aside" }, loading ? /* @__PURE__ */ React.createElement("div", { className: "booksEngine__state" }, "Cargando libro...") : book ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "booksEngine__copy" }, /* @__PURE__ */ React.createElement("span", { className: "booksEngine__eyebrow" }, "Books"), /* @__PURE__ */ React.createElement("h1", null, book.title), /* @__PURE__ */ React.createElement("p", null, book.author || "Autor sin curar")), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__panel" }, /* @__PURE__ */ React.createElement("div", { className: "booksEngine__field" }, /* @__PURE__ */ React.createElement("span", null, "Estado"), /* @__PURE__ */ React.createElement(StatePill, { status: book.readingStatus })), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__choiceGroup" }, BOOK_READING_STATUSES.map((status) => /* @__PURE__ */ React.createElement(
-    "button",
+  )), /* @__PURE__ */ React.createElement("aside", { className: "booksEngine__aside" }, loading ? /* @__PURE__ */ React.createElement(StateBlock, { className: "booksEngine__state", title: "Cargando libro" }) : book ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "booksEngine__copy" }, /* @__PURE__ */ React.createElement("span", { className: "booksEngine__eyebrow" }, "Books"), /* @__PURE__ */ React.createElement("h1", null, book.title), /* @__PURE__ */ React.createElement("p", null, book.author || "Autor sin curar")), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__panel" }, /* @__PURE__ */ React.createElement("div", { className: "booksEngine__field" }, /* @__PURE__ */ React.createElement("span", null, "Estado"), /* @__PURE__ */ React.createElement(StatePill, { status: book.readingStatus })), /* @__PURE__ */ React.createElement(
+    SegmentedControl,
     {
-      key: status,
-      type: "button",
-      className: [
-        "booksEngine__choiceButton",
-        book.readingStatus === status && "is-active"
-      ].filter(Boolean).join(" "),
-      disabled: saving,
-      onClick: () => void handleUpdateBook({ readingStatus: status })
-    },
-    getReadingStatusLabel(status)
-  ))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__field" }, /* @__PURE__ */ React.createElement("span", null, "Progreso"), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__progressRow" }, /* @__PURE__ */ React.createElement(
+      className: "booksEngine__choiceGroup",
+      ariaLabel: "Estado de lectura",
+      options: BOOK_READING_STATUSES.map((status) => ({
+        value: status,
+        label: getReadingStatusLabel(status),
+        disabled: saving
+      })),
+      value: book.readingStatus,
+      onChange: (status) => void handleUpdateBook({ readingStatus: status })
+    }
+  ), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__field" }, /* @__PURE__ */ React.createElement("span", null, "Progreso"), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__progressRow" }, /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "range",
@@ -31884,7 +32385,7 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
       onTouchEnd: () => void handleUpdateBook({ progressPercent: book.progressPercent })
     }
   ), /* @__PURE__ */ React.createElement(
-    "button",
+    Button,
     {
       type: "button",
       className: "booksEngine__secondaryButton",
@@ -31892,10 +32393,14 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
       onClick: () => void handleUpdateBook({ progressPercent: book.progressPercent })
     },
     formatPercent(book.progressPercent)
-  ))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__field" }, /* @__PURE__ */ React.createElement("span", null, "Ultima apertura"), /* @__PURE__ */ React.createElement("strong", null, formatDateTime(book.lastOpenedAt))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__field" }, /* @__PURE__ */ React.createElement("span", null, "Ruta"), /* @__PURE__ */ React.createElement("strong", null, resolvedFilePath || filePath)))) : /* @__PURE__ */ React.createElement("div", { className: "booksEngine__state" }, "No se pudo resolver el libro actual."), error ? /* @__PURE__ */ React.createElement("div", { className: "booksEngine__state booksEngine__state--error" }, error) : null)));
+  ))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__field" }, /* @__PURE__ */ React.createElement("span", null, "Ultima apertura"), /* @__PURE__ */ React.createElement("strong", null, formatDateTime(book.lastOpenedAt))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__field" }, /* @__PURE__ */ React.createElement("span", null, "Ruta"), /* @__PURE__ */ React.createElement("strong", null, resolvedFilePath || filePath)))) : /* @__PURE__ */ React.createElement(StateBlock, { className: "booksEngine__state", title: "No se pudo resolver el libro actual" }), error ? /* @__PURE__ */ React.createElement("div", { className: "booksEngine__state booksEngine__state--error" }, error) : null)));
 }
 
+// ../nexus-plugins/Books/src/BooksLibraryView.jsx
+init_define_process();
+
 // ../nexus-frontend/src/utils/devLog.js
+init_define_process();
 var DEV_LOG_BATCH_CHANNEL = "dev-log:append-batch";
 var ipcRenderer2 = window.nexus.ipc;
 var rendererDevLoggingEnabled = window.location.protocol !== "file:";
@@ -32080,134 +32585,8 @@ function createRendererDevLogger(scope) {
   };
 }
 
-// ../nexus-frontend/src/ui/cx.js
-function cx(...values) {
-  return values.filter(Boolean).join(" ");
-}
-
-// ../nexus-frontend/src/ui/WorkspacePage.jsx
-function WorkspacePage({ className = "", children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-page", className) }, children);
-}
-function WorkspaceTopbar({ className = "", children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-topbar", className) }, children);
-}
-function WorkspaceTitle({
-  className = "",
-  eyebrow = "",
-  title = "",
-  description = "",
-  aside = null
-}) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-title", className) }, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-title__copy" }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null), aside ? /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-title__aside" }, aside) : null);
-}
-function ToolbarActions({ className = "", children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-toolbar-actions", className) }, children);
-}
-function WorkspaceBody({ className = "", children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-body", className) }, children);
-}
-
-// ../nexus-frontend/src/ui/SectionPanel.jsx
-function SectionPanel({
-  className = "",
-  tone = "default",
-  padding = "default",
-  children
-}) {
-  return /* @__PURE__ */ React.createElement(
-    "section",
-    {
-      className: cx(
-        "nexus-ui-panel",
-        tone !== "default" && `nexus-ui-panel--${tone}`,
-        padding !== "default" && `nexus-ui-panel--padding-${padding}`,
-        className
-      )
-    },
-    children
-  );
-}
-
-// ../nexus-frontend/src/ui/Actions.jsx
-function Button({
-  className = "",
-  tone = "secondary",
-  iconOnly = false,
-  children,
-  ...props
-}) {
-  return /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      ...props,
-      className: cx(
-        "nexus-ui-button",
-        tone !== "secondary" && `nexus-ui-button--${tone}`,
-        iconOnly && "nexus-ui-button--icon",
-        className
-      )
-    },
-    children
-  );
-}
-function IconButton({ className = "", tone = "secondary", title = "", children, ...props }) {
-  return /* @__PURE__ */ React.createElement(
-    Button,
-    {
-      ...props,
-      className,
-      tone,
-      iconOnly: true,
-      title,
-      "aria-label": props["aria-label"] || title || void 0
-    },
-    children
-  );
-}
-
-// ../nexus-frontend/src/ui/Fields.jsx
-function InlineField({
-  className = "",
-  label = "",
-  children,
-  grow = false
-}) {
-  return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-inline-field", grow && "nexus-ui-inline-field--grow", className) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-inline-field__label" }, label), /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-inline-field__control" }, children));
-}
-
-// ../nexus-frontend/src/ui/States.jsx
-function Notice({ className = "", tone = "info", children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-notice", `nexus-ui-notice--${tone}`, className) }, children);
-}
-function StateBlock({
-  className = "",
-  tone = "default",
-  eyebrow = "",
-  title = "",
-  description = "",
-  centered = false,
-  children = null
-}) {
-  return /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      className: cx(
-        "nexus-ui-state",
-        tone !== "default" && `nexus-ui-state--${tone}`,
-        centered && "nexus-ui-state--centered",
-        className
-      )
-    },
-    eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null,
-    title ? /* @__PURE__ */ React.createElement("strong", null, title) : null,
-    description ? /* @__PURE__ */ React.createElement("p", null, description) : null,
-    children
-  );
-}
-
 // ../nexus-plugins/Books/src/BooksLibraryView.jsx
-var { startTransition, useDeferredValue, useEffect: useEffect3, useMemo: useMemo3, useRef: useRef3, useState: useState3 } = window.React;
+var { startTransition, useDeferredValue, useEffect: useEffect4, useMemo: useMemo3, useRef: useRef4, useState: useState5 } = window.React;
 var ipcRenderer3 = window.nexus.ipc;
 var booksLibraryLogger = createRendererDevLogger("renderer.plugins.books");
 var BOOK_GRID_ASPECT_RATIO = 0.72;
@@ -32293,9 +32672,12 @@ function compareBooks(left, right, sortBy) {
     sensitivity: "base"
   });
 }
-function getGridMetrics(containerWidth) {
+function getGridMetrics(containerWidth, requestedColumns = null) {
   const width = Math.max(0, Number(containerWidth) || 0);
-  const columns = width <= 430 ? 1 : width <= 760 ? 2 : width <= 1040 ? 3 : width <= 1320 ? 4 : 5;
+  const responsiveColumns = width <= 430 ? 1 : width <= 760 ? 2 : width <= 1040 ? 3 : width <= 1320 ? 4 : 5;
+  const hasRequestedColumns = requestedColumns !== null && requestedColumns !== void 0 && requestedColumns !== "";
+  const normalizedRequestedColumns = Number(requestedColumns);
+  const columns = hasRequestedColumns && Number.isFinite(normalizedRequestedColumns) ? Math.min(8, Math.max(1, Math.round(normalizedRequestedColumns))) : responsiveColumns;
   const gap = width <= 760 ? 12 : 14;
   const cardWidth = columns > 0 ? Math.max(0, (width - gap * Math.max(0, columns - 1)) / columns) : 0;
   const cardHeight = cardWidth > 0 ? cardWidth / BOOK_GRID_ASPECT_RATIO + BOOK_GRID_BODY_HEIGHT : 0;
@@ -32420,10 +32802,10 @@ function BookCoverPreview({ book }) {
   const itemId = book?.itemId || "";
   const resolvedFilePath = useMemo3(() => resolveVaultFilePath(filePath), [filePath]);
   const initialPreviewSrc = book?.coverPreview || readSessionCoverPreview(itemId, resolvedFilePath);
-  const [shouldLoad, setShouldLoad] = useState3(Boolean(initialPreviewSrc));
-  const [previewReady, setPreviewReady] = useState3(Boolean(initialPreviewSrc));
-  const [previewSrc, setPreviewSrc] = useState3(initialPreviewSrc);
-  useEffect3(() => {
+  const [shouldLoad, setShouldLoad] = useState5(Boolean(initialPreviewSrc));
+  const [previewReady, setPreviewReady] = useState5(Boolean(initialPreviewSrc));
+  const [previewSrc, setPreviewSrc] = useState5(initialPreviewSrc);
+  useEffect4(() => {
     const cachedPreview = book?.coverPreview || readSessionCoverPreview(itemId, resolvedFilePath);
     if (book?.coverPreview) {
       writeSessionCoverPreview(itemId, resolvedFilePath, book.coverPreview);
@@ -32432,7 +32814,7 @@ function BookCoverPreview({ book }) {
     setPreviewReady(Boolean(cachedPreview));
     setShouldLoad(Boolean(cachedPreview) || shouldRetrySessionCoverPreview(itemId, resolvedFilePath));
   }, [book?.coverPreview, itemId, resolvedFilePath]);
-  useEffect3(() => {
+  useEffect4(() => {
     if (!shouldLoad || !resolvedFilePath || previewSrc) {
       return void 0;
     }
@@ -32496,23 +32878,24 @@ function ProgressBar({ value }) {
   )), /* @__PURE__ */ React.createElement("span", { className: "booksLibrary__progressValue" }, formatPercent(normalizedValue)));
 }
 function BooksLibraryView({ ctx }) {
-  const contentRef = useRef3(null);
-  const gridMeasureRef = useRef3(null);
-  const [books, setBooks] = useState3([]);
-  const [loading, setLoading] = useState3(true);
-  const [refreshing, setRefreshing] = useState3(false);
-  const [error, setError] = useState3("");
-  const [searchValue, setSearchValue] = useState3("");
-  const [sortBy, setSortBy] = useState3("added");
-  const [virtualLayout, setVirtualLayout] = useState3({
+  const contentRef = useRef4(null);
+  const gridMeasureRef = useRef4(null);
+  const [books, setBooks] = useState5([]);
+  const [loading, setLoading] = useState5(true);
+  const [refreshing, setRefreshing] = useState5(false);
+  const [error, setError] = useState5("");
+  const [searchValue, setSearchValue] = useState5("");
+  const [sortBy, setSortBy] = useState5("added");
+  const [columnOverride, setColumnOverride] = useState5(null);
+  const [virtualLayout, setVirtualLayout] = useState5({
     gridWidth: 0,
     viewportHeight: 0
   });
-  const [virtualRange, setVirtualRange] = useState3({
+  const [virtualRange, setVirtualRange] = useState5({
     startIndex: 0,
     endIndex: 0
   });
-  const viewportPressureLogRef = useRef3({
+  const viewportPressureLogRef = useRef4({
     lastLoggedAt: 0
   });
   const deferredSearchValue = useDeferredValue(searchValue);
@@ -32554,7 +32937,7 @@ function BooksLibraryView({ ctx }) {
       setRefreshing(false);
     }
   };
-  useEffect3(() => {
+  useEffect4(() => {
     booksLibraryLogger.info("books.library.mount", "Vista BooksLibrary montada.", null);
     void loadBooks();
     return () => {
@@ -32572,8 +32955,8 @@ function BooksLibraryView({ ctx }) {
     return nextBooks.sort((left, right) => compareBooks(left, right, sortBy));
   }, [books, deferredSearchValue, sortBy]);
   const gridMetrics = useMemo3(
-    () => getGridMetrics(virtualLayout.gridWidth),
-    [virtualLayout.gridWidth]
+    () => getGridMetrics(virtualLayout.gridWidth, columnOverride),
+    [columnOverride, virtualLayout.gridWidth]
   );
   const totalRows = useMemo3(
     () => gridMetrics.columns > 0 ? Math.ceil(visibleBooks.length / gridMetrics.columns) : 0,
@@ -32585,7 +32968,7 @@ function BooksLibraryView({ ctx }) {
     }
     return totalRows * gridMetrics.rowHeight - gridMetrics.gap;
   }, [gridMetrics.gap, gridMetrics.rowHeight, totalRows]);
-  useEffect3(() => {
+  useEffect4(() => {
     const contentNode = contentRef.current;
     const measureNode = gridMeasureRef.current;
     if (!contentNode || !measureNode) {
@@ -32597,7 +32980,7 @@ function BooksLibraryView({ ctx }) {
         gridWidth: measureNode.clientWidth || 0,
         viewportHeight: contentNode.clientHeight || 0
       };
-      const nextMetrics = getGridMetrics(nextLayout.gridWidth);
+      const nextMetrics = getGridMetrics(nextLayout.gridWidth, columnOverride);
       const nextRange = getBookVirtualRange({
         itemCount: visibleBooks.length,
         columns: nextMetrics.columns,
@@ -32629,7 +33012,7 @@ function BooksLibraryView({ ctx }) {
       resizeObserver?.disconnect();
       contentNode.removeEventListener("scroll", handleScroll);
     };
-  }, [loading, visibleBooks.length]);
+  }, [columnOverride, loading, visibleBooks.length]);
   const virtualizedBooks = useMemo3(
     () => visibleBooks.slice(virtualRange.startIndex, virtualRange.endIndex).map((book, index) => {
       const absoluteIndex = virtualRange.startIndex + index;
@@ -32655,7 +33038,7 @@ function BooksLibraryView({ ctx }) {
       visibleBooks
     ]
   );
-  useEffect3(() => {
+  useEffect4(() => {
     if (loading) {
       return;
     }
@@ -32686,31 +33069,34 @@ function BooksLibraryView({ ctx }) {
     });
   };
   const showEmptySearchState = !loading && books.length > 0 && visibleBooks.length === 0;
-  return /* @__PURE__ */ React.createElement(WorkspacePage, { className: "booksLibrary" }, /* @__PURE__ */ React.createElement(WorkspaceTopbar, null, /* @__PURE__ */ React.createElement(
-    WorkspaceTitle,
+  return /* @__PURE__ */ React.createElement(WorkspacePage, { className: "booksLibrary" }, /* @__PURE__ */ React.createElement(WorkspaceBody, null, /* @__PURE__ */ React.createElement("nav", { className: "booksLibrary__navbar", "aria-label": "Herramientas de biblioteca" }, /* @__PURE__ */ React.createElement(
+    SearchField,
     {
-      eyebrow: "Plugin books",
-      title: "Biblioteca",
-      description: "Biblioteca PDF-first con busqueda rapida, progreso simple y apertura directa al visor."
-    }
-  ), /* @__PURE__ */ React.createElement(ToolbarActions, { className: "booksLibrary__controls" }, /* @__PURE__ */ React.createElement(InlineField, { className: "booksLibrary__searchField", label: "Buscar", grow: true }, /* @__PURE__ */ React.createElement(
-    "input",
-    {
-      type: "search",
+      className: "booksLibrary__searchField",
       value: searchValue,
       onChange: (event) => setSearchValue(event.target.value),
-      placeholder: "Titulo o autor"
+      placeholder: "Titulo o autor",
+      "aria-label": "Buscar por titulo o autor"
     }
-  )), /* @__PURE__ */ React.createElement(InlineField, { className: "booksLibrary__sortField", label: "Ordenar" }, /* @__PURE__ */ React.createElement("select", { value: sortBy, onChange: (event) => setSortBy(event.target.value) }, BOOK_SORT_OPTIONS.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.value, value: option.value }, option.label)))), /* @__PURE__ */ React.createElement(
-    IconButton,
+  ), /* @__PURE__ */ React.createElement(
+    Select,
+    {
+      className: "booksLibrary__sortField",
+      value: sortBy,
+      "aria-label": "Ordenar biblioteca",
+      onChange: (event) => setSortBy(event.target.value)
+    },
+    BOOK_SORT_OPTIONS.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.value, value: option.value }, option.label))
+  ), /* @__PURE__ */ React.createElement(
+    CyberIconButton,
     {
       type: "button",
       onClick: () => void loadBooks(),
       disabled: refreshing,
-      title: "Recargar biblioteca"
+      label: "Recargar biblioteca"
     },
-    /* @__PURE__ */ React.createElement(RefreshIcon, { size: 16 })
-  ))), /* @__PURE__ */ React.createElement(WorkspaceBody, null, error ? /* @__PURE__ */ React.createElement(Notice, { tone: "danger" }, error) : null, /* @__PURE__ */ React.createElement(SectionPanel, { className: "booksLibrary__content", padding: "tight" }, loading ? /* @__PURE__ */ React.createElement(
+    /* @__PURE__ */ React.createElement(ReloadIcon, { size: 16 })
+  )), error ? /* @__PURE__ */ React.createElement(Notice, { tone: "danger" }, error) : null, /* @__PURE__ */ React.createElement(SectionPanel, { className: "booksLibrary__content", padding: "tight" }, loading ? /* @__PURE__ */ React.createElement(
     StateBlock,
     {
       eyebrow: "Cargando",
@@ -32733,23 +33119,38 @@ function BooksLibraryView({ ctx }) {
       title: "No encontramos libros para ese filtro",
       description: "Prueba con otro titulo, autor o criterio de orden."
     }
-  ) : /* @__PURE__ */ React.createElement("div", { ref: contentRef, className: "booksLibrary__virtualViewport" }, /* @__PURE__ */ React.createElement("div", { ref: gridMeasureRef, className: "booksLibrary__virtualGrid", style: { height: `${totalGridHeight}px` } }, virtualizedBooks.map(({ book, style }) => /* @__PURE__ */ React.createElement(
-    "button",
+  ) : /* @__PURE__ */ React.createElement("div", { ref: contentRef, className: "booksLibrary__virtualViewport" }, /* @__PURE__ */ React.createElement(
+    GalleryGrid,
     {
-      type: "button",
-      key: book.itemId,
-      className: "booksLibrary__card",
-      style,
-      onClick: () => void handleOpenBook(book),
-      title: book.title || "Abrir PDF"
+      ref: gridMeasureRef,
+      className: "booksLibrary__virtualGrid",
+      style: { height: `${totalGridHeight}px` },
+      columns: gridMetrics.columns,
+      minColumns: 1,
+      maxColumns: 8,
+      onColumnsChange: setColumnOverride,
+      virtual: true
     },
-    /* @__PURE__ */ React.createElement(BookCoverPreview, { book }),
-    /* @__PURE__ */ React.createElement("div", { className: "booksLibrary__cardBody" }, /* @__PURE__ */ React.createElement("strong", { className: "booksLibrary__cardTitle" }, book.title || "Documento"), /* @__PURE__ */ React.createElement("p", { className: "booksLibrary__cardAuthor" }, book.author || "Autor sin curar"), /* @__PURE__ */ React.createElement(ProgressBar, { value: book.progressPercent }))
-  )))))));
+    virtualizedBooks.map(({ book, style }) => /* @__PURE__ */ React.createElement(
+      GalleryCard,
+      {
+        as: "button",
+        type: "button",
+        key: book.itemId,
+        className: "booksLibrary__card",
+        style,
+        onClick: () => void handleOpenBook(book),
+        "aria-label": `Abrir ${book.title || "PDF"}`
+      },
+      /* @__PURE__ */ React.createElement(BookCoverPreview, { book }),
+      /* @__PURE__ */ React.createElement(GalleryCardBody, { className: "booksLibrary__cardBody" }, /* @__PURE__ */ React.createElement(GalleryCardTitle, { className: "booksLibrary__cardTitle" }, book.title || "Documento"), /* @__PURE__ */ React.createElement(GalleryCardMeta, { as: "p", className: "booksLibrary__cardAuthor" }, book.author || "Autor sin curar"), /* @__PURE__ */ React.createElement(ProgressBar, { value: book.progressPercent }))
+    ))
+  )))));
 }
 
 // ../nexus-plugins/Books/src/BooksSettingsSection.jsx
-var { useEffect: useEffect4, useMemo: useMemo4, useState: useState4 } = window.React;
+init_define_process();
+var { useEffect: useEffect5, useMemo: useMemo4, useState: useState6 } = window.React;
 function createEmptyAssignment() {
   return {
     rootItemId: "",
@@ -32803,13 +33204,13 @@ function BooksSettingsSection({ ctx }) {
     })),
     [folderOptions, hydratedPersistedAssignments]
   );
-  const [draftAssignments, setDraftAssignments] = useState4(
+  const [draftAssignments, setDraftAssignments] = useState6(
     () => hydratedPersistedAssignments
   );
-  const [saving, setSaving] = useState4(false);
-  const [notice, setNotice] = useState4("");
-  const [error, setError] = useState4("");
-  useEffect4(() => {
+  const [saving, setSaving] = useState6(false);
+  const [notice, setNotice] = useState6("");
+  const [error, setError] = useState6("");
+  useEffect5(() => {
     setDraftAssignments(
       (currentValue) => getAssignmentsSignature(currentValue) === persistedAssignmentsSignature ? currentValue : hydratedPersistedAssignments
     );
@@ -32836,7 +33237,7 @@ function BooksSettingsSection({ ctx }) {
       key: `${assignment.rootItemId || assignment.rootPath || "empty"}-${index}`
     },
     /* @__PURE__ */ React.createElement(
-      "select",
+      Select,
       {
         value: getAssignmentSelectValue(assignment),
         onChange: (event) => setDraftAssignments(
@@ -32872,11 +33273,12 @@ function BooksSettingsSection({ ctx }) {
       folderOptions.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.id, value: option.id }, option.rootPath || "Vault completo")),
       legacyFolderOptions.map((option) => /* @__PURE__ */ React.createElement("option", { key: option.key, value: option.id }, option.label))
     ),
-    /* @__PURE__ */ React.createElement("label", { className: "booksPluginSettings__checkbox" }, /* @__PURE__ */ React.createElement(
-      "input",
+    /* @__PURE__ */ React.createElement(
+      Checkbox,
       {
-        type: "checkbox",
+        className: "booksPluginSettings__checkbox",
         checked: assignment.recursive,
+        label: "Recursiva",
         onChange: (event) => setDraftAssignments(
           (currentValue) => currentValue.map(
             (entry, entryIndex) => entryIndex === index ? {
@@ -32887,9 +33289,9 @@ function BooksSettingsSection({ ctx }) {
         ),
         disabled: saving
       }
-    ), /* @__PURE__ */ React.createElement("span", null, "Recursiva")),
+    ),
     /* @__PURE__ */ React.createElement(
-      "button",
+      Button,
       {
         type: "button",
         className: "booksPluginSettings__secondaryButton",
@@ -32900,8 +33302,15 @@ function BooksSettingsSection({ ctx }) {
       },
       "Quitar"
     )
-  )) : /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__empty" }, "Sin carpetas asignadas todavia. Fuera de estas carpetas, los PDFs siguen usando el viewer host.")), /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__actions" }, /* @__PURE__ */ React.createElement(
-    "button",
+  )) : /* @__PURE__ */ React.createElement(
+    StateBlock,
+    {
+      className: "booksPluginSettings__empty",
+      title: "Sin carpetas asignadas",
+      description: "Fuera de estas carpetas, los PDFs siguen usando el viewer host."
+    }
+  )), /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__actions" }, /* @__PURE__ */ React.createElement(
+    Button,
     {
       type: "button",
       className: "booksPluginSettings__secondaryButton",
@@ -32910,15 +33319,16 @@ function BooksSettingsSection({ ctx }) {
     },
     "Agregar carpeta"
   ), /* @__PURE__ */ React.createElement(
-    "button",
+    Button,
     {
       type: "button",
+      tone: "primary",
       className: "booksPluginSettings__primaryButton",
       onClick: () => void handleSave(),
       disabled: saving
     },
     saving ? "Guardando..." : "Guardar carpetas"
-  )), notice ? /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__notice" }, notice) : null, error ? /* @__PURE__ */ React.createElement("div", { className: "booksPluginSettings__error" }, error) : null);
+  )), notice ? /* @__PURE__ */ React.createElement(Notice, { tone: "success", className: "booksPluginSettings__notice" }, notice) : null, error ? /* @__PURE__ */ React.createElement(Notice, { tone: "danger", className: "booksPluginSettings__error" }, error) : null);
 }
 
 // ../nexus-plugins/Books/src/renderer.js

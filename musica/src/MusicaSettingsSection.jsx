@@ -1,4 +1,8 @@
-const { useEffect, useMemo, useState } = window.React;
+import {
+  Button,
+  Checkbox,
+  Select,
+} from "@nexus/ui";
 import {
   buildFolderOptions,
   hydrateAssignmentsWithFolderOptions,
@@ -7,6 +11,8 @@ import {
   resolveFolderOptionForAssignment,
   writeEngineAssignments,
 } from "./renderer-helpers.js";
+
+const { useEffect, useMemo, useState } = window.React;
 
 function createEmptyAssignment() {
   return {
@@ -122,7 +128,7 @@ export default function MusicaSettingsSection({ ctx }) {
               className="musicaPluginSettings__row"
               key={`${assignment.rootItemId || assignment.rootPath || "empty"}-${index}`}
             >
-              <select
+              <Select
                 value={getAssignmentSelectValue(assignment)}
                 onChange={(event) =>
                   setDraftAssignments((currentValue) =>
@@ -171,32 +177,28 @@ export default function MusicaSettingsSection({ ctx }) {
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </Select>
 
-              <label className="musicaPluginSettings__checkbox">
-                <input
-                  type="checkbox"
-                  checked={assignment.recursive}
-                  onChange={(event) =>
-                    setDraftAssignments((currentValue) =>
-                      currentValue.map((entry, entryIndex) =>
-                        entryIndex === index
-                          ? {
-                              ...entry,
-                              recursive: event.target.checked,
-                            }
-                          : entry,
-                      ),
-                    )
-                  }
-                  disabled={saving}
-                />
-                <span>Recursiva</span>
-              </label>
+              <Checkbox
+                label="Recursiva"
+                checked={assignment.recursive}
+                onChange={(event) =>
+                  setDraftAssignments((currentValue) =>
+                    currentValue.map((entry, entryIndex) =>
+                      entryIndex === index
+                        ? {
+                            ...entry,
+                            recursive: event.target.checked,
+                          }
+                        : entry,
+                    ),
+                  )
+                }
+                disabled={saving}
+              />
 
-              <button
+              <Button
                 type="button"
-                className="musicaPluginSettings__secondaryButton"
                 onClick={() =>
                   setDraftAssignments((currentValue) =>
                     currentValue.filter((_entry, entryIndex) => entryIndex !== index),
@@ -205,7 +207,7 @@ export default function MusicaSettingsSection({ ctx }) {
                 disabled={saving}
               >
                 Quitar
-              </button>
+              </Button>
             </div>
           ))
         ) : (
@@ -217,24 +219,23 @@ export default function MusicaSettingsSection({ ctx }) {
       </div>
 
       <div className="musicaPluginSettings__actions">
-        <button
+        <Button
           type="button"
-          className="musicaPluginSettings__secondaryButton"
           onClick={() =>
             setDraftAssignments((currentValue) => [...currentValue, createEmptyAssignment()])
           }
           disabled={saving}
         >
           Agregar carpeta
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className="musicaPluginSettings__primaryButton"
+          tone="primary"
           onClick={() => void handleSave()}
           disabled={saving}
         >
           {saving ? "Guardando..." : "Guardar carpetas"}
-        </button>
+        </Button>
       </div>
 
       {notice ? <div className="musicaPluginSettings__notice">{notice}</div> : null}

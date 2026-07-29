@@ -1,4 +1,4 @@
-import { StateBlock } from "../../../../../nexus-frontend/src/ui/index.js";
+import { StateBlock } from "@nexus/ui";
 
 const React = window.React;
 const { useEffect, useRef } = React;
@@ -15,7 +15,7 @@ export default function EntityRelationsGrid({
   entityKindLabels,
   getInitials,
   columns,
-  onColumnWheel,
+  onColumnsChange,
   onEntityHover,
   onGroupAssociationHover,
 }) {
@@ -53,7 +53,7 @@ export default function EntityRelationsGrid({
         entityKindLabels={entityKindLabels}
         getInitials={getInitials}
         columns={columns}
-        onColumnWheel={onColumnWheel}
+        onColumnsChange={onColumnsChange}
         onEntityHover={onEntityHover}
         onGroupAssociationHover={onGroupAssociationHover}
       />
