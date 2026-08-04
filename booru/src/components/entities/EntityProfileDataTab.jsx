@@ -1,4 +1,4 @@
-import { Button, Field } from "@nexus/ui";
+import { Button, Field, TextArea } from "@nexus/ui";
 
 const React = window.React;
 const { useEffect, useState } = React;
@@ -94,8 +94,8 @@ export default function EntityProfileDataTab({
 
       {(kind === "author" || kind === "artist") ? (
         <>
-          <Field label="Aliases" description="Un nombre por linea. Tambien resuelven esta entidad en el buscador." className="booruView__field">
-            <textarea value={aliases} onChange={(event) => setAliases(event.target.value)} placeholder="Otro nombre conocido" disabled={busy || saving} />
+          <Field label="Otros nombres" description="Uno por linea. Son aliases de esta misma entidad, no tags." className="booruView__field">
+            <TextArea value={aliases} onChange={(event) => setAliases(event.target.value)} placeholder="Otro nombre conocido" disabled={busy || saving} />
           </Field>
           <Field label="Redes" description="Elige una plataforma registrada y pega su enlace." className="booruView__field">
             <div className="booruView__entityProfileLinks">

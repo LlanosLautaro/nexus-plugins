@@ -11,8 +11,13 @@ Las reglas puras compartidas por backend y renderer viven en `domain/`.
   3:1. Guarda `scale`, `offsetX` y `offsetY` normalizados en el perfil.
 - `EntityVisualMedia`: adaptador único de proyección para card y encabezado de
   perfil. Aplica la fuente, transformación y fallback definidos por dominio.
-- `ClipboardAssociationComposer`: alta/asociacion de un recurso pegado con
-  busqueda tipada de Persona, Artist, Character y Universe.
+- `ClipboardAssociationComposer`: alta/asociacion de un recurso ya capturado
+  en staging temporal, con preview centrada y busqueda tipada de Persona,
+  Artist, Character y Universe. Al crear Persona/Artist incluye nombres
+  adicionales en la misma operacion. `Enter` confirma el formulario valido.
+- `EntityCreationDialog`: creador compacto compartido por navbar, Details y
+  recomendaciones. Persona/Artist persisten nombre principal y aliases juntos;
+  Universe conserva el alta directa y Character su dialog con Universe.
 - `components/media/`: preview, cards, grilla virtual, paginacion interna,
   hero overlay y drag preview.
 - `components/search/`: composer estructurado y autocompletes de entidad/tag.
@@ -31,10 +36,17 @@ Las reglas puras compartidas por backend y renderer viven en `domain/`.
   final; ningun flujo presenta controles de pagina.
 - `booru:paste-clipboard-media` es el contrato canonico. Acepta un temporal
   creado por el bridge y una asociacion existente o una entidad a asegurar.
-  El IPC historico de pegado a entidad sigue disponible como adaptador.
+  Sin contexto, el renderer captura el recurso antes de abrir el compositor,
+  de modo que el portapapeles puede reutilizarse para pegar el nombre. Cancelar
+  descarta el staging mediante `booru:discard-clipboard-media`. El IPC historico
+  de pegado a entidad sigue disponible como adaptador.
 - Las visuales de perfil priorizan el original para conservar animacion y
   definicion. Video se reproduce silencioso y en loop; GIF/WebP usan su asset
   original para no degradarse a una thumbnail estatica.
+- La identidad de entidad nunca depende de un nombre: las relaciones usan UUID.
+  Nombre principal y aliases comparten resolucion normalizada por tipo; un alias
+  no crea una tag ni una segunda entidad y las colisiones se rechazan antes de
+  persistir.
 - Una card bajo el cursor es el destino inmediato de `Ctrl/Cmd+V`; fuera de
   una card se abre el compositor. Character siempre requiere Universe.
 - `domain/classification-policy.js` es la fuente unica para realidad efectiva,

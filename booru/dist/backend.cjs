@@ -6537,25 +6537,46 @@ function findEntityByIdSync(db, kind, entityId) {
   `);
   return statement.get(entityId) || null;
 }
+function findEntityNameOwnerIdsSync(db, kind, value) {
+  const comparableName = normalizeBooruComparableText(value);
+  if (!comparableName) return [];
+  const ownerIds = /* @__PURE__ */ new Set();
+  db.prepare(`
+    SELECT id
+    FROM ${getEntityTable(kind)}
+    ORDER BY created_at ASC
+  `).all().forEach((row) => {
+    if (normalizeBooruComparableText(row?.display_name) === comparableName) {
+      ownerIds.add(String(row?.id || ""));
+    }
+  });
+  db.prepare(`
+    SELECT entity_id
+    FROM booru_entity_aliases
+    WHERE entity_kind = ? AND comparable_name = ?
+    ORDER BY created_at ASC
+  `).all(kind, comparableName).forEach((row) => ownerIds.add(String(row?.entity_id || "")));
+  return [...ownerIds].filter(Boolean);
+}
 function getEntityRecordByIdSync(db, kind, entityId) {
   return listEntitiesSync(db, kind).find((entity) => entity.id === entityId) || null;
 }
 function findEntityByExactNameSync(db, kind, value) {
-  const normalizedDisplayName = normalizeBooruComparableText(value);
   const normalizedSlug = normalizeBooruSlug(value, "");
+  const ownerIds = findEntityNameOwnerIdsSync(db, kind, value);
+  if (ownerIds.length > 1) {
+    throw new Error(`El nombre ingresado coincide con mas de una ${BOORU_ENTITY_KIND_LABELS[kind]}. Revisa sus nombres adicionales antes de continuar.`);
+  }
+  if (ownerIds.length === 1) {
+    return findEntityByIdSync(db, kind, ownerIds[0]);
+  }
   if (normalizedSlug) {
     const bySlug = findEntityBySlugSync(db, kind, normalizedSlug);
     if (bySlug) {
       return bySlug;
     }
   }
-  const statement = db.prepare(`
-    SELECT *
-    FROM ${getEntityTable(kind)}
-    ORDER BY created_at ASC
-  `);
-  const rows = statement.all();
-  return rows.find((row) => normalizeBooruComparableText(row?.display_name) === normalizedDisplayName) || null;
+  return null;
 }
 function allocateUniqueEntitySlugSync(db, kind, baseSlug, currentId = null) {
   let slug = normalizeBooruSlug(baseSlug, kind);
@@ -6569,13 +6590,17 @@ function allocateUniqueEntitySlugSync(db, kind, baseSlug, currentId = null) {
     suffix += 1;
   }
 }
-function ensureTypedEntityRecordSync(db, kind, name) {
+function ensureTypedEntityRecordSync(db, kind, name, aliasNames = []) {
   const displayName = normalizeBooruOptionalText(name);
   if (!displayName) {
     throw new Error(`El nombre para ${kind} es obligatorio.`);
   }
+  const aliases = normalizeEntityAliasesForPrimaryName(kind, displayName, aliasNames);
   const existing = findEntityByExactNameSync(db, kind, displayName);
   if (existing) {
+    if (aliases.length) {
+      mergeEntityAliasesSync(db, kind, String(existing.id || ""), aliases);
+    }
     return {
       created: false,
       entity: normalizeEntityRow(db, kind, {
@@ -6587,21 +6612,25 @@ function ensureTypedEntityRecordSync(db, kind, name) {
   const entityId = import_node_crypto.default.randomUUID();
   const createdAt = nowIso();
   const slug = allocateUniqueEntitySlugSync(db, kind, displayName);
-  db.prepare(`
-    INSERT INTO ${getEntityTable(kind)} (
-      id,
-      display_name,
+  withTransaction(db, () => {
+    assertEntityNamesAvailableSync(db, kind, null, [displayName, ...aliases]);
+    db.prepare(`
+      INSERT INTO ${getEntityTable(kind)} (
+        id,
+        display_name,
+        slug,
+        cover_resource_id,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?)
+    `).run(
+      entityId,
+      displayName,
       slug,
-      cover_resource_id,
-      created_at
-    ) VALUES (?, ?, ?, ?, ?)
-  `).run(
-    entityId,
-    displayName,
-    slug,
-    null,
-    createdAt
-  );
+      null,
+      createdAt
+    );
+    replaceEntityAliasesSync(db, kind, entityId, aliases);
+  });
   return {
     created: true,
     entity: normalizeEntityRow(db, kind, {
@@ -6616,11 +6645,11 @@ function ensureTypedEntityRecordSync(db, kind, name) {
     })
   };
 }
-function ensureTypedEntitySync(db, kind, name) {
+function ensureTypedEntitySync(db, kind, name, aliasNames = []) {
   if (kind === "character") {
     throw new Error("Un character debe crearse junto con su universe.");
   }
-  return ensureTypedEntityRecordSync(db, kind, name);
+  return ensureTypedEntityRecordSync(db, kind, name, aliasNames);
 }
 function normalizeRecommendationDraftIds(value) {
   return uniqueBooruIds(
@@ -7248,6 +7277,45 @@ function normalizeUniqueTextList(value) {
   });
   return values;
 }
+function normalizeEntityAliasesForPrimaryName(kind, primaryName, value) {
+  const aliases = normalizeUniqueTextList(value);
+  if (aliases.length && kind !== "author" && kind !== "artist") {
+    throw new Error("Solo Persona y Artist admiten nombres adicionales.");
+  }
+  const primaryComparable = normalizeBooruComparableText(primaryName);
+  return aliases.filter((alias) => normalizeBooruComparableText(alias) !== primaryComparable);
+}
+function assertEntityNamesAvailableSync(db, kind, currentEntityId, names) {
+  const checked = /* @__PURE__ */ new Set();
+  normalizeUniqueTextList(names).forEach((name) => {
+    const comparableName = normalizeBooruComparableText(name);
+    if (!comparableName || checked.has(comparableName)) return;
+    checked.add(comparableName);
+    const conflictingId = findEntityNameOwnerIdsSync(db, kind, name).find((ownerId) => ownerId !== currentEntityId);
+    if (!conflictingId) return;
+    const conflictingEntity = findEntityByIdSync(db, kind, conflictingId);
+    const conflictingName = normalizeBooruOptionalText(conflictingEntity?.display_name) || name;
+    throw new Error(`El nombre "${name}" ya pertenece a ${BOORU_ENTITY_KIND_LABELS[kind]} "${conflictingName}".`);
+  });
+}
+function replaceEntityAliasesSync(db, kind, entityId, aliases) {
+  db.prepare(`DELETE FROM booru_entity_aliases WHERE entity_kind = ? AND entity_id = ?`).run(kind, entityId);
+  const insertAlias = db.prepare(`
+    INSERT INTO booru_entity_aliases (entity_kind, entity_id, alias_name, comparable_name, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  aliases.forEach((alias) => insertAlias.run(kind, entityId, alias, normalizeBooruComparableText(alias), nowIso()));
+}
+function mergeEntityAliasesSync(db, kind, entityId, aliasNames) {
+  const entity = findEntityByIdSync(db, kind, entityId);
+  if (!entity) throw new Error("La entidad solicitada ya no existe en Booru.");
+  const aliases = normalizeEntityAliasesForPrimaryName(kind, entity?.display_name, [
+    ...listEntityAliasesSync(db, kind, entityId),
+    ...normalizeUniqueTextList(aliasNames)
+  ]);
+  assertEntityNamesAvailableSync(db, kind, entityId, [String(entity?.display_name || ""), ...aliases]);
+  withTransaction(db, () => replaceEntityAliasesSync(db, kind, entityId, aliases));
+}
 function normalizeSocialLinks(value) {
   const seen = /* @__PURE__ */ new Set();
   const links = [];
@@ -7270,11 +7338,13 @@ function saveEntityProfileSync(db, payload) {
   }
   const tagIds = Object.prototype.hasOwnProperty.call(payload || {}, "tagIds") ? uniqueBooruIds(payload?.tagIds) : listEntityTagsSync(db, kind, entityId).map((tag) => tag.id);
   assertValidTagIdsSync(db, tagIds);
-  const aliases = Object.prototype.hasOwnProperty.call(payload || {}, "aliasNames") ? normalizeUniqueTextList(payload?.aliasNames) : listEntityAliasesSync(db, kind, entityId);
+  const entity = findEntityByIdSync(db, kind, entityId);
+  const aliases = Object.prototype.hasOwnProperty.call(payload || {}, "aliasNames") ? normalizeEntityAliasesForPrimaryName(kind, entity?.display_name, payload?.aliasNames) : listEntityAliasesSync(db, kind, entityId);
   const socialLinks = Object.prototype.hasOwnProperty.call(payload || {}, "socialLinks") ? normalizeSocialLinks(payload?.socialLinks) : listEntitySocialLinksSync(db, kind, entityId).map((link) => ({ platformId: link?.platform?.id, url: link?.url }));
   if ((aliases.length || socialLinks.length) && kind !== "author" && kind !== "artist") {
     throw new Error("Solo Persona y Artist admiten aliases y redes.");
   }
+  assertEntityNamesAvailableSync(db, kind, entityId, [String(entity?.display_name || ""), ...aliases]);
   socialLinks.forEach((link) => {
     if (!db.prepare(`SELECT id FROM booru_social_platforms WHERE id = ?`).get(link.platformId)) {
       throw new Error("Una plataforma seleccionada ya no existe.");
@@ -7288,12 +7358,7 @@ function saveEntityProfileSync(db, payload) {
     `);
     tagIds.forEach((tagId) => insertTag.run(kind, entityId, tagId, nowIso()));
     if (kind === "author" || kind === "artist") {
-      db.prepare(`DELETE FROM booru_entity_aliases WHERE entity_kind = ? AND entity_id = ?`).run(kind, entityId);
-      const insertAlias = db.prepare(`
-        INSERT INTO booru_entity_aliases (entity_kind, entity_id, alias_name, comparable_name, created_at)
-        VALUES (?, ?, ?, ?, ?)
-      `);
-      aliases.forEach((alias) => insertAlias.run(kind, entityId, alias, normalizeBooruComparableText(alias), nowIso()));
+      replaceEntityAliasesSync(db, kind, entityId, aliases);
       db.prepare(`DELETE FROM booru_entity_social_links WHERE entity_kind = ? AND entity_id = ?`).run(kind, entityId);
       const insertLink = db.prepare(`
         INSERT INTO booru_entity_social_links (id, entity_kind, entity_id, platform_id, url, created_at)
@@ -7982,7 +8047,7 @@ function resolveClipboardAssociationsSync(db, payload) {
         }
         entityId = String(ensureCharacterInUniverseSync(db, { name: entityName, universeId })?.entity?.id || "");
       } else {
-        entityId = String(ensureTypedEntitySync(db, kind, entityName)?.entity?.id || "");
+        entityId = String(ensureTypedEntitySync(db, kind, entityName, association?.aliasNames)?.entity?.id || "");
       }
     }
     const targetExists = kind === "tag" ? findTagByIdSync(db, entityId) : findEntityByIdSync(db, kind, entityId);
@@ -8959,7 +9024,7 @@ var booruPlugin = {
         }
         const result = {
           kind,
-          ...ensureTypedEntitySync(db, kind, name)
+          ...ensureTypedEntitySync(db, kind, name, payload?.aliasNames)
         };
         scheduleRuntimeInvalidation("entitiesVersion");
         return createSuccess(result);
@@ -9207,6 +9272,15 @@ var booruPlugin = {
         });
       } catch (error) {
         return createError(error, "No se pudo pegar la imagen del portapapeles en Booru.");
+      }
+    });
+    ctx.registerIpc("booru:discard-clipboard-media", async (_event, payload) => {
+      try {
+        const tempFilePath = assertClipboardTempFilePath(payload?.tempFilePath);
+        await removeFileIfExists(tempFilePath);
+        return createSuccess({ discarded: true });
+      } catch (error) {
+        return createError(error, "No se pudo descartar el recurso temporal del portapapeles.");
       }
     });
     ctx.registerIpc("booru:paste-clipboard-media", async (_event, payload) => {

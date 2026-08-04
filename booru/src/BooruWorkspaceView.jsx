@@ -86,7 +86,12 @@ import {
   normalizeBooruResourceMutationResult,
   resolveBooruAnchoredResources,
 } from "./domain/resource-mutations.js";
-import { CharacterCreationDialog, ClipboardAssociationComposer, EntityVisualCropper } from "./components/index.js";
+import {
+  CharacterCreationDialog,
+  ClipboardAssociationComposer,
+  EntityCreationDialog,
+  EntityVisualCropper,
+} from "./components/index.js";
 import SettingsSection from "./components/settings/SettingsSection.jsx";
 import EntityGrid from "./components/entities/EntityGrid.jsx";
 import EntityNavigationBar from "./components/entities/EntityNavigationBar.jsx";
@@ -1788,10 +1793,11 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const [resourceHeroState, setResourceHeroState] = useState(null);
   const [entityVisualCropState, setEntityVisualCropState] = useState(null);
   const [clipboardAssociationState, setClipboardAssociationState] = useState(null);
-  const [characterCreationName, setCharacterCreationName] = useState("");
+  const [entityCreationRequest, setEntityCreationRequest] = useState(null);
   const [activeRouteScrollTop, setActiveRouteScrollTop] = useState(0);
   const [profileGallerySelectedIds, setProfileGallerySelectedIds] = useState([]);
-  const characterCreationResolverRef = useRef(null);
+  const entityCreationResolverRef = useRef(null);
+  const stagedClipboardTempPathRef = useRef("");
   const hoveredEntityRef = useRef(null);
   const hoveredGroupAssociationRef = useRef(null);
   const routeSessionsRef = useRef(new Map());
@@ -1799,28 +1805,28 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const sectionNavigationRef = useRef(new Map());
   const activeRouteScrollTopRef = useRef(0);
 
-  const finishCharacterCreation = useCallback((result = null) => {
-    const resolveRequest = characterCreationResolverRef.current;
-    characterCreationResolverRef.current = null;
-    setCharacterCreationName("");
+  const finishEntityCreation = useCallback((result = null) => {
+    const resolveRequest = entityCreationResolverRef.current;
+    entityCreationResolverRef.current = null;
+    setEntityCreationRequest(null);
     resolveRequest?.(result);
   }, []);
 
   const ensureEntityFromUi = useCallback((kind, name) => {
-    if (kind !== "character") {
+    if (kind !== "character" && kind !== "author" && kind !== "artist") {
       return invoke("booru:ensure-entity", { kind, name });
     }
 
     return new Promise((resolve) => {
-      characterCreationResolverRef.current?.(null);
-      characterCreationResolverRef.current = resolve;
-      setCharacterCreationName(String(name || "").trim());
+      entityCreationResolverRef.current?.(null);
+      entityCreationResolverRef.current = resolve;
+      setEntityCreationRequest({ kind, name: String(name || "").trim() });
     });
   }, []);
 
   useEffect(() => () => {
-    characterCreationResolverRef.current?.(null);
-    characterCreationResolverRef.current = null;
+    entityCreationResolverRef.current?.(null);
+    entityCreationResolverRef.current = null;
   }, []);
   const activeSection = getActiveSection(input);
   const settingsSubview = getSettingsSubview(input);
@@ -5139,17 +5145,62 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     }
   };
 
-  const importClipboardMedia = async (associationValue) => {
+  const openClipboardAssociationComposer = async () => {
+    if (entityBusy || clipboardAssociationState) return;
+    setEntityBusy(true);
+
+    try {
+      const tempFilePath = await window.nexus.clipboard.exportMediaToTempFile("booru-media");
+      stagedClipboardTempPathRef.current = tempFilePath;
+      setClipboardAssociationState({
+        defaultKind: activeEntityKind || "author",
+        tempFilePath,
+      });
+      setEntityError("");
+      if (!showEntityProfile) setError("");
+    } catch (pasteError) {
+      const message = pasteError instanceof Error
+        ? pasteError.message
+        : "No se pudo conservar el recurso del portapapeles.";
+      if (showEntityProfile) setEntityProfileError(message);
+      else setError(message);
+    } finally {
+      setEntityBusy(false);
+    }
+  };
+
+  const discardClipboardAssociation = () => {
+    const tempFilePath = stagedClipboardTempPathRef.current;
+    stagedClipboardTempPathRef.current = "";
+    setClipboardAssociationState(null);
+
+    if (tempFilePath) {
+      void invoke("booru:discard-clipboard-media", { tempFilePath }).catch(() => undefined);
+    }
+  };
+
+  useEffect(() => () => {
+    const tempFilePath = stagedClipboardTempPathRef.current;
+    stagedClipboardTempPathRef.current = "";
+    if (tempFilePath) {
+      void window.nexus.ipc
+        .invoke("booru:discard-clipboard-media", { tempFilePath })
+        .catch(() => undefined);
+    }
+  }, []);
+
+  const importClipboardMedia = async (associationValue, stagedTempFilePath = "") => {
     const associations = mergeBooruClipboardAssociations(associationValue);
     if (!associations.length) {
-      setClipboardAssociationState({ defaultKind: activeEntityKind || "author" });
+      await openClipboardAssociationComposer();
       return;
     }
     if (entityBusy) return;
     setEntityBusy(true);
 
     try {
-      const tempFilePath = await window.nexus.clipboard.exportMediaToTempFile("booru-media");
+      const tempFilePath = stagedTempFilePath
+        || await window.nexus.clipboard.exportMediaToTempFile("booru-media");
       const result = await invoke("booru:paste-clipboard-media", {
         tempFilePath,
         associations,
@@ -5161,6 +5212,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       }
       setEntityError("");
       setEntityProfileError("");
+      stagedClipboardTempPathRef.current = "";
       setClipboardAssociationState(null);
       setEntityRevision((currentValue) => currentValue + 1);
       if (showEntityProfile) setEntityProfilePageForSection(activeSection, 1);
@@ -5176,6 +5228,14 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         : "No se pudo pegar el recurso del portapapeles en Booru.";
       if (showEntityProfile) setEntityProfileError(message);
       else setError(message);
+
+      if (stagedTempFilePath) {
+        const stillExists = await window.nexus.files.exists(stagedTempFilePath).catch(() => false);
+        if (!stillExists) {
+          stagedClipboardTempPathRef.current = "";
+          setClipboardAssociationState(null);
+        }
+      }
     } finally {
       setEntityBusy(false);
     }
@@ -5200,6 +5260,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       || String(event.key || "").toLowerCase() !== "v"
       || isTextEntryElement(event.target)
       || entityBusy
+      || clipboardAssociationState
     ) return;
     event.preventDefault();
     event.stopPropagation();
@@ -5217,7 +5278,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       void importClipboardMedia(associations);
       return;
     }
-    setClipboardAssociationState({ defaultKind: activeEntityKind || "author" });
+    void openClipboardAssociationComposer();
   };
 
   useEffect(() => {
@@ -5229,6 +5290,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   }, [
     activeEntityKind,
     activeEntityProfile?.id,
+    clipboardAssociationState,
     entityBusy,
     showEntityProfile,
   ]);
@@ -5243,17 +5305,9 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     setEntityBusy(true);
 
     try {
-      if (activeEntityKind === "character") {
-        const created = await ensureEntityFromUi("character", trimmedName);
-
-        if (!created?.entity?.id) {
-          return;
-        }
-      } else {
-        await invoke("booru:ensure-entity", {
-          kind: activeEntityKind,
-          name: trimmedName,
-        });
+      const ensured = await ensureEntityFromUi(activeEntityKind, trimmedName);
+      if (!ensured?.entity?.id) {
+        return;
       }
       setEntityError("");
       setEntityCreateValue("");
@@ -5987,23 +6041,46 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         {clipboardAssociationState ? (
           <ClipboardAssociationComposer
             defaultKind={clipboardAssociationState.defaultKind}
-            onCancel={() => setClipboardAssociationState(null)}
-            onConfirm={importClipboardMedia}
+            tempFilePath={clipboardAssociationState.tempFilePath}
+            onCancel={discardClipboardAssociation}
+            onConfirm={(association) => importClipboardMedia(
+              association,
+              clipboardAssociationState.tempFilePath,
+            )}
           />
         ) : null}
-        {characterCreationName ? (
+        {entityCreationRequest ? (
           <div className="booruView__cropOverlay">
-            <CharacterCreationDialog
-              name={characterCreationName}
-              invoke={invoke}
-              SingleEntityField={SingleEntityAutocompleteField}
-              onCancel={() => finishCharacterCreation(null)}
-              onCreated={(entity) => {
-                if (!entity?.id) return;
-                setEntityRevision((currentValue) => currentValue + 1);
-                finishCharacterCreation({ kind: "character", created: true, entity });
-              }}
-            />
+            {entityCreationRequest.kind === "character" ? (
+              <CharacterCreationDialog
+                name={entityCreationRequest.name}
+                invoke={invoke}
+                SingleEntityField={SingleEntityAutocompleteField}
+                onCancel={() => finishEntityCreation(null)}
+                onCreated={(entity) => {
+                  if (!entity?.id) return;
+                  setEntityRevision((currentValue) => currentValue + 1);
+                  finishEntityCreation({ kind: "character", created: true, entity });
+                }}
+              />
+            ) : (
+              <EntityCreationDialog
+                kind={entityCreationRequest.kind}
+                name={entityCreationRequest.name}
+                invoke={invoke}
+                entityKindLabels={BOORU_ENTITY_KIND_LABELS}
+                onCancel={() => finishEntityCreation(null)}
+                onCreated={(result) => {
+                  if (!result?.entity?.id) return;
+                  setEntityRevision((currentValue) => currentValue + 1);
+                  finishEntityCreation({
+                    kind: entityCreationRequest.kind,
+                    created: Boolean(result.created),
+                    entity: result.entity,
+                  });
+                }}
+              />
+            )}
           </div>
         ) : null}
       </WorkspaceBody>

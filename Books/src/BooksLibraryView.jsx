@@ -1,14 +1,22 @@
-const { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } = window.React;
+const { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } = window.React;
 import { BookIcon } from "./icons.jsx";
 import { formatPercent, resolveVaultFilePath } from "./renderer-helpers.js";
+import {
+  BOOKS_DEFAULT_LIBRARY_PREFERENCES,
+  normalizeBooksGridColumnOverride,
+  normalizeBooksLibraryPreferences,
+  writeBooksGridColumns,
+} from "./library-preferences.js";
 import { createRendererDevLogger } from "../../../nexus-frontend/src/utils/devLog.js";
 import {
+  ActionMenu,
   CyberIconButton,
   GalleryCard,
   GalleryCardBody,
   GalleryCardMeta,
   GalleryCardTitle,
   GalleryGrid,
+  Input,
   Notice,
   ReloadIcon,
   SearchField,
@@ -31,6 +39,12 @@ const COVER_PREVIEW_RETRY_COOLDOWN_MS = 12_000;
 const sessionCoverPreviewCache = new Map();
 const sessionCoverPreviewPendingCache = new Map();
 const sessionCoverPreviewMissCache = new Map();
+const EMPTY_RENAME_STATE = {
+  itemId: null,
+  value: "",
+  selectionEnd: 0,
+  saving: false,
+};
 
 function getSessionCoverPreviewCacheKey(itemId, resolvedFilePath) {
   return String(itemId || resolvedFilePath || "");
@@ -134,18 +148,59 @@ function compareBooks(left, right, sortBy) {
   });
 }
 
+function getPathLeaf(value) {
+  return String(value || "").split(/[\\/]/).pop() || "";
+}
+
+function getBookItemDisplayName(book) {
+  const item = book?.item;
+  const pathLeaf = getPathLeaf(item?.path);
+  const rawName = String(item?.name || "").trim();
+
+  if (!rawName) {
+    return pathLeaf;
+  }
+
+  if (!pathLeaf || rawName === pathLeaf) {
+    return rawName;
+  }
+
+  const extension = String(item?.extension || "")
+    .replace(/^\./, "")
+    .trim()
+    .toLowerCase();
+
+  if (extension && rawName.toLowerCase().endsWith(`.${extension}`)) {
+    return rawName;
+  }
+
+  return pathLeaf;
+}
+
+function getBookItemBaseSelectionEnd(fileName, extension) {
+  const normalizedName = String(fileName || "");
+  const normalizedExtension = String(extension || "")
+    .replace(/^\./, "")
+    .trim();
+  const expectedSuffix = normalizedExtension ? `.${normalizedExtension}` : "";
+
+  if (
+    expectedSuffix
+    && normalizedName.toLowerCase().endsWith(expectedSuffix.toLowerCase())
+  ) {
+    return normalizedName.length - expectedSuffix.length;
+  }
+
+  const extensionIndex = normalizedName.lastIndexOf(".");
+  return extensionIndex > 0 ? extensionIndex : normalizedName.length;
+}
+
 function getGridMetrics(containerWidth, requestedColumns = null) {
   const width = Math.max(0, Number(containerWidth) || 0);
   const responsiveColumns =
     width <= 430 ? 1 : width <= 760 ? 2 : width <= 1040 ? 3 : width <= 1320 ? 4 : 5;
-  const hasRequestedColumns =
-    requestedColumns !== null
-    && requestedColumns !== undefined
-    && requestedColumns !== "";
-  const normalizedRequestedColumns = Number(requestedColumns);
-  const columns = hasRequestedColumns && Number.isFinite(normalizedRequestedColumns)
-    ? Math.min(8, Math.max(1, Math.round(normalizedRequestedColumns)))
-    : responsiveColumns;
+  const normalizedRequestedColumns = normalizeBooksGridColumnOverride(requestedColumns);
+  const columns = normalizedRequestedColumns ?? responsiveColumns;
   const gap = width <= 760 ? 12 : 14;
   const cardWidth =
     columns > 0 ? Math.max(0, (width - gap * Math.max(0, columns - 1)) / columns) : 0;
@@ -403,6 +458,15 @@ function ProgressBar({ value }) {
 }
 
 export default function BooksLibraryView({ ctx }) {
+  const uiPreferencesApi = useMemo(
+    () => ctx.createPluginSettingsApi("nexus.books.ui", BOOKS_DEFAULT_LIBRARY_PREFERENCES),
+    [ctx],
+  );
+  const persistedUiPreferences = uiPreferencesApi.useValue();
+  const columnOverride = useMemo(
+    () => normalizeBooksLibraryPreferences(persistedUiPreferences).gridColumns,
+    [persistedUiPreferences?.gridColumns],
+  );
   const contentRef = useRef(null);
   const gridMeasureRef = useRef(null);
   const [books, setBooks] = useState([]);
@@ -411,7 +475,8 @@ export default function BooksLibraryView({ ctx }) {
   const [error, setError] = useState("");
   const [searchValue, setSearchValue] = useState("");
   const [sortBy, setSortBy] = useState("added");
-  const [columnOverride, setColumnOverride] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [renameState, setRenameState] = useState(EMPTY_RENAME_STATE);
   const [virtualLayout, setVirtualLayout] = useState({
     gridWidth: 0,
     viewportHeight: 0,
@@ -423,7 +488,27 @@ export default function BooksLibraryView({ ctx }) {
   const viewportPressureLogRef = useRef({
     lastLoggedAt: 0,
   });
+  const renameInputRef = useRef(null);
+  const renameSubmittingItemIdRef = useRef(null);
   const deferredSearchValue = useDeferredValue(searchValue);
+
+  const handleGridColumnsChange = useCallback((nextColumnCount) => {
+    const nextPreferences = writeBooksGridColumns(persistedUiPreferences, nextColumnCount);
+    if (nextPreferences.gridColumns === columnOverride) {
+      return;
+    }
+
+    void uiPreferencesApi.set(nextPreferences).catch((settingsError) => {
+      booksLibraryLogger.warn(
+        "books.library.gridPreferencesSaveError",
+        "No se pudo persistir la densidad de la biblioteca Books.",
+        {
+          gridColumns: nextPreferences.gridColumns,
+          error: settingsError instanceof Error ? settingsError.message : String(settingsError || ""),
+        },
+      );
+    });
+  }, [columnOverride, persistedUiPreferences, uiPreferencesApi]);
 
   const loadBooks = async () => {
     setError("");
@@ -482,6 +567,15 @@ export default function BooksLibraryView({ ctx }) {
       booksLibraryLogger.info("books.library.unmount", "Vista BooksLibrary desmontada.", null);
     };
   }, []);
+
+  useEffect(() => {
+    if (!renameState.itemId || !renameInputRef.current) {
+      return;
+    }
+
+    renameInputRef.current.focus();
+    renameInputRef.current.setSelectionRange(0, renameState.selectionEnd);
+  }, [renameState.itemId, renameState.selectionEnd]);
 
   const visibleBooks = useMemo(() => {
     const normalizedQuery = normalizeBooksSearchText(deferredSearchValue);
@@ -633,7 +727,10 @@ export default function BooksLibraryView({ ctx }) {
     });
   }, [books.length, loading, visibleBooks.length, virtualizedBooks]);
 
-  const handleOpenBook = async (book) => {
+  const handleOpenBook = useCallback(async (
+    book,
+    { reuse = true, activate = true } = {},
+  ) => {
     if (!book?.item) {
       return;
     }
@@ -641,9 +738,145 @@ export default function BooksLibraryView({ ctx }) {
     await ctx.actions.openFile({
       item: book.item,
       sourceId: "nexus.books.library",
-      reuse: false,
+      reuse,
+      activate,
     });
-  };
+  }, [ctx]);
+
+  const startRenamingBook = useCallback((book) => {
+    const fileName = getBookItemDisplayName(book);
+
+    if (!book?.itemId || !fileName) {
+      return;
+    }
+
+    setError("");
+    renameSubmittingItemIdRef.current = null;
+    setRenameState({
+      itemId: book.itemId,
+      value: fileName,
+      selectionEnd: getBookItemBaseSelectionEnd(fileName, book?.item?.extension),
+      saving: false,
+    });
+  }, []);
+
+  const cancelBookRename = useCallback((itemId) => {
+    renameSubmittingItemIdRef.current = itemId;
+    setRenameState(EMPTY_RENAME_STATE);
+  }, []);
+
+  const submitBookRename = useCallback(async (book) => {
+    const itemId = book?.itemId;
+    const nextName = renameState.value.trim();
+    const currentName = getBookItemDisplayName(book);
+
+    if (!itemId || renameState.itemId !== itemId) {
+      return;
+    }
+
+    if (renameSubmittingItemIdRef.current === itemId) {
+      return;
+    }
+
+    if (!nextName || nextName === currentName) {
+      cancelBookRename(itemId);
+      return;
+    }
+
+    renameSubmittingItemIdRef.current = itemId;
+    setRenameState((currentValue) => ({
+      ...currentValue,
+      saving: true,
+    }));
+
+    const result = await ctx.actions.renameItem({
+      itemId,
+      name: nextName,
+    });
+
+    if (!result?.ok) {
+      renameSubmittingItemIdRef.current = null;
+      setRenameState((currentValue) => ({
+        ...currentValue,
+        saving: false,
+      }));
+      setError(result?.error || "No se pudo cambiar el nombre del archivo.");
+      return;
+    }
+
+    setBooks((currentBooks) => currentBooks.map((currentBook) => (
+      currentBook.itemId === itemId
+        ? {
+            ...currentBook,
+            item: {
+              ...(currentBook.item || {}),
+              ...(result.item || {}),
+              name: result.item?.name || nextName,
+            },
+          }
+        : currentBook
+    )));
+    setError("");
+    setRenameState(EMPTY_RENAME_STATE);
+  }, [cancelBookRename, ctx, renameState]);
+
+  const deleteBook = useCallback(async (book) => {
+    if (!book?.item) {
+      return;
+    }
+
+    setError("");
+    const itemsState = ctx.getItems();
+    const currentItem = itemsState.byId?.[book.item.id]
+      || (await itemsState.ensureItemLoaded?.(book.item.id))?.item
+      || book.item;
+    const result = await ctx.actions.deleteItem({ item: currentItem });
+
+    if (!result?.ok) {
+      setError(result?.error || "No se pudo eliminar el archivo.");
+      return;
+    }
+
+    setBooks((currentBooks) => (
+      currentBooks.filter((currentBook) => currentBook.itemId !== book.itemId)
+    ));
+  }, [ctx]);
+
+  const contextMenuGroups = contextMenu?.book
+    ? [
+        {
+          id: "open",
+          items: [
+            {
+              id: "open",
+              label: "Abrir",
+              onClick: () => void handleOpenBook(contextMenu.book, { reuse: true }),
+            },
+            {
+              id: "open-new-tab",
+              label: "Abrir en nueva tab",
+              onClick: () => void handleOpenBook(contextMenu.book, { reuse: false }),
+            },
+          ],
+        },
+        {
+          id: "manage",
+          items: [
+            {
+              id: "rename",
+              label: "Cambiar nombre",
+              onClick: () => startRenamingBook(contextMenu.book),
+            },
+            {
+              id: "delete",
+              label: "Eliminar",
+              danger: true,
+              onClick: () => void deleteBook(contextMenu.book),
+            },
+          ],
+        },
+      ]
+    : [];
 
   const showEmptySearchState = !loading && books.length > 0 && visibleBooks.length === 0;
 
@@ -716,25 +949,104 @@ export default function BooksLibraryView({ ctx }) {
                 columns={gridMetrics.columns}
                 minColumns={1}
                 maxColumns={8}
-                onColumnsChange={setColumnOverride}
+                onColumnsChange={handleGridColumnsChange}
                 virtual
               >
                 {virtualizedBooks.map(({ book, style }) => (
                   <GalleryCard
-                    as="button"
-                    type="button"
+                    as="article"
                     key={book.itemId}
                     className="booksLibrary__card"
                     style={style}
-                    onClick={() => void handleOpenBook(book)}
+                    interactive
+                    selected={contextMenu?.book?.itemId === book.itemId}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (renameState.itemId !== book.itemId) {
+                        void handleOpenBook(book, { reuse: true });
+                      }
+                    }}
+                    onMouseDown={(event) => {
+                      if (event.button === 1) {
+                        event.preventDefault();
+                      }
+                    }}
+                    onAuxClick={(event) => {
+                      if (event.button !== 1) {
+                        return;
+                      }
+
+                      event.preventDefault();
+                      void handleOpenBook(book, {
+                        reuse: false,
+                        activate: false,
+                      });
+                    }}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setContextMenu({
+                        book,
+                        x: event.clientX,
+                        y: event.clientY,
+                      });
+                    }}
+                    onKeyDown={(event) => {
+                      if (
+                        event.target !== event.currentTarget
+                        || (event.key !== "Enter" && event.key !== " ")
+                      ) {
+                        return;
+                      }
+
+                      event.preventDefault();
+                      void handleOpenBook(book, { reuse: true });
+                    }}
                     aria-label={`Abrir ${book.title || "PDF"}`}
                   >
                     <BookCoverPreview book={book} />
 
                     <GalleryCardBody className="booksLibrary__cardBody">
-                      <GalleryCardTitle className="booksLibrary__cardTitle">
-                        {book.title || "Documento"}
-                      </GalleryCardTitle>
+                      {renameState.itemId === book.itemId ? (
+                        <GalleryCardTitle
+                          as="div"
+                          className="booksLibrary__cardTitle booksLibrary__cardTitle--renaming"
+                        >
+                          <Input
+                            ref={renameInputRef}
+                            className="booksLibrary__renameInput"
+                            value={renameState.value}
+                            disabled={renameState.saving}
+                            spellCheck={false}
+                            aria-label={`Cambiar nombre de ${getBookItemDisplayName(book)}`}
+                            onChange={(event) => setRenameState((currentValue) => ({
+                              ...currentValue,
+                              value: event.target.value,
+                            }))}
+                            onClick={(event) => event.stopPropagation()}
+                            onAuxClick={(event) => event.stopPropagation()}
+                            onContextMenu={(event) => event.stopPropagation()}
+                            onBlur={() => void submitBookRename(book)}
+                            onKeyDown={(event) => {
+                              event.stopPropagation();
+
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                void submitBookRename(book);
+                              }
+
+                              if (event.key === "Escape") {
+                                event.preventDefault();
+                                cancelBookRename(book.itemId);
+                              }
+                            }}
+                          />
+                        </GalleryCardTitle>
+                      ) : (
+                        <GalleryCardTitle className="booksLibrary__cardTitle">
+                          {book.title || "Documento"}
+                        </GalleryCardTitle>
+                      )}
                       <GalleryCardMeta as="p" className="booksLibrary__cardAuthor">
                         {book.author || "Autor sin curar"}
                       </GalleryCardMeta>
@@ -747,6 +1059,16 @@ export default function BooksLibraryView({ ctx }) {
           )}
         </SectionPanel>
       </WorkspaceBody>
+
+      {contextMenu?.book ? (
+        <ActionMenu
+          ariaLabel={`Acciones para ${contextMenu.book.title || "PDF"}`}
+          groups={contextMenuGroups}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+        />
+      ) : null}
     </WorkspacePage>
   );
 }

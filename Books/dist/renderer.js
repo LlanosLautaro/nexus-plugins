@@ -55,6 +55,21 @@ var require_react = __commonJS({
   }
 });
 
+// scripts/plugins/shims/react-dom.cjs
+var require_react_dom = __commonJS({
+  "scripts/plugins/shims/react-dom.cjs"(exports, module) {
+    init_define_process();
+    function requireReactDom() {
+      const hostReactDom = globalThis?.window?.__NEXUS_HOST_REACT_DOM__;
+      if (!hostReactDom) {
+        throw new Error("Nexus plugins renderer no encontro react-dom del host en window.__NEXUS_HOST_REACT_DOM__.");
+      }
+      return hostReactDom;
+    }
+    module.exports = requireReactDom();
+  }
+});
+
 // node_modules/pdfjs-dist/legacy/build/pdf.mjs
 var pdf_exports = {};
 __export(pdf_exports, {
@@ -31166,10 +31181,160 @@ function SegmentedControl({
   );
 }
 
-// ../packages/nexus-ui/src/components/Select/Select.jsx
+// ../packages/nexus-ui/src/components/ActionMenu/ActionMenu.jsx
 init_define_process();
 var import_react2 = __toESM(require_react(), 1);
-var Select = (0, import_react2.forwardRef)(function Select2({ className = "", children, ...props }, ref) {
+var import_react_dom = __toESM(require_react_dom(), 1);
+var VIEWPORT_MARGIN = 8;
+function ActionMenu({
+  align = "end",
+  anchorRef,
+  ariaLabel,
+  className = "",
+  groups = [],
+  onAction,
+  onClose,
+  x,
+  y
+}) {
+  const menuRef = (0, import_react2.useRef)(null);
+  const [position, setPosition] = (0, import_react2.useState)({
+    ready: false,
+    submenusLeft: false,
+    x: x ?? 0,
+    y: y ?? 0
+  });
+  (0, import_react2.useEffect)(() => {
+    const handlePointerDown = (event) => {
+      const clickedAnchor = anchorRef?.current?.contains?.(event.target);
+      if (!menuRef.current?.contains(event.target) && !clickedAnchor) {
+        onClose?.();
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose?.();
+    };
+    const closeOnViewportChange = () => onClose?.();
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", closeOnViewportChange);
+    window.addEventListener("scroll", closeOnViewportChange, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", closeOnViewportChange);
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+    };
+  }, [anchorRef, onClose]);
+  (0, import_react2.useLayoutEffect)(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const menuRect = menu.getBoundingClientRect();
+    const anchorRect = anchorRef?.current?.getBoundingClientRect();
+    const requestedX = Number.isFinite(x) ? x : align === "start" ? anchorRect?.left ?? VIEWPORT_MARGIN : (anchorRect?.right ?? VIEWPORT_MARGIN) - menuRect.width;
+    const requestedY = Number.isFinite(y) ? y : (anchorRect?.bottom ?? VIEWPORT_MARGIN) + 7;
+    setPosition({
+      ready: true,
+      submenusLeft: requestedX + menuRect.width + 224 > window.innerWidth,
+      x: Math.max(
+        VIEWPORT_MARGIN,
+        Math.min(requestedX, window.innerWidth - menuRect.width - VIEWPORT_MARGIN)
+      ),
+      y: Math.max(
+        VIEWPORT_MARGIN,
+        Math.min(requestedY, window.innerHeight - menuRect.height - VIEWPORT_MARGIN)
+      )
+    });
+  }, [align, anchorRef, groups, x, y]);
+  const renderActions = (actions, depth = 0) => actions.map((action) => {
+    const children = Array.isArray(action.children) ? action.children : [];
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: cx(
+          "nexus-ui-action-menu__item",
+          children.length && "has-children"
+        ),
+        key: action.id
+      },
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          "aria-checked": action.checked,
+          "aria-haspopup": children.length ? "menu" : void 0,
+          className: cx(
+            action.danger && "is-danger",
+            action.checked && "is-selected"
+          ),
+          disabled: action.disabled,
+          role: action.role || "menuitem",
+          type: "button",
+          onClick: () => {
+            if (children.length) return;
+            onAction?.(action);
+            action.onClick?.();
+            if (!action.keepOpen) onClose?.();
+          }
+        },
+        action.icon ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-action-menu__icon" }, action.icon) : null,
+        /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-action-menu__copy" }, /* @__PURE__ */ React.createElement("strong", null, action.label), action.description ? /* @__PURE__ */ React.createElement("small", null, action.description) : null),
+        /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-action-menu__end" }, children.length ? "\u203A" : action.end)
+      ),
+      children.length ? /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          "aria-label": action.label,
+          className: "nexus-ui-action-menu nexus-ui-action-menu__submenu",
+          role: "menu",
+          style: { "--submenu-depth": depth + 1 }
+        },
+        renderActions(children, depth + 1)
+      ) : null
+    );
+  });
+  return (0, import_react_dom.createPortal)(
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        "aria-label": ariaLabel,
+        className: cx(
+          "nexus-ui-action-menu",
+          position.submenusLeft && "has-submenus-left",
+          className
+        ),
+        ref: menuRef,
+        role: "menu",
+        style: {
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          visibility: position.ready ? "visible" : "hidden"
+        }
+      },
+      groups.map((group, groupIndex) => /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-action-menu__group", key: group.id || groupIndex }, renderActions(group.items || [])))
+    ),
+    document.body
+  );
+}
+
+// ../packages/nexus-ui/src/components/Input/Input.jsx
+init_define_process();
+var import_react3 = __toESM(require_react(), 1);
+var Input = (0, import_react3.forwardRef)(function Input2({ className = "", type = "text", ...props }, ref) {
+  return /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      ...props,
+      ref,
+      className: cx("nexus-ui-input", className),
+      type
+    }
+  );
+});
+
+// ../packages/nexus-ui/src/components/Select/Select.jsx
+init_define_process();
+var import_react4 = __toESM(require_react(), 1);
+var Select = (0, import_react4.forwardRef)(function Select2({ className = "", children, ...props }, ref) {
   return /* @__PURE__ */ React.createElement(
     "select",
     {
@@ -31194,11 +31359,11 @@ function Checkbox({
 
 // ../packages/nexus-ui/src/components/SearchField/SearchField.jsx
 init_define_process();
-var import_react3 = __toESM(require_react(), 1);
+var import_react5 = __toESM(require_react(), 1);
 function DefaultSearchIcon() {
   return /* @__PURE__ */ React.createElement("svg", { "aria-hidden": "true", fill: "none", viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "10.5", cy: "10.5", r: "6.5" }), /* @__PURE__ */ React.createElement("path", { d: "m15.5 15.5 4 4" }));
 }
-var SearchField = (0, import_react3.forwardRef)(function SearchField2({
+var SearchField = (0, import_react5.forwardRef)(function SearchField2({
   className = "",
   endAction = null,
   icon,
@@ -31218,7 +31383,7 @@ var SearchField = (0, import_react3.forwardRef)(function SearchField2({
 
 // ../packages/nexus-ui/src/components/Gallery/Gallery.jsx
 init_define_process();
-var import_react4 = __toESM(require_react(), 1);
+var import_react6 = __toESM(require_react(), 1);
 function normalizeColumnCount(value, fallback = null) {
   const numericValue = Number(value);
   return Number.isFinite(numericValue) && numericValue > 0 ? Math.round(numericValue) : fallback;
@@ -31230,7 +31395,7 @@ function assignRef(ref, value) {
     ref.current = value;
   }
 }
-var GalleryGrid = (0, import_react4.forwardRef)(function GalleryGrid2({
+var GalleryGrid = (0, import_react6.forwardRef)(function GalleryGrid2({
   as: Component = "div",
   className = "",
   compact = false,
@@ -31245,9 +31410,9 @@ var GalleryGrid = (0, import_react4.forwardRef)(function GalleryGrid2({
   children,
   ...props
 }, ref) {
-  const nodeRef = (0, import_react4.useRef)(null);
-  const leftControlPressedRef = (0, import_react4.useRef)(false);
-  const [uncontrolledColumns, setUncontrolledColumns] = (0, import_react4.useState)(
+  const nodeRef = (0, import_react6.useRef)(null);
+  const leftControlPressedRef = (0, import_react6.useRef)(false);
+  const [uncontrolledColumns, setUncontrolledColumns] = (0, import_react6.useState)(
     () => normalizeColumnCount(defaultColumns)
   );
   const controlledColumns = normalizeColumnCount(columns);
@@ -31257,11 +31422,11 @@ var GalleryGrid = (0, import_react4.forwardRef)(function GalleryGrid2({
     normalizedMinColumns,
     normalizeColumnCount(maxColumns, 12)
   );
-  const setNodeRef = (0, import_react4.useCallback)((node) => {
+  const setNodeRef = (0, import_react6.useCallback)((node) => {
     nodeRef.current = node;
     assignRef(ref, node);
   }, [ref]);
-  (0, import_react4.useEffect)(() => {
+  (0, import_react6.useEffect)(() => {
     if (!adjustableColumns || !activeColumns || !nodeRef.current) {
       return void 0;
     }
@@ -31338,7 +31503,7 @@ var GalleryGrid = (0, import_react4.forwardRef)(function GalleryGrid2({
     children
   );
 });
-var GalleryCard = (0, import_react4.forwardRef)(function GalleryCard2({
+var GalleryCard = (0, import_react6.forwardRef)(function GalleryCard2({
   as: Component = "article",
   className = "",
   interactive,
@@ -31794,7 +31959,7 @@ function queueBooksEditorLogEvent(event, message, data = null, level = "info") {
 }
 
 // ../nexus-plugins/Books/src/BooksPdfViewer.jsx
-var { useEffect: useEffect2, useMemo, useRef: useRef2, useState: useState3 } = window.React;
+var { useEffect: useEffect3, useMemo, useRef: useRef3, useState: useState4 } = window.React;
 var PAGE_OBSERVER_ROOT_MARGIN = "1200px 0px";
 var DEFAULT_PAGE_ASPECT_RATIO = 1.414;
 var VIEWER_HORIZONTAL_PADDING = 32;
@@ -31824,16 +31989,16 @@ function BooksPdfPage({
   documentKey,
   onFirstPageRendered
 }) {
-  const wrapperRef = useRef2(null);
-  const canvasRef = useRef2(null);
-  const firstPageReportedRef = useRef2(false);
-  const [shouldRender, setShouldRender] = useState3(pageNumber === 1);
-  const [pageAspectRatio, setPageAspectRatio] = useState3(defaultAspectRatio || DEFAULT_PAGE_ASPECT_RATIO);
-  const [renderState, setRenderState] = useState3({
+  const wrapperRef = useRef3(null);
+  const canvasRef = useRef3(null);
+  const firstPageReportedRef = useRef3(false);
+  const [shouldRender, setShouldRender] = useState4(pageNumber === 1);
+  const [pageAspectRatio, setPageAspectRatio] = useState4(defaultAspectRatio || DEFAULT_PAGE_ASPECT_RATIO);
+  const [renderState, setRenderState] = useState4({
     status: pageNumber === 1 ? "loading" : "idle",
     error: ""
   });
-  useEffect2(() => {
+  useEffect3(() => {
     setShouldRender(pageNumber === 1);
     setPageAspectRatio(defaultAspectRatio || DEFAULT_PAGE_ASPECT_RATIO);
     setRenderState({
@@ -31842,7 +32007,7 @@ function BooksPdfPage({
     });
     firstPageReportedRef.current = false;
   }, [defaultAspectRatio, documentKey, pageNumber]);
-  useEffect2(() => {
+  useEffect3(() => {
     const wrapperNode = wrapperRef.current;
     if (!wrapperNode || shouldRender) {
       return void 0;
@@ -31864,7 +32029,7 @@ function BooksPdfPage({
       observer.disconnect();
     };
   }, [shouldRender, viewportRootRef]);
-  useEffect2(() => {
+  useEffect3(() => {
     if (!pdfDocument || !shouldRender || !canvasRef.current || !containerWidth) {
       return void 0;
     }
@@ -32000,12 +32165,12 @@ function BooksPdfViewer({
   reloadToken,
   closing = false
 }) {
-  const viewportRef = useRef2(null);
-  const firstPageLoggedRef = useRef2(false);
-  const activeLoadingTaskRef = useRef2(null);
-  const activeDocumentRef = useRef2(null);
-  const [containerWidth, setContainerWidth] = useState3(0);
-  const [viewerState, setViewerState] = useState3({
+  const viewportRef = useRef3(null);
+  const firstPageLoggedRef = useRef3(false);
+  const activeLoadingTaskRef = useRef3(null);
+  const activeDocumentRef = useRef3(null);
+  const [containerWidth, setContainerWidth] = useState4(0);
+  const [viewerState, setViewerState] = useState4({
     status: filePath ? "loading" : "idle",
     error: "",
     pageCount: 0,
@@ -32013,7 +32178,7 @@ function BooksPdfViewer({
     defaultAspectRatio: DEFAULT_PAGE_ASPECT_RATIO,
     documentKey: ""
   });
-  useEffect2(() => {
+  useEffect3(() => {
     const viewportNode = viewportRef.current;
     if (!viewportNode) {
       return void 0;
@@ -32027,7 +32192,7 @@ function BooksPdfViewer({
       resizeObserver.disconnect();
     };
   }, []);
-  useEffect2(() => {
+  useEffect3(() => {
     let cancelled = false;
     let loadingTask = null;
     let pdfDocument = null;
@@ -32188,7 +32353,7 @@ function BooksPdfViewer({
 }
 
 // ../nexus-plugins/Books/src/BooksDocumentEngine.jsx
-var { useCallback: useCallback2, useEffect: useEffect3, useMemo: useMemo2, useRef: useRef3, useState: useState4 } = window.React;
+var { useCallback: useCallback2, useEffect: useEffect4, useMemo: useMemo2, useRef: useRef4, useState: useState5 } = window.React;
 var ipcRenderer = window.nexus.ipc;
 var PDF_VIEWER_CLOSE_SETTLE_MS = 32;
 function clampZoom(value) {
@@ -32210,15 +32375,15 @@ function StatePill({ status }) {
   return /* @__PURE__ */ React.createElement("span", { className: `booksEngine__status booksEngine__status--${status || "pending"}` }, getReadingStatusLabel(status));
 }
 function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
-  const [book, setBook] = useState4(null);
-  const [loading, setLoading] = useState4(true);
-  const [saving, setSaving] = useState4(false);
-  const [error, setError] = useState4("");
-  const [reloadToken, setReloadToken] = useState4(0);
-  const [zoom, setZoom] = useState4(100);
-  const [isClosingViewer, setIsClosingViewer] = useState4(false);
-  const preclosePromiseRef = useRef3(null);
-  const latestPayloadRef = useRef3({
+  const [book, setBook] = useState5(null);
+  const [loading, setLoading] = useState5(true);
+  const [saving, setSaving] = useState5(false);
+  const [error, setError] = useState5("");
+  const [reloadToken, setReloadToken] = useState5(0);
+  const [zoom, setZoom] = useState5(100);
+  const [isClosingViewer, setIsClosingViewer] = useState5(false);
+  const preclosePromiseRef = useRef4(null);
+  const latestPayloadRef = useRef4({
     filePath,
     tabId: tabId || null
   });
@@ -32261,7 +32426,7 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
     });
     return preclosePromiseRef.current;
   }, []);
-  useEffect3(() => {
+  useEffect4(() => {
     if (!tabId || typeof hostApi?.registerTabCloseHandler !== "function") {
       return void 0;
     }
@@ -32270,7 +32435,7 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
       () => prepareViewerForClose("tab-close-handler")
     );
   }, [hostApi, tabId, prepareViewerForClose]);
-  useEffect3(() => {
+  useEffect4(() => {
     if (!itemId) {
       return void 0;
     }
@@ -32398,6 +32563,38 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
 
 // ../nexus-plugins/Books/src/BooksLibraryView.jsx
 init_define_process();
+
+// ../nexus-plugins/Books/src/library-preferences.js
+init_define_process();
+var BOOKS_GRID_COLUMN_LIMITS = Object.freeze({ min: 1, max: 8 });
+var BOOKS_DEFAULT_LIBRARY_PREFERENCES = Object.freeze({
+  gridColumns: null
+});
+function normalizeBooksGridColumnOverride(value) {
+  if (value === null || value === void 0 || value === "") {
+    return null;
+  }
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return null;
+  }
+  return Math.min(
+    BOOKS_GRID_COLUMN_LIMITS.max,
+    Math.max(BOOKS_GRID_COLUMN_LIMITS.min, Math.round(numericValue))
+  );
+}
+function normalizeBooksLibraryPreferences(value = null) {
+  return {
+    gridColumns: normalizeBooksGridColumnOverride(value?.gridColumns)
+  };
+}
+function writeBooksGridColumns(currentValue, nextColumnCount) {
+  const gridColumns = normalizeBooksGridColumnOverride(nextColumnCount);
+  return {
+    ...currentValue && typeof currentValue === "object" ? currentValue : {},
+    gridColumns
+  };
+}
 
 // ../nexus-frontend/src/utils/devLog.js
 init_define_process();
@@ -32586,7 +32783,7 @@ function createRendererDevLogger(scope) {
 }
 
 // ../nexus-plugins/Books/src/BooksLibraryView.jsx
-var { startTransition, useDeferredValue, useEffect: useEffect4, useMemo: useMemo3, useRef: useRef4, useState: useState5 } = window.React;
+var { startTransition, useCallback: useCallback3, useDeferredValue, useEffect: useEffect5, useMemo: useMemo3, useRef: useRef5, useState: useState6 } = window.React;
 var ipcRenderer3 = window.nexus.ipc;
 var booksLibraryLogger = createRendererDevLogger("renderer.plugins.books");
 var BOOK_GRID_ASPECT_RATIO = 0.72;
@@ -32598,6 +32795,12 @@ var COVER_PREVIEW_RETRY_COOLDOWN_MS = 12e3;
 var sessionCoverPreviewCache = /* @__PURE__ */ new Map();
 var sessionCoverPreviewPendingCache = /* @__PURE__ */ new Map();
 var sessionCoverPreviewMissCache = /* @__PURE__ */ new Map();
+var EMPTY_RENAME_STATE = {
+  itemId: null,
+  value: "",
+  selectionEnd: 0,
+  saving: false
+};
 function getSessionCoverPreviewCacheKey(itemId, resolvedFilePath) {
   return String(itemId || resolvedFilePath || "");
 }
@@ -32672,12 +32875,40 @@ function compareBooks(left, right, sortBy) {
     sensitivity: "base"
   });
 }
+function getPathLeaf(value) {
+  return String(value || "").split(/[\\/]/).pop() || "";
+}
+function getBookItemDisplayName(book) {
+  const item = book?.item;
+  const pathLeaf = getPathLeaf(item?.path);
+  const rawName = String(item?.name || "").trim();
+  if (!rawName) {
+    return pathLeaf;
+  }
+  if (!pathLeaf || rawName === pathLeaf) {
+    return rawName;
+  }
+  const extension = String(item?.extension || "").replace(/^\./, "").trim().toLowerCase();
+  if (extension && rawName.toLowerCase().endsWith(`.${extension}`)) {
+    return rawName;
+  }
+  return pathLeaf;
+}
+function getBookItemBaseSelectionEnd(fileName, extension) {
+  const normalizedName = String(fileName || "");
+  const normalizedExtension = String(extension || "").replace(/^\./, "").trim();
+  const expectedSuffix = normalizedExtension ? `.${normalizedExtension}` : "";
+  if (expectedSuffix && normalizedName.toLowerCase().endsWith(expectedSuffix.toLowerCase())) {
+    return normalizedName.length - expectedSuffix.length;
+  }
+  const extensionIndex = normalizedName.lastIndexOf(".");
+  return extensionIndex > 0 ? extensionIndex : normalizedName.length;
+}
 function getGridMetrics(containerWidth, requestedColumns = null) {
   const width = Math.max(0, Number(containerWidth) || 0);
   const responsiveColumns = width <= 430 ? 1 : width <= 760 ? 2 : width <= 1040 ? 3 : width <= 1320 ? 4 : 5;
-  const hasRequestedColumns = requestedColumns !== null && requestedColumns !== void 0 && requestedColumns !== "";
-  const normalizedRequestedColumns = Number(requestedColumns);
-  const columns = hasRequestedColumns && Number.isFinite(normalizedRequestedColumns) ? Math.min(8, Math.max(1, Math.round(normalizedRequestedColumns))) : responsiveColumns;
+  const normalizedRequestedColumns = normalizeBooksGridColumnOverride(requestedColumns);
+  const columns = normalizedRequestedColumns ?? responsiveColumns;
   const gap = width <= 760 ? 12 : 14;
   const cardWidth = columns > 0 ? Math.max(0, (width - gap * Math.max(0, columns - 1)) / columns) : 0;
   const cardHeight = cardWidth > 0 ? cardWidth / BOOK_GRID_ASPECT_RATIO + BOOK_GRID_BODY_HEIGHT : 0;
@@ -32802,10 +33033,10 @@ function BookCoverPreview({ book }) {
   const itemId = book?.itemId || "";
   const resolvedFilePath = useMemo3(() => resolveVaultFilePath(filePath), [filePath]);
   const initialPreviewSrc = book?.coverPreview || readSessionCoverPreview(itemId, resolvedFilePath);
-  const [shouldLoad, setShouldLoad] = useState5(Boolean(initialPreviewSrc));
-  const [previewReady, setPreviewReady] = useState5(Boolean(initialPreviewSrc));
-  const [previewSrc, setPreviewSrc] = useState5(initialPreviewSrc);
-  useEffect4(() => {
+  const [shouldLoad, setShouldLoad] = useState6(Boolean(initialPreviewSrc));
+  const [previewReady, setPreviewReady] = useState6(Boolean(initialPreviewSrc));
+  const [previewSrc, setPreviewSrc] = useState6(initialPreviewSrc);
+  useEffect5(() => {
     const cachedPreview = book?.coverPreview || readSessionCoverPreview(itemId, resolvedFilePath);
     if (book?.coverPreview) {
       writeSessionCoverPreview(itemId, resolvedFilePath, book.coverPreview);
@@ -32814,7 +33045,7 @@ function BookCoverPreview({ book }) {
     setPreviewReady(Boolean(cachedPreview));
     setShouldLoad(Boolean(cachedPreview) || shouldRetrySessionCoverPreview(itemId, resolvedFilePath));
   }, [book?.coverPreview, itemId, resolvedFilePath]);
-  useEffect4(() => {
+  useEffect5(() => {
     if (!shouldLoad || !resolvedFilePath || previewSrc) {
       return void 0;
     }
@@ -32878,27 +33109,55 @@ function ProgressBar({ value }) {
   )), /* @__PURE__ */ React.createElement("span", { className: "booksLibrary__progressValue" }, formatPercent(normalizedValue)));
 }
 function BooksLibraryView({ ctx }) {
-  const contentRef = useRef4(null);
-  const gridMeasureRef = useRef4(null);
-  const [books, setBooks] = useState5([]);
-  const [loading, setLoading] = useState5(true);
-  const [refreshing, setRefreshing] = useState5(false);
-  const [error, setError] = useState5("");
-  const [searchValue, setSearchValue] = useState5("");
-  const [sortBy, setSortBy] = useState5("added");
-  const [columnOverride, setColumnOverride] = useState5(null);
-  const [virtualLayout, setVirtualLayout] = useState5({
+  const uiPreferencesApi = useMemo3(
+    () => ctx.createPluginSettingsApi("nexus.books.ui", BOOKS_DEFAULT_LIBRARY_PREFERENCES),
+    [ctx]
+  );
+  const persistedUiPreferences = uiPreferencesApi.useValue();
+  const columnOverride = useMemo3(
+    () => normalizeBooksLibraryPreferences(persistedUiPreferences).gridColumns,
+    [persistedUiPreferences?.gridColumns]
+  );
+  const contentRef = useRef5(null);
+  const gridMeasureRef = useRef5(null);
+  const [books, setBooks] = useState6([]);
+  const [loading, setLoading] = useState6(true);
+  const [refreshing, setRefreshing] = useState6(false);
+  const [error, setError] = useState6("");
+  const [searchValue, setSearchValue] = useState6("");
+  const [sortBy, setSortBy] = useState6("added");
+  const [contextMenu, setContextMenu] = useState6(null);
+  const [renameState, setRenameState] = useState6(EMPTY_RENAME_STATE);
+  const [virtualLayout, setVirtualLayout] = useState6({
     gridWidth: 0,
     viewportHeight: 0
   });
-  const [virtualRange, setVirtualRange] = useState5({
+  const [virtualRange, setVirtualRange] = useState6({
     startIndex: 0,
     endIndex: 0
   });
-  const viewportPressureLogRef = useRef4({
+  const viewportPressureLogRef = useRef5({
     lastLoggedAt: 0
   });
+  const renameInputRef = useRef5(null);
+  const renameSubmittingItemIdRef = useRef5(null);
   const deferredSearchValue = useDeferredValue(searchValue);
+  const handleGridColumnsChange = useCallback3((nextColumnCount) => {
+    const nextPreferences = writeBooksGridColumns(persistedUiPreferences, nextColumnCount);
+    if (nextPreferences.gridColumns === columnOverride) {
+      return;
+    }
+    void uiPreferencesApi.set(nextPreferences).catch((settingsError) => {
+      booksLibraryLogger.warn(
+        "books.library.gridPreferencesSaveError",
+        "No se pudo persistir la densidad de la biblioteca Books.",
+        {
+          gridColumns: nextPreferences.gridColumns,
+          error: settingsError instanceof Error ? settingsError.message : String(settingsError || "")
+        }
+      );
+    });
+  }, [columnOverride, persistedUiPreferences, uiPreferencesApi]);
   const loadBooks = async () => {
     setError("");
     setRefreshing(true);
@@ -32937,13 +33196,20 @@ function BooksLibraryView({ ctx }) {
       setRefreshing(false);
     }
   };
-  useEffect4(() => {
+  useEffect5(() => {
     booksLibraryLogger.info("books.library.mount", "Vista BooksLibrary montada.", null);
     void loadBooks();
     return () => {
       booksLibraryLogger.info("books.library.unmount", "Vista BooksLibrary desmontada.", null);
     };
   }, []);
+  useEffect5(() => {
+    if (!renameState.itemId || !renameInputRef.current) {
+      return;
+    }
+    renameInputRef.current.focus();
+    renameInputRef.current.setSelectionRange(0, renameState.selectionEnd);
+  }, [renameState.itemId, renameState.selectionEnd]);
   const visibleBooks = useMemo3(() => {
     const normalizedQuery = normalizeBooksSearchText(deferredSearchValue);
     const nextBooks = normalizedQuery ? books.filter((book) => {
@@ -32968,7 +33234,7 @@ function BooksLibraryView({ ctx }) {
     }
     return totalRows * gridMetrics.rowHeight - gridMetrics.gap;
   }, [gridMetrics.gap, gridMetrics.rowHeight, totalRows]);
-  useEffect4(() => {
+  useEffect5(() => {
     const contentNode = contentRef.current;
     const measureNode = gridMeasureRef.current;
     if (!contentNode || !measureNode) {
@@ -33038,7 +33304,7 @@ function BooksLibraryView({ ctx }) {
       visibleBooks
     ]
   );
-  useEffect4(() => {
+  useEffect5(() => {
     if (loading) {
       return;
     }
@@ -33058,16 +33324,125 @@ function BooksLibraryView({ ctx }) {
       visiblePreviewMissCount
     });
   }, [books.length, loading, visibleBooks.length, virtualizedBooks]);
-  const handleOpenBook = async (book) => {
+  const handleOpenBook = useCallback3(async (book, { reuse = true, activate = true } = {}) => {
     if (!book?.item) {
       return;
     }
     await ctx.actions.openFile({
       item: book.item,
       sourceId: "nexus.books.library",
-      reuse: false
+      reuse,
+      activate
     });
-  };
+  }, [ctx]);
+  const startRenamingBook = useCallback3((book) => {
+    const fileName = getBookItemDisplayName(book);
+    if (!book?.itemId || !fileName) {
+      return;
+    }
+    setError("");
+    renameSubmittingItemIdRef.current = null;
+    setRenameState({
+      itemId: book.itemId,
+      value: fileName,
+      selectionEnd: getBookItemBaseSelectionEnd(fileName, book?.item?.extension),
+      saving: false
+    });
+  }, []);
+  const cancelBookRename = useCallback3((itemId) => {
+    renameSubmittingItemIdRef.current = itemId;
+    setRenameState(EMPTY_RENAME_STATE);
+  }, []);
+  const submitBookRename = useCallback3(async (book) => {
+    const itemId = book?.itemId;
+    const nextName = renameState.value.trim();
+    const currentName = getBookItemDisplayName(book);
+    if (!itemId || renameState.itemId !== itemId) {
+      return;
+    }
+    if (renameSubmittingItemIdRef.current === itemId) {
+      return;
+    }
+    if (!nextName || nextName === currentName) {
+      cancelBookRename(itemId);
+      return;
+    }
+    renameSubmittingItemIdRef.current = itemId;
+    setRenameState((currentValue) => ({
+      ...currentValue,
+      saving: true
+    }));
+    const result = await ctx.actions.renameItem({
+      itemId,
+      name: nextName
+    });
+    if (!result?.ok) {
+      renameSubmittingItemIdRef.current = null;
+      setRenameState((currentValue) => ({
+        ...currentValue,
+        saving: false
+      }));
+      setError(result?.error || "No se pudo cambiar el nombre del archivo.");
+      return;
+    }
+    setBooks((currentBooks) => currentBooks.map((currentBook) => currentBook.itemId === itemId ? {
+      ...currentBook,
+      item: {
+        ...currentBook.item || {},
+        ...result.item || {},
+        name: result.item?.name || nextName
+      }
+    } : currentBook));
+    setError("");
+    setRenameState(EMPTY_RENAME_STATE);
+  }, [cancelBookRename, ctx, renameState]);
+  const deleteBook = useCallback3(async (book) => {
+    if (!book?.item) {
+      return;
+    }
+    setError("");
+    const itemsState = ctx.getItems();
+    const currentItem = itemsState.byId?.[book.item.id] || (await itemsState.ensureItemLoaded?.(book.item.id))?.item || book.item;
+    const result = await ctx.actions.deleteItem({ item: currentItem });
+    if (!result?.ok) {
+      setError(result?.error || "No se pudo eliminar el archivo.");
+      return;
+    }
+    setBooks((currentBooks) => currentBooks.filter((currentBook) => currentBook.itemId !== book.itemId));
+  }, [ctx]);
+  const contextMenuGroups = contextMenu?.book ? [
+    {
+      id: "open",
+      items: [
+        {
+          id: "open",
+          label: "Abrir",
+          onClick: () => void handleOpenBook(contextMenu.book, { reuse: true })
+        },
+        {
+          id: "open-new-tab",
+          label: "Abrir en nueva tab",
+          onClick: () => void handleOpenBook(contextMenu.book, { reuse: false })
+        }
+      ]
+    },
+    {
+      id: "manage",
+      items: [
+        {
+          id: "rename",
+          label: "Cambiar nombre",
+          onClick: () => startRenamingBook(contextMenu.book)
+        },
+        {
+          id: "delete",
+          label: "Eliminar",
+          danger: true,
+          onClick: () => void deleteBook(contextMenu.book)
+        }
+      ]
+    }
+  ] : [];
   const showEmptySearchState = !loading && books.length > 0 && visibleBooks.length === 0;
   return /* @__PURE__ */ React.createElement(WorkspacePage, { className: "booksLibrary" }, /* @__PURE__ */ React.createElement(WorkspaceBody, null, /* @__PURE__ */ React.createElement("nav", { className: "booksLibrary__navbar", "aria-label": "Herramientas de biblioteca" }, /* @__PURE__ */ React.createElement(
     SearchField,
@@ -33128,29 +33503,111 @@ function BooksLibraryView({ ctx }) {
       columns: gridMetrics.columns,
       minColumns: 1,
       maxColumns: 8,
-      onColumnsChange: setColumnOverride,
+      onColumnsChange: handleGridColumnsChange,
       virtual: true
     },
     virtualizedBooks.map(({ book, style }) => /* @__PURE__ */ React.createElement(
       GalleryCard,
       {
-        as: "button",
-        type: "button",
+        as: "article",
         key: book.itemId,
         className: "booksLibrary__card",
         style,
-        onClick: () => void handleOpenBook(book),
+        interactive: true,
+        selected: contextMenu?.book?.itemId === book.itemId,
+        role: "button",
+        tabIndex: 0,
+        onClick: () => {
+          if (renameState.itemId !== book.itemId) {
+            void handleOpenBook(book, { reuse: true });
+          }
+        },
+        onMouseDown: (event) => {
+          if (event.button === 1) {
+            event.preventDefault();
+          }
+        },
+        onAuxClick: (event) => {
+          if (event.button !== 1) {
+            return;
+          }
+          event.preventDefault();
+          void handleOpenBook(book, {
+            reuse: false,
+            activate: false
+          });
+        },
+        onContextMenu: (event) => {
+          event.preventDefault();
+          setContextMenu({
+            book,
+            x: event.clientX,
+            y: event.clientY
+          });
+        },
+        onKeyDown: (event) => {
+          if (event.target !== event.currentTarget || event.key !== "Enter" && event.key !== " ") {
+            return;
+          }
+          event.preventDefault();
+          void handleOpenBook(book, { reuse: true });
+        },
         "aria-label": `Abrir ${book.title || "PDF"}`
       },
       /* @__PURE__ */ React.createElement(BookCoverPreview, { book }),
-      /* @__PURE__ */ React.createElement(GalleryCardBody, { className: "booksLibrary__cardBody" }, /* @__PURE__ */ React.createElement(GalleryCardTitle, { className: "booksLibrary__cardTitle" }, book.title || "Documento"), /* @__PURE__ */ React.createElement(GalleryCardMeta, { as: "p", className: "booksLibrary__cardAuthor" }, book.author || "Autor sin curar"), /* @__PURE__ */ React.createElement(ProgressBar, { value: book.progressPercent }))
+      /* @__PURE__ */ React.createElement(GalleryCardBody, { className: "booksLibrary__cardBody" }, renameState.itemId === book.itemId ? /* @__PURE__ */ React.createElement(
+        GalleryCardTitle,
+        {
+          as: "div",
+          className: "booksLibrary__cardTitle booksLibrary__cardTitle--renaming"
+        },
+        /* @__PURE__ */ React.createElement(
+          Input,
+          {
+            ref: renameInputRef,
+            className: "booksLibrary__renameInput",
+            value: renameState.value,
+            disabled: renameState.saving,
+            spellCheck: false,
+            "aria-label": `Cambiar nombre de ${getBookItemDisplayName(book)}`,
+            onChange: (event) => setRenameState((currentValue) => ({
+              ...currentValue,
+              value: event.target.value
+            })),
+            onClick: (event) => event.stopPropagation(),
+            onAuxClick: (event) => event.stopPropagation(),
+            onContextMenu: (event) => event.stopPropagation(),
+            onBlur: () => void submitBookRename(book),
+            onKeyDown: (event) => {
+              event.stopPropagation();
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void submitBookRename(book);
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                cancelBookRename(book.itemId);
+              }
+            }
+          }
+        )
+      ) : /* @__PURE__ */ React.createElement(GalleryCardTitle, { className: "booksLibrary__cardTitle" }, book.title || "Documento"), /* @__PURE__ */ React.createElement(GalleryCardMeta, { as: "p", className: "booksLibrary__cardAuthor" }, book.author || "Autor sin curar"), /* @__PURE__ */ React.createElement(ProgressBar, { value: book.progressPercent }))
     ))
-  )))));
+  )))), contextMenu?.book ? /* @__PURE__ */ React.createElement(
+    ActionMenu,
+    {
+      ariaLabel: `Acciones para ${contextMenu.book.title || "PDF"}`,
+      groups: contextMenuGroups,
+      x: contextMenu.x,
+      y: contextMenu.y,
+      onClose: () => setContextMenu(null)
+    }
+  ) : null);
 }
 
 // ../nexus-plugins/Books/src/BooksSettingsSection.jsx
 init_define_process();
-var { useEffect: useEffect5, useMemo: useMemo4, useState: useState6 } = window.React;
+var { useEffect: useEffect6, useMemo: useMemo4, useState: useState7 } = window.React;
 function createEmptyAssignment() {
   return {
     rootItemId: "",
@@ -33204,13 +33661,13 @@ function BooksSettingsSection({ ctx }) {
     })),
     [folderOptions, hydratedPersistedAssignments]
   );
-  const [draftAssignments, setDraftAssignments] = useState6(
+  const [draftAssignments, setDraftAssignments] = useState7(
     () => hydratedPersistedAssignments
   );
-  const [saving, setSaving] = useState6(false);
-  const [notice, setNotice] = useState6("");
-  const [error, setError] = useState6("");
-  useEffect5(() => {
+  const [saving, setSaving] = useState7(false);
+  const [notice, setNotice] = useState7("");
+  const [error, setError] = useState7("");
+  useEffect6(() => {
     setDraftAssignments(
       (currentValue) => getAssignmentsSignature(currentValue) === persistedAssignmentsSignature ? currentValue : hydratedPersistedAssignments
     );
@@ -33357,7 +33814,7 @@ var booksRendererPlugin = {
       title: "Books",
       icon: BookIcon,
       tone: "document",
-      surface: "workspace",
+      surface: "tab",
       component: (props) => /* @__PURE__ */ React.createElement(BooksLibraryView, { ...props, ctx })
     });
     ctx.registerSideToolbarButton({
@@ -33373,10 +33830,6 @@ var booksRendererPlugin = {
           reuse: true,
           sourceId: "nexus.books.toolbar"
         });
-      },
-      isActive: ({ getState }) => {
-        const workspaceSurface = getState().data.workspaceSurface;
-        return workspaceSurface?.kind === "workspace-view" && workspaceSurface.viewId === BOOKS_LIBRARY_VIEW_ID;
       }
     });
     ctx.registerItemEngine({

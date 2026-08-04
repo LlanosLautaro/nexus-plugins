@@ -38,7 +38,7 @@ const booksRendererPlugin = {
       title: "Books",
       icon: BookIcon,
       tone: "document",
-      surface: "workspace",
+      surface: "tab",
       component: (props) => <BooksLibraryView {...props} ctx={ctx} />,
     });
 
@@ -55,13 +55,6 @@ const booksRendererPlugin = {
           reuse: true,
           sourceId: "nexus.books.toolbar",
         });
-      },
-      isActive: ({ getState }) => {
-        const workspaceSurface = getState().data.workspaceSurface;
-        return (
-          workspaceSurface?.kind === "workspace-view"
-          && workspaceSurface.viewId === BOOKS_LIBRARY_VIEW_ID
-        );
       },
     });
 

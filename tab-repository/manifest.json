@@ -1,20 +1,20 @@
 {
-  "id": "nexus.booru",
-  "displayName": "Booru",
-  "version": "0.3.121",
+  "id": "nexus.tab-repository",
+  "displayName": "Tab Repository",
+  "version": "0.1.9",
   "apiVersion": 1,
   "schemaVersion": 1,
-  "description": "Catalogo media-first con storage oculto, dedupe exacto y clasificacion propia dentro de Nexus.",
+  "description": "Repositorio por vault para descargar tabs de Brave, organizarlas y devolverlas por lotes.",
   "author": "NEW-NEXUS",
+  "permissions": [
+    "browser.tabs.read",
+    "browser.tabs.manage"
+  ],
   "entrypoints": {
     "backend": "./dist/backend.cjs",
     "renderer": "./dist/renderer.js"
   },
   "contributes": {
-    "settings": {
-      "schema": "./settings/schema.json",
-      "defaults": "./settings/defaults.json"
-    },
     "views": [],
     "sideToolbar": [],
     "frameMenu": [],

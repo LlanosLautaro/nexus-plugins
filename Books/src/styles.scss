@@ -265,6 +265,19 @@
   overflow: hidden;
 }
 
+.booksLibrary__cardTitle--renaming {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+.booksLibrary__renameInput {
+  width: 100%;
+  min-width: 0;
+  height: var(--control-height-m);
+  cursor: text;
+}
+
 .booksLibrary__cardAuthor {
   min-height: 1.35em;
   color: var(--color-text-muted);
