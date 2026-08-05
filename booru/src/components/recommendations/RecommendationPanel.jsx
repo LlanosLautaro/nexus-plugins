@@ -25,6 +25,7 @@ export default function RecommendationPanel({
   summarizeIds,
   pageSize,
   helpers,
+  variant = "sidebar",
 }) {
   const { getRecommendationItemKindClass, getRecommendationKindTooltip } = helpers;
   const [query, setQuery] = useState("");
@@ -46,6 +47,8 @@ export default function RecommendationPanel({
   const listRef = useRef(null);
   const requestVersionRef = useRef(0);
   const deferredQuery = useDeferredValue(query);
+  const normalizedDeferredQuery = String(deferredQuery || "").trim();
+  const waitsForQuery = variant === "details";
   const draftSignature = JSON.stringify({
     reality: draft?.reality || null,
     authors: summarizeIds(draft?.authors),
@@ -60,6 +63,16 @@ export default function RecommendationPanel({
     append = false,
     requestedOffset = 0,
   } = {}) => {
+    if (waitsForQuery && !normalizedDeferredQuery) {
+      requestVersionRef.current += 1;
+      setItems([]);
+      setTotalCount(0);
+      setHasMore(false);
+      setError("");
+      setLoading(false);
+      return;
+    }
+
     const startedAt = performance.now();
     requestVersionRef.current += 1;
     const requestVersion = requestVersionRef.current;
@@ -70,7 +83,7 @@ export default function RecommendationPanel({
       "Booru inicio la carga del recomendador unificado.",
       {
         append,
-        query: String(deferredQuery || "").trim() || null,
+        query: normalizedDeferredQuery || null,
         requestedOffset,
         revisionKey,
         selectedResourceIds: normalizedSelectedResourceIds.slice(0, 12),
@@ -80,7 +93,7 @@ export default function RecommendationPanel({
 
     try {
       const data = await invoke("booru:list-recommendations", {
-        query: String(deferredQuery || "").trim() || null,
+        query: normalizedDeferredQuery || null,
         resourceQuery,
         scope: recommendationScope,
         selectedResourceIds: normalizedSelectedResourceIds,
@@ -104,7 +117,7 @@ export default function RecommendationPanel({
         performance.now() - startedAt,
         {
           append,
-          query: String(deferredQuery || "").trim() || null,
+          query: normalizedDeferredQuery || null,
           requestedOffset,
           itemCount: nextItems.length,
           totalCount: Number(data?.totalCount || 0),
@@ -155,6 +168,8 @@ export default function RecommendationPanel({
     revisionKey,
     selectionCount,
     summarizeIds,
+    normalizedDeferredQuery,
+    waitsForQuery,
   ]);
 
   useEffect(() => {
@@ -205,9 +220,9 @@ export default function RecommendationPanel({
   }, [hasMore, items.length, loadRecommendations, loading]);
 
   return (
-    <div className="booruView__quickAssign">
+    <div className={["booruView__quickAssign", variant === "details" ? "booruView__quickAssign--details" : ""].filter(Boolean).join(" ")}>
       <span className="booruView__groupLabel">
-        {recommendationScope === "tags" ? "Tags" : "Recomendaciones"}
+        {variant === "details" ? "Agregar" : (recommendationScope === "tags" ? "Tags" : "Recomendaciones")}
       </span>
 
       <div className="booruView__entityInputRow">
@@ -258,13 +273,15 @@ export default function RecommendationPanel({
         {manualAssignDisabledReason || (
           selectionCount > 1
             ? `Aplicara la recomendacion elegida a ${selectionCount} recursos seleccionados cuando corresponda.`
-            : "Click aplica sobre el draft actual. Drag/drop conserva la asignacion rapida directa para entidades."
+            : variant === "details"
+              ? "Busca una tag o entidad y aplicala al recurso."
+              : "Click aplica sobre el draft actual. Drag/drop conserva la asignacion rapida directa para entidades."
         )}
       </span>
 
       {error ? <p className="booruView__fieldError">{error}</p> : null}
 
-      <div
+      {!waitsForQuery || normalizedDeferredQuery ? <div
         ref={listRef}
         className="booruView__quickAssignList"
         onScroll={handleListScroll}
@@ -331,7 +348,7 @@ export default function RecommendationPanel({
             Sin recomendaciones por ahora. Ajusta el contexto o escribe una busqueda.
           </span>
         )}
-      </div>
+      </div> : null}
     </div>
   );
 }

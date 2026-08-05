@@ -61,11 +61,17 @@ export function createBooruRandomSeed() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+export function getDefaultBooruBrowseDirection(sortBy) {
+  return ["importedAt", "createdAt", "resourceCount"].includes(String(sortBy || ""))
+    ? BOORU_BROWSE_DIRECTIONS.DESC
+    : BOORU_BROWSE_DIRECTIONS.ASC;
+}
+
 export function normalizeBooruBrowseQuery(value = null, family = "resource", allowUniverseSort = false) {
   const isEntity = family === "entity";
   const allowedSorts = isEntity ? ENTITY_SORTS : RESOURCE_SORTS;
-  const fallbackSort = isEntity ? "name" : "importedAt";
-  const fallbackDirection = isEntity ? "asc" : "desc";
+  const fallbackSort = isEntity ? "resourceCount" : "importedAt";
+  const fallbackDirection = getDefaultBooruBrowseDirection(fallbackSort);
   let sortBy = allowedSorts.has(String(value?.sortBy || "")) ? String(value.sortBy) : fallbackSort;
   if (sortBy === "universe" && (!isEntity || !allowUniverseSort)) sortBy = fallbackSort;
   const direction = value?.direction === "asc" || value?.direction === "desc"

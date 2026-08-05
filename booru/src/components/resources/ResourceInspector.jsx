@@ -1,8 +1,6 @@
 import { Button, Field, SectionPanel, SegmentedControl, StateBlock } from "@nexus/ui";
-import {
-  getBooruDetailsFieldSchema,
-  getBooruDetailsRealityState,
-} from "../../domain/details-policy.js";
+import { getBooruDetailsRealityState } from "../../domain/details-policy.js";
+import { buildBooruEffectiveDetailChips } from "../../domain/effective-details.js";
 
 function formatDuration(value) {
   if (value == null || value === "") {
@@ -51,14 +49,16 @@ export default function ResourceInspector({
   onPurge,
   onClose,
   onEnsureEntity,
+  onApplyRecommendation,
+  onRemoveEffectiveItem,
+  recommendationRevisionKey = 0,
+  recommendationBusy = false,
   helpers,
   MediaPreview,
-  EntityField,
-  TagField,
+  RecommendationPanel,
   SingleEntityField,
   mediaKindLabels,
   realityOptions,
-  priorityEntity = null,
 }) {
   const {
     applyClassificationPolicyToDraft,
@@ -89,10 +89,9 @@ export default function ResourceInspector({
   const isDuplicate = section === "duplicates" || resource.classificationState === "duplicate-review";
   const isTrash = section === "trash" || normalizedSelection.every((item) => item?.trashedAt);
   const canSaveProgress = canSaveDraftProgress(draft);
-  const mixedFields = new Set(Array.isArray(draft?.mixedFields) ? draft.mixedFields : []);
   const realityState = getBooruDetailsRealityState(draft);
-  const fieldSchema = getBooruDetailsFieldSchema(draft);
   const metadataResources = isBatch ? normalizedSelection : [resource];
+  const effectiveChips = buildBooruEffectiveDetailChips(metadataResources, draft);
   const metadata = [
     {
       label: "Resolución",
@@ -210,39 +209,61 @@ export default function ResourceInspector({
               </div>
             )}
 
-            {fieldSchema.map((fieldConfig) => {
-              const selectedItems = draft?.[fieldConfig.field] || [];
-              const mixed = mixedFields.has(fieldConfig.field);
+            <div className="booruView__detailsTags">
+              <span className="booruView__groupLabel">Tags y entidades</span>
+              <div className="booruView__detailsTagChips" aria-label="Tags y entidades efectivas">
+                {effectiveChips.length ? effectiveChips.map((chip) => (
+                  <span
+                    key={`${chip.kind}:${chip.id}`}
+                    className={`booruView__selectionChip booruView__selectionChip--${chip.kind}`}
+                  >
+                    {chip.label}
+                    <button
+                      type="button"
+                      className="booruView__selectionChipRemove"
+                      aria-label={`Quitar ${chip.label}`}
+                      disabled={saving || recommendationBusy}
+                      onClick={() => {
+                        if (chip.persisted && (chip.kind === "tag" || chip.kind === "universe")) {
+                          void onRemoveEffectiveItem?.(chip);
+                          return;
+                        }
+                        onDraftChange?.((currentDraft) => {
+                          const nextItems = (Array.isArray(currentDraft?.[chip.field]) ? currentDraft[chip.field] : [])
+                            .filter((item) => item?.id !== chip.id);
+                          const nextDraft = markDraftDirty({
+                            ...currentDraft,
+                            [chip.field]: nextItems,
+                            ...(chip.field === "characters" ? {
+                              characterUniverses: pruneCharacterUniverseAssignments(
+                                currentDraft.characterUniverses,
+                                nextItems,
+                              ),
+                            } : {}),
+                          }, chip.field);
+                          return applyClassificationPolicyToDraft(nextDraft);
+                        });
+                      }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                )) : (
+                  <span className="booruView__suggestionsHint">Todavia no hay asociaciones ni tags.</span>
+                )}
+              </div>
 
-              return (
-                <EntityField
-                  key={fieldConfig.kind}
-                  kind={fieldConfig.kind}
-                  label={fieldConfig.label}
-                  description={mixed ? `Valores mixtos; se muestran los compartidos. ${fieldConfig.description}` : fieldConfig.description}
-                  required={fieldConfig.required}
-                  selectedItems={selectedItems}
-                  onEnsureEntity={onEnsureEntity}
-                  onChange={(items) => {
-                    onDraftChange?.((currentDraft) => {
-                      const nextDraft = markDraftDirty({
-                        ...currentDraft,
-                        [fieldConfig.field]: items,
-                        ...(fieldConfig.kind === "character" ? {
-                          characterUniverses: pruneCharacterUniverseAssignments(
-                            currentDraft.characterUniverses,
-                            items,
-                          ),
-                        } : {}),
-                      }, fieldConfig.field);
-                      return applyClassificationPolicyToDraft(nextDraft);
-                    });
-                  }}
-                  disabled={saving}
-                  priorityEntity={priorityEntity?.kind === fieldConfig.kind ? priorityEntity : null}
-                />
-              );
-            })}
+              <RecommendationPanel
+                variant="details"
+                selectedResourceIds={metadataResources.map((item) => item.id)}
+                manualAssignDisabledReason=""
+                assigning={saving || recommendationBusy}
+                revisionKey={recommendationRevisionKey}
+                recommendationScope="all"
+                draft={draft}
+                onApplyRecommendation={onApplyRecommendation}
+              />
+            </div>
 
             {Array.isArray(draft?.characters) && draft.characters.some((character) => !getCharacterUniverse(character)) ? (
               <div className="booruView__characterUniverseRepair">
@@ -288,23 +309,6 @@ export default function ResourceInspector({
                 </div>
               </div>
             ) : null}
-
-            <TagField
-              label="Tags"
-              description={
-                mixedFields.has("manualTags")
-                  ? "Valores mixtos; se muestran las tags compartidas. Buscar o crear aquí modifica solo las tags planas."
-                  : "Tags planas del recurso. Enter crea la faltante."
-              }
-              selectedItems={draft?.manualTags || []}
-              onChange={(items) => {
-                onDraftChange?.((currentDraft) => markDraftDirty({
-                  ...currentDraft,
-                  manualTags: items,
-                }, "manualTags"));
-              }}
-              disabled={saving}
-            />
 
             <span className="booruView__suggestionsHint booruView__detailsSaveState">
               {saving

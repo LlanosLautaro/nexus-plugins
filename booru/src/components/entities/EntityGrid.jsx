@@ -124,12 +124,12 @@ export default function EntityGrid({
                 type="button"
                 className="booruView__entityCard"
                 onClick={() => onOpenEntity?.(kind, item)}
+                onContextMenu={(event) => onPreviewContextMenu?.(item, event, kind)}
                 onPointerEnter={() => onEntityHover?.(kind, item)}
                 onPointerLeave={() => onEntityHover?.(null)}
               >
                 <GalleryCardMedia
                   className="booruView__entityCardPreview"
-                  onContextMenu={(event) => onPreviewContextMenu?.(item, event)}
                 >
                   <EntityVisualMedia
                     visual={item.visual}

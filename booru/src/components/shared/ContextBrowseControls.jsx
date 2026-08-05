@@ -1,4 +1,5 @@
 import { Button, SegmentedControl } from "@nexus/ui";
+import { getDefaultBooruBrowseDirection } from "../../domain/contextual-browse.js";
 
 export default function ContextBrowseControls({
   value,
@@ -54,6 +55,7 @@ export default function ContextBrowseControls({
               onChange?.({
                 ...value,
                 sortBy,
+                direction: getDefaultBooruBrowseDirection(sortBy),
                 ...(!hasResourceGrouping && value?.grouping === "sectioned" && sortBy !== "random"
                   ? { groupBy: sortBy }
                   : {}),

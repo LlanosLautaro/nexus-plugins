@@ -389,6 +389,7 @@ type SetEntityVisualPayload = {
   entityId?: unknown;
   resourceId?: unknown;
   visualRole?: unknown;
+  layout?: unknown;
 };
 
 type SetEntityVisualLayoutPayload = {
@@ -403,6 +404,7 @@ type SetEntityVisualLayoutPayload = {
 type SaveEntityProfilePayload = {
   kind?: unknown;
   entityId?: unknown;
+  displayName?: unknown;
   aliasNames?: unknown;
   tagIds?: unknown;
   socialLinks?: unknown;
@@ -1506,6 +1508,7 @@ function normalizeResourceRow(db: DatabaseSync, row: any) {
     authors,
     artists,
     characters,
+    directUniverses,
     universes,
     manualTags,
     tags,
@@ -5283,11 +5286,30 @@ function setEntityVisualSync(db: DatabaseSync, payload: SetEntityVisualPayload) 
     throw new Error("El recurso seleccionado ya no esta disponible en Booru.");
   }
 
-  db.prepare(`
-    UPDATE ${getEntityTable(kind)}
-    SET ${visualColumn} = ?
-    WHERE id = ?
-  `).run(resourceId, entityId);
+  const hasLayout = payload?.layout && typeof payload.layout === "object";
+  const nextVisualSettings = hasLayout
+    ? normalizeEntityVisualSettings({
+        ...parseEntityVisualSettings(entity?.visual_settings_json),
+        [visualRole]: payload.layout,
+      })
+    : null;
+
+  withTransaction(db, () => {
+    if (nextVisualSettings) {
+      db.prepare(`
+        UPDATE ${getEntityTable(kind)}
+        SET ${visualColumn} = ?, visual_settings_json = ?
+        WHERE id = ?
+      `).run(resourceId, serializeEntityVisualSettings(nextVisualSettings), entityId);
+      return;
+    }
+
+    db.prepare(`
+      UPDATE ${getEntityTable(kind)}
+      SET ${visualColumn} = ?
+      WHERE id = ?
+    `).run(resourceId, entityId);
+  });
 
   const profile = getEntityProfileSync(db, kind, entityId);
 
@@ -5526,21 +5548,37 @@ function saveEntityProfileSync(db: DatabaseSync, payload: SaveEntityProfilePaylo
     throw new Error("La entidad solicitada ya no existe en Booru.");
   }
 
+  const entity = findEntityByIdSync(db, kind, entityId);
+  const currentDisplayName = normalizeBooruOptionalText(entity?.display_name);
+  const hasDisplayName = Object.prototype.hasOwnProperty.call(payload || {}, "displayName");
+  const displayName = hasDisplayName
+    ? normalizeBooruOptionalText(payload?.displayName)
+    : currentDisplayName;
+  if (!displayName) {
+    throw new Error("El nombre principal es obligatorio.");
+  }
+
   const tagIds = Object.prototype.hasOwnProperty.call(payload || {}, "tagIds")
     ? uniqueBooruIds(payload?.tagIds)
     : listEntityTagsSync(db, kind, entityId).map((tag) => tag.id);
   assertValidTagIdsSync(db, tagIds);
-  const entity = findEntityByIdSync(db, kind, entityId);
-  const aliases = Object.prototype.hasOwnProperty.call(payload || {}, "aliasNames")
-    ? normalizeEntityAliasesForPrimaryName(kind, entity?.display_name, payload?.aliasNames)
+  const requestedAliases = Object.prototype.hasOwnProperty.call(payload || {}, "aliasNames")
+    ? normalizeUniqueTextList(payload?.aliasNames)
     : listEntityAliasesSync(db, kind, entityId);
+  const aliases = normalizeEntityAliasesForPrimaryName(kind, displayName, [
+    ...requestedAliases,
+    ...((kind === "author" || kind === "artist")
+      && normalizeBooruComparableText(displayName) !== normalizeBooruComparableText(currentDisplayName)
+      ? [currentDisplayName]
+      : []),
+  ]);
   const socialLinks = Object.prototype.hasOwnProperty.call(payload || {}, "socialLinks")
     ? normalizeSocialLinks(payload?.socialLinks)
     : listEntitySocialLinksSync(db, kind, entityId).map((link: any) => ({ platformId: link?.platform?.id, url: link?.url }));
   if ((aliases.length || socialLinks.length) && kind !== "author" && kind !== "artist") {
     throw new Error("Solo Persona y Artist admiten aliases y redes.");
   }
-  assertEntityNamesAvailableSync(db, kind, entityId, [String(entity?.display_name || ""), ...aliases]);
+  assertEntityNamesAvailableSync(db, kind, entityId, [displayName, ...aliases]);
 
   socialLinks.forEach((link) => {
     if (!db.prepare(`SELECT id FROM booru_social_platforms WHERE id = ?`).get(link.platformId)) {
@@ -5549,6 +5587,11 @@ function saveEntityProfileSync(db: DatabaseSync, payload: SaveEntityProfilePaylo
   });
 
   withTransaction(db, () => {
+    if (hasDisplayName && displayName !== currentDisplayName) {
+      db.prepare(`UPDATE ${getEntityTable(kind)} SET display_name = ? WHERE id = ?`)
+        .run(displayName, entityId);
+    }
+
     db.prepare(`DELETE FROM booru_entity_tags WHERE entity_kind = ? AND entity_id = ?`).run(kind, entityId);
     const insertTag = db.prepare(`
       INSERT INTO booru_entity_tags (entity_kind, entity_id, tag_id, created_at)

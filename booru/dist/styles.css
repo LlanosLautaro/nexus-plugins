@@ -16,7 +16,7 @@
   justify-self: center;
   overflow: hidden;
   border: 1px solid var(--color-accent);
-  background: var(--workspace-main-bg);
+  background: var(--ui-canvas);
   touch-action: none;
   cursor: grab;
 }
@@ -31,7 +31,7 @@
 }
 
 .booruVisualCropper__frame.is-banner {
-  aspect-ratio: 3/1;
+  aspect-ratio: 4/1;
 }
 
 .booruVisualCropper__frame img,
@@ -175,16 +175,33 @@
 }
 
 .booruView {
-  background: var(--workspace-main-bg);
+  background: var(--ui-canvas);
 }
 
 .booruView__layout.nexus-ui-split--sidebar-detail {
-  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  grid-template-columns: var(--booru-left-rail-width, 280px) minmax(0, 1fr);
   gap: 8px;
+}
+
+.booruView__resizableLayout {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.booruView__resizableLayout > .booruView__layout {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .booruView__layout--entity.nexus-ui-split--sidebar-detail {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.booruView__layout--entity .booruView__detail {
+  gap: 0;
 }
 
 .booruView__body,
@@ -220,66 +237,74 @@
   gap: 6px;
 }
 
+.booruView__layout--entity .booruView__content {
+  padding-top: 0;
+}
+
 .booruView__entityNavbar {
-  display: grid;
-  grid-template-columns: minmax(190px, auto) minmax(220px, 1fr) auto minmax(190px, 0.7fr);
-  align-items: end;
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   flex: 0 0 auto;
-  padding: 6px;
+  min-height: 34px;
+  padding: 3px 6px;
   border-bottom: 1px solid var(--color-line);
-  background: var(--workspace-main-bg);
+  background: var(--ui-canvas);
 }
 
 .booruView__entityNavbarContext,
 .booruView__entityNavbarCreate {
   display: flex;
   min-width: 0;
-  align-items: flex-end;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
 }
 
 .booruView__entityNavbarTitle {
-  display: flex;
+  display: block;
   min-width: 0;
-  flex: 1 1 auto;
-  flex-direction: column;
-  justify-content: center;
-  min-height: var(--control-height-m);
-}
-
-.booruView__entityNavbarTitle span,
-.booruView__entityNavbarTitle strong {
+  max-width: 170px;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.booruView__entityNavbarTitle span {
-  color: var(--color-text-muted);
-  font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.booruView__entityNavbarTitle strong {
   color: var(--color-text);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
 }
 
-.booruView__entityNavbarSearch,
-.booruView__entityNavbarCreate .nexus-ui-inline-field {
+.booruView__entityNavbarSearch {
   min-width: 0;
+  flex: 1 1 220px;
+}
+
+.booruView__entityNavbarCreate {
+  flex: 0 1 260px;
+}
+
+.booruView__entityNavbarCreate > input {
+  min-width: 110px;
+  flex: 1 1 150px;
 }
 
 .booruView__browseControls {
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: 4px;
+}
+
+.booruView__browseControls.is-compact {
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+}
+
+.booruView__browseControls.is-compact .booruView__browseField > span {
+  display: none;
+}
+
+.booruView__browseControls.is-compact .booruView__browseField {
+  min-width: 132px;
 }
 
 .booruView__browseField {
@@ -412,6 +437,13 @@
 .booruView__panel {
   border: 1px solid var(--color-line);
   background: var(--shell-panel-bg);
+}
+
+.booruView__panel:has(.booruView__resourcePanelBody),
+.booruView__resourcePanelBody,
+.booruView__resourcePanelContent,
+.booruView__groupedGallery {
+  background: var(--ui-canvas);
 }
 
 .booruView__panel--fill {
@@ -559,8 +591,66 @@
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  grid-template-columns: minmax(0, 1fr) var(--booru-right-rail-width, 380px);
   gap: 8px;
+}
+
+.booruView__sidebar,
+.booruView__inspectorRail {
+  position: relative;
+}
+
+.booruView__inspectorRail {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.booruView__inspectorRail > .booruView__panel {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.booruView__railResize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 12;
+  width: 10px;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.booruView__railResize--left {
+  right: -9px;
+}
+
+.booruView__railResize--right {
+  left: -9px;
+}
+
+.booruView__railResize::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 4px;
+  width: 1px;
+  border-radius: 999px;
+  background: var(--color-line);
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.booruView__railResize:is(:hover, :focus-visible)::after,
+.booru-is-resizing-rail .booruView__railResize::after {
+  background: var(--color-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+.booru-is-resizing-rail {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .booruView__workspaceGrid--single {
@@ -998,6 +1088,12 @@
   color: var(--color-text-soft);
 }
 
+.booruView__selectionChip--tag {
+  border-color: color-mix(in srgb, var(--color-accent) 18%, var(--color-line));
+  background: color-mix(in srgb, var(--surface-pill) 95%, var(--color-accent) 5%);
+  color: var(--color-text-soft);
+}
+
 .booruView__selectionChip--syntax {
   font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, monospace;
   font-weight: 600;
@@ -1040,6 +1136,27 @@
   gap: 8px;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.booruView__detailsTags {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.booruView__detailsTagChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.booruView__quickAssign--details {
+  flex: 0 0 auto;
+}
+
+.booruView__quickAssign--details .booruView__quickAssignList {
+  flex: 0 1 auto;
+  max-height: 240px;
 }
 
 .booruView__quickAssignList {
@@ -1223,8 +1340,20 @@
 }
 
 .booruView__entityProfileBanner {
-  aspect-ratio: 3/1;
+  aspect-ratio: 4/1;
   border-radius: calc(var(--radius-m) + 2px);
+}
+
+.booruView__entityProfileBanner::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 28%;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--ui-canvas));
 }
 
 .booruView__entityProfileBanner .booruView__previewMedia,
@@ -1261,7 +1390,7 @@
   display: flex;
   align-items: flex-end;
   gap: 14px;
-  margin-top: -64px;
+  margin-top: -50px;
   padding-inline: 12px;
   position: relative;
   z-index: 1;
@@ -1371,7 +1500,87 @@
   display: grid;
   place-items: center;
   padding: 28px;
-  background: color-mix(in srgb, var(--workspace-main-bg) 72%, transparent);
+  background: color-mix(in srgb, var(--ui-canvas) 72%, transparent);
+}
+
+.booruEntityContextDialog {
+  display: flex;
+  width: min(920px, 100vw - 56px);
+  max-height: min(760px, 100vh - 56px);
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--ui-radius-panel);
+  background: var(--ui-canvas);
+  box-shadow: var(--shadow-l);
+}
+
+.booruEntityContextDialog__header,
+.booruEntityContextDialog__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.booruEntityContextDialog__header h2 {
+  margin: 2px 0 0;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.booruEntityContextDialog__form,
+.booruEntityContextDialog__details,
+.booruEntityContextDialog__details section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.booruEntityContextDialog__form > label {
+  color: var(--color-text-soft);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.booruEntityContextDialog__actions {
+  justify-content: flex-end;
+}
+
+.booruEntityContextDialog__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.booruEntityContextDialog__picker {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.booruEntityContextDialog__grid {
+  gap: 8px;
+}
+
+.booruEntityContextDialog__resource {
+  min-width: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.booruEntityContextDialog__preview {
+  aspect-ratio: 1/1;
+  background: var(--ui-canvas);
+}
+
+.booruEntityContextDialog__preview .booruView__previewMedia,
+.booruEntityContextDialog__preview .booruView__previewPlaceholder,
+.booruEntityContextDialog__preview .booruView__previewFallback {
+  width: 100%;
+  height: 100%;
 }
 
 .booruView__entityProfileFacts {
@@ -1465,16 +1674,16 @@
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 26px;
-  background: color-mix(in srgb, var(--workspace-main-bg) 48%, rgba(0, 0, 0, 0.58));
-  backdrop-filter: blur(10px);
+  padding: 12px;
+  background: color-mix(in srgb, var(--ui-canvas) 82%, transparent);
+  backdrop-filter: blur(2px);
   z-index: 1700;
 }
 
 .booruView__heroShell {
   position: relative;
-  width: min(1120px, 100vw - 84px);
-  height: min(760px, 100vh - 84px);
+  width: calc(100vw - 24px);
+  height: calc(100vh - 24px);
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) 38px;
   align-items: center;
@@ -1487,19 +1696,47 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 12%, var(--color-line));
-  border-radius: 20px;
-  background: linear-gradient(180deg, var(--fx-sheen-soft), transparent 18%), color-mix(in srgb, var(--shell-panel-bg) 95%, transparent);
-  box-shadow: 0 20px 42px rgba(4, 8, 14, 0.34), inset 0 1px 0 color-mix(in srgb, var(--color-text-soft) 7%, transparent);
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--ui-canvas);
+  box-shadow: 0 18px 38px rgba(4, 8, 14, 0.3);
+}
+
+.booruView__heroViewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-s);
+  background: var(--ui-canvas);
+  touch-action: none;
+  cursor: default;
+}
+
+.booruView__heroViewport.is-pannable {
+  cursor: grab;
+}
+
+.booruView__heroViewport.is-pannable:active {
+  cursor: grabbing;
 }
 
 .booruView__heroMedia {
-  flex: 1 1 auto;
-  min-height: 0;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--workspace-main-bg) 62%, var(--shell-panel-soft));
+  flex: 0 0 auto;
+  max-width: none;
+  max-height: none;
+  transform-origin: center;
+  transition: transform 100ms ease-out;
+  background: var(--ui-canvas);
+  user-select: none;
+  pointer-events: none;
+}
+
+video.booruView__heroMedia {
+  pointer-events: auto;
 }
 
 .booruView__heroMeta {
@@ -1707,11 +1944,14 @@
   .booruView__layout.nexus-ui-split--sidebar-detail {
     grid-template-columns: 1fr;
   }
+  .booruView__railResize {
+    display: none;
+  }
   .booruView__entityNavbar {
-    grid-template-columns: minmax(0, 1fr) minmax(180px, 1fr);
+    flex-wrap: wrap;
   }
   .booruView__entityNavbarCreate {
-    grid-column: 1/-1;
+    flex: 1 1 220px;
   }
   .booruView__mediaGrid--paged {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1734,7 +1974,7 @@
     grid-column: 1/-1;
   }
   .booruView__entityProfileBanner {
-    aspect-ratio: 3/1;
+    aspect-ratio: 4/1;
   }
   .booruView__entityProfileIdentity {
     align-items: flex-start;
@@ -1778,13 +2018,14 @@
     padding: 6px;
   }
   .booruView__entityNavbar {
-    grid-template-columns: 1fr;
+    align-items: stretch;
+    flex-direction: column;
   }
   .booruView__entityNavbarCreate {
-    grid-column: auto;
+    flex: 0 0 auto;
   }
   .booruView__entityProfileBanner {
-    aspect-ratio: 3/1;
+    aspect-ratio: 4/1;
   }
   .booruView__metrics {
     grid-template-columns: 1fr;

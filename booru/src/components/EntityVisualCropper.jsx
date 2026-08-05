@@ -95,12 +95,20 @@ export default function EntityVisualCropper({
   const save = async () => {
     setSaving(true);
     try {
-      const result = await invoke("booru:set-entity-visual-layout", {
-        kind,
-        entityId,
-        visualRole: role,
-        layout,
-      });
+      const result = source?.resourceId
+        ? await invoke("booru:set-entity-visual", {
+            kind,
+            entityId,
+            resourceId: source.resourceId,
+            visualRole: role,
+            layout,
+          })
+        : await invoke("booru:set-entity-visual-layout", {
+            kind,
+            entityId,
+            visualRole: role,
+            layout,
+          });
       onSaved?.(result?.profile || null);
     } finally {
       setSaving(false);

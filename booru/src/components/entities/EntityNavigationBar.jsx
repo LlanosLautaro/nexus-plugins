@@ -1,4 +1,4 @@
-import { Button, InlineField, Input, SearchField } from "@nexus/ui";
+import { Button, Input, SearchField } from "@nexus/ui";
 
 export default function EntityNavigationBar({
   kind,
@@ -21,53 +21,45 @@ export default function EntityNavigationBar({
 
   return (
     <nav className="booruView__entityNavbar" aria-label="Navegacion de entidades">
-      <div className="booruView__entityNavbarContext">
-        {profileOpen ? (
+      {profileOpen ? (
+        <div className="booruView__entityNavbarContext">
           <Button type="button" onClick={() => onBack?.()}>
             Volver
           </Button>
-        ) : null}
-        <div className="booruView__entityNavbarTitle">
-          <span>{kindLabel}</span>
-          {profileOpen && contextLabel ? <strong>{contextLabel}</strong> : null}
-        </div>
-        {profileOpen ? (
+          {contextLabel ? <strong className="booruView__entityNavbarTitle">{contextLabel}</strong> : null}
           <Button type="button" onClick={() => onOpenInMedia?.()}>
-            Abrir en Media
+            Media
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {searchable ? (
         searchContent || (
-          <InlineField label="Buscar" grow className="booruView__entityNavbarSearch">
-            <SearchField
-              value={searchValue}
-              onChange={(event) => onSearchChange?.(event.target.value)}
-              placeholder={profileOpen ? "Buscar en esta seccion" : `Buscar ${kindLabel.toLowerCase()}`}
-              aria-label={`Buscar ${kindLabel.toLowerCase()}`}
-            />
-          </InlineField>
+          <SearchField
+            className="booruView__entityNavbarSearch"
+            value={searchValue}
+            onChange={(event) => onSearchChange?.(event.target.value)}
+            placeholder={profileOpen ? "Buscar en esta seccion" : `Buscar ${kindLabel.toLowerCase()}`}
+            aria-label={`Buscar ${kindLabel.toLowerCase()}`}
+          />
         )
       ) : null}
 
       {browseControls}
 
       <div className="booruView__entityNavbarCreate">
-        <InlineField label="Crear" grow>
-          <Input
-            value={createValue}
-            onChange={(event) => onCreateChange?.(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                onCreate?.();
-              }
-            }}
-            placeholder={`Crear ${kindLabel.toLowerCase()}`}
-            aria-label={`Crear ${kindLabel.toLowerCase()}`}
-          />
-        </InlineField>
+        <Input
+          value={createValue}
+          onChange={(event) => onCreateChange?.(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onCreate?.();
+            }
+          }}
+          placeholder={`Crear ${kindLabel.toLowerCase()}`}
+          aria-label={`Crear ${kindLabel.toLowerCase()}`}
+        />
         <Button
           type="button"
           onClick={() => onCreate?.()}

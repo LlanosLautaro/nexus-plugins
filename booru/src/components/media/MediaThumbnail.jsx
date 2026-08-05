@@ -18,6 +18,7 @@ export default function MediaThumbnail({
   mediaStyle = null,
   objectFit = "",
   autoplayPath = "",
+  onMediaReady,
   toFileUrl,
   logger,
   mediaKindLabels,
@@ -122,6 +123,10 @@ export default function MediaThumbnail({
         loop={loop || autoplay}
         controls={controls}
         onError={() => handlePreviewError(originalUrl)}
+        onLoadedMetadata={(event) => onMediaReady?.({
+          width: event.currentTarget.videoWidth,
+          height: event.currentTarget.videoHeight,
+        })}
         onPointerEnter={startHoverPreview}
         onPointerLeave={stopHoverPreview}
       />
@@ -144,6 +149,10 @@ export default function MediaThumbnail({
         fetchPriority={highPriority ? "high" : "low"}
         draggable="false"
         onError={() => handlePreviewError(imageUrl)}
+        onLoad={(event) => onMediaReady?.({
+          width: event.currentTarget.naturalWidth,
+          height: event.currentTarget.naturalHeight,
+        })}
         onPointerEnter={startHoverPreview}
         onPointerLeave={stopHoverPreview}
       />

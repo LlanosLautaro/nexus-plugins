@@ -57,12 +57,15 @@ import {
 } from "./domain/floating-details.js";
 import {
   BOORU_DEFAULT_GRID_COLUMNS,
+  BOORU_DEFAULT_RAIL_WIDTHS,
   BOORU_GRID_FAMILIES,
   BOORU_NAVIGATION_INPUT_KEY,
+  BOORU_RAIL_WIDTH_LIMITS,
   createBooruResourceRouteSession,
   createBooruSectionRootRoute,
   createBooruWorkspaceRouteKey,
   normalizeBooruGridPreferences,
+  normalizeBooruRailWidths,
   normalizeBooruNavigationState,
   normalizeBooruWorkspaceRoute,
   popBooruWorkspaceRoute,
@@ -101,6 +104,7 @@ import ResourceHeroOverlay from "./components/media/ResourceHeroOverlay.jsx";
 import FloatingDetailsWindow from "./components/resources/FloatingDetailsWindow.jsx";
 import FloatingContextMenu from "./components/shared/FloatingContextMenu.jsx";
 import ContextBrowseControls from "./components/shared/ContextBrowseControls.jsx";
+import ResizableRailHandle from "./components/shared/ResizableRailHandle.jsx";
 import BooruDragPreviewLayer from "./components/media/BooruDragPreviewLayer.jsx";
 import MediaThumbnailComponent from "./components/media/MediaThumbnail.jsx";
 import ResourceSearchComposer from "./components/search/ResourceSearchComposer.jsx";
@@ -117,6 +121,7 @@ import ResourceInspectorComponent from "./components/resources/ResourceInspector
 import EntityProfileViewComponent from "./components/entities/EntityProfileView.jsx";
 import EntityProfileDataTabComponent from "./components/entities/EntityProfileDataTab.jsx";
 import EntityProfileTagsTabComponent from "./components/entities/EntityProfileTagsTab.jsx";
+import EntityContextDialog from "./components/entities/EntityContextDialog.jsx";
 
 const ipcRenderer = window.nexus.ipc;
 const { pathToFileUrl } = window.nexus.urls;
@@ -284,7 +289,7 @@ function RecommendationPanel(props) {
 }
 
 function ResourceInspector(props) {
-  return <ResourceInspectorComponent {...props} helpers={{ applyClassificationPolicyToDraft, canSaveDraftProgress, formatFileSize, getCharacterUniverse, getDraftUniverseForCharacter, markDraftDirty, pruneCharacterUniverseAssignments }} MediaPreview={MediaThumbnail} EntityField={EntityAutocompleteField} TagField={TagAutocompleteField} SingleEntityField={SingleEntityAutocompleteField} mediaKindLabels={BOORU_MEDIA_KIND_LABELS} realityOptions={BOORU_REALITY_OPTIONS} />;
+  return <ResourceInspectorComponent {...props} helpers={{ applyClassificationPolicyToDraft, canSaveDraftProgress, formatFileSize, getCharacterUniverse, getDraftUniverseForCharacter, markDraftDirty, pruneCharacterUniverseAssignments }} MediaPreview={MediaThumbnail} RecommendationPanel={RecommendationPanel} SingleEntityField={SingleEntityAutocompleteField} mediaKindLabels={BOORU_MEDIA_KIND_LABELS} realityOptions={BOORU_REALITY_OPTIONS} />;
 }
 
 function EntityProfileView(props) {
@@ -1117,6 +1122,10 @@ function getRecommendationItemKindClass(item) {
     return "booruView__selectionChip--reality";
   }
 
+  if (item?.type === "tag" || item?.type === "create-tag") {
+    return "booruView__selectionChip--tag";
+  }
+
   return "";
 }
 
@@ -1728,6 +1737,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const uiPreferencesApi = useMemo(
     () => ctx.createPluginSettingsApi("nexus.booru.ui", {
       gridColumns: BOORU_DEFAULT_GRID_COLUMNS,
+      railWidths: BOORU_DEFAULT_RAIL_WIDTHS,
     }),
     [ctx],
   );
@@ -1736,6 +1746,11 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     () => normalizeBooruGridPreferences(persistedUiPreferences?.gridColumns),
     [persistedUiPreferences?.gridColumns],
   );
+  const persistedRailWidths = useMemo(
+    () => normalizeBooruRailWidths(persistedUiPreferences?.railWidths),
+    [persistedUiPreferences?.railWidths],
+  );
+  const [railWidths, setRailWidths] = useState(persistedRailWidths);
   const [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [resourceLoading, setResourceLoading] = useState(false);
@@ -1792,6 +1807,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   }));
   const [resourceHeroState, setResourceHeroState] = useState(null);
   const [entityVisualCropState, setEntityVisualCropState] = useState(null);
+  const [entityContextDialogState, setEntityContextDialogState] = useState(null);
   const [clipboardAssociationState, setClipboardAssociationState] = useState(null);
   const [entityCreationRequest, setEntityCreationRequest] = useState(null);
   const [activeRouteScrollTop, setActiveRouteScrollTop] = useState(0);
@@ -1804,6 +1820,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   const sectionLastRouteRef = useRef(new Map());
   const sectionNavigationRef = useRef(new Map());
   const activeRouteScrollTopRef = useRef(0);
+
+  useEffect(() => {
+    setRailWidths(persistedRailWidths);
+  }, [persistedRailWidths.left, persistedRailWidths.right]);
 
   const finishEntityCreation = useCallback((result = null) => {
     const resolveRequest = entityCreationResolverRef.current;
@@ -2261,6 +2281,25 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       },
     });
   }, [gridColumns, persistedUiPreferences, uiPreferencesApi]);
+
+  const handleRailWidthChange = useCallback((rail, width) => {
+    setRailWidths((currentValue) => normalizeBooruRailWidths({
+      ...currentValue,
+      [rail]: width,
+    }));
+  }, []);
+
+  const handleRailWidthCommit = useCallback((rail, width) => {
+    const nextRailWidths = normalizeBooruRailWidths({
+      ...railWidths,
+      [rail]: width,
+    });
+    setRailWidths(nextRailWidths);
+    void uiPreferencesApi.set({
+      ...(persistedUiPreferences && typeof persistedUiPreferences === "object" ? persistedUiPreferences : {}),
+      railWidths: nextRailWidths,
+    });
+  }, [persistedUiPreferences, railWidths, uiPreferencesApi]);
 
   const updateResourceBrowse = useCallback((nextValue) => {
     setResourceBrowse((currentValue) => {
@@ -4212,6 +4251,15 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         },
       );
     } catch (actionError) {
+      if (contextSurface === "entity") {
+        setEntityContextDialogState((currentValue) => currentValue
+          ? {
+              ...currentValue,
+              loading: false,
+              error: actionError instanceof Error ? actionError.message : "No se pudo abrir la entidad.",
+            }
+          : currentValue);
+      }
       setError(
         actionError instanceof Error
           ? actionError.message
@@ -4337,8 +4385,6 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       activeId: item.id,
       items: nextItems,
     });
-    setInspectorOpen(false);
-    setAnchoredResources([]);
   };
 
   const stepResourceHero = (direction) => {
@@ -4487,17 +4533,8 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     });
   };
 
-  const openEntityCardContextMenu = (item, event) => {
-    const contextResource = buildContextResourceFromDescriptor(item?.visual || item);
-
-    if (!contextResource) {
-      return;
-    }
-
-    if (!canUseResourceForImageActions(contextResource)) {
-      return;
-    }
-
+  const openEntityCardContextMenu = (item, event, entityKind = activeEntityKind) => {
+    if (!item?.id || !entityKind) return;
     event.preventDefault();
     event.stopPropagation();
 
@@ -4505,11 +4542,18 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       x: event.clientX,
       y: event.clientY,
       items: [
-        { id: "copy", label: "Copiar al portapapeles" },
-        { id: "google", label: "Buscar en Google" },
+        { id: "rename-entity", label: "Renombrar" },
+        { id: "entity-details", label: "Ver detalles", description: "Tags y aliases" },
+        { id: "change-avatar", label: "Cambiar foto de perfil", disabled: !Number(item.resourceCount || 0) },
+        { id: "change-banner", label: "Cambiar portada", disabled: !Number(item.resourceCount || 0) },
+        { id: "adjust-avatar", label: "Ajustar foto de perfil", disabled: !item?.visual?.source?.pathValue },
       ],
-      resourceIds: [contextResource.id],
-      resources: [contextResource],
+      resourceIds: [],
+      resources: [],
+      entityKind,
+      entityId: item.id,
+      entityItem: item,
+      surface: "entity",
     });
   };
 
@@ -4559,6 +4603,67 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     await window.nexus.clipboard.writeImageFromPath(resource.storagePath);
   };
 
+  const applyEntityProfileUpdate = (profile) => {
+    if (!profile?.id) return;
+    const updateItem = (item) => item?.id === profile.id
+      ? {
+          ...item,
+          displayName: profile.displayName,
+          slug: profile.slug,
+          resourceCount: profile.resourceCount,
+          visual: profile.visuals?.avatar || profile.visual || item.visual,
+        }
+      : item;
+    setEntityItems((items) => items.map(updateItem));
+    setEntityProfileRelationState((currentValue) => ({
+      ...currentValue,
+      items: (currentValue?.items || []).map(updateItem),
+    }));
+    if (activeEntityKind === profile.kind && activeEntityProfile?.id === profile.id) {
+      setEntityProfile(profile);
+    }
+    setEntityRevision((currentValue) => currentValue + 1);
+  };
+
+  const handleRenameContextEntity = async (displayName) => {
+    const dialog = entityContextDialogState;
+    if (!dialog?.kind || !dialog?.entityId) return;
+    setEntityBusy(true);
+    try {
+      const result = await invoke("booru:save-entity-profile", {
+        kind: dialog.kind,
+        entityId: dialog.entityId,
+        displayName,
+      });
+      applyEntityProfileUpdate(result?.profile);
+      setEntityContextDialogState(null);
+      setEntityError("");
+    } catch (renameError) {
+      setEntityContextDialogState((currentValue) => currentValue
+        ? { ...currentValue, error: renameError instanceof Error ? renameError.message : "No se pudo renombrar la entidad." }
+        : currentValue);
+    } finally {
+      setEntityBusy(false);
+    }
+  };
+
+  const handleChooseContextVisual = (resource) => {
+    const dialog = entityContextDialogState;
+    if (!dialog?.kind || !dialog?.entityId || !resource?.id) return;
+    setEntityContextDialogState(null);
+    setEntityVisualCropState({
+      kind: dialog.kind,
+      entityId: dialog.entityId,
+      role: dialog.role === "banner" ? "banner" : "avatar",
+      source: {
+        resourceId: resource.id,
+        pathValue: resource.storagePath,
+        mediaKind: resource.mediaKind,
+      },
+      initialLayout: null,
+    });
+  };
+
   const handleContextMenuAction = async (actionId) => {
     const contextResources = getContextSelectionResources();
     const contextIds = uniqueIds([
@@ -4571,20 +4676,71 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     const contextEntityId = String(contextMenuState?.entityId || "").trim();
     const contextVisualRole = String(contextMenuState?.visualRole || "").trim();
     const contextSurface = String(contextMenuState?.surface || "resource").trim();
+    const contextEntityItem = contextMenuState?.entityItem || null;
     setContextMenuState(null);
 
     try {
-      if ((actionId === "set-avatar" || actionId === "set-banner") && singleResource && contextEntityKind && contextEntityId) {
-        setBusyAction(actionId);
-        const result = await invoke("booru:set-entity-visual", {
+      if (actionId === "rename-entity" && contextEntityKind && contextEntityId) {
+        setEntityContextDialogState({
+          mode: "rename",
           kind: contextEntityKind,
           entityId: contextEntityId,
-          resourceId: singleResource.id,
-          visualRole: actionId === "set-avatar" ? "avatar" : "banner",
+          item: contextEntityItem,
         });
-        if (result?.profile) {
-          setEntityProfile(result.profile);
-        }
+        return;
+      }
+
+      if (actionId === "entity-details" && contextEntityKind && contextEntityId) {
+        setEntityContextDialogState({ mode: "details", kind: contextEntityKind, entityId: contextEntityId, item: contextEntityItem, loading: true });
+        const profile = await invoke("booru:get-entity-profile", { kind: contextEntityKind, id: contextEntityId });
+        setEntityContextDialogState((currentValue) => currentValue?.entityId === contextEntityId
+          ? { ...currentValue, profile, loading: false, error: "" }
+          : currentValue);
+        return;
+      }
+
+      if ((actionId === "change-avatar" || actionId === "change-banner") && contextEntityKind && contextEntityId) {
+        const role = actionId === "change-banner" ? "banner" : "avatar";
+        setEntityContextDialogState({ mode: "pick-visual", kind: contextEntityKind, entityId: contextEntityId, role, item: contextEntityItem, loading: true });
+        const result = await invoke("booru:list-resources", {
+          section: "profile",
+          query: { includeEntities: [{ kind: contextEntityKind, id: contextEntityId, label: contextEntityItem?.displayName || null }] },
+          offset: 0,
+          limit: 240,
+        });
+        const resources = (Array.isArray(result?.items) ? result.items : []).filter(canUseResourceAsEntityVisual);
+        setEntityContextDialogState((currentValue) => currentValue?.entityId === contextEntityId && currentValue?.role === role
+          ? { ...currentValue, resources, loading: false, error: "" }
+          : currentValue);
+        return;
+      }
+
+      if (actionId === "adjust-avatar" && contextEntityKind && contextEntityId && contextEntityItem?.visual?.source?.pathValue) {
+        setEntityVisualCropState({
+          kind: contextEntityKind,
+          entityId: contextEntityId,
+          role: "avatar",
+          source: {
+            pathValue: contextEntityItem.visual.source.pathValue,
+            mediaKind: contextEntityItem.visual.source.mediaKind,
+          },
+          initialLayout: contextEntityItem.visual.layout || null,
+        });
+        return;
+      }
+
+      if ((actionId === "set-avatar" || actionId === "set-banner") && singleResource && contextEntityKind && contextEntityId) {
+        setEntityVisualCropState({
+          kind: contextEntityKind,
+          entityId: contextEntityId,
+          role: actionId === "set-avatar" ? "avatar" : "banner",
+          source: {
+            resourceId: singleResource.id,
+            pathValue: singleResource.storagePath,
+            mediaKind: singleResource.mediaKind,
+          },
+          initialLayout: null,
+        });
         setEntityProfileError("");
         return;
       }
@@ -5083,6 +5239,40 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     }
   };
 
+  const handleRemoveEffectiveItem = async (item) => {
+    const resourceIds = selectedResources.map((resource) => resource?.id).filter(Boolean);
+    const channel = item?.kind === "tag"
+      ? "booru:exclude-resource-tag"
+      : item?.kind === "universe"
+        ? "booru:exclude-resource-universe"
+        : null;
+
+    if (!channel || !item?.id || !resourceIds.length) return;
+
+    setBusyAction("details-remove");
+    try {
+      for (const resourceId of resourceIds) {
+        const result = await invoke(channel, {
+          resourceId,
+          ...(item.kind === "tag" ? { tagId: item.id } : { universeId: item.id }),
+          ...(showResourceWorkspace ? { view: { section: activeResourceSection, query: resourceQuery } } : {}),
+        });
+        applyResourceMutationResult(result);
+      }
+      setError("");
+      setEntityRevision((currentValue) => currentValue + 1);
+      await refreshDetailsAnchor();
+    } catch (removeError) {
+      setError(
+        removeError instanceof Error
+          ? removeError.message
+          : "No se pudo quitar la tag o entidad del recurso.",
+      );
+    } finally {
+      setBusyAction("");
+    }
+  };
+
   const handleSetCharacterUniverse = async (nextUniverse) => {
     if (activeEntityKind !== "character" || !activeEntityProfile?.id) {
       return;
@@ -5536,12 +5726,24 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   return (
     <WorkspacePage className="booruView" onKeyDownCapture={handleClipboardPasteShortcut}>
       <WorkspaceBody className="booruView__body">
-        <SplitLayout
-          variant="sidebar-detail"
-          className={["booruView__layout", activeEntityKind ? "booruView__layout--entity" : ""].filter(Boolean).join(" ")}
+        <div
+          className="booruView__resizableLayout"
+          style={{ "--booru-left-rail-width": `${railWidths.left}px` }}
         >
+          <SplitLayout
+            variant="sidebar-detail"
+            className={["booruView__layout", activeEntityKind ? "booruView__layout--entity" : ""].filter(Boolean).join(" ")}
+          >
           {showResourceWorkspace ? (
           <SplitSidebar className="booruView__sidebar">
+            <ResizableRailHandle
+              rail="left"
+              width={railWidths.left}
+              min={BOORU_RAIL_WIDTH_LIMITS.left.min}
+              max={BOORU_RAIL_WIDTH_LIMITS.left.max}
+              onResize={(width) => handleRailWidthChange("left", width)}
+              onResizeEnd={(width) => handleRailWidthCommit("left", width)}
+            />
             <ScrollRegion className="booruView__sidebarScroll">
               <PanelStack className="booruView__sidebarStack">
                 <SectionPanel className="booruView__panel booruView__panel--compact booruView__panel--fill">
@@ -5763,7 +5965,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                 <div className={[
                   "booruView__workspaceGrid",
                   !showInspector ? "booruView__workspaceGrid--single" : "",
-                ].filter(Boolean).join(" ")}>
+                ].filter(Boolean).join(" ")} style={{ "--booru-right-rail-width": `${railWidths.right}px` }}>
                   <ResourceGrid
                     items={resourceItems}
                     placements={resourceState.placements}
@@ -5811,7 +6013,16 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                   />
 
                   {showInspector ? (
-                    <ResourceInspector
+                    <div className="booruView__inspectorRail">
+                      <ResizableRailHandle
+                        rail="right"
+                        width={railWidths.right}
+                        min={BOORU_RAIL_WIDTH_LIMITS.right.min}
+                        max={BOORU_RAIL_WIDTH_LIMITS.right.max}
+                        onResize={(width) => handleRailWidthChange("right", width)}
+                        onResizeEnd={(width) => handleRailWidthCommit("right", width)}
+                      />
+                      <ResourceInspector
                       section={activeResourceSection}
                       activeResource={activeResource}
                       selectedResources={selectedResources}
@@ -5832,7 +6043,12 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                         setAnchoredResources([]);
                       }}
                       onEnsureEntity={ensureEntityFromUi}
-                    />
+                      onApplyRecommendation={handleApplyRecommendation}
+                      onRemoveEffectiveItem={handleRemoveEffectiveItem}
+                      recommendationRevisionKey={entityRevision}
+                      recommendationBusy={busyAction === "recommendation-apply" || busyAction === "details-remove"}
+                      />
+                    </div>
                   ) : null}
                 </div>
               </div>
@@ -5969,7 +6185,8 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
               </ScrollRegion>
             )}
           </SplitDetail>
-        </SplitLayout>
+          </SplitLayout>
+        </div>
 
         <FloatingContextMenu
           state={contextMenuState}
@@ -6003,6 +6220,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
                 setAnchoredResources([]);
               }}
               onEnsureEntity={ensureEntityFromUi}
+              onApplyRecommendation={handleApplyRecommendation}
+              onRemoveEffectiveItem={handleRemoveEffectiveItem}
+              recommendationRevisionKey={entityRevision}
+              recommendationBusy={busyAction === "recommendation-apply" || busyAction === "details-remove"}
               priorityEntity={detailsContext?.profileContext || null}
             />
           </FloatingDetailsWindow>
@@ -6017,12 +6238,20 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
           MediaPreview={MediaThumbnail}
           mediaKindLabels={BOORU_MEDIA_KIND_LABELS}
         />
+        <EntityContextDialog
+          state={entityContextDialogState}
+          busy={entityBusy}
+          onClose={() => setEntityContextDialogState(null)}
+          onRename={handleRenameContextEntity}
+          onChooseResource={handleChooseContextVisual}
+          MediaPreview={MediaThumbnail}
+        />
         {entityVisualCropState ? (
           <div className="booruView__cropOverlay">
             <EntityVisualCropper
               {...entityVisualCropState}
               onSaved={(profile) => {
-                if (profile) setEntityProfile(profile);
+                applyEntityProfileUpdate(profile);
                 setEntityVisualCropState(null);
               }}
               onCancel={() => setEntityVisualCropState(null)}

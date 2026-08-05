@@ -8,7 +8,8 @@ Las reglas puras compartidas por backend y renderer viven en `domain/`.
 ## Componentes compartidos
 
 - `EntityVisualCropper`: encuadre por Pointer Events para avatar 1:1 y banner
-  3:1. Guarda `scale`, `offsetX` y `offsetY` normalizados en el perfil.
+  4:1. Guarda `scale`, `offsetX` y `offsetY` normalizados en el perfil; una
+  seleccion nueva persiste recurso y layout juntos al confirmar.
 - `EntityVisualMedia`: adaptador único de proyección para card y encabezado de
   perfil. Aplica la fuente, transformación y fallback definidos por dominio.
 - `ClipboardAssociationComposer`: alta/asociacion de un recurso ya capturado
@@ -19,15 +20,17 @@ Las reglas puras compartidas por backend y renderer viven en `domain/`.
   recomendaciones. Persona/Artist persisten nombre principal y aliases juntos;
   Universe conserva el alta directa y Character su dialog con Universe.
 - `components/media/`: preview, cards, grilla virtual, paginacion interna,
-  hero overlay y drag preview.
+  visor maximizado del original con encaje inicial, zoom, paneo y drag preview.
 - `components/search/`: composer estructurado y autocompletes de entidad/tag.
 - `components/recommendations/`: panel incremental, badge y destino DnD.
-- `components/entities/`: cards, perfil, datos y galeria de entidad.
+- `components/entities/`: cards, perfil, datos, galeria y dialog contextual de
+  entidad para renombrado, resumen de aliases/tags y seleccion de visuales.
 - `EntityNavigationBar` sustituye la sidebar en las cuatro secciones de entidad;
   `EntityRelationsGrid` reutiliza `EntityGrid` sin envolverlo en otro panel.
 - `CharacterCreationDialog`: alta compacta de Character que exige buscar o
   crear un Universe antes de invocar el unico IPC valido de creacion.
-- `components/resources/`: inspector de clasificacion y metadata.
+- `components/resources/`: inspector de metadata, chips efectivos tipados y un
+  unico recomendador de clasificacion.
 - `components/settings/` y `components/shared/`: ajustes y menu contextual.
 
 ## Reglas de datos e interaccion

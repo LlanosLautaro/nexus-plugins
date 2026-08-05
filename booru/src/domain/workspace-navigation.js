@@ -33,6 +33,22 @@ export const BOORU_DEFAULT_GRID_COLUMNS = Object.freeze({
   [BOORU_GRID_FAMILIES.PROFILE_RESOURCES]: 6,
 });
 
+export const BOORU_RAIL_WIDTH_LIMITS = Object.freeze({
+  left: Object.freeze({ min: 220, max: 420 }),
+  right: Object.freeze({ min: 280, max: 520 }),
+});
+
+export const BOORU_DEFAULT_RAIL_WIDTHS = Object.freeze({ left: 280, right: 380 });
+
+export function normalizeBooruRailWidths(value = null) {
+  return Object.fromEntries(Object.entries(BOORU_DEFAULT_RAIL_WIDTHS).map(([rail, fallback]) => {
+    const limits = BOORU_RAIL_WIDTH_LIMITS[rail];
+    const candidate = Number(value?.[rail]);
+    const width = Number.isFinite(candidate) ? Math.round(candidate) : fallback;
+    return [rail, Math.min(limits.max, Math.max(limits.min, width))];
+  }));
+}
+
 function normalizeText(value) {
   return String(value || "").trim();
 }
