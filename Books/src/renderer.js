@@ -30,6 +30,7 @@ function disposeStylesheet() {
 
 const booksRendererPlugin = {
   activate(ctx) {
+    configurePluginIpc(ctx.ipc);
     ensureStylesheet();
 
     ctx.registerView({
@@ -87,3 +88,4 @@ const booksRendererPlugin = {
 };
 
 export default booksRendererPlugin;
+import { configurePluginIpc } from "./ipc-client.js";

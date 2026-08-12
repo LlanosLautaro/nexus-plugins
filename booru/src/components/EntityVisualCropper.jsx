@@ -8,7 +8,7 @@ const React = window.React;
 const { useEffect, useMemo, useRef, useState } = React;
 
 async function invoke(channel, payload) {
-  const response = await window.nexus.ipc.invoke(channel, payload);
+  const response = await pluginIpc.invoke(channel, payload);
   if (!response?.ok) {
     throw new Error(response?.error || "No se pudo guardar el encuadre.");
   }
@@ -153,3 +153,4 @@ export default function EntityVisualCropper({
     </div>
   );
 }
+import { pluginIpc } from "../ipc-client.js";

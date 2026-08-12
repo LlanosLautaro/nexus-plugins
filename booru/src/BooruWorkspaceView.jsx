@@ -123,7 +123,7 @@ import EntityProfileDataTabComponent from "./components/entities/EntityProfileDa
 import EntityProfileTagsTabComponent from "./components/entities/EntityProfileTagsTab.jsx";
 import EntityContextDialog from "./components/entities/EntityContextDialog.jsx";
 
-const ipcRenderer = window.nexus.ipc;
+const ipcRenderer = pluginIpc;
 const { pathToFileUrl } = window.nexus.urls;
 const React = window.React;
 const { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } = React;
@@ -5340,11 +5340,11 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     setEntityBusy(true);
 
     try {
-      const tempFilePath = await window.nexus.clipboard.exportMediaToTempFile("booru-media");
-      stagedClipboardTempPathRef.current = tempFilePath;
+      const capture = await window.nexus.clipboard.captureMedia("booru-media", { includePreview: true });
+      stagedClipboardTempPathRef.current = capture;
       setClipboardAssociationState({
         defaultKind: activeEntityKind || "author",
-        tempFilePath,
+        capture,
       });
       setEntityError("");
       if (!showEntityProfile) setError("");
@@ -5360,26 +5360,26 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
   };
 
   const discardClipboardAssociation = () => {
-    const tempFilePath = stagedClipboardTempPathRef.current;
-    stagedClipboardTempPathRef.current = "";
+    const capture = stagedClipboardTempPathRef.current;
+    stagedClipboardTempPathRef.current = null;
     setClipboardAssociationState(null);
 
-    if (tempFilePath) {
-      void invoke("booru:discard-clipboard-media", { tempFilePath }).catch(() => undefined);
+    if (capture?.grantId) {
+      void invoke("booru:discard-clipboard-media", { grantId: capture.grantId }).catch(() => undefined);
     }
   };
 
   useEffect(() => () => {
-    const tempFilePath = stagedClipboardTempPathRef.current;
-    stagedClipboardTempPathRef.current = "";
-    if (tempFilePath) {
-      void window.nexus.ipc
-        .invoke("booru:discard-clipboard-media", { tempFilePath })
+    const capture = stagedClipboardTempPathRef.current;
+    stagedClipboardTempPathRef.current = null;
+    if (capture?.grantId) {
+      void pluginIpc
+        .invoke("booru:discard-clipboard-media", { grantId: capture.grantId })
         .catch(() => undefined);
     }
   }, []);
 
-  const importClipboardMedia = async (associationValue, stagedTempFilePath = "") => {
+  const importClipboardMedia = async (associationValue, stagedCapture = null) => {
     const associations = mergeBooruClipboardAssociations(associationValue);
     if (!associations.length) {
       await openClipboardAssociationComposer();
@@ -5389,10 +5389,10 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     setEntityBusy(true);
 
     try {
-      const tempFilePath = stagedTempFilePath
-        || await window.nexus.clipboard.exportMediaToTempFile("booru-media");
+      const capture = stagedCapture
+        || await window.nexus.clipboard.captureMedia("booru-media");
       const result = await invoke("booru:paste-clipboard-media", {
-        tempFilePath,
+        grantId: capture.grantId,
         associations,
       });
 
@@ -5402,7 +5402,7 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
       }
       setEntityError("");
       setEntityProfileError("");
-      stagedClipboardTempPathRef.current = "";
+      stagedClipboardTempPathRef.current = null;
       setClipboardAssociationState(null);
       setEntityRevision((currentValue) => currentValue + 1);
       if (showEntityProfile) setEntityProfilePageForSection(activeSection, 1);
@@ -6270,11 +6270,11 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
         {clipboardAssociationState ? (
           <ClipboardAssociationComposer
             defaultKind={clipboardAssociationState.defaultKind}
-            tempFilePath={clipboardAssociationState.tempFilePath}
+            capture={clipboardAssociationState.capture}
             onCancel={discardClipboardAssociation}
             onConfirm={(association) => importClipboardMedia(
               association,
-              clipboardAssociationState.tempFilePath,
+              clipboardAssociationState.capture,
             )}
           />
         ) : null}
@@ -6316,3 +6316,4 @@ export default function BooruWorkspaceView({ input = null, ctx }) {
     </WorkspacePage>
   );
 }
+import { pluginIpc } from "./ipc-client.js";

@@ -746,6 +746,57 @@ function normalizeTrainingMarkdownForComparison(value: unknown) {
     .trim();
 }
 
+function withoutTrainingCoverForComparison(source: string) {
+  const parsed = extractYamlFrontmatter(source);
+  if (
+    parsed.parseError
+    || !parsed.hasFrontmatter
+    || !Object.prototype.hasOwnProperty.call(parsed.frontmatter, "cover")
+  ) {
+    return source;
+  }
+
+  const frontmatter = { ...parsed.frontmatter };
+  delete frontmatter.cover;
+  return buildMarkdownDocumentWithFrontmatter({
+    frontmatter,
+    body: parsed.body,
+  });
+}
+
+function preserveTrainingCover(
+  currentDoc: TrainingDocRecord | null,
+  managedContent: string,
+) {
+  if (!currentDoc?.itemPath || !existsSync(currentDoc.itemPath)) {
+    return managedContent;
+  }
+
+  try {
+    const currentSource = readFileSync(currentDoc.itemPath, "utf8");
+    const currentParsed = extractYamlFrontmatter(currentSource);
+    const cover = currentParsed.frontmatter.cover;
+    if (currentParsed.parseError || typeof cover !== "string" || !cover.trim()) {
+      return managedContent;
+    }
+
+    const managedParsed = extractYamlFrontmatter(managedContent);
+    if (managedParsed.parseError) {
+      return managedContent;
+    }
+
+    return buildMarkdownDocumentWithFrontmatter({
+      frontmatter: {
+        ...managedParsed.frontmatter,
+        cover: cover.trim(),
+      },
+      body: managedParsed.body,
+    });
+  } catch {
+    return managedContent;
+  }
+}
+
 function getRealTrainingConceptId(value: unknown) {
   const normalizedValue = normalizeOptionalText(value);
   return normalizedValue && !normalizedValue.startsWith("item:")
@@ -2948,7 +2999,7 @@ function getTrainingConceptCoverageKey(ctx: NexusBackendPluginContext) {
 }
 
 function queueTrainingManagedMarkdownLinkSync(ctx: NexusBackendPluginContext) {
-  if (typeof ctx.syncMarkdownLinks !== "function") {
+  if (typeof ctx.syncMarkdownLinks !== "function" || !ctx.lifecycle.acceptingWork) {
     return;
   }
 
@@ -2957,9 +3008,11 @@ function queueTrainingManagedMarkdownLinkSync(ctx: NexusBackendPluginContext) {
     return;
   }
 
-  const pendingRun = new Promise<void>((resolve) => {
-    setTimeout(resolve, 0);
-  }).then(async () => {
+  const pendingRun = ctx.lifecycle.run("life-tracker.training-markdown-links", async ({ signal }) => {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    signal.throwIfAborted();
     const repositories = getRepositories(ctx);
     const markdownItems = (await repositories.items.findAll()).filter((item: any) => {
       const relativePath = normalizeRelativeContentPath(item?.relative_path || item?.path);
@@ -2970,6 +3023,7 @@ function queueTrainingManagedMarkdownLinkSync(ctx: NexusBackendPluginContext) {
     });
 
     for (const item of markdownItems) {
+      signal.throwIfAborted();
       await ctx.syncMarkdownLinks({
         item,
         reason: "content-updated",
@@ -2978,6 +3032,7 @@ function queueTrainingManagedMarkdownLinkSync(ctx: NexusBackendPluginContext) {
       });
     }
 
+    signal.throwIfAborted();
     trainingMarkdownLinksSynced.add(coverageKey);
   }).catch((error) => {
     console.error("[life-tracker.training] No se pudieron indexar los enlaces de notas gestionadas.", error);
@@ -3086,6 +3141,7 @@ async function restoreTrainingMuscleManagedDoc(ctx: NexusBackendPluginContext, m
   const existingDoc = existingBinding?.concept_id
     ? getTrainingDocRecordByConceptIdSync(ctx, existingBinding.concept_id)
     : findTrainingExistingMuscleDocRecordSync(ctx, muscle);
+  const managedContent = buildTrainingConceptMarkdownContent(muscle.title, muscle.id, payload);
   const doc = await ensureTrainingManagedConceptDoc(ctx, {
     relativePath: getTrainingMuscleConceptPreferredRelativePath(muscle),
     currentRelativePath: existingDoc?.relativePath || null,
@@ -3094,7 +3150,7 @@ async function restoreTrainingMuscleManagedDoc(ctx: NexusBackendPluginContext, m
     title: muscle.title,
     slug: muscle.id,
     summary: payload.summary ?? null,
-    content: buildTrainingConceptMarkdownContent(muscle.title, muscle.id, payload),
+    content: preserveTrainingCover(existingDoc, managedContent),
   });
 
   const conceptId = getRealTrainingConceptId(doc?.conceptId);
@@ -3154,6 +3210,7 @@ async function restoreTrainingStarterExerciseManagedDoc(
     ? getTrainingDocRecordByConceptIdSync(ctx, currentRow?.concept_id)
     : exercise.doc || findTrainingExistingExerciseDocRecordSync(ctx, exercise);
   const payload = buildTrainingStarterExerciseConceptPayload(definition, exercise.id);
+  const managedContent = buildTrainingConceptMarkdownContent(exercise.title, exercise.slug || exercise.title, payload);
   const doc = await ensureTrainingManagedConceptDoc(ctx, {
     relativePath: getTrainingExerciseConceptPreferredRelativePath(exercise),
     currentRelativePath: currentDoc?.relativePath || null,
@@ -3162,7 +3219,7 @@ async function restoreTrainingStarterExerciseManagedDoc(
     title: exercise.title,
     slug: exercise.slug || exercise.title,
     summary: payload.summary ?? null,
-    content: buildTrainingConceptMarkdownContent(exercise.title, exercise.slug || exercise.title, payload),
+    content: preserveTrainingCover(currentDoc, managedContent),
   });
 
   const conceptId = getRealTrainingConceptId(doc?.conceptId);
@@ -3210,13 +3267,18 @@ async function ensureTrainingConceptCoverage(ctx: NexusBackendPluginContext) {
 
   const pendingRun = (async () => {
     try {
+      ctx.lifecycle.throwIfAborted();
       await copyTrainingManagedDocAssets(ctx);
+      ctx.lifecycle.throwIfAborted();
       await ensureTrainingConceptFolders(ctx);
+      ctx.lifecycle.throwIfAborted();
       await ensureAllTrainingMuscleConcepts(ctx);
       for (const muscle of TRAINING_MUSCLE_CATALOG) {
+        ctx.lifecycle.throwIfAborted();
         await upgradeTrainingLegacyMuscleManagedDocIfNeeded(ctx, muscle);
       }
       for (const definition of TRAINING_STARTER_EXERCISES) {
+        ctx.lifecycle.throwIfAborted();
         await ensureTrainingStarterExerciseRecord(ctx, definition);
         await restoreTrainingStarterExerciseManagedDoc(ctx, definition.templateKey, {
           ensureFolders: false,
@@ -3247,7 +3309,8 @@ function resolveManagedTrainingDocStatus(
   }
 
   const currentContent = readFileSync(currentDoc.itemPath, "utf8");
-  return normalizeTrainingMarkdownForComparison(currentContent) === normalizeTrainingMarkdownForComparison(expectedContent)
+  return normalizeTrainingMarkdownForComparison(withoutTrainingCoverForComparison(currentContent))
+    === normalizeTrainingMarkdownForComparison(withoutTrainingCoverForComparison(expectedContent))
     ? "original"
     : "edited";
 }
@@ -4556,13 +4619,13 @@ const trainingPlugin: NexusBackendPluginModule = {
   },
   activate(ctx) {
     registerTrainingSchema(ctx);
-    void ensureTrainingConceptCoverage(ctx)
+    void ctx.lifecycle.run("life-tracker.training-seed", () => ensureTrainingConceptCoverage(ctx))
       .then(() => queueTrainingManagedMarkdownLinkSync(ctx))
       .catch((error) => {
         console.error("[life-tracker.training] No se pudo sembrar la documentacion fitness.", error);
       });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:list`, async () => {
+    ctx.ipc.handle("training.list", async () => {
       try {
         await ensureTrainingConceptCoverage(ctx);
         queueTrainingManagedMarkdownLinkSync(ctx);
@@ -4579,7 +4642,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:list-muscles`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.list-muscles", async (_event, payload: any) => {
       try {
         await ensureTrainingConceptCoverage(ctx);
         const query = typeof payload === "string" ? payload : normalizeOptionalText(payload?.query);
@@ -4600,7 +4663,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:ensure-muscle-concept`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.ensure-muscle-concept", async (_event, payload: any) => {
       try {
         const muscleId = normalizeOptionalText(typeof payload === "string" ? payload : payload?.id || payload?.muscleId);
         if (!muscleId) {
@@ -4622,7 +4685,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:ensure-exercise-concept`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.ensure-exercise-concept", async (_event, payload: any) => {
       try {
         const exerciseId = normalizeOptionalText(typeof payload === "string" ? payload : payload?.id || payload?.exerciseId);
         if (!exerciseId) {
@@ -4641,7 +4704,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:ensure-all-muscle-concepts`, async () => {
+    ctx.ipc.handle("training.ensure-all-muscle-concepts", async () => {
       try {
         const docs = await ensureAllTrainingMuscleConcepts(ctx);
         return createSuccess({
@@ -4653,7 +4716,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:list-managed-docs`, async () => {
+    ctx.ipc.handle("training.list-managed-docs", async () => {
       try {
         return createSuccess({
           managedDocs: await listTrainingManagedDocs(ctx),
@@ -4663,7 +4726,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:restore-managed-doc`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.restore-managed-doc", async (_event, payload: any) => {
       try {
         const managedDocId = normalizeOptionalText(typeof payload === "string" ? payload : payload?.id || payload?.managedDocId);
         if (!managedDocId) {
@@ -4676,7 +4739,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:export`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.export", async (_event, payload: any) => {
       try {
         await ensureTrainingConceptCoverage(ctx);
         return createSuccess(buildTrainingTransferEnvelope(ctx, isPlainObject(payload) ? payload : {}));
@@ -4685,7 +4748,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:import`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.import", async (_event, payload: any) => {
       try {
         return createSuccess(await importTrainingTransferEnvelope(ctx, payload));
       } catch (error) {
@@ -4693,7 +4756,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:save-muscle-doc`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.save-muscle-doc", async (_event, payload: any) => {
       try {
         const muscleId = normalizeOptionalText(typeof payload === "string" ? payload : payload?.id || payload?.muscleId);
         if (!muscleId) {
@@ -4708,7 +4771,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:get-exercise`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.get-exercise", async (_event, payload: any) => {
       try {
         const exerciseId = normalizeOptionalText(typeof payload === "string" ? payload : payload?.id || payload?.exerciseId);
         if (!exerciseId) {
@@ -4723,7 +4786,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:get-routine`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.get-routine", async (_event, payload: any) => {
       try {
         const routineId = normalizeOptionalText(typeof payload === "string" ? payload : payload?.id || payload?.routineId);
         if (!routineId) {
@@ -4738,7 +4801,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:save-exercise`, async (_event, payload: TrainingExerciseInput) => {
+    ctx.ipc.handle("training.save-exercise", async (_event, payload: TrainingExerciseInput) => {
       try {
         return createSuccess({
           exercise: await saveTrainingExercise(ctx, payload || {}),
@@ -4748,7 +4811,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:delete-exercise`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.delete-exercise", async (_event, payload: any) => {
       try {
         const exerciseId = normalizeOptionalText(typeof payload === "string" ? payload : payload?.id || payload?.exerciseId);
         return createSuccess({
@@ -4759,7 +4822,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:save-routine`, async (_event, payload: TrainingRoutineInput) => {
+    ctx.ipc.handle("training.save-routine", async (_event, payload: TrainingRoutineInput) => {
       try {
         return createSuccess({
           routine: await saveTrainingRoutine(ctx, payload || {}),
@@ -4769,7 +4832,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:delete-routine`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.delete-routine", async (_event, payload: any) => {
       try {
         const routineId = normalizeOptionalText(typeof payload === "string" ? payload : payload?.id || payload?.routineId);
         return createSuccess({
@@ -4780,7 +4843,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:list-assignments`, async () => {
+    ctx.ipc.handle("training.list-assignments", async () => {
       try {
         return createSuccess({
           assignments: listTrainingAssignmentsSync(ctx),
@@ -4790,7 +4853,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:get-assignment`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.get-assignment", async (_event, payload: any) => {
       try {
         const assignmentId = normalizeOptionalText(typeof payload === "string" ? payload : payload?.id || payload?.assignmentId);
         if (!assignmentId) {
@@ -4805,7 +4868,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:save-assignment`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.save-assignment", async (_event, payload: any) => {
       try {
         return createSuccess({
           assignment: await saveTrainingAssignment(ctx, payload || {}),
@@ -4815,7 +4878,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:delete-assignment`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.delete-assignment", async (_event, payload: any) => {
       try {
         const assignmentId = normalizeOptionalText(typeof payload === "string" ? payload : payload?.id || payload?.assignmentId);
         return createSuccess({
@@ -4826,7 +4889,7 @@ const trainingPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:save-occurrence-result`, async (_event, payload: any) => {
+    ctx.ipc.handle("training.save-occurrence-result", async (_event, payload: any) => {
       try {
         return createSuccess(await saveTrainingOccurrenceResult(ctx, payload || {}));
       } catch (error) {

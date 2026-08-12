@@ -15,7 +15,7 @@ const React = window.React;
 const { useEffect, useState } = React;
 
 async function invoke(channel, payload) {
-  const response = await window.nexus.ipc.invoke(channel, payload);
+  const response = await pluginIpc.invoke(channel, payload);
   if (!response?.ok) throw new Error(response?.error || "No se pudo actualizar las plataformas.");
   return response.data;
 }
@@ -48,8 +48,8 @@ export default function SettingsSection({
     }).catch(() => setResources([]));
   }, []);
   const pasteIcon = async () => {
-    const tempFilePath = await window.nexus.clipboard.exportMediaToTempFile("booru-platform-icon");
-    const result = await invoke("booru:import-social-platform-icon", { tempFilePath });
+    const capture = await window.nexus.clipboard.captureMedia("booru-platform-icon");
+    const result = await invoke("booru:import-social-platform-icon", { grantId: capture.grantId });
     setIconResourceId(result?.resource?.id || "");
   };
   const savePlatform = async () => {
@@ -62,8 +62,10 @@ export default function SettingsSection({
   };
   const importFileIcon = async (event) => {
     const file = event.target.files?.[0];
-    if (!file?.path) return;
-    const result = await invoke("booru:import-social-platform-icon-file", { sourcePath: file.path });
+    if (!file) return;
+    const grant = await window.nexus.drag.grantFile(file);
+    if (!grant?.grantId) return;
+    const result = await invoke("booru:import-social-platform-icon-file", { grantId: grant.grantId });
     setIconResourceId(result?.resource?.id || "");
     event.target.value = "";
   };
@@ -238,3 +240,4 @@ export default function SettingsSection({
     </div>
   );
 }
+import { pluginIpc } from "../../ipc-client.js";

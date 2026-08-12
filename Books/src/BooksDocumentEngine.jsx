@@ -23,7 +23,7 @@ import {
   resolveVaultFilePath,
 } from "./renderer-helpers.js";
 
-const ipcRenderer = window.nexus.ipc;
+const ipcRenderer = pluginIpc;
 
 const PDF_VIEWER_CLOSE_SETTLE_MS = 32;
 
@@ -335,3 +335,4 @@ export default function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }
     </section>
   );
 }
+import { pluginIpc } from "./ipc-client.js";

@@ -38,7 +38,7 @@ import {
   shouldSendTabOnDoubleClick,
 } from "./ui-helpers.mjs";
 
-const ipcRenderer = window.nexus.ipc;
+const ipcRenderer = pluginIpc;
 const TAB_DRAG_TYPE = "nexus.tab-repository.tab";
 const GROUP_DRAG_TYPE = "nexus.tab-repository.group";
 
@@ -911,3 +911,4 @@ export default function TabRepositoryView({ ctx }) {
     </WorkspacePage>
   );
 }
+import { pluginIpc } from "./ipc-client.js";

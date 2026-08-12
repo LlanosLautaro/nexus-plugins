@@ -27,7 +27,7 @@ import {
   WorkspacePage,
 } from "@nexus/ui";
 
-const ipcRenderer = window.nexus.ipc;
+const ipcRenderer = pluginIpc;
 const booksLibraryLogger = createRendererDevLogger("renderer.plugins.books");
 
 const BOOK_GRID_ASPECT_RATIO = 0.72;
@@ -1072,3 +1072,4 @@ export default function BooksLibraryView({ ctx }) {
     </WorkspacePage>
   );
 }
+import { pluginIpc } from "./ipc-client.js";

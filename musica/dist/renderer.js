@@ -5,11 +5,20 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
 };
 var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -57,8 +66,27 @@ init_define_process();
 
 // ../nexus-plugins/musica/src/PluginMetadataForm.jsx
 init_define_process();
+
+// ../nexus-plugins/musica/src/ipc-client.js
+init_define_process();
+var runtimeIpc = null;
+function configurePluginIpc(ipc) {
+  runtimeIpc = ipc;
+}
+function toOperation(channel) {
+  const operation = String(channel || "").replace(/^audio:/, "").replace(/:/g, ".");
+  return operation === "getByItemId" ? "get-by-item-id" : operation;
+}
+var pluginIpc = Object.freeze({
+  invoke(channel, ...args) {
+    if (!runtimeIpc) throw new Error("PLUGIN_IPC_NOT_READY");
+    return runtimeIpc.invoke(toOperation(channel), ...args);
+  }
+});
+
+// ../nexus-plugins/musica/src/PluginMetadataForm.jsx
 var { useEffect, useMemo, useState } = window.React;
-var ipcRenderer = window.nexus.ipc;
+var ipcRenderer = pluginIpc;
 function normalizeFieldValue(field, value) {
   if (field.type === "boolean") {
     return Boolean(value);
@@ -516,7 +544,7 @@ var writeEngineAssignments = writeMusicaEngineAssignments;
 
 // ../nexus-plugins/musica/src/MusicAudioEngine.jsx
 var { useEffect: useEffect2, useMemo: useMemo2, useRef, useState: useState2 } = window.React;
-var ipcRenderer2 = window.nexus.ipc;
+var ipcRenderer2 = pluginIpc;
 var DEFAULT_AUDIO_STATE = {
   audioFile: null,
   src: null,
@@ -881,7 +909,6 @@ function cx(...values) {
 function Button({
   className = "",
   tone = "secondary",
-  iconOnly = false,
   children,
   ...props
 }) {
@@ -892,7 +919,6 @@ function Button({
       className: cx(
         "nexus-ui-button",
         tone !== "secondary" && `nexus-ui-button--${tone}`,
-        iconOnly && "nexus-ui-button--icon",
         className
       )
     },
@@ -1116,6 +1142,7 @@ function disposeStylesheet() {
 }
 var musicaRendererPlugin = {
   activate(ctx) {
+    configurePluginIpc(ctx.ipc);
     ensureStylesheet();
     ctx.registerItemEngine({
       pluginId: ctx.pluginId,

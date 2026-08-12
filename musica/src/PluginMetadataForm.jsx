@@ -1,6 +1,6 @@
 const { useEffect, useMemo, useState } = window.React;
 
-const ipcRenderer = window.nexus.ipc;
+const ipcRenderer = pluginIpc;
 
 function normalizeFieldValue(field, value) {
   if (field.type === "boolean") {
@@ -298,3 +298,4 @@ export default function PluginMetadataForm({ itemId, formInstance, onSubmitted }
     </form>
   );
 }
+import { pluginIpc } from "./ipc-client.js";

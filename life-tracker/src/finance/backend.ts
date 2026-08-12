@@ -556,7 +556,7 @@ const lifeTrackerFinancePlugin: NexusBackendPluginModule = {
   },
 
   activate(ctx) {
-    ctx.registerIpc(`${LIFE_TRACKER_FINANCE_CHANNEL_PREFIX}:list`, async () => {
+    ctx.ipc.handle("finance.list", async () => {
       try {
         return createSuccess(await listFinanceDashboard(ctx));
       } catch (error) {
@@ -564,7 +564,7 @@ const lifeTrackerFinancePlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_FINANCE_CHANNEL_PREFIX}:save-movement`, async (_event, payload: any) => {
+    ctx.ipc.handle("finance.save-movement", async (_event, payload: any) => {
       try {
         return createSuccess({
           movement: await saveFinanceMovement(ctx, payload),
@@ -574,7 +574,7 @@ const lifeTrackerFinancePlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_FINANCE_CHANNEL_PREFIX}:save-cash-count`, async (_event, payload: any) => {
+    ctx.ipc.handle("finance.save-cash-count", async (_event, payload: any) => {
       try {
         return createSuccess({
           cashCount: await saveFinanceCashCount(ctx, payload),
@@ -584,7 +584,7 @@ const lifeTrackerFinancePlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc(`${LIFE_TRACKER_FINANCE_CHANNEL_PREFIX}:delete-movement`, async (_event, payload: any) => {
+    ctx.ipc.handle("finance.delete-movement", async (_event, payload: any) => {
       try {
         const movementId =
           typeof payload === "string"

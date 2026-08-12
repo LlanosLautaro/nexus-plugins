@@ -1276,6 +1276,44 @@
   z-index: 0;
 }
 
+.trainingPlugin__galleryCardMedia {
+  display: grid;
+  height: 132px;
+  place-items: center;
+}
+.trainingPlugin__galleryCardMedia img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.trainingPlugin__galleryCardMediaPlaceholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--ui-text-subtle);
+  background: var(--ui-surface-inset);
+}
+
+.trainingPlugin__galleryCardMediaEdit {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  left: var(--space-2);
+  overflow: hidden;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, var(--ui-border-divider));
+  border-radius: var(--ui-radius-control);
+  background: color-mix(in srgb, var(--ui-surface-elevated) 90%, transparent);
+  color: var(--ui-text-primary);
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .trainingPlugin__galleryCardSummary,
 .trainingPlugin__galleryCardMeta {
   color: var(--color-text-muted);
@@ -1289,6 +1327,7 @@
 
 .trainingPlugin__detailStack {
   display: grid;
+  flex: 0 0 auto;
   gap: var(--space-4);
 }
 

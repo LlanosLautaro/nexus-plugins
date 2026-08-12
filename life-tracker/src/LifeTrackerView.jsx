@@ -111,7 +111,7 @@ import {
 } from "./home/drafts.js";
 import { QueueItemCard } from "./home/queue.jsx";
 
-const ipcRenderer = window.nexus.ipc;
+const ipcRenderer = pluginIpc;
 
 ChartJS.register(
   CategoryScale,
@@ -4705,3 +4705,4 @@ export default function LifeTrackerView({ ctx, input = null }) {
   );
 }
 
+import { pluginIpc } from "./ipc-client.js";

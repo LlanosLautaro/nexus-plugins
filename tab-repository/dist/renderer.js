@@ -5,11 +5,20 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
 };
 var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -505,6 +514,22 @@ function shouldSendTabOnDoubleClick(target, { disabled = false, trashed = false 
   return !target.closest("button, input, label, a, textarea, select, [role='button'], [role='menuitem'], .tabRepositoryRow__drag");
 }
 
+// ../nexus-plugins/tab-repository/src/ipc-client.js
+init_define_process();
+var runtimeIpc = null;
+function configurePluginIpc(ipc) {
+  runtimeIpc = ipc;
+}
+function toOperation(channel) {
+  return String(channel || "").replace(/^tab-repository:/, "").replace(/:/g, ".");
+}
+var pluginIpc = Object.freeze({
+  invoke(channel, ...args) {
+    if (!runtimeIpc) throw new Error("PLUGIN_IPC_NOT_READY");
+    return runtimeIpc.invoke(toOperation(channel), ...args);
+  }
+});
+
 // ../nexus-plugins/tab-repository/src/TabRepositoryView.jsx
 var {
   useEffect: useEffect2,
@@ -513,7 +538,7 @@ var {
   useRef: useRef2,
   useState: useState3
 } = window.React;
-var ipcRenderer = window.nexus.ipc;
+var ipcRenderer = pluginIpc;
 var TAB_DRAG_TYPE = "nexus.tab-repository.tab";
 var GROUP_DRAG_TYPE = "nexus.tab-repository.group";
 async function invoke(channel, payload = {}) {
@@ -1289,6 +1314,7 @@ function disposeStylesheet() {
 }
 var tabRepositoryRenderer = {
   activate(ctx) {
+    configurePluginIpc(ctx.ipc);
     ensureStylesheet();
     ctx.registerView({
       id: TAB_REPOSITORY_VIEW_ID,

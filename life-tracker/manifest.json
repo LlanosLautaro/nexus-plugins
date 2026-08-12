@@ -1,8 +1,8 @@
 {
   "id": "nexus.life-tracker",
   "displayName": "Life Tracker",
-  "version": "0.2.38",
-  "apiVersion": 1,
+  "version": "0.2.43",
+  "apiVersion": 2,
   "schemaVersion": 1,
   "description": "Canvas personal con seguimiento diario, dinero y entrenamiento dentro de Nexus.",
   "author": "NEW-NEXUS",
@@ -72,6 +72,52 @@
           "minH": 5
         }
       }
-    ]
-  }
+    ],
+    "ipc": {
+      "operations": [
+        "finance.delete-movement",
+        "finance.list",
+        "finance.save-cash-count",
+        "finance.save-movement",
+        "habits.clear-category-references",
+        "habits.delete-category",
+        "habits.delete-habit",
+        "habits.delete-task",
+        "habits.get-home",
+        "habits.rename-category-references",
+        "habits.save-category",
+        "habits.save-habit",
+        "habits.save-task",
+        "habits.set-occurrence-quantity",
+        "habits.toggle-occurrence",
+        "habits.toggle-occurrence-checklist-item",
+        "habits.toggle-task",
+        "habits.toggle-task-subitem",
+        "training.delete-assignment",
+        "training.delete-exercise",
+        "training.delete-routine",
+        "training.ensure-all-muscle-concepts",
+        "training.ensure-exercise-concept",
+        "training.ensure-muscle-concept",
+        "training.export",
+        "training.get-assignment",
+        "training.get-exercise",
+        "training.get-routine",
+        "training.import",
+        "training.list",
+        "training.list-assignments",
+        "training.list-managed-docs",
+        "training.list-muscles",
+        "training.restore-managed-doc",
+        "training.save-assignment",
+        "training.save-exercise",
+        "training.save-muscle-doc",
+        "training.save-occurrence-result",
+        "training.save-routine"
+      ]
+    }
+  },
+  "permissions": [
+    "host.node"
+  ]
 }

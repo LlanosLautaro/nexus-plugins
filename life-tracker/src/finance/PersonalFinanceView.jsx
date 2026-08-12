@@ -47,7 +47,7 @@ import {
   StateBlock,
 } from "@nexus/ui";
 
-const ipcRenderer = window.nexus.ipc;
+const ipcRenderer = pluginIpc;
 const LIFE_TRACKER_FINANCE_CHANNEL_PREFIX = "life-tracker:finance";
 
 const CURRENCY_FORMATTER = new Intl.NumberFormat("es-AR", {
@@ -1396,3 +1396,4 @@ export default function PersonalFinanceView({
     </WorkspacePage>
   );
 }
+import { pluginIpc } from "../ipc-client.js";

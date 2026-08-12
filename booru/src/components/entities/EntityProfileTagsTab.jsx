@@ -4,7 +4,7 @@ const React = window.React;
 const { useEffect, useState } = React;
 
 async function invoke(channel, payload) {
-  const response = await window.nexus.ipc.invoke(channel, payload);
+  const response = await pluginIpc.invoke(channel, payload);
   if (!response?.ok) throw new Error(response?.error || "No se pudo guardar las tags.");
   return response.data;
 }
@@ -61,3 +61,4 @@ export default function EntityProfileTagsTab({
     </div>
   );
 }
+import { pluginIpc } from "../../ipc-client.js";

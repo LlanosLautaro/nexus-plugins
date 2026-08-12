@@ -29,6 +29,7 @@ function disposeStylesheet() {
 
 const booruRendererPlugin = {
   activate(ctx) {
+    configurePluginIpc(ctx.ipc);
     ensureStylesheet();
 
     ctx.registerView({
@@ -75,3 +76,4 @@ const booruRendererPlugin = {
 };
 
 export default booruRendererPlugin;
+import { configurePluginIpc } from "./ipc-client.js";

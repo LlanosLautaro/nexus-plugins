@@ -5,7 +5,11 @@ var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -1333,9 +1337,14 @@ function clearExpiredPreviews() {
 function normalizeBrowserTabs(value) {
   return Array.isArray(value) ? value.filter((entry) => entry && typeof entry === "object") : [];
 }
-async function previewBrowserImport(ctx, launchIfNeeded) {
+async function previewBrowserImport(ctx, launchIfNeeded, signal) {
+  signal?.throwIfAborted();
   clearExpiredPreviews();
-  const tabs = normalizeBrowserTabs(await ctx.browserConnection.tabs.list({ query: {}, launchIfNeeded }));
+  const tabs = normalizeBrowserTabs(await ctx.browserConnection.tabs.list(
+    { query: {}, launchIfNeeded },
+    { signal }
+  ));
+  signal?.throwIfAborted();
   const candidates = [];
   for (const tab of tabs) {
     const url = normalizeHttpUrl(tab.url);
@@ -1371,27 +1380,29 @@ async function previewBrowserImport(ctx, launchIfNeeded) {
     excludedCount: preview.excludedCount
   };
 }
-async function closeImportedTabs(ctx, candidates) {
+async function closeImportedTabs(ctx, candidates, signal) {
   const failed = [];
   let closed = 0;
   const chunks = [];
   for (let index = 0; index < candidates.length; index += 50) chunks.push(candidates.slice(index, index + 50));
   for (const chunk of chunks) {
+    signal?.throwIfAborted();
     try {
       await ctx.browserConnection.tabs.close({
         tabIds: chunk.map((entry) => entry.tabId),
         connectionId: chunk[0]?.connectionId,
         requestId: import_node_crypto.default.randomUUID()
-      });
+      }, { signal });
       closed += chunk.length;
     } catch {
       for (const candidate of chunk) {
+        signal?.throwIfAborted();
         try {
           await ctx.browserConnection.tabs.close({
             tabId: candidate.tabId,
             connectionId: candidate.connectionId,
             requestId: import_node_crypto.default.randomUUID()
-          });
+          }, { signal });
           closed += 1;
         } catch (error) {
           failed.push({
@@ -1404,7 +1415,8 @@ async function closeImportedTabs(ctx, candidates) {
   }
   return { closed, failed };
 }
-async function commitBrowserImport(ctx, rawToken) {
+async function commitBrowserImport(ctx, rawToken, signal) {
+  signal?.throwIfAborted();
   clearExpiredPreviews();
   const token = String(rawToken || "");
   const preview = importPreviews.get(token);
@@ -1414,7 +1426,11 @@ async function commitBrowserImport(ctx, rawToken) {
     throw error;
   }
   importPreviews.delete(token);
-  const currentTabs = normalizeBrowserTabs(await ctx.browserConnection.tabs.list({ query: {} }));
+  const currentTabs = normalizeBrowserTabs(await ctx.browserConnection.tabs.list(
+    { query: {} },
+    { signal }
+  ));
+  signal?.throwIfAborted();
   const currentById = new Map(currentTabs.map((tab) => [`${tab.connectionId}:${tab.id}`, tab]));
   const matched = preview.candidates.flatMap((candidate) => {
     const current = currentById.get(`${candidate.connectionId}:${candidate.tabId}`);
@@ -1435,7 +1451,8 @@ async function commitBrowserImport(ctx, rawToken) {
       detail: "Cerrando las tabs guardadas",
       progress: { current: matched.length, total: matched.length, label: "tabs" }
     });
-    const closeResult = await closeImportedTabs(ctx, matched);
+    signal?.throwIfAborted();
+    const closeResult = await closeImportedTabs(ctx, matched, signal);
     if (closeResult.failed.length) {
       ctx.tasks.fail("browser-import", {
         message: "Algunas tabs quedaron abiertas en Brave.",
@@ -1477,7 +1494,7 @@ function preparePendingRequest(db, tabId) {
     return { tab: mapTab(row), requestId: String(requestId) };
   });
 }
-async function sendTabs(ctx, rawIds, launchIfNeeded) {
+async function sendTabs(ctx, rawIds, launchIfNeeded, signal) {
   const db = assertDb();
   const ids = normalizeTabIds(rawIds);
   if (!ids.length) throw new Error("No hay tabs para enviar.");
@@ -1488,6 +1505,7 @@ async function sendTabs(ctx, rawIds, launchIfNeeded) {
     progress: { current: 0, total: ids.length, label: "tabs" }
   });
   for (let index = 0; index < ids.length; index += 1) {
+    signal?.throwIfAborted();
     const pending = preparePendingRequest(db, ids[index]);
     if (!pending) continue;
     try {
@@ -1496,7 +1514,7 @@ async function sendTabs(ctx, rawIds, launchIfNeeded) {
         active: false,
         launchIfNeeded: launchIfNeeded && result.opened.length === 0,
         requestId: pending.requestId
-      });
+      }, { signal });
       db.prepare("DELETE FROM tab_repository_tabs WHERE id = ?").run(pending.tab.id);
       result.opened.push(pending.tab.id);
     } catch (error) {
@@ -1547,9 +1565,10 @@ function exportJson(db) {
   return { urls };
 }
 function registerHandler(ctx, channel, handler) {
-  ctx.registerIpc(channel, async (_event, payload = {}) => {
+  ctx.ipc.handle(channel.replace(/^tab-repository:/, ""), async (_event, payload = {}, request) => {
     try {
-      return success(await handler(payload));
+      request.throwIfAborted();
+      return success(await handler(payload, request));
     } catch (error) {
       return failure(error, void 0, error?.partial);
     }
@@ -1615,10 +1634,10 @@ var tabRepositoryPlugin = {
       result: regroupByDomain(db),
       snapshot: buildSnapshot(db)
     }));
-    registerHandler(ctx, "tab-repository:browser-preview", (payload) => previewBrowserImport(ctx, payload.launchIfNeeded === true));
-    registerHandler(ctx, "tab-repository:browser-commit", (payload) => commitBrowserImport(ctx, payload.token));
-    registerHandler(ctx, "tab-repository:browser-send", async (payload) => ({
-      result: await sendTabs(ctx, payload.tabIds, payload.launchIfNeeded === true),
+    registerHandler(ctx, "tab-repository:browser-preview", (payload, request) => previewBrowserImport(ctx, payload.launchIfNeeded === true, request.signal));
+    registerHandler(ctx, "tab-repository:browser-commit", (payload, request) => commitBrowserImport(ctx, payload.token, request.signal));
+    registerHandler(ctx, "tab-repository:browser-send", async (payload, request) => ({
+      result: await sendTabs(ctx, payload.tabIds, payload.launchIfNeeded === true, request.signal),
       snapshot: buildSnapshot(db)
     }));
     registerHandler(ctx, "tab-repository:json-import", (payload) => ({

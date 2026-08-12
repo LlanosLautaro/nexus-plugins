@@ -5,11 +5,20 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
 };
 var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -112,8 +121,28 @@ var BOORU_ENTITY_KIND_LABELS = Object.freeze({
 
 // ../nexus-frontend/src/utils/devLog.js
 init_define_process();
+
+// ../nexus-frontend/src/utils/coreCapabilities.mjs
+init_define_process();
+function splitKey(key) {
+  const segments = String(key || "").split(":");
+  if (segments[0] === "nexus" && segments.length > 2) {
+    return [segments[1], segments.slice(2).join(":")];
+  }
+  return [segments[0], segments.slice(1).join(":")];
+}
+function requireCapability(root, key) {
+  const [family, operation] = splitKey(key);
+  const capability = root?.[family]?.[operation];
+  if (!capability) throw new Error(`IPC_CONTRACT_UNKNOWN:${family}.${operation}`);
+  return capability;
+}
+function sendCoreEvent(key, ...args) {
+  return requireCapability(window.nexus.events, key).send(...args);
+}
+
+// ../nexus-frontend/src/utils/devLog.js
 var DEV_LOG_BATCH_CHANNEL = "dev-log:append-batch";
-var ipcRenderer = window.nexus.ipc;
 var rendererDevLoggingEnabled = window.location.protocol !== "file:";
 var devLogRawConsole = {
   debug: console.debug.bind(console),
@@ -269,7 +298,7 @@ function flushRendererDevLogBuffer() {
   }
   const events = rendererDevLogState.queue.splice(0, rendererDevLogState.queue.length);
   try {
-    ipcRenderer.send(DEV_LOG_BATCH_CHANNEL, {
+    sendCoreEvent(DEV_LOG_BATCH_CHANNEL, {
       events
     });
   } catch (error) {
@@ -2114,11 +2143,27 @@ function getBooruEntityVisualRenderProps(visual = null) {
   };
 }
 
+// ../nexus-plugins/booru/src/ipc-client.js
+init_define_process();
+var runtimeIpc = null;
+function configurePluginIpc(ipc) {
+  runtimeIpc = ipc;
+}
+function toOperation(channel) {
+  return String(channel || "").replace(/^booru:/, "").replace(/:/g, ".");
+}
+var pluginIpc = Object.freeze({
+  invoke(channel, ...args) {
+    if (!runtimeIpc) throw new Error("PLUGIN_IPC_NOT_READY");
+    return runtimeIpc.invoke(toOperation(channel), ...args);
+  }
+});
+
 // ../nexus-plugins/booru/src/components/EntityVisualCropper.jsx
 var React2 = window.React;
 var { useEffect: useEffect3, useMemo, useRef: useRef3, useState: useState3 } = React2;
 async function invoke(channel, payload) {
-  const response = await window.nexus.ipc.invoke(channel, payload);
+  const response = await pluginIpc.invoke(channel, payload);
   if (!response?.ok) {
     throw new Error(response?.error || "No se pudo guardar el encuadre.");
   }
@@ -2250,7 +2295,7 @@ function parseAliasNames(value) {
   return String(value || "").split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
 }
 async function invoke2(channel, payload) {
-  const response = await window.nexus.ipc.invoke(channel, payload);
+  const response = await pluginIpc.invoke(channel, payload);
   if (!response?.ok) throw new Error(response?.error || "No se pudo buscar en Booru.");
   return response.data;
 }
@@ -2279,17 +2324,13 @@ function EntityField({ kind, value, onChange, onSelect, label }) {
     }
   ), items.length ? /* @__PURE__ */ React3.createElement("div", { className: "booruClipboardComposer__suggestions" }, items.map((item) => /* @__PURE__ */ React3.createElement("button", { key: item.id, type: "button", onClick: () => onSelect(item) }, item.displayName))) : null);
 }
-function getPreviewKind(pathValue) {
-  const extension = String(pathValue || "").split(/[.]/).pop()?.toLowerCase() || "";
+function getPreviewKind(name) {
+  const extension = String(name || "").split(/[.]/).pop()?.toLowerCase() || "";
   return VIDEO_EXTENSIONS.has(extension) ? "video" : "image";
-}
-function toFileUrl2(pathValue) {
-  if (!pathValue) return "";
-  return new URL(window.nexus.urls.pathToFileUrl(pathValue)).href;
 }
 function ClipboardAssociationComposer({
   defaultKind = "author",
-  tempFilePath = "",
+  capture = null,
   onCancel,
   onConfirm
 }) {
@@ -2300,10 +2341,19 @@ function ClipboardAssociationComposer({
   const [universeName, setUniverseName] = useState4("");
   const [universeId, setUniverseId] = useState4("");
   const [busy, setBusy] = useState4(false);
-  const previewUrl = toFileUrl2(tempFilePath);
-  const previewKind = getPreviewKind(tempFilePath);
+  const [previewUrl, setPreviewUrl] = useState4("");
+  useEffect4(() => {
+    if (!capture?.previewBytes) {
+      setPreviewUrl("");
+      return void 0;
+    }
+    const url = URL.createObjectURL(new Blob([capture.previewBytes], { type: capture.mimeType }));
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [capture]);
+  const previewKind = getPreviewKind(capture?.name);
   const canSubmit = Boolean(
-    tempFilePath && (entityId || entityName.trim()) && (kind !== "character" || universeId || universeName.trim())
+    capture?.grantId && (entityId || entityName.trim()) && (kind !== "character" || universeId || universeName.trim())
   );
   const submit = async () => {
     if (!canSubmit || busy) return;
@@ -2333,7 +2383,7 @@ function ClipboardAssociationComposer({
         void submit();
       }
     },
-    /* @__PURE__ */ React3.createElement("div", { className: "booruClipboardComposer__preview" }, previewKind === "video" ? /* @__PURE__ */ React3.createElement("video", { src: previewUrl, muted: true, autoPlay: true, loop: true, playsInline: true, preload: "metadata" }) : /* @__PURE__ */ React3.createElement("img", { src: previewUrl, alt: "Recurso pegado pendiente de asociar", draggable: "false" })),
+    /* @__PURE__ */ React3.createElement("div", { className: "booruClipboardComposer__preview" }, !previewUrl ? /* @__PURE__ */ React3.createElement("span", null, capture?.name || "Recurso pendiente") : previewKind === "video" ? /* @__PURE__ */ React3.createElement("video", { src: previewUrl, muted: true, autoPlay: true, loop: true, playsInline: true, preload: "metadata" }) : /* @__PURE__ */ React3.createElement("img", { src: previewUrl, alt: "Recurso pegado pendiente de asociar", draggable: "false" })),
     /* @__PURE__ */ React3.createElement("div", { className: "booruClipboardComposer__form" }, /* @__PURE__ */ React3.createElement(Select, { value: kind, onChange: (event) => {
       setKind(event.target.value);
       setEntityId("");
@@ -2504,7 +2554,7 @@ init_define_process();
 var React6 = window.React;
 var { useEffect: useEffect5, useState: useState7 } = React6;
 async function invoke3(channel, payload) {
-  const response = await window.nexus.ipc.invoke(channel, payload);
+  const response = await pluginIpc.invoke(channel, payload);
   if (!response?.ok) throw new Error(response?.error || "No se pudo actualizar las plataformas.");
   return response.data;
 }
@@ -2537,8 +2587,8 @@ function SettingsSection({
     }).catch(() => setResources([]));
   }, []);
   const pasteIcon = async () => {
-    const tempFilePath = await window.nexus.clipboard.exportMediaToTempFile("booru-platform-icon");
-    const result = await invoke3("booru:import-social-platform-icon", { tempFilePath });
+    const capture = await window.nexus.clipboard.captureMedia("booru-platform-icon");
+    const result = await invoke3("booru:import-social-platform-icon", { grantId: capture.grantId });
     setIconResourceId(result?.resource?.id || "");
   };
   const savePlatform = async () => {
@@ -2551,8 +2601,10 @@ function SettingsSection({
   };
   const importFileIcon = async (event) => {
     const file = event.target.files?.[0];
-    if (!file?.path) return;
-    const result = await invoke3("booru:import-social-platform-icon-file", { sourcePath: file.path });
+    if (!file) return;
+    const grant = await window.nexus.drag.grantFile(file);
+    if (!grant?.grantId) return;
+    const result = await invoke3("booru:import-social-platform-icon-file", { grantId: grant.grantId });
     setIconResourceId(result?.resource?.id || "");
     event.target.value = "";
   };
@@ -3604,16 +3656,16 @@ function MediaThumbnail({
   objectFit = "",
   autoplayPath = "",
   onMediaReady,
-  toFileUrl: toFileUrl4,
+  toFileUrl: toFileUrl3,
   logger,
   mediaKindLabels
 }) {
-  const originalUrl = toFileUrl4(pathValue);
-  const autoplayUrl = toFileUrl4(autoplayPath);
+  const originalUrl = toFileUrl3(pathValue);
+  const autoplayUrl = toFileUrl3(autoplayPath);
   const isAnimatedImage = mediaKind === "gif" || /\.webp(?:$|[?#])/i.test(String(pathValue || ""));
   const [hoverActive, setHoverActive] = useState11(false);
   const hoverTimerRef = useRef10(0);
-  const thumbnailUrl = !controls && thumbnail?.status === "ready" ? toFileUrl4(thumbnail?.storagePath) : "";
+  const thumbnailUrl = !controls && thumbnail?.status === "ready" ? toFileUrl3(thumbnail?.storagePath) : "";
   const canUseOriginalPreview = preferOriginalWhenThumbnailMissing && mediaKind !== "video";
   const shouldUseOriginal = forceOriginal || isAnimatedImage || hoverActive && hoverPlayable && mediaKind !== "video";
   const imageUrl = controls || shouldUseOriginal ? originalUrl : thumbnailUrl || (canUseOriginalPreview ? originalUrl : "");
@@ -5758,16 +5810,16 @@ function EntityProfileView({
     return () => window.cancelAnimationFrame(frameId);
   }, [scrollKey, scrollTop]);
   useEffect23(() => () => {
-    void window.nexus.ipc.invoke("booru:clear-fast-classification", { scopeId: fastScopeRef.current });
+    void pluginIpc.invoke("booru:clear-fast-classification", { scopeId: fastScopeRef.current });
   }, [kind, profile?.id]);
   const toggleFastClassification = async () => {
     if (!profile?.id) return;
     if (fastClassificationActive) {
-      await window.nexus.ipc.invoke("booru:clear-fast-classification", { scopeId: fastScopeRef.current });
+      await pluginIpc.invoke("booru:clear-fast-classification", { scopeId: fastScopeRef.current });
       setFastClassificationActive(false);
       return;
     }
-    const response = await window.nexus.ipc.invoke("booru:set-fast-classification", {
+    const response = await pluginIpc.invoke("booru:set-fast-classification", {
       kind,
       entityId: profile.id,
       scopeId: fastScopeRef.current
@@ -5906,7 +5958,7 @@ init_define_process();
 var React27 = window.React;
 var { useEffect: useEffect24, useState: useState21 } = React27;
 async function invoke4(channel, payload) {
-  const response = await window.nexus.ipc.invoke(channel, payload);
+  const response = await pluginIpc.invoke(channel, payload);
   if (!response?.ok) throw new Error(response?.error || "No se pudo guardar el perfil.");
   return response.data;
 }
@@ -5982,7 +6034,7 @@ init_define_process();
 var React28 = window.React;
 var { useEffect: useEffect25, useState: useState22 } = React28;
 async function invoke5(channel, payload) {
-  const response = await window.nexus.ipc.invoke(channel, payload);
+  const response = await pluginIpc.invoke(channel, payload);
   if (!response?.ok) throw new Error(response?.error || "No se pudo guardar las tags.");
   return response.data;
 }
@@ -6115,7 +6167,7 @@ function EntityContextDialog({
 }
 
 // ../nexus-plugins/booru/src/BooruWorkspaceView.jsx
-var ipcRenderer2 = window.nexus.ipc;
+var ipcRenderer = pluginIpc;
 var { pathToFileUrl } = window.nexus.urls;
 var React30 = window.React;
 var { useCallback: useCallback8, useDeferredValue: useDeferredValue2, useEffect: useEffect27, useMemo: useMemo14, useRef: useRef17, useState: useState24 } = React30;
@@ -6216,7 +6268,7 @@ var ENTITY_PROFILE_PAGE_SECTIONS = {
   universes: { page: 1, profileKey: "" }
 };
 async function invoke6(channel, payload) {
-  const response = await ipcRenderer2.invoke(channel, payload);
+  const response = await ipcRenderer.invoke(channel, payload);
   if (!response?.ok) {
     throw new Error(response?.error || "No se pudo ejecutar la operacion.");
   }
@@ -6227,7 +6279,7 @@ function MediaThumbnail2(props) {
     MediaThumbnail,
     {
       ...props,
-      toFileUrl: toFileUrl3,
+      toFileUrl: toFileUrl2,
       logger: booruViewLogger,
       mediaKindLabels: BOORU_MEDIA_KIND_LABELS
     }
@@ -6338,7 +6390,7 @@ function openPath(pathValue) {
   }
   window.nexus.desktop.showItemInFolder(normalizedPath);
 }
-function toFileUrl3(pathValue) {
+function toFileUrl2(pathValue) {
   const normalizedPath = String(pathValue || "").trim();
   if (!normalizedPath) {
     return "";
@@ -10327,11 +10379,11 @@ function BooruWorkspaceView({ input = null, ctx }) {
     if (entityBusy || clipboardAssociationState) return;
     setEntityBusy(true);
     try {
-      const tempFilePath = await window.nexus.clipboard.exportMediaToTempFile("booru-media");
-      stagedClipboardTempPathRef.current = tempFilePath;
+      const capture = await window.nexus.clipboard.captureMedia("booru-media", { includePreview: true });
+      stagedClipboardTempPathRef.current = capture;
       setClipboardAssociationState({
         defaultKind: activeEntityKind || "author",
-        tempFilePath
+        capture
       });
       setEntityError("");
       if (!showEntityProfile) setError("");
@@ -10344,21 +10396,21 @@ function BooruWorkspaceView({ input = null, ctx }) {
     }
   };
   const discardClipboardAssociation = () => {
-    const tempFilePath = stagedClipboardTempPathRef.current;
-    stagedClipboardTempPathRef.current = "";
+    const capture = stagedClipboardTempPathRef.current;
+    stagedClipboardTempPathRef.current = null;
     setClipboardAssociationState(null);
-    if (tempFilePath) {
-      void invoke6("booru:discard-clipboard-media", { tempFilePath }).catch(() => void 0);
+    if (capture?.grantId) {
+      void invoke6("booru:discard-clipboard-media", { grantId: capture.grantId }).catch(() => void 0);
     }
   };
   useEffect27(() => () => {
-    const tempFilePath = stagedClipboardTempPathRef.current;
-    stagedClipboardTempPathRef.current = "";
-    if (tempFilePath) {
-      void window.nexus.ipc.invoke("booru:discard-clipboard-media", { tempFilePath }).catch(() => void 0);
+    const capture = stagedClipboardTempPathRef.current;
+    stagedClipboardTempPathRef.current = null;
+    if (capture?.grantId) {
+      void pluginIpc.invoke("booru:discard-clipboard-media", { grantId: capture.grantId }).catch(() => void 0);
     }
   }, []);
-  const importClipboardMedia = async (associationValue, stagedTempFilePath = "") => {
+  const importClipboardMedia = async (associationValue, stagedCapture = null) => {
     const associations = mergeBooruClipboardAssociations(associationValue);
     if (!associations.length) {
       await openClipboardAssociationComposer();
@@ -10367,9 +10419,9 @@ function BooruWorkspaceView({ input = null, ctx }) {
     if (entityBusy) return;
     setEntityBusy(true);
     try {
-      const tempFilePath = stagedTempFilePath || await window.nexus.clipboard.exportMediaToTempFile("booru-media");
+      const capture = stagedCapture || await window.nexus.clipboard.captureMedia("booru-media");
       const result = await invoke6("booru:paste-clipboard-media", {
-        tempFilePath,
+        grantId: capture.grantId,
         associations
       });
       setSnapshot(result?.snapshot || snapshot);
@@ -10378,7 +10430,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
       }
       setEntityError("");
       setEntityProfileError("");
-      stagedClipboardTempPathRef.current = "";
+      stagedClipboardTempPathRef.current = null;
       setClipboardAssociationState(null);
       setEntityRevision((currentValue) => currentValue + 1);
       if (showEntityProfile) setEntityProfilePageForSection(activeSection, 1);
@@ -11082,11 +11134,11 @@ function BooruWorkspaceView({ input = null, ctx }) {
     ClipboardAssociationComposer,
     {
       defaultKind: clipboardAssociationState.defaultKind,
-      tempFilePath: clipboardAssociationState.tempFilePath,
+      capture: clipboardAssociationState.capture,
       onCancel: discardClipboardAssociation,
       onConfirm: (association) => importClipboardMedia(
         association,
-        clipboardAssociationState.tempFilePath
+        clipboardAssociationState.capture
       )
     }
   ) : null, entityCreationRequest ? /* @__PURE__ */ React30.createElement("div", { className: "booruView__cropOverlay" }, entityCreationRequest.kind === "character" ? /* @__PURE__ */ React30.createElement(
@@ -11142,6 +11194,7 @@ function disposeStylesheet() {
 }
 var booruRendererPlugin = {
   activate(ctx) {
+    configurePluginIpc(ctx.ipc);
     ensureStylesheet();
     ctx.registerView({
       id: BOORU_WORKSPACE_VIEW_ID,

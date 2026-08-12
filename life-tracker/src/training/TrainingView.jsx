@@ -27,9 +27,17 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   DeleteIcon,
+  ImageIcon,
   PlusIcon,
   RefreshIcon,
 } from "./icons.jsx";
+import {
+  getTrainingCoverValue,
+  hasTrainingCoverProperty,
+  isTrainingTextEntryElement,
+  pasteTrainingCover,
+  resolveTrainingCoverImageUrl,
+} from "./training-cover.js";
 import {
   Button,
   Field,
@@ -37,6 +45,7 @@ import {
   CyberIconButton,
   GalleryCard,
   GalleryCardBody,
+  GalleryCardMedia,
   GalleryCardMeta,
   GalleryCardTitle,
   GalleryGrid,
@@ -66,7 +75,8 @@ import {
 
 const LIFE_TRACKER_TRAINING_CHANNEL_PREFIX = "life-tracker:training";
 
-const ipcRenderer = window.nexus.ipc;
+const ipcRenderer = pluginIpc;
+const { pathToFileUrl } = window.nexus.urls;
 const React = window.React;
 const { useEffect, useMemo, useRef, useState } = React;
 
@@ -705,6 +715,9 @@ function TrainingGalleryCard({
   summary,
   meta = "",
   active = false,
+  media = null,
+  editMode = false,
+  busy = false,
   onClick,
 }) {
   return (
@@ -713,14 +726,68 @@ function TrainingGalleryCard({
       type="button"
       className={["trainingPlugin__galleryCard", active ? "is-active" : ""].filter(Boolean).join(" ")}
       selected={active}
+      aria-pressed={editMode ? active : undefined}
+      aria-busy={busy || undefined}
       onClick={onClick}
     >
+      {media}
       <GalleryCardBody>
         <GalleryCardTitle>{title}</GalleryCardTitle>
         {summary ? <GalleryCardMeta className="trainingPlugin__galleryCardSummary">{summary}</GalleryCardMeta> : null}
         {meta ? <GalleryCardMeta className="trainingPlugin__galleryCardMeta">{meta}</GalleryCardMeta> : null}
       </GalleryCardBody>
     </GalleryCard>
+  );
+}
+
+function TrainingCoverMedia({ doc, title, editMode = false, selected = false, busy = false }) {
+  const coverValue = getTrainingCoverValue(doc);
+  const hasCoverProperty = hasTrainingCoverProperty(doc);
+  const requestKey = `${doc?.itemId || "missing"}:${coverValue}`;
+  const [media, setMedia] = useState({ key: "", source: "", failed: false });
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!coverValue) {
+      setMedia({ key: requestKey, source: "", failed: false });
+      return () => { cancelled = true; };
+    }
+
+    void resolveTrainingCoverImageUrl(doc, { ipcRenderer, pathToFileUrl })
+      .then((source) => {
+        if (!cancelled) setMedia({ key: requestKey, source, failed: false });
+      })
+      .catch(() => {
+        if (!cancelled) setMedia({ key: requestKey, source: "", failed: true });
+      });
+    return () => { cancelled = true; };
+  }, [coverValue, doc, requestKey]);
+
+  const hasImage = media.key === requestKey && media.source && !media.failed;
+  const editLabel = busy
+    ? "Guardando portada..."
+    : hasCoverProperty
+      ? "Ctrl+V para reemplazar"
+      : "Ctrl+V para anadir";
+
+  return (
+    <GalleryCardMedia className="trainingPlugin__galleryCardMedia">
+      {hasImage ? (
+        <img
+          alt={`Portada de ${title}`}
+          draggable="false"
+          src={media.source}
+          onError={() => setMedia((current) => ({ ...current, failed: true }))}
+        />
+      ) : (
+        <span className="trainingPlugin__galleryCardMediaPlaceholder" aria-hidden="true">
+          <ImageIcon size={24} />
+        </span>
+      )}
+      {editMode && selected ? (
+        <span className="trainingPlugin__galleryCardMediaEdit">{editLabel}</span>
+      ) : null}
+    </GalleryCardMedia>
   );
 }
 
@@ -2059,6 +2126,10 @@ function TrainingView({
   const [muscleMarkdown, setMuscleMarkdown] = useState("");
   const [exerciseEditorKey, setExerciseEditorKey] = useState(() => createId("exercise-editor"));
   const [muscleEditorKey, setMuscleEditorKey] = useState(() => createId("muscle-editor"));
+  const [muscleCoverEditMode, setMuscleCoverEditMode] = useState(false);
+  const [muscleCoverTargetId, setMuscleCoverTargetId] = useState(null);
+  const [muscleCoverBusyId, setMuscleCoverBusyId] = useState(null);
+  const [muscleCoverNotice, setMuscleCoverNotice] = useState("");
   const exerciseMarkdownLoadIdRef = useRef(0);
   const muscleMarkdownLoadIdRef = useRef(0);
 
@@ -2130,9 +2201,11 @@ function TrainingView({
     [catalog.exercises],
   );
 
-  async function loadLibrary(preferred = {}) {
-    setLoading(true);
-    setError("");
+  async function loadLibrary(preferred = {}, { silent = false } = {}) {
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
 
     try {
       const library = await invoke(`${LIFE_TRACKER_TRAINING_CHANNEL_PREFIX}:list`);
@@ -2161,7 +2234,38 @@ function TrainingView({
       setError(loadError?.message || "No se pudo cargar el modulo de entrenamiento.");
       return null;
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+    }
+  }
+
+  async function handlePasteMuscleCover(muscle) {
+    if (!muscle?.id || !muscle.doc?.itemId || muscleCoverBusyId) return;
+
+    const hasCurrentCover = hasTrainingCoverProperty(muscle.doc);
+    if (
+      hasCurrentCover
+      && !window.confirm(`Reemplazar la portada de "${muscle.title}"?`)
+    ) {
+      return;
+    }
+
+    setMuscleCoverBusyId(muscle.id);
+    setMuscleCoverNotice("");
+    setError("");
+
+    try {
+      await pasteTrainingCover({
+        doc: muscle.doc,
+        muscleId: muscle.id,
+        ipcRenderer,
+        captureImage: (prefix) => window.nexus.clipboard.captureImage(prefix),
+      });
+      await loadLibrary({ muscleId: selectedMuscleId }, { silent: true });
+      setMuscleCoverNotice(`Portada actualizada para ${muscle.title}.`);
+    } catch (pasteError) {
+      setError(pasteError?.message || "No se pudo guardar la portada del musculo.");
+    } finally {
+      setMuscleCoverBusyId(null);
     }
   }
 
@@ -2169,6 +2273,39 @@ function TrainingView({
     void loadLibrary();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!muscleCoverEditMode || mode !== "muscles" || muscleView !== "gallery") {
+      return undefined;
+    }
+
+    const handlePasteShortcut = (event) => {
+      if (
+        event.defaultPrevented
+        || !(event.ctrlKey || event.metaKey)
+        || event.altKey
+        || String(event.key || "").toLowerCase() !== "v"
+        || isTrainingTextEntryElement(event.target)
+        || muscleCoverBusyId
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      const muscle = catalog.muscles.find((entry) => entry.id === muscleCoverTargetId) || null;
+      if (!muscle) {
+        setError("Selecciona primero el musculo cuya portada quieres cambiar.");
+        return;
+      }
+      void handlePasteMuscleCover(muscle);
+    };
+
+    window.addEventListener("keydown", handlePasteShortcut, true);
+    return () => window.removeEventListener("keydown", handlePasteShortcut, true);
+    // handlePasteMuscleCover debe leer el catalogo y los hashes vigentes de este render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog.muscles, mode, muscleCoverBusyId, muscleCoverEditMode, muscleCoverTargetId, muscleView]);
 
   useEffect(() => {
     if (selectedExerciseId && !catalog.exercises.some((exercise) => exercise.id === selectedExerciseId)) {
@@ -2295,6 +2432,9 @@ function TrainingView({
 
   function openMusclePreviewByRecord(muscle) {
     setMode("muscles");
+    setMuscleCoverEditMode(false);
+    setMuscleCoverTargetId(null);
+    setMuscleCoverNotice("");
     setError("");
     void hydrateMuscleDetail(muscle, "preview");
   }
@@ -2594,6 +2734,9 @@ function TrainingView({
   function activateMode(nextMode) {
     setMode(nextMode);
     setError("");
+    setMuscleCoverEditMode(false);
+    setMuscleCoverTargetId(null);
+    setMuscleCoverNotice("");
     if (nextMode === "exercises") {
       setExerciseView("gallery");
     } else if (nextMode === "muscles") {
@@ -2701,7 +2844,26 @@ function TrainingView({
               </InlineField>
             </>
           )}
+          actions={(
+            <Button
+              type="button"
+              tone={muscleCoverEditMode ? "primary" : "secondary"}
+              onClick={() => {
+                setMuscleCoverEditMode((current) => !current);
+                setMuscleCoverTargetId(null);
+                setMuscleCoverNotice("");
+                setError("");
+              }}
+            >
+              {muscleCoverEditMode ? "Terminar" : "Editar portadas"}
+            </Button>
+          )}
         />
+
+        {muscleCoverEditMode ? (
+          <Notice>Selecciona un musculo y pega una imagen con Ctrl+V.</Notice>
+        ) : null}
+        {muscleCoverNotice ? <Notice tone="success">{muscleCoverNotice}</Notice> : null}
 
         {filteredMuscles.length ? (
           <GalleryGrid className="trainingPlugin__galleryGrid">
@@ -2711,8 +2873,29 @@ function TrainingView({
                 title={muscle.title}
                 summary={[muscle.groupTitle, muscle.regionTitle].filter(Boolean).join(" - ")}
                 meta={buildMuscleMaxLoadSummary(muscle.id, muscleMaxLoadLookup)}
-                active={selectedMuscleId === muscle.id}
-                onClick={() => openMusclePreviewByRecord(muscle)}
+                active={muscleCoverEditMode
+                  ? muscleCoverTargetId === muscle.id
+                  : selectedMuscleId === muscle.id}
+                editMode={muscleCoverEditMode}
+                busy={muscleCoverBusyId === muscle.id}
+                media={(
+                  <TrainingCoverMedia
+                    doc={muscle.doc}
+                    title={muscle.title}
+                    editMode={muscleCoverEditMode}
+                    selected={muscleCoverTargetId === muscle.id}
+                    busy={muscleCoverBusyId === muscle.id}
+                  />
+                )}
+                onClick={() => {
+                  if (muscleCoverEditMode) {
+                    setMuscleCoverTargetId(muscle.id);
+                    setMuscleCoverNotice("");
+                    setError("");
+                    return;
+                  }
+                  openMusclePreviewByRecord(muscle);
+                }}
               />
             ))}
           </GalleryGrid>
@@ -2994,3 +3177,4 @@ function TrainingView({
 
 export default TrainingView;
 
+import { pluginIpc } from "../ipc-client.js";

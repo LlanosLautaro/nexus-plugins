@@ -1,8 +1,8 @@
 {
   "id": "nexus.booru",
   "displayName": "Booru",
-  "version": "0.3.126",
-  "apiVersion": 1,
+  "version": "0.3.129",
+  "apiVersion": 2,
   "schemaVersion": 1,
   "description": "Catalogo media-first con storage oculto, dedupe exacto y clasificacion propia dentro de Nexus.",
   "author": "NEW-NEXUS",
@@ -19,6 +19,53 @@
     "sideToolbar": [],
     "frameMenu": [],
     "fileExplorerHeader": [],
-    "engines": []
-  }
+    "engines": [],
+    "ipc": {
+      "operations": [
+        "clear-fast-classification",
+        "delete-social-platform",
+        "disassociate-resources-from-entity",
+        "discard-clipboard-media",
+        "ensure-character-in-universe",
+        "ensure-entity",
+        "ensure-tag",
+        "exclude-resource-tag",
+        "exclude-resource-universe",
+        "get-entity-profile",
+        "get-resources-by-ids",
+        "get-snapshot",
+        "import-social-platform-icon",
+        "import-social-platform-icon-file",
+        "list-entities",
+        "list-entity-relations",
+        "list-recommendations",
+        "list-resources",
+        "list-search-suggestions",
+        "list-social-platforms",
+        "list-tags",
+        "open-in-brave",
+        "paste-clipboard-image-to-entity",
+        "paste-clipboard-media",
+        "prime-visible-thumbnails",
+        "purge-resources",
+        "quick-assign-entity",
+        "rescan-watch-folder",
+        "restart-watcher",
+        "restore-resources",
+        "save-basic-classification",
+        "save-entity-profile",
+        "save-resource-metadata",
+        "save-social-platform",
+        "set-character-universe",
+        "set-entity-visual",
+        "set-entity-visual-layout",
+        "set-fast-classification",
+        "trash-resources"
+      ]
+    }
+  },
+  "permissions": [
+    "host.node",
+    "host.media"
+  ]
 }

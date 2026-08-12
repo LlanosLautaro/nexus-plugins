@@ -17,6 +17,7 @@ import { registerMusicaMetadataResources } from "./metadata-resource";
 import type {
   NexusBackendPluginContext,
   NexusBackendPluginModule,
+  NexusPluginIpcRequestContext,
 } from "../../../nexus-backend/src/plugins/types.ts";
 import {
   normalizeRelativePath,
@@ -101,6 +102,7 @@ async function reconcileMusicaAssignments(ctx: NexusBackendPluginContext) {
   const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
 
   for (const item of items) {
+    ctx.lifecycle.throwIfAborted();
     const resolvedItem = await hydrateResolvedItem(ctx, item);
 
     if (!isSupportedAudioItem(resolvedItem)) {
@@ -174,8 +176,13 @@ const musicaPlugin: NexusBackendPluginModule = {
   activate: (ctx: NexusBackendPluginContext) => {
     registerMusicaMetadataResources(ctx);
 
-    ctx.registerIpc("audio:getByItemId", async (_event, itemId: string) => {
+    ctx.ipc.handle("get-by-item-id", async (
+      _event,
+      itemId: string,
+      request: NexusPluginIpcRequestContext,
+    ) => {
       try {
+        request.throwIfAborted();
         const repositories = ctx.getRepositories();
         const extractEmbeddedCoverArt = await isMusicaCoverArtEnabled(ctx);
 
@@ -218,6 +225,7 @@ const musicaPlugin: NexusBackendPluginModule = {
           : await parseAudioMetadata(filePath, {
               includeCovers: extractEmbeddedCoverArt,
             });
+        request.throwIfAborted();
         const metadataMimeType = metadata?.format ? (metadata.format as any).mimeType ?? null : null;
         const picture = extractEmbeddedCoverArt ? metadata?.common?.picture?.[0] : null;
         const authors = getAudioTrackAuthorNames(audioTrack);
@@ -236,7 +244,7 @@ const musicaPlugin: NexusBackendPluginModule = {
           metadataCompleted: Boolean(getModelValue(audioTrack, "metadataCompleted")),
         };
 
-        const buffer = await fsp.readFile(filePath);
+        const buffer = await fsp.readFile(filePath, { signal: request.signal });
 
         return {
           ok: true,
@@ -257,9 +265,10 @@ const musicaPlugin: NexusBackendPluginModule = {
 
     let reconcileQueue = Promise.resolve();
     ctx.settings.subscribe(
-      (settingsValue) => {
+      async (settingsValue) => {
         reconcileQueue = reconcileQueue
           .then(async () => {
+            ctx.lifecycle.throwIfAborted();
             const migratedSettings = await migrateMusicaAssignmentIdsIfNeeded(ctx, settingsValue);
 
             if (migratedSettings) {
@@ -267,11 +276,13 @@ const musicaPlugin: NexusBackendPluginModule = {
               return;
             }
 
+            ctx.lifecycle.throwIfAborted();
             await reconcileMusicaAssignments(ctx);
           })
           .catch((error) => {
             console.error("[musica] Error reconciliando assignments live:", error);
           });
+        await reconcileQueue;
       },
       { emitCurrent: true },
     );

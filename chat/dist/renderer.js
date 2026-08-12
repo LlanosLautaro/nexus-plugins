@@ -5,11 +5,20 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
 };
 var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -214,9 +223,25 @@ init_define_process();
 var CHAT_PLUGIN_ID = "nexus.chat";
 var CHAT_VIEW_ID = "nexus.chat.panel";
 
+// ../nexus-plugins/chat/src/ipc-client.js
+init_define_process();
+var runtimeIpc = null;
+function configurePluginIpc(ipc) {
+  runtimeIpc = ipc;
+}
+function toOperation(channel) {
+  return String(channel || "").replace(/^chatbot:/, "").replace(/:/g, ".");
+}
+var pluginIpc = Object.freeze({
+  invoke(channel, ...args) {
+    if (!runtimeIpc) throw new Error("PLUGIN_IPC_NOT_READY");
+    return runtimeIpc.invoke(toOperation(channel), ...args);
+  }
+});
+
 // ../nexus-plugins/chat/src/ChatView.jsx
 var { startTransition, useEffect, useLayoutEffect, useRef, useState } = window.React;
-var ipcRenderer = window.nexus.ipc;
+var ipcRenderer = pluginIpc;
 function createMessage(role, content, meta = null) {
   return {
     id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -555,6 +580,7 @@ function disposeStylesheet() {
 }
 var chatRendererPlugin = {
   activate(ctx) {
+    configurePluginIpc(ctx.ipc);
     ensureStylesheet();
     ctx.registerView({
       id: CHAT_VIEW_ID,

@@ -11,6 +11,10 @@ import type {
   NexusBackendPluginModule,
 } from "../../../nexus-backend/src/plugins/types.ts";
 import { createDevLogger } from "../../../nexus-backend/src/shared/dev-log.js";
+import {
+  createBooruMediaRuntimeAccess,
+  isSystemicMediaRuntimeError,
+} from "./media-runtime.mjs";
 import { BOORU_ENTITY_KIND_LABELS, BOORU_PLUGIN_ID } from "./constants.js";
 import {
   normalizeBooruSettings,
@@ -193,6 +197,7 @@ type PrimeVisibleThumbnailsPayload = {
 
 type ThumbnailStatus = "pending" | "ready" | "error";
 type MediaInfoStatus = "pending" | "ready" | "error";
+type BooruMediaRuntimeAccess = ReturnType<typeof createBooruMediaRuntimeAccess>;
 
 type RuntimeState = {
   generation: string;
@@ -219,6 +224,7 @@ type RuntimeState = {
     pendingCount: number;
   };
   python: PythonStatus;
+  mediaRuntimeAccess: BooruMediaRuntimeAccess;
   queue: Promise<void>;
   queuedPaths: Set<string>;
   ingestByContentHash: ReturnType<typeof createBooruKeyedSerialExecutor>;
@@ -357,7 +363,7 @@ type QuickAssignEntityPayload = {
 type PasteClipboardImageToEntityPayload = {
   kind?: unknown;
   entityId?: unknown;
-  tempFilePath?: unknown;
+  grantId?: unknown;
 };
 
 type ClipboardAssociationPayload = {
@@ -614,7 +620,10 @@ function isRuntimeCancellation(error: unknown) {
 }
 
 function trackRuntimeBackgroundTask<T>(state: RuntimeState, task: Promise<T>) {
-  const trackedTask = Promise.resolve(task) as Promise<unknown>;
+  const trackedTask = state.ctx.lifecycle.run(
+    "booru.background",
+    () => task,
+  ) as Promise<unknown>;
   state.backgroundTasks.add(trackedTask);
   void trackedTask.finally(() => {
     state.backgroundTasks.delete(trackedTask);
@@ -660,7 +669,7 @@ function scheduleRuntimeInvalidationForState(
 
     const versionBase = `${Date.now()}-${state.invalidationVersion++}`;
 
-    void Promise.all(
+    const invalidationTask = Promise.all(
       pendingKeys.map((key) => state.ctx.state.set(
         BOORU_RUNTIME_STATE_KEYS[key],
         `${versionBase}:${key}`,
@@ -686,6 +695,7 @@ function scheduleRuntimeInvalidationForState(
           },
         );
       });
+    trackRuntimeBackgroundTask(state, invalidationTask);
   }, desiredDelayMs);
 }
 
@@ -1098,14 +1108,6 @@ function resolveBooruRuntimeAssetPath(...segments: string[]) {
 
 function getBooruMediaWorkerPath() {
   return resolveBooruRuntimeAssetPath("assets", "booru_media_worker.py");
-}
-
-function getBooruFfmpegPath() {
-  return path.resolve(__dirname, "vendor", "ffmpeg.exe");
-}
-
-function getBooruFfprobePath() {
-  return path.resolve(__dirname, "vendor", "ffprobe.exe");
 }
 
 function getThumbnailOutputPaths(thumbsRoot: string, resourceId: string) {
@@ -2824,19 +2826,10 @@ async function runThumbnailWorkerForResource(state: RuntimeState, resource: any)
   }
 
   const workerPath = getBooruMediaWorkerPath();
-  const ffmpegPath = getBooruFfmpegPath();
-  const ffprobePath = getBooruFfprobePath();
+  const mediaRuntime = await state.mediaRuntimeAccess.requireRuntime();
 
   if (!fs.existsSync(workerPath)) {
     throw new Error(`No se encontro el worker Python de Booru en ${workerPath}.`);
-  }
-
-  if (!fs.existsSync(ffmpegPath)) {
-    throw new Error(`No se encontro ffmpeg para Booru en ${ffmpegPath}.`);
-  }
-
-  if (!fs.existsSync(ffprobePath)) {
-    throw new Error(`No se encontro ffprobe para Booru en ${ffprobePath}.`);
   }
 
   const outputPaths = getThumbnailOutputPaths(state.thumbsRoot, resource.id);
@@ -2851,9 +2844,9 @@ async function runThumbnailWorkerForResource(state: RuntimeState, resource: any)
     "--media-kind",
     resource.mediaKind,
     "--ffmpeg-path",
-    ffmpegPath,
+    mediaRuntime.ffmpegPath,
     "--ffprobe-path",
-    ffprobePath,
+    mediaRuntime.ffprobePath,
     "--thumbnail-webp-path",
     outputPaths.webpPath,
     "--thumbnail-jpeg-path",
@@ -2996,7 +2989,7 @@ function persistThumbnailErrorSync(
 function queueThumbnailGeneration(resourceIds: string[], priority: "high" | "low" = "low") {
   const state = runtimeState;
 
-  if (!isRuntimeStateActive(state)) {
+  if (!isRuntimeStateActive(state) || state.mediaRuntimeAccess.isUnavailable()) {
     return;
   }
 
@@ -3080,6 +3073,15 @@ function queueThumbnailGeneration(resourceIds: string[], priority: "high" | "low
   }
 
   void pumpThumbnailQueue();
+}
+
+function stopThumbnailQueueForSystemicFailure(state: RuntimeState, errorMessage: string) {
+  const droppedCount = state.thumbnailHighPriorityIds.length + state.thumbnailLowPriorityIds.length;
+  state.thumbnailHighPriorityIds = [];
+  state.thumbnailLowPriorityIds = [];
+  state.thumbnailQueuedIds.clear();
+  state.thumbnailTaskFailed += droppedCount;
+  state.thumbnailLastError = errorMessage;
 }
 
 function dequeueNextThumbnailResourceId(state: RuntimeState) {
@@ -3205,7 +3207,11 @@ async function processThumbnailQueueEntry(state: RuntimeState, resourceId: strin
       stderrSnippet: truncateDiagnosticText(error?.stderr),
       stdoutSnippet: truncateDiagnosticText(error?.stdout),
     };
-    const systemicFailure = /No se encontro (Python|ffmpeg|ffprobe|worker)|Configura pythonExecutable/i.test(errorMessage);
+    const systemicFailure = isSystemicMediaRuntimeError(error)
+      || /No se encontro (Python|worker)|Configura pythonExecutable/i.test(errorMessage);
+    if (systemicFailure) {
+      stopThumbnailQueueForSystemicFailure(state, errorMessage);
+    }
     booruBackendLogger[systemicFailure ? "warn" : "info"](
       "booru.thumbnail.worker.error",
       "Booru no pudo generar la thumbnail de un recurso.",
@@ -3364,6 +3370,7 @@ function createRuntimeState(ctx: NexusBackendPluginContext): RuntimeState {
       resolvedExecutable: null,
       error: null,
     },
+    mediaRuntimeAccess: createBooruMediaRuntimeAccess(ctx),
     queue: Promise.resolve(),
     queuedPaths: new Set<string>(),
     ingestByContentHash: createBooruKeyedSerialExecutor(),
@@ -6437,10 +6444,10 @@ async function pasteClipboardImageToEntitySync(
   ctx: NexusBackendPluginContext,
   db: DatabaseSync,
   payload: PasteClipboardImageToEntityPayload,
+  tempFilePath: string,
 ) {
   const kind = normalizeBooruText(payload?.kind) as BooruEntityKind;
   const entityId = normalizeBooruText(payload?.entityId);
-  const tempFilePath = assertClipboardTempFilePath(payload?.tempFilePath);
 
   if (!ENTITY_TABLES[kind]) {
     throw new Error("El tipo de entidad solicitado no existe en Booru.");
@@ -6575,8 +6582,8 @@ async function pasteClipboardMediaSync(
   ctx: NexusBackendPluginContext,
   db: DatabaseSync,
   payload: PasteClipboardMediaPayload,
+  tempFilePath: string,
 ) {
-  const tempFilePath = assertClipboardTempFilePath(payload?.tempFilePath);
   const associations = resolveClipboardAssociationsSync(db, payload);
 
   try {
@@ -7340,6 +7347,16 @@ const booruPlugin: NexusBackendPluginModule = {
   async activate(ctx: NexusBackendPluginContext) {
     const state = createRuntimeState(ctx);
     runtimeState = state;
+    const abortFromHost = () => {
+      if (!state.abortController.signal.aborted) {
+        state.abortController.abort(ctx.lifecycle.signal.reason);
+      }
+    };
+    if (ctx.lifecycle.signal.aborted) {
+      abortFromHost();
+    } else {
+      ctx.lifecycle.signal.addEventListener("abort", abortFromHost, { once: true });
+    }
     await ensureStoragePaths(getStoragePaths(ctx));
     state.db = new DatabaseSync(state.catalogPath);
     ensureCatalogSchema(state.db);
@@ -7359,10 +7376,11 @@ const booruPlugin: NexusBackendPluginModule = {
     };
 
     ctx.registerCleanup(async () => {
+      ctx.lifecycle.signal.removeEventListener("abort", abortFromHost);
       await shutdownRuntimeState(state);
     });
 
-    ctx.registerIpc("booru:get-snapshot", async () => {
+    ctx.ipc.handle("get-snapshot", async () => {
       const startedAt = performance.now();
       try {
         const snapshot = buildResourcesSnapshot(ctx, await ctx.settings.get());
@@ -7385,7 +7403,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:list-resources", async (_event, payload: ListResourcesPayload) => {
+    ctx.ipc.handle("list-resources", async (_event, payload: ListResourcesPayload) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
@@ -7411,7 +7429,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:get-resources-by-ids", async (_event, payload: { resourceIds?: unknown }) => {
+    ctx.ipc.handle("get-resources-by-ids", async (_event, payload: { resourceIds?: unknown }) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
@@ -7433,7 +7451,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:prime-visible-thumbnails", async (_event, payload: PrimeVisibleThumbnailsPayload) => {
+    ctx.ipc.handle("prime-visible-thumbnails", async (_event, payload: PrimeVisibleThumbnailsPayload) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
@@ -7461,7 +7479,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:list-entities", async (_event, payload: any) => {
+    ctx.ipc.handle("list-entities", async (_event, payload: any) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
@@ -7504,7 +7522,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:get-entity-profile", async (_event, payload: any) => {
+    ctx.ipc.handle("get-entity-profile", async (_event, payload: any) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
@@ -7542,7 +7560,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:list-entity-relations", async (_event, payload: any) => {
+    ctx.ipc.handle("list-entity-relations", async (_event, payload: any) => {
       const startedAt = performance.now();
       try {
         const result = listEntityRelationsSync(assertRuntimeDb(), payload);
@@ -7567,7 +7585,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:list-tags", async (_event, payload: any) => {
+    ctx.ipc.handle("list-tags", async (_event, payload: any) => {
       try {
         const db = assertRuntimeDb();
         const query = normalizeBooruOptionalText(payload?.query);
@@ -7579,7 +7597,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:list-search-suggestions", async (_event, payload: any) => {
+    ctx.ipc.handle("list-search-suggestions", async (_event, payload: any) => {
       try {
         return createSuccess({ items: listSearchSuggestionsSync(assertRuntimeDb(), normalizeBooruOptionalText(payload?.query), payload) });
       } catch (error) {
@@ -7587,7 +7605,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:list-social-platforms", async () => {
+    ctx.ipc.handle("list-social-platforms", async () => {
       try {
         return createSuccess({ items: listSocialPlatformsSync(assertRuntimeDb()) });
       } catch (error) {
@@ -7595,7 +7613,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:save-social-platform", async (_event, payload: any) => {
+    ctx.ipc.handle("save-social-platform", async (_event, payload: any) => {
       try {
         const platform = saveSocialPlatformSync(assertRuntimeDb(), payload);
         scheduleRuntimeInvalidation("entitiesVersion");
@@ -7605,7 +7623,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:delete-social-platform", async (_event, payload: any) => {
+    ctx.ipc.handle("delete-social-platform", async (_event, payload: any) => {
       try {
         const result = deleteSocialPlatformSync(assertRuntimeDb(), payload);
         scheduleRuntimeInvalidation("entitiesVersion");
@@ -7615,8 +7633,10 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:import-social-platform-icon", async (_event, payload: any) => {
-      const tempFilePath = assertClipboardTempFilePath(payload?.tempFilePath);
+    ctx.ipc.handle("import-social-platform-icon", async (event, payload: any) => {
+      const tempFilePath = assertClipboardTempFilePath(
+        ctx.capabilities.external.consume(event, String(payload?.grantId || "")),
+      );
       try {
         const result = await ingestFile(ctx, tempFilePath, {
           updateWatcherState: false,
@@ -7632,8 +7652,8 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:import-social-platform-icon-file", async (_event, payload: any) => {
-      const sourcePath = normalizeBooruOptionalText(payload?.sourcePath);
+    ctx.ipc.handle("import-social-platform-icon-file", async (event, payload: any) => {
+      const sourcePath = ctx.capabilities.external.consume(event, String(payload?.grantId || ""));
       if (!sourcePath || !fs.existsSync(sourcePath)) return createError(new Error("El archivo elegido ya no existe."), "No se pudo importar el icono de plataforma.");
       const tempFilePath = path.join(CLIPBOARD_IMAGE_TEMP_ROOT, `${crypto.randomUUID()}${path.extname(sourcePath) || ".png"}`);
       try {
@@ -7653,7 +7673,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:list-recommendations", async (_event, payload: ListRecommendationsPayload) => {
+    ctx.ipc.handle("list-recommendations", async (_event, payload: ListRecommendationsPayload) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
@@ -7678,7 +7698,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:ensure-entity", async (_event, payload: any) => {
+    ctx.ipc.handle("ensure-entity", async (_event, payload: any) => {
       try {
         const db = assertRuntimeDb();
         const kind = normalizeBooruText(payload?.kind) as BooruEntityKind;
@@ -7699,7 +7719,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:set-character-universe", async (_event, payload: SetCharacterUniversePayload) => {
+    ctx.ipc.handle("set-character-universe", async (_event, payload: SetCharacterUniversePayload) => {
       try {
         const db = assertRuntimeDb();
         const profile = setCharacterUniverseSync(db, payload);
@@ -7710,7 +7730,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:ensure-character-in-universe", async (_event, payload: EnsureCharacterInUniversePayload) => {
+    ctx.ipc.handle("ensure-character-in-universe", async (_event, payload: EnsureCharacterInUniversePayload) => {
       try {
         const db = assertRuntimeDb();
         const result = ensureCharacterInUniverseSync(db, payload);
@@ -7721,7 +7741,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:set-entity-visual", async (_event, payload: SetEntityVisualPayload) => {
+    ctx.ipc.handle("set-entity-visual", async (_event, payload: SetEntityVisualPayload) => {
       try {
         const db = assertRuntimeDb();
         const profile = setEntityVisualSync(db, payload);
@@ -7732,7 +7752,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:set-entity-visual-layout", async (_event, payload: SetEntityVisualLayoutPayload) => {
+    ctx.ipc.handle("set-entity-visual-layout", async (_event, payload: SetEntityVisualLayoutPayload) => {
       try {
         const db = assertRuntimeDb();
         const profile = setEntityVisualLayoutSync(db, payload);
@@ -7743,7 +7763,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:save-entity-profile", async (_event, payload: SaveEntityProfilePayload) => {
+    ctx.ipc.handle("save-entity-profile", async (_event, payload: SaveEntityProfilePayload) => {
       try {
         const profile = saveEntityProfileSync(assertRuntimeDb(), payload);
         scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion");
@@ -7753,7 +7773,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:disassociate-resources-from-entity", async (_event, payload: ResourceEntityAssociationPayload) => {
+    ctx.ipc.handle("disassociate-resources-from-entity", async (_event, payload: ResourceEntityAssociationPayload) => {
       try {
         const result = disassociateResourcesFromEntitySync(assertRuntimeDb(), payload);
         scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion");
@@ -7763,7 +7783,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:exclude-resource-tag", async (_event, payload: any) => {
+    ctx.ipc.handle("exclude-resource-tag", async (_event, payload: any) => {
       try {
         const db = assertRuntimeDb();
         const mutationContext = createResourceMutationContextSync(db, payload);
@@ -7780,7 +7800,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:exclude-resource-universe", async (_event, payload: any) => {
+    ctx.ipc.handle("exclude-resource-universe", async (_event, payload: any) => {
       try {
         const db = assertRuntimeDb();
         const mutationContext = createResourceMutationContextSync(db, payload);
@@ -7797,7 +7817,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:set-fast-classification", async (_event, payload: FastClassificationPayload) => {
+    ctx.ipc.handle("set-fast-classification", async (_event, payload: FastClassificationPayload) => {
       try {
         const state = runtimeState;
         const kind = normalizeBooruText(payload?.kind) as BooruEntityKind;
@@ -7813,7 +7833,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:clear-fast-classification", async (_event, payload: FastClassificationPayload) => {
+    ctx.ipc.handle("clear-fast-classification", async (_event, payload: FastClassificationPayload) => {
       const state = runtimeState;
       const scopeId = normalizeBooruOptionalText(payload?.scopeId);
       if (state?.fastClassification && (!scopeId || state.fastClassification.scopeId === scopeId)) {
@@ -7822,7 +7842,7 @@ const booruPlugin: NexusBackendPluginModule = {
       return createSuccess({ active: false });
     });
 
-    ctx.registerIpc("booru:ensure-tag", async (_event, payload: any) => {
+    ctx.ipc.handle("ensure-tag", async (_event, payload: any) => {
       try {
         const db = assertRuntimeDb();
         const name = normalizeBooruText(payload?.name);
@@ -7834,7 +7854,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:save-resource-metadata", async (_event, payload: SaveResourceMetadataPayload) => {
+    ctx.ipc.handle("save-resource-metadata", async (_event, payload: SaveResourceMetadataPayload) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
@@ -7865,7 +7885,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:save-basic-classification", async (_event, payload: SaveBasicClassificationPayload) => {
+    ctx.ipc.handle("save-basic-classification", async (_event, payload: SaveBasicClassificationPayload) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
@@ -7896,7 +7916,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:quick-assign-entity", async (_event, payload: QuickAssignEntityPayload) => {
+    ctx.ipc.handle("quick-assign-entity", async (_event, payload: QuickAssignEntityPayload) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
@@ -7929,11 +7949,14 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:paste-clipboard-image-to-entity", async (_event, payload: PasteClipboardImageToEntityPayload) => {
+    ctx.ipc.handle("paste-clipboard-image-to-entity", async (event, payload: PasteClipboardImageToEntityPayload) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
-        const result = await pasteClipboardImageToEntitySync(ctx, db, payload);
+        const tempFilePath = assertClipboardTempFilePath(
+          ctx.capabilities.external.consume(event, String(payload?.grantId || "")),
+        );
+        const result = await pasteClipboardImageToEntitySync(ctx, db, payload, tempFilePath);
         scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion");
         logBackendDuration(
           "booru.clipboard-paste.done",
@@ -7956,9 +7979,11 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:discard-clipboard-media", async (_event, payload: { tempFilePath?: unknown }) => {
+    ctx.ipc.handle("discard-clipboard-media", async (event, payload: { grantId?: unknown }) => {
       try {
-        const tempFilePath = assertClipboardTempFilePath(payload?.tempFilePath);
+        const tempFilePath = assertClipboardTempFilePath(
+          ctx.capabilities.external.consume(event, String(payload?.grantId || "")),
+        );
         await removeFileIfExists(tempFilePath);
         return createSuccess({ discarded: true });
       } catch (error) {
@@ -7966,10 +7991,13 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:paste-clipboard-media", async (_event, payload: PasteClipboardMediaPayload) => {
+    ctx.ipc.handle("paste-clipboard-media", async (event, payload: PasteClipboardMediaPayload) => {
       try {
         const db = assertRuntimeDb();
-        const result = await pasteClipboardMediaSync(ctx, db, payload);
+        const tempFilePath = assertClipboardTempFilePath(
+          ctx.capabilities.external.consume(event, String(payload?.grantId || "")),
+        );
+        const result = await pasteClipboardMediaSync(ctx, db, payload, tempFilePath);
         scheduleRuntimeInvalidation("resourcesVersion", "entitiesVersion");
         return createSuccess({
           ...result,
@@ -7980,7 +8008,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:trash-resources", async (_event, payload: TrashResourcesPayload) => {
+    ctx.ipc.handle("trash-resources", async (_event, payload: TrashResourcesPayload) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
@@ -8011,7 +8039,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:restore-resources", async (_event, payload: TrashResourcesPayload) => {
+    ctx.ipc.handle("restore-resources", async (_event, payload: TrashResourcesPayload) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
@@ -8042,7 +8070,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:purge-resources", async (_event, payload: TrashResourcesPayload) => {
+    ctx.ipc.handle("purge-resources", async (_event, payload: TrashResourcesPayload) => {
       const startedAt = performance.now();
       try {
         const db = assertRuntimeDb();
@@ -8073,7 +8101,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:open-in-brave", async (_event, payload: OpenInBravePayload) => {
+    ctx.ipc.handle("open-in-brave", async (_event, payload: OpenInBravePayload) => {
       try {
         const db = assertRuntimeDb();
         return createSuccess(await openResourceInBraveSync(db, payload));
@@ -8082,7 +8110,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:restart-watcher", async () => {
+    ctx.ipc.handle("restart-watcher", async () => {
       try {
         const state = runtimeState;
         assertRuntimeStateActive(state!);
@@ -8095,7 +8123,7 @@ const booruPlugin: NexusBackendPluginModule = {
       }
     });
 
-    ctx.registerIpc("booru:rescan-watch-folder", async () => {
+    ctx.ipc.handle("rescan-watch-folder", async () => {
       try {
         const settingsValue = await ctx.settings.get();
         await rescanWatchFolder(ctx, settingsValue);

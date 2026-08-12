@@ -8,7 +8,7 @@ import {
 
 const React = window.React;
 const { useEffect, useMemo, useState } = React;
-const ipcRenderer = window.nexus.ipc;
+const ipcRenderer = pluginIpc;
 
 const LIFE_TRACKER_TRAINING_CHANNEL_PREFIX = "life-tracker:training";
 const TRAINING_MANAGED_DOC_GROUP_ORDER = ["Ejercicios", "Musculos"];
@@ -358,3 +358,4 @@ export default function TrainingHostSettingsSection() {
     </div>
   );
 }
+import { pluginIpc } from "../ipc-client.js";

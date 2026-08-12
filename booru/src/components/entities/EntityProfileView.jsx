@@ -76,17 +76,17 @@ export default function EntityProfileView({
   }, [scrollKey, scrollTop]);
 
   useEffect(() => () => {
-    void window.nexus.ipc.invoke("booru:clear-fast-classification", { scopeId: fastScopeRef.current });
+    void pluginIpc.invoke("booru:clear-fast-classification", { scopeId: fastScopeRef.current });
   }, [kind, profile?.id]);
 
   const toggleFastClassification = async () => {
     if (!profile?.id) return;
     if (fastClassificationActive) {
-      await window.nexus.ipc.invoke("booru:clear-fast-classification", { scopeId: fastScopeRef.current });
+      await pluginIpc.invoke("booru:clear-fast-classification", { scopeId: fastScopeRef.current });
       setFastClassificationActive(false);
       return;
     }
-    const response = await window.nexus.ipc.invoke("booru:set-fast-classification", {
+    const response = await pluginIpc.invoke("booru:set-fast-classification", {
       kind,
       entityId: profile.id,
       scopeId: fastScopeRef.current,
@@ -246,3 +246,4 @@ export default function EntityProfileView({
     </SectionPanel>
   );
 }
+import { pluginIpc } from "../../ipc-client.js";

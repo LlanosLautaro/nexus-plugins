@@ -13,7 +13,7 @@ import {
 import { ChatIcon, ClearIcon, SendIcon } from "./icons.jsx";
 import { CHAT_VIEW_ID } from "./constants.js";
 
-const ipcRenderer = window.nexus.ipc;
+const ipcRenderer = pluginIpc;
 
 function createMessage(role, content, meta = null) {
   return {
@@ -468,3 +468,4 @@ export default function ChatView({ ctx }) {
     </WorkspacePage>
   );
 }
+import { pluginIpc } from "./ipc-client.js";

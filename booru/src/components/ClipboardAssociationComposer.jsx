@@ -15,7 +15,7 @@ function parseAliasNames(value) {
 }
 
 async function invoke(channel, payload) {
-  const response = await window.nexus.ipc.invoke(channel, payload);
+  const response = await pluginIpc.invoke(channel, payload);
   if (!response?.ok) throw new Error(response?.error || "No se pudo buscar en Booru.");
   return response.data;
 }
@@ -48,19 +48,14 @@ function EntityField({ kind, value, onChange, onSelect, label }) {
   );
 }
 
-function getPreviewKind(pathValue) {
-  const extension = String(pathValue || "").split(/[.]/).pop()?.toLowerCase() || "";
+function getPreviewKind(name) {
+  const extension = String(name || "").split(/[.]/).pop()?.toLowerCase() || "";
   return VIDEO_EXTENSIONS.has(extension) ? "video" : "image";
-}
-
-function toFileUrl(pathValue) {
-  if (!pathValue) return "";
-  return new URL(window.nexus.urls.pathToFileUrl(pathValue)).href;
 }
 
 export default function ClipboardAssociationComposer({
   defaultKind = "author",
-  tempFilePath = "",
+  capture = null,
   onCancel,
   onConfirm,
 }) {
@@ -71,10 +66,16 @@ export default function ClipboardAssociationComposer({
   const [universeName, setUniverseName] = useState("");
   const [universeId, setUniverseId] = useState("");
   const [busy, setBusy] = useState(false);
-  const previewUrl = toFileUrl(tempFilePath);
-  const previewKind = getPreviewKind(tempFilePath);
+  const [previewUrl, setPreviewUrl] = useState("");
+  useEffect(() => {
+    if (!capture?.previewBytes) { setPreviewUrl(""); return undefined; }
+    const url = URL.createObjectURL(new Blob([capture.previewBytes], { type: capture.mimeType }));
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [capture]);
+  const previewKind = getPreviewKind(capture?.name);
   const canSubmit = Boolean(
-    tempFilePath
+    capture?.grantId
     && (entityId || entityName.trim())
     && (kind !== "character" || universeId || universeName.trim()),
   );
@@ -107,7 +108,9 @@ export default function ClipboardAssociationComposer({
         }}
       >
         <div className="booruClipboardComposer__preview">
-          {previewKind === "video" ? (
+          {!previewUrl ? (
+            <span>{capture?.name || "Recurso pendiente"}</span>
+          ) : previewKind === "video" ? (
             <video src={previewUrl} muted autoPlay loop playsInline preload="metadata" />
           ) : (
             <img src={previewUrl} alt="Recurso pegado pendiente de asociar" draggable="false" />
@@ -143,3 +146,4 @@ export default function ClipboardAssociationComposer({
     </div>
   );
 }
+import { pluginIpc } from "../ipc-client.js";

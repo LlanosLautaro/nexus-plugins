@@ -65,6 +65,16 @@ export function RefreshIcon(props) {
   );
 }
 
+export function ImageIcon(props) {
+  return (
+    <BaseIcon {...props}>
+      <rect x="4" y="5" width="16" height="14" rx="1.5" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="m6.5 17 4.25-4.25 2.5 2.5 1.75-1.75 2.5 3.5" />
+    </BaseIcon>
+  );
+}
+
 export function ArrowUpIcon(props) {
   return (
     <BaseIcon {...props}>

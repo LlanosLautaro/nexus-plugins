@@ -24,6 +24,7 @@ function disposeStylesheet() {
 
 const chatRendererPlugin = {
   activate(ctx) {
+    configurePluginIpc(ctx.ipc);
     ensureStylesheet();
 
     ctx.registerView({
@@ -66,3 +67,4 @@ const chatRendererPlugin = {
 };
 
 export default chatRendererPlugin;
+import { configurePluginIpc } from "./ipc-client.js";

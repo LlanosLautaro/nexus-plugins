@@ -24,6 +24,7 @@ function disposeStylesheet() {
 
 const musicaRendererPlugin = {
   activate(ctx) {
+    configurePluginIpc(ctx.ipc);
     ensureStylesheet();
 
     ctx.registerItemEngine({
@@ -54,3 +55,4 @@ const musicaRendererPlugin = {
 };
 
 export default musicaRendererPlugin;
+import { configurePluginIpc } from "./ipc-client.js";

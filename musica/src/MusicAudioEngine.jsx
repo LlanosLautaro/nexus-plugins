@@ -2,7 +2,7 @@ const { useEffect, useMemo, useRef, useState } = window.React;
 import PluginMetadataForm from "./PluginMetadataForm.jsx";
 import { MUSICA_ENGINE_ID, isSupportedAudioItem } from "./renderer-helpers.js";
 
-const ipcRenderer = window.nexus.ipc;
+const ipcRenderer = pluginIpc;
 
 const DEFAULT_AUDIO_STATE = {
   audioFile: null,
@@ -523,3 +523,4 @@ export default function MusicAudioEngine({
     </div>
   );
 }
+import { pluginIpc } from "./ipc-client.js";

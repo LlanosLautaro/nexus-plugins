@@ -21,6 +21,7 @@ function disposeStylesheet() {
 
 const tabRepositoryRenderer = {
   activate(ctx) {
+    configurePluginIpc(ctx.ipc);
     ensureStylesheet();
     ctx.registerView({
       id: TAB_REPOSITORY_VIEW_ID,
@@ -61,3 +62,4 @@ const tabRepositoryRenderer = {
 };
 
 export default tabRepositoryRenderer;
+import { configurePluginIpc } from "./ipc-client.js";

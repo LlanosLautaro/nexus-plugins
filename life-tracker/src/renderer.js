@@ -30,6 +30,7 @@ function disposeStylesheet() {
 
 const lifeTrackerRendererPlugin = {
   activate(ctx) {
+    configurePluginIpc(ctx.ipc);
     ensureStylesheet();
 
     ctx.registerView({
@@ -90,3 +91,4 @@ const lifeTrackerRendererPlugin = {
 };
 
 export default lifeTrackerRendererPlugin;
+import { configurePluginIpc } from "./ipc-client.js";

@@ -101,15 +101,17 @@ function normalizeModelEntry(entry) {
     reasoning: normalizeReasoning(entry?.capabilities?.reasoning)
   };
 }
-async function requestLmStudioJson(pathname, init) {
+async function requestLmStudioJson(pathname, init, lifecycleSignal) {
   const url = new URL(pathname, LM_STUDIO_BASE_URL);
+  const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const signal = lifecycleSignal ? AbortSignal.any([lifecycleSignal, timeoutSignal]) : timeoutSignal;
   const response = await fetch(url, {
     ...init,
     headers: {
       Accept: "application/json",
       ...init?.headers || {}
     },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    signal
   });
   let payload = null;
   try {
@@ -123,8 +125,8 @@ async function requestLmStudioJson(pathname, init) {
   }
   return payload;
 }
-async function listChatModels() {
-  const payload = await requestLmStudioJson(MODELS_ENDPOINT);
+async function listChatModels(signal) {
+  const payload = await requestLmStudioJson(MODELS_ENDPOINT, void 0, signal);
   const models = Array.isArray(payload?.models) ? payload.models.map((entry) => normalizeModelEntry(entry)).filter(Boolean).filter((entry) => Boolean(entry?.id)) : [];
   return models.sort((left, right) => {
     if (left.loaded !== right.loaded) {
@@ -133,25 +135,39 @@ async function listChatModels() {
     return String(left.label).localeCompare(String(right.label));
   });
 }
-function sleep(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
+function sleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const complete = () => {
+      signal?.removeEventListener("abort", abort);
+      resolve();
+    };
+    const timeout = setTimeout(complete, ms);
+    const abort = () => {
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", abort);
+      reject(signal?.reason || new DOMException("Aborted", "AbortError"));
+    };
+    if (signal?.aborted) {
+      abort();
+      return;
+    }
+    signal?.addEventListener("abort", abort, { once: true });
   });
 }
-async function waitForModelLoaded(modelId) {
+async function waitForModelLoaded(modelId, signal) {
   const startedAt = Date.now();
-  let lastModels = await listChatModels();
+  let lastModels = await listChatModels(signal);
   while (Date.now() - startedAt <= MODEL_LOAD_WAIT_TIMEOUT_MS) {
     const targetModel = lastModels.find((entry) => entry?.id === modelId);
     if (targetModel?.loaded) {
       return lastModels;
     }
-    await sleep(MODEL_LOAD_POLL_INTERVAL_MS);
-    lastModels = await listChatModels();
+    await sleep(MODEL_LOAD_POLL_INTERVAL_MS, signal);
+    lastModels = await listChatModels(signal);
   }
   throw new Error(`El modelo "${modelId}" no quedo disponible a tiempo en LM Studio.`);
 }
-async function loadChatModel(payload) {
+async function loadChatModel(payload, signal) {
   const model = normalizeText(payload?.model);
   if (!model) {
     throw new Error("Falta el modelo a cargar.");
@@ -164,8 +180,8 @@ async function loadChatModel(payload) {
     body: JSON.stringify({
       model
     })
-  });
-  const models = await waitForModelLoaded(model);
+  }, signal);
+  const models = await waitForModelLoaded(model, signal);
   return {
     model,
     models,
@@ -192,7 +208,7 @@ function extractResponseMetadata(payload) {
     stats: payload?.stats && typeof payload.stats === "object" ? payload.stats : null
   };
 }
-async function sendChatMessage(payload) {
+async function sendChatMessage(payload, signal) {
   const model = normalizeText(payload?.model);
   if (!model) {
     throw new Error("Selecciona un modelo antes de enviar mensajes.");
@@ -207,7 +223,7 @@ async function sendChatMessage(payload) {
       model,
       input: transcript
     })
-  });
+  }, signal);
   return {
     message: extractAssistantMessage(responsePayload),
     ...extractResponseMetadata(responsePayload)
@@ -215,26 +231,26 @@ async function sendChatMessage(payload) {
 }
 var chatPlugin = {
   activate(ctx) {
-    ctx.registerIpc("chatbot:list-models", async () => {
+    ctx.ipc.handle("list-models", async (_event, _payload, request) => {
       try {
         return createSuccess({
-          models: await listChatModels(),
+          models: await listChatModels(request.signal),
           baseUrl: LM_STUDIO_BASE_URL
         });
       } catch (error) {
         return createError(error, "No se pudieron cargar los modelos de LM Studio.");
       }
     });
-    ctx.registerIpc("chatbot:send-message", async (_event, payload) => {
+    ctx.ipc.handle("send-message", async (_event, payload, request) => {
       try {
-        return createSuccess(await sendChatMessage(payload));
+        return createSuccess(await sendChatMessage(payload, request.signal));
       } catch (error) {
         return createError(error, "No se pudo enviar el mensaje a LM Studio.");
       }
     });
-    ctx.registerIpc("chatbot:load-model", async (_event, payload) => {
+    ctx.ipc.handle("load-model", async (_event, payload, request) => {
       try {
-        return createSuccess(await loadChatModel(payload));
+        return createSuccess(await loadChatModel(payload, request.signal));
       } catch (error) {
         return createError(error, "No se pudo cargar el modelo en LM Studio.");
       }
