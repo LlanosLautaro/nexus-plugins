@@ -1,0 +1,60 @@
+.nexus-ui-menu-icon {
+  position: relative;
+  display: block;
+  width: 16px;
+  height: 12px;
+}
+
+.nexus-ui-menu-icon i {
+  position: absolute;
+  left: 0;
+  display: block;
+  width: 100%;
+  height: 1px;
+  border-radius: 9px;
+  background: currentColor;
+  opacity: 1;
+  transform: rotate(0deg);
+  transform-origin: center;
+  transition: 250ms ease-in-out;
+}
+
+.nexus-ui-menu-icon i:nth-child(1) {
+  top: 0;
+  transform-origin: left center;
+}
+
+.nexus-ui-menu-icon i:nth-child(2) {
+  top: 50%;
+  transform: translateY(-50%);
+  transform-origin: left center;
+}
+
+.nexus-ui-menu-icon i:nth-child(3) {
+  top: 100%;
+  transform: translateY(-100%);
+  transform-origin: left center;
+}
+
+.nexus-ui-menu-icon.is-open i:nth-child(1) {
+  top: 0;
+  left: 2px;
+  transform: rotate(45deg);
+}
+
+.nexus-ui-menu-icon.is-open i:nth-child(2) {
+  width: 0;
+  opacity: 0;
+}
+
+.nexus-ui-menu-icon.is-open i:last-child {
+  top: 11px;
+  left: 2px;
+  transform: rotate(-45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexus-ui-menu-icon i {
+    transition: none;
+  }
+}

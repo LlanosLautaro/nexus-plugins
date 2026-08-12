@@ -1,0 +1,10 @@
+// Public @nexus/ui motion mixins.
+@mixin transition($items...) {
+  transition: $items;
+}
+
+@mixin lift-on-hover($distance: -1px) {
+  &:hover:not(:disabled) {
+    transform: translateY($distance);
+  }
+}

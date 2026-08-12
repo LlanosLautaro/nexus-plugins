@@ -18,7 +18,7 @@ import type {
   NexusBackendPluginContext,
   NexusBackendPluginModule,
   NexusPluginIpcRequestContext,
-} from "../../../nexus-backend/src/plugins/types.ts";
+} from "@nexus/plugin-sdk";
 import {
   normalizeRelativePath,
   readMusicaEngineAssignments,

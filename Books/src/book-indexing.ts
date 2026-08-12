@@ -1,10 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { serializeVaultItem } from "../../../nexus-backend/src/backend/vault-runtime/file-system/path-utils.js";
 import { BOOKS_ENGINE_ID, BOOK_READING_STATUSES } from "./constants.js";
 import { readBooksEngineAssignments } from "./plugin-settings.js";
-import type { NexusBackendPluginContext } from "../../../nexus-backend/src/plugins/types.ts";
-import type { VaultRepositories } from "../../../nexus-backend/src/backend/vault-runtime/db/repositories.ts";
+import type { NexusBackendPluginContext } from "@nexus/plugin-sdk";
+
+type VaultRepositories = ReturnType<NexusBackendPluginContext["requireRepositories"]>;
 
 const SUPPORTED_BOOK_EXTENSIONS = new Set(["pdf"]);
 
@@ -204,7 +204,7 @@ function normalizeJoinedBookRow(row: any): BookRecord | null {
     coverPreviewSourceHash: hasFreshCoverPreview ? coverPreviewSourceHash : null,
     itemHash,
     item: row.item_path
-      ? serializeVaultItem({
+      ? {
           id: row.item_id,
           name: row.item_name,
           path: row.item_path,
@@ -216,7 +216,7 @@ function normalizeJoinedBookRow(row: any): BookRecord | null {
           color: row.item_color ?? null,
           hidden: Boolean(row.item_hidden),
           deleted: Boolean(row.item_deleted),
-        })
+        }
       : null,
   };
 }

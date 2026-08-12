@@ -7,7 +7,6 @@ import {
   normalizeBooksLibraryPreferences,
   writeBooksGridColumns,
 } from "./library-preferences.js";
-import { createRendererDevLogger } from "../../../nexus-frontend/src/utils/devLog.js";
 import {
   ActionMenu,
   CyberIconButton,
@@ -28,7 +27,7 @@ import {
 } from "@nexus/ui";
 
 const ipcRenderer = pluginIpc;
-const booksLibraryLogger = createRendererDevLogger("renderer.plugins.books");
+let booksLibraryLogger = null;
 
 const BOOK_GRID_ASPECT_RATIO = 0.72;
 const BOOK_GRID_BODY_HEIGHT = 114;
@@ -458,6 +457,7 @@ function ProgressBar({ value }) {
 }
 
 export default function BooksLibraryView({ ctx }) {
+  booksLibraryLogger = ctx.log;
   const uiPreferencesApi = useMemo(
     () => ctx.createPluginSettingsApi("nexus.books.ui", BOOKS_DEFAULT_LIBRARY_PREFERENCES),
     [ctx],

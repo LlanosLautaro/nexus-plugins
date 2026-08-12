@@ -37,15 +37,16 @@ import {
   WorkspaceBody,
   WorkspacePage,
 } from "@nexus/ui";
-import {
-  getCachedIconSvgMarkup,
-  loadIconSvgMarkup,
-  loadUnifiedIconCatalog,
-} from "../../../nexus-frontend/src/components/icons/iconCatalogClient.js";
-import {
-  CanvasWorkspace,
-  createCanvasStateFromLegacyLayouts,
-} from "../../../nexus-frontend/src/internalModules/runtime/CanvasWorkspace.jsx";
+let getCachedIconSvgMarkup;
+let loadIconSvgMarkup;
+let loadUnifiedIconCatalog;
+let CanvasWorkspace;
+let createCanvasStateFromLegacyLayouts;
+
+export function configureLifeTrackerHostUi(ui) {
+  ({ getCachedIconSvgMarkup, loadIconSvgMarkup, loadUnifiedIconCatalog } = ui.icons);
+  ({ CanvasWorkspace, createCanvasStateFromLegacyLayouts } = ui.canvas);
+}
 import PersonalFinanceView from "./finance/PersonalFinanceView.jsx";
 import TrainingView from "./training/TrainingView.jsx";
 import {

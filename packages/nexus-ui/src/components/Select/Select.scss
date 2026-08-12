@@ -1,0 +1,8 @@
+@use "../../scss" as *;
+
+.nexus-ui-select {
+  @include field-control();
+  padding: 0 31px 0 11px;
+  color-scheme: dark;
+  cursor: pointer;
+}

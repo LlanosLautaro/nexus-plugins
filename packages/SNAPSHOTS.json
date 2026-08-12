@@ -1,0 +1,392 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "LlanosLautaro/nexus-platform",
+  "packages": [
+    {
+      "name": "@nexus/plugin-sdk",
+      "version": "2.0.0",
+      "directory": "plugin-sdk",
+      "sourceCommit": "8d791d2efcf390da51fd64d3df989b71c3d7dce8",
+      "digest": "4eb3869b2f6d752c4570e83777c9a138ecfc624ad3d4e2b9375abdf2e68a03e3",
+      "files": [
+        {
+          "file": "package.json",
+          "sha256": "4d717886d151ff8d5a9758e590fcf42eaf7529932cca09c93bf40e182637b166"
+        },
+        {
+          "file": "src/index.d.ts",
+          "sha256": "f4b3ed5143fcb90dbbd923415dd9e895c7963a1fd806ba645e3d3d1bedf758f4"
+        },
+        {
+          "file": "src/index.js",
+          "sha256": "7246c781b84c47c613ec68a4d28fc258a57cd006a56c1bd5bd32b5128ef2e03a"
+        },
+        {
+          "file": "src/item-location.js",
+          "sha256": "7979c50a44171512b453361f0e5b0e1a15508cbf00b5368609b61b5d38154924"
+        }
+      ]
+    },
+    {
+      "name": "@nexus/ui",
+      "version": "0.1.0",
+      "directory": "nexus-ui",
+      "sourceCommit": "8d791d2efcf390da51fd64d3df989b71c3d7dce8",
+      "digest": "2dbdd00a42a4da930d91d1d4e55d0e5b6ce713d03404ce37f0ed679b572498e2",
+      "files": [
+        {
+          "file": "package.json",
+          "sha256": "264bcaf03289c3ba35cc66572ac1d35caaa30f7fc81f9aa990657440d5033a77"
+        },
+        {
+          "file": "README.md",
+          "sha256": "1c9e0d869f956183f07472e3bc6971689a05b74e0d2e0b665dfc143f6cbd9f4a"
+        },
+        {
+          "file": "src/components/ActionMenu/ActionMenu.jsx",
+          "sha256": "5d0b2700a512061f11f5de3597c8453d3c58a06fa61068d14f220ae457bfa8eb"
+        },
+        {
+          "file": "src/components/ActionMenu/ActionMenu.scss",
+          "sha256": "facde64326c62dad93f6ad89ad23b5591d20af94641b41de63d5066b2cd77838"
+        },
+        {
+          "file": "src/components/ActionMenu/index.js",
+          "sha256": "9ee58b02967fb98a27a791e4f845a9a7817e9131ede993e91094008f2bcaa9f9"
+        },
+        {
+          "file": "src/components/AnimatedMenuIcon/AnimatedMenuIcon.jsx",
+          "sha256": "a7abc5f3c375d1ccc71adeb66844691f6b569062bb444aa9983d3da38f83ea8e"
+        },
+        {
+          "file": "src/components/AnimatedMenuIcon/AnimatedMenuIcon.scss",
+          "sha256": "828ebc2d7ba8b918abfdea1ef8a687a8b64ccb8aa66b8858596dc9ee05c76476"
+        },
+        {
+          "file": "src/components/AnimatedMenuIcon/index.js",
+          "sha256": "264272d34bbeeb0a095a64325d9cc198af63b50333f175fe264dc3821ce297fe"
+        },
+        {
+          "file": "src/components/Button/Button.jsx",
+          "sha256": "20e22cc27641e3df994bfdb9afecb923fa1e899fd7f2b3fb612555a4b9988c77"
+        },
+        {
+          "file": "src/components/Button/Button.scss",
+          "sha256": "3bfb0963869d6527e8ad8a05b9376d8d6a23b9daf26a2e00f14adfa5b1c76054"
+        },
+        {
+          "file": "src/components/Button/index.js",
+          "sha256": "e8b8b7debecb3ae455b5f553348ff17f4cbc8615c42c8296417c9950ed12f865"
+        },
+        {
+          "file": "src/components/Checkbox/Checkbox.jsx",
+          "sha256": "ea11519496d1ee623170a3e4c1b69be849e8a0abb96673bfb17da6bcfe5e863d"
+        },
+        {
+          "file": "src/components/Checkbox/Checkbox.scss",
+          "sha256": "4ebd9d7c9f7a0b8644f526f03d61cb6485467c128dde442d54cecfecdbea6d4e"
+        },
+        {
+          "file": "src/components/Checkbox/index.js",
+          "sha256": "5289677b46b004acb124434a2f51d1d915c41a1a15d70fd71b387a62daa98073"
+        },
+        {
+          "file": "src/components/CyberIconButton/CyberIconButton.jsx",
+          "sha256": "346125069e91b4517f6f964eef34a77f812d1dd96981de30a41cf99bce6d6841"
+        },
+        {
+          "file": "src/components/CyberIconButton/CyberIconButton.scss",
+          "sha256": "5138c953d2013de72c5e6542dd7b37a40053646f6c56cd148c07303c784ae8d9"
+        },
+        {
+          "file": "src/components/CyberIconButton/index.js",
+          "sha256": "b8c40a267940ff93bf964cc8bd818558487d179190f69f865bdad8066bfa2d29"
+        },
+        {
+          "file": "src/components/Gallery/Gallery.jsx",
+          "sha256": "c53c77e8df1fc7ac41c6dd730a0ecf948cae1659a4c02f2633e6d817dfd9f827"
+        },
+        {
+          "file": "src/components/Gallery/Gallery.scss",
+          "sha256": "3cace2f3f0775434a5c80722ee27de6909fd3fb4e8221ed9c63cb53389b02a1e"
+        },
+        {
+          "file": "src/components/Gallery/index.js",
+          "sha256": "b4af35a287d4e25702e5330a08207ed8a87e275e5f14ea956b8b56ee37d6324a"
+        },
+        {
+          "file": "src/components/HolographicStatusIndicator/HolographicStatusIndicator.jsx",
+          "sha256": "e1103b135ace3fb038a220d886acd3858f5945e89d4160424c5b6907181f13b6"
+        },
+        {
+          "file": "src/components/HolographicStatusIndicator/HolographicStatusIndicator.scss",
+          "sha256": "d42764e8f892a97b259b72ee1dfcad53fbbfc770452acf539f3fa66e14928f30"
+        },
+        {
+          "file": "src/components/HolographicStatusIndicator/index.js",
+          "sha256": "15f2718c1dfc134d7cac105a28d1468da9536f9771421b32beb3754aa7b199e4"
+        },
+        {
+          "file": "src/components/Input/index.js",
+          "sha256": "47a465b458ac445befbe4d428e79392cd69ad5ec5dd565d55454d716d6da052d"
+        },
+        {
+          "file": "src/components/Input/Input.jsx",
+          "sha256": "a5a0382b4fdc7e9bd6069495e69115290524d5180ab9a903d853362f7f106fdd"
+        },
+        {
+          "file": "src/components/Input/Input.scss",
+          "sha256": "b42bcb7e1b4b04b7b74f1182f781c902feddeb2b3bd8f3b5c8be8ba1c80ddf4b"
+        },
+        {
+          "file": "src/components/LoadingIndicator/index.js",
+          "sha256": "ce4bde31af7c28138cfca7280f496a42ba7161fbd801a0e334a99660d784d8b0"
+        },
+        {
+          "file": "src/components/LoadingIndicator/LoadingIndicator.jsx",
+          "sha256": "dd5583451f019eb6b23d63ec37190e8235a03b9bda3559d438e121c3837b3ef7"
+        },
+        {
+          "file": "src/components/LoadingIndicator/LoadingIndicator.scss",
+          "sha256": "4746a745b10fc71db078f5ce982cb8933bc0e90b2bce90b35ffa392ee42ff993"
+        },
+        {
+          "file": "src/components/ReloadIcon/index.js",
+          "sha256": "e08319853dae2e64e904a8dd760b6e60885da87a917d20754782b68f28d68343"
+        },
+        {
+          "file": "src/components/ReloadIcon/ReloadIcon.jsx",
+          "sha256": "3ddfb82fa163d67ea236584cce7f8876684b1b49a9707e7224b0e6fe5bd5149e"
+        },
+        {
+          "file": "src/components/SearchField/index.js",
+          "sha256": "d38f73e2ac4b5c156436dbdb2acb4c6a1c7e216fb0431fb9a77445ccdd94a6f4"
+        },
+        {
+          "file": "src/components/SearchField/SearchField.jsx",
+          "sha256": "399ccaf5e7558319be7997883dd3b6f1da12fb0978b193d105a8721d0a17d2cc"
+        },
+        {
+          "file": "src/components/SearchField/SearchField.scss",
+          "sha256": "630f22231488a24f575c7444f0ed0d845cc52eadd98d4ade03d5d826623e9f3f"
+        },
+        {
+          "file": "src/components/SegmentedControl/index.js",
+          "sha256": "a83480ec7870600ffef9d0fa177ce9587181480423240ef587cccbb14079fd5e"
+        },
+        {
+          "file": "src/components/SegmentedControl/SegmentedControl.jsx",
+          "sha256": "179a6067f49989ce56741cf546f38e1b3d3dea9427e609462391780ad12578b1"
+        },
+        {
+          "file": "src/components/SegmentedControl/SegmentedControl.scss",
+          "sha256": "40d2164f03af3b0626737d86d7a6a7acef6e37a24b673014adf344a263859900"
+        },
+        {
+          "file": "src/components/Select/index.js",
+          "sha256": "b732d44a25edbb6e3ead700869ae6a888bee24f3af5d4be100ad0f3033bf0777"
+        },
+        {
+          "file": "src/components/Select/Select.jsx",
+          "sha256": "23e543dccb88dd8e44ed621902435fe0ead1abff8adb8ed005eab779cc68f66b"
+        },
+        {
+          "file": "src/components/Select/Select.scss",
+          "sha256": "2f1d14a7427a27dea29d15cdbdc167b50983d7366b1e47ee8ad409c92d319249"
+        },
+        {
+          "file": "src/components/Switch/index.js",
+          "sha256": "2e259c425911633528a23b79ccc75434385bc01357b3a867a6be7c44bd886b8f"
+        },
+        {
+          "file": "src/components/Switch/Switch.jsx",
+          "sha256": "5184a6a79383fbca8113be95cf442a541ea39425c4a182ce1c49e34fd4b70946"
+        },
+        {
+          "file": "src/components/Switch/Switch.scss",
+          "sha256": "f91b49bb7a5f1f5a2d2115ccded3ab44a6e8275f8fd6a5a920353e78e81fecf9"
+        },
+        {
+          "file": "src/components/TaskStatusPanel/index.js",
+          "sha256": "0ab7662a6bab049ecc6e312d452d48107fd4c68a233eef581cea9eeb4989a2c9"
+        },
+        {
+          "file": "src/components/TaskStatusPanel/TaskStatusPanel.jsx",
+          "sha256": "04743b00d611852d622acf182965f0f62ac259c484313fc230bcfc901d904ded"
+        },
+        {
+          "file": "src/components/TaskStatusPanel/TaskStatusPanel.scss",
+          "sha256": "7c2a745e3db6e0a5dea8047f3dd955c58a9053975a1b316412ac4b2279ae22d3"
+        },
+        {
+          "file": "src/components/TextArea/index.js",
+          "sha256": "86c73a35eaea934d25bac97fd8db4da2751edcaf68c1f33ecbc1a1bcf70b03fa"
+        },
+        {
+          "file": "src/components/TextArea/TextArea.jsx",
+          "sha256": "309c6f50a1a6ce7e864e2af842abce02b16113c0e374b3a3ceb7207899bc2863"
+        },
+        {
+          "file": "src/components/TextArea/TextArea.scss",
+          "sha256": "2766d1e8cf427d890513d13dd851db8b49c8b1e51a1fce5b367839a21f979d46"
+        },
+        {
+          "file": "src/components/Tooltip/index.js",
+          "sha256": "1af1b0f01cbf15c941574404e66a9c786796f029a12ed8f582830acacc047c5d"
+        },
+        {
+          "file": "src/components/Tooltip/Tooltip.jsx",
+          "sha256": "6bde66aa3638ff15beefb598197af7efb9da911e0c7d763a838deb466716060d"
+        },
+        {
+          "file": "src/components/Tooltip/Tooltip.scss",
+          "sha256": "da03e060ef19fdf8872dbb07661063f1a4923b4a0a6008f1277c09fc398bbe5f"
+        },
+        {
+          "file": "src/index.js",
+          "sha256": "da5f0c58805f1b1a5e028160df02bfbec17baea21efbb83cd4ac8ebc1be411fd"
+        },
+        {
+          "file": "src/legacy/Fields.jsx",
+          "sha256": "ec3d123b18bb1fbbc1730b2f40a0a2560c84c330dccddbf9c13d821efa42cace"
+        },
+        {
+          "file": "src/legacy/Panels.jsx",
+          "sha256": "8f7a1893c63189badbce67fccea6810ac1f9b4f705bcf7c8291fab5e42363926"
+        },
+        {
+          "file": "src/legacy/States.jsx",
+          "sha256": "d24390a39294d60f5d430296ef74dbadf7b7ee3d595c4bef31a6e2fe66f40de5"
+        },
+        {
+          "file": "src/legacy/Workspace.jsx",
+          "sha256": "07f37be1eeec703f67636282fa9ca175aaf3b2a7c7b50f85c1fe7ff72126f751"
+        },
+        {
+          "file": "src/scss/_index.scss",
+          "sha256": "69577407620492da9a6ef6fb361167d74849c2065c48c841e68d9ac4a7c1745a"
+        },
+        {
+          "file": "src/scss/_nexus-ui-tools.scss",
+          "sha256": "792b009b3b49e6aad7d66640738f4eadcacd730cb47b9012754c9ddbf5e4305e"
+        },
+        {
+          "file": "src/scss/theme/_color.scss",
+          "sha256": "22d897b5e03d812de0a9a41d86c351c4c67b8d1e207a514d7ec30c283cd1db27"
+        },
+        {
+          "file": "src/scss/theme/_layout.scss",
+          "sha256": "fd75616be1e7da6907a90c6aa32f6c1f181bc2132f73986e769dd46a1c95f14c"
+        },
+        {
+          "file": "src/scss/theme/_legacy.scss",
+          "sha256": "530c035cb07cf5743cd74862ba4bdd18b2c8ff5685dc9a3c64c24e2477decd70"
+        },
+        {
+          "file": "src/scss/theme/_root.scss",
+          "sha256": "78a68cd4b0a2c1be72c8a31be58aab157e14de9aca873821d94268bc5b77a6f4"
+        },
+        {
+          "file": "src/scss/theme/_semantic.scss",
+          "sha256": "9e0e5e73da0e29824dd4064f9e4058e1c2c5d01f19a5cb34a30df1ced5ca28ab"
+        },
+        {
+          "file": "src/scss/tools/_functions.scss",
+          "sha256": "2e467a8f1d480337059f41a8155a30cbdafe6760f4d43144ea9f90de6359425f"
+        },
+        {
+          "file": "src/scss/tools/_index.scss",
+          "sha256": "8b2d417d47284b1b70282e6da074b4c83f36d7ae5692a57ed1a513f1e0911897"
+        },
+        {
+          "file": "src/scss/tools/_interaction.scss",
+          "sha256": "a0e2b86ac02228330c717cb584ed0479fa28841c54f7e5cedbe45fcaaae399b6"
+        },
+        {
+          "file": "src/scss/tools/_layout.scss",
+          "sha256": "f81caa90525a13d5911df691e8947314d956337f0ba8eabb3263e6e09edd4bbb"
+        },
+        {
+          "file": "src/scss/tools/_motion.scss",
+          "sha256": "4ded58053002fb43f113e05707edd76ef0d1c4a157d248dbad4eb5b5de8c5f4f"
+        },
+        {
+          "file": "src/scss/tools/_surface.scss",
+          "sha256": "61b515f7c355aae3900fabb55d65bb49ba03943605b6e31c021b02b291f0dff4"
+        },
+        {
+          "file": "src/scss/tools/_typography.scss",
+          "sha256": "e181fa4801c559b11949c812a10a34bbf0d892c95151b7e09b49b4af1c692b18"
+        },
+        {
+          "file": "src/scss/utilities/_animations.scss",
+          "sha256": "90a8f23f427fa85636a28e4aac7c5979b4c93e9295beda64b7a69e4fb990606b"
+        },
+        {
+          "file": "src/scss/utilities/_base.scss",
+          "sha256": "5742fe98a586bbe0239b876b3cbfbbcefc3353fb97b9bbe8f4112ed505b67bbf"
+        },
+        {
+          "file": "src/scss/utilities/_scrollbars.scss",
+          "sha256": "4cc0d509168b858b35eff769636a4ec3c9ffff724dd00f7af83185b9ec07a5d4"
+        },
+        {
+          "file": "src/shell/ExplorerRow/ExplorerRow.jsx",
+          "sha256": "d23f53dfc1740f2d996d70b5147ef158847ce72b5a29a2b9792b722f3adc661d"
+        },
+        {
+          "file": "src/shell/ExplorerRow/ExplorerRow.scss",
+          "sha256": "24486194e8ff510d085dda8aecd1bd929d7f78665384082ad98963ccebccf6b8"
+        },
+        {
+          "file": "src/shell/ExplorerRow/index.js",
+          "sha256": "31737091309bdf407516742a486253e3ca31f3bf6b0522098fd5c86b19785ae4"
+        },
+        {
+          "file": "src/shell/index.js",
+          "sha256": "181fb1e88c5e3f185b95d514df10713122ad098f70cdc1a58a8bb9b10c4b2026"
+        },
+        {
+          "file": "src/shell/ShellGlyph/index.js",
+          "sha256": "81a3ea44db7ba439965aae34322434e6014d81a7471e92359fa3a8f8d06bf6fc"
+        },
+        {
+          "file": "src/shell/ShellGlyph/ShellGlyph.jsx",
+          "sha256": "0ff39f82eeb187ddfe03aa44bb3bcaa8a98c6fe96314a547fe7bc0cc66d859ec"
+        },
+        {
+          "file": "src/shell/ShellGlyph/ShellGlyph.scss",
+          "sha256": "7479b958cf47441155ed3c2eb41d8561e3ecbba0864c5d17d257527c59c34d59"
+        },
+        {
+          "file": "src/shell/ShellTab/index.js",
+          "sha256": "d447e782854d8f9d8b44662605dc7f2e8601df3072bfd207468fbd087024c2f7"
+        },
+        {
+          "file": "src/shell/ShellTab/ShellTab.jsx",
+          "sha256": "f715027ea17b3b8ae464f4c3ada0fc1a99a5592f97df1d4a2c301fa77074d597"
+        },
+        {
+          "file": "src/shell/ShellTab/ShellTab.scss",
+          "sha256": "25fb742142580b22f18382a8318228186122fecfea4f63263951799806e96597"
+        },
+        {
+          "file": "src/styles/_components.scss",
+          "sha256": "3ca21f9306ae63bdb99ebd515c79567faf32dd9c4936d64b79dff3c80a145ac8"
+        },
+        {
+          "file": "src/styles/_index.scss",
+          "sha256": "8830426b3eba944d92bbd2129465247ce3f70a1167bad3ddfb44af0bdfa986d0"
+        },
+        {
+          "file": "src/theme/workspaceTheme.mjs",
+          "sha256": "5d0b798a0a9e6e7b31924fd399b8beea5d600ce0c21e107b81c8a23c92800f8e"
+        },
+        {
+          "file": "src/utils/cx.js",
+          "sha256": "af737ae92785d93d7761c9de552ab25387f44190f06103ad53ca71e0b3d7e369"
+        }
+      ]
+    }
+  ]
+}

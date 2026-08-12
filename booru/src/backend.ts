@@ -9,8 +9,7 @@ import chokidar from "chokidar";
 import type {
   NexusBackendPluginContext,
   NexusBackendPluginModule,
-} from "../../../nexus-backend/src/plugins/types.ts";
-import { createDevLogger } from "../../../nexus-backend/src/shared/dev-log.js";
+} from "@nexus/plugin-sdk";
 import {
   createBooruMediaRuntimeAccess,
   isSystemicMediaRuntimeError,
@@ -524,7 +523,7 @@ const BOORU_RUNTIME_STATE_KEYS: Record<RuntimeInvalidationKey, string> = {
   watcherVersion: `plugins.runtimeState.${BOORU_PLUGIN_ID}.watcherVersion`,
   metricsVersion: `plugins.runtimeState.${BOORU_PLUGIN_ID}.metricsVersion`,
 };
-const booruBackendLogger = createDevLogger("backend.plugins.booru");
+let booruBackendLogger: NexusBackendPluginContext["log"];
 
 let runtimeState: RuntimeState | null = null;
 
@@ -7345,6 +7344,7 @@ const booruPlugin: NexusBackendPluginModule = {
   },
 
   async activate(ctx: NexusBackendPluginContext) {
+    booruBackendLogger = ctx.log;
     const state = createRuntimeState(ctx);
     runtimeState = state;
     const abortFromHost = () => {

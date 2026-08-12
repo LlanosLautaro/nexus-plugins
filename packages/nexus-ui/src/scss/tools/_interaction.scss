@@ -1,0 +1,161 @@
+// Public @nexus/ui interaction mixins.
+@mixin chrome-static() {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+
+@mixin interactive-chip(
+  $radius: var(--ui-radius-control, var(--radius-m)),
+  $background: var(--surface-pill),
+  $border: var(--color-line),
+  $color: var(--color-text-soft)
+) {
+  @include chrome-static();
+  border-radius: $radius;
+  border: 1px solid $border;
+  background: $background;
+  color: $color;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+
+  &:hover:not(:disabled) {
+    background:
+      linear-gradient(var(--ui-hover-overlay), var(--ui-hover-overlay)),
+      $background;
+    border-color: var(--color-line-strong);
+    transform: translateY(-1px);
+  }
+}
+
+@mixin interactive-tile(
+  $radius: var(--ui-radius-control, var(--radius-m)),
+  $background: var(--surface-pill),
+  $border: var(--color-line),
+  $color: var(--color-text)
+) {
+  @include chrome-static();
+  border-radius: $radius;
+  border: 1px solid $border;
+  background: $background;
+  color: $color;
+  box-shadow: inset 0 1px 0 var(--fx-sheen-soft);
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+
+  &:hover:not(:disabled) {
+    background:
+      linear-gradient(var(--ui-hover-overlay), var(--ui-hover-overlay)),
+      $background;
+    border-color: var(--color-line-strong);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(0, 0, 0, 0.14);
+  }
+}
+
+@mixin interactive-active($shadow: 0 12px 24px rgba(0, 0, 0, 0.18)) {
+  background: var(--gradient-active);
+  border-color: var(--color-border-accent);
+  color: var(--color-text);
+  box-shadow: inset 0 1px 0 var(--fx-sheen-strong), $shadow;
+}
+
+@mixin button-base(
+  $height: var(--control-height-m),
+  $radius: var(--ui-radius-control, var(--radius-m)),
+  $background: var(--button-secondary-bg),
+  $border: var(--button-secondary-border),
+  $color: var(--button-secondary-text)
+) {
+  @include chrome-static();
+  min-height: $height;
+  border-radius: $radius;
+  border: 1px solid $border;
+  background: $background;
+  color: $color;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+
+  &:hover:not(:disabled),
+  &:focus-visible:not(:disabled) {
+    border-color: var(--color-line-strong);
+    background:
+      linear-gradient(var(--ui-hover-overlay), var(--ui-hover-overlay)),
+      $background;
+    color: var(--color-text);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.58;
+    cursor: default;
+  }
+}
+
+@mixin button-primary {
+  @include button-base(
+    $background: var(--button-primary-bg),
+    $border: var(--button-primary-border),
+    $color: var(--button-primary-text)
+  );
+  box-shadow: inset 0 1px 0 var(--fx-sheen-strong);
+}
+
+@mixin button-secondary {
+  @include button-base();
+}
+
+@mixin button-danger {
+  @include button-base(
+    $background: var(--button-danger-bg),
+    $border: var(--button-danger-border),
+    $color: var(--button-danger-text)
+  );
+}
+
+@mixin field-control($height: var(--control-height-m)) {
+  width: 100%;
+  min-width: 0;
+  min-height: $height;
+  border: 1px solid var(--field-border);
+  border-radius: var(--ui-radius-control, var(--radius-m));
+  outline: 0;
+  background: var(--field-bg);
+  color: var(--field-text);
+  font: inherit;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+
+  &::placeholder {
+    color: var(--field-placeholder);
+  }
+
+  &:hover:not(:disabled) {
+    border-color: var(--ui-border-control-strong);
+  }
+
+  &:focus,
+  &:focus-visible {
+    border-color: var(--field-border-focus);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.58;
+  }
+}

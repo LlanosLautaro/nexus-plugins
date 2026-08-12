@@ -1,0 +1,49 @@
+.nexus-ui-loading {
+  display: grid;
+  grid-template-columns: repeat(2, 8px);
+  gap: 3px;
+  width: max-content;
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--ui-accent) 34%, transparent));
+}
+
+.nexus-ui-loading__cell {
+  width: 8px;
+  height: 8px;
+  border: 1px solid color-mix(in srgb, var(--ui-accent) 62%, var(--ui-border-control));
+  border-radius: var(--ui-radius-control);
+  background: color-mix(in srgb, var(--ui-accent) 16%, var(--ui-surface-inset));
+  animation: nexus-ui-loading-cell var(--duration-ambient, 2400ms) ease-in-out infinite;
+}
+
+.nexus-ui-loading__cell:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.nexus-ui-loading__cell:nth-child(4) {
+  animation-delay: 240ms;
+}
+
+.nexus-ui-loading__cell:nth-child(3) {
+  animation-delay: 360ms;
+}
+
+@keyframes nexus-ui-loading-cell {
+  0%,
+  62%,
+  100% {
+    background: color-mix(in srgb, var(--ui-accent) 14%, var(--ui-surface-inset));
+    opacity: 0.42;
+  }
+
+  31% {
+    background: var(--ui-accent);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexus-ui-loading__cell {
+    animation: none;
+    opacity: 0.78;
+  }
+}

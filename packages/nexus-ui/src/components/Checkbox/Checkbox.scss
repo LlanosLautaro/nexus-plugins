@@ -1,0 +1,90 @@
+.nexus-ui-checkbox {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--ui-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.nexus-ui-checkbox__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.nexus-ui-checkbox__box {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  place-items: center;
+  border: 1px solid var(--ui-border-control-strong);
+  border-radius: var(--ui-radius-control);
+  background: var(--field-bg);
+  color: var(--ui-text-primary);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.nexus-ui-checkbox__box svg {
+  width: 11px;
+  height: 10px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-width: 1.8;
+  opacity: 0;
+  transform: translateY(-1px);
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.nexus-ui-checkbox:hover .nexus-ui-checkbox__box {
+  border-color: var(--ui-selector-icon-hover);
+}
+
+.nexus-ui-checkbox__input:focus-visible + .nexus-ui-checkbox__box {
+  border-color: var(--ui-border-focus);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ui-accent) 24%, transparent);
+}
+
+.nexus-ui-checkbox__input:checked + .nexus-ui-checkbox__box {
+  border-color: color-mix(in srgb, var(--ui-accent) 60%, var(--ui-border-control));
+  background: color-mix(in srgb, var(--ui-accent) 18%, var(--ui-surface-inset));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ui-accent) 18%, transparent);
+}
+
+.nexus-ui-checkbox__input:checked + .nexus-ui-checkbox__box svg {
+  opacity: 1;
+}
+
+.nexus-ui-checkbox__input:disabled ~ * {
+  cursor: default;
+  opacity: 0.54;
+}
+
+.nexus-ui-checkbox__copy {
+  display: grid;
+  gap: 3px;
+}
+
+.nexus-ui-checkbox__label {
+  color: var(--ui-text-primary);
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.nexus-ui-checkbox__description {
+  color: var(--ui-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}

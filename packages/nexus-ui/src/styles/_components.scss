@@ -1,0 +1,461 @@
+@use "../scss" as *;
+
+.nexus-ui-page {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--workspace-main-bg);
+  container-type: inline-size;
+}
+
+.nexus-ui-topbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--ui-border-divider);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--shell-bg-strong) 92%, transparent), color-mix(in srgb, var(--shell-bg) 97%, transparent));
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nexus-ui-title {
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nexus-ui-title__copy,
+.nexus-ui-panel-title,
+.nexus-ui-panel-header__copy {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.nexus-ui-eyebrow {
+  @include eyebrow(var(--ui-text-muted), 0.14em);
+}
+
+.nexus-ui-title strong,
+.nexus-ui-panel-title strong,
+.nexus-ui-state strong,
+.nexus-ui-metric strong {
+  @include section-title();
+}
+
+.nexus-ui-title p,
+.nexus-ui-panel-title p,
+.nexus-ui-state p,
+.nexus-ui-metric p {
+  margin: 0;
+  color: var(--ui-text-muted);
+  line-height: 1.45;
+}
+
+.nexus-ui-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nexus-ui-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 0;
+}
+
+.nexus-ui-split {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.nexus-ui-split--main-aside {
+  @include split-main-aside(360px, var(--space-4));
+}
+
+.nexus-ui-split--sidebar-detail {
+  @include split-sidebar-detail(320px, var(--space-4));
+}
+
+.nexus-ui-split__main,
+.nexus-ui-split__aside,
+.nexus-ui-split__sidebar,
+.nexus-ui-split__detail {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.nexus-ui-split__aside {
+  background: transparent;
+}
+
+.nexus-ui-scroll-region {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.nexus-ui-panel {
+  @include section-panel();
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.nexus-ui-panel--soft {
+  background: var(--shell-panel-soft);
+}
+
+.nexus-ui-panel--highlight {
+  background: var(--shell-panel-highlight);
+}
+
+.nexus-ui-panel--danger {
+  background: var(--state-danger-bg);
+  border-color: var(--state-danger-border);
+}
+
+.nexus-ui-panel--padding-tight {
+  padding: var(--panel-padding-s);
+}
+
+.nexus-ui-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nexus-ui-panel-header__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.nexus-ui-stack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.nexus-ui-button {
+  @include button-secondary();
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 14px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nexus-ui-button--primary {
+  @include button-primary();
+}
+
+.nexus-ui-button--danger {
+  @include button-danger();
+}
+
+.nexus-ui-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px;
+  border-radius: var(--ui-radius-control);
+  border: 1px solid var(--ui-border-control);
+  background: color-mix(in srgb, var(--ui-surface-raised) 92%, transparent);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nexus-ui-segmented--compact {
+  --segment-padding: 2px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--segment-count, 1), minmax(0, 1fr));
+  gap: 0;
+  min-width: 0;
+  padding: var(--segment-padding);
+  border-radius: var(--ui-radius-control);
+  background: color-mix(in srgb, var(--ui-surface-raised) 90%, transparent);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.nexus-ui-segmented--compact::before {
+  content: "";
+  position: absolute;
+  top: var(--segment-padding);
+  bottom: var(--segment-padding);
+  left: calc(var(--segment-padding) + 1px);
+  width: calc((100% - (var(--segment-padding) * 2)) / var(--segment-count, 1));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, var(--ui-border-control));
+  border-radius: max(1px, calc(var(--ui-radius-control) - 1px));
+  background:
+    linear-gradient(180deg, var(--fx-sheen-soft), transparent),
+    color-mix(in srgb, var(--shell-panel-bg) 78%, var(--color-accent) 22%);
+  box-shadow:
+    0 8px 14px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 var(--fx-sheen-soft);
+  transform: translate3d(calc(var(--active-index, 0) * 100%), 0, 0);
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), opacity 120ms ease;
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.nexus-ui-segmented--compact.has-active::before {
+  opacity: 1;
+}
+
+.nexus-ui-segmented__button {
+  @include button-secondary();
+  min-height: 30px;
+  padding: 0 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.nexus-ui-segmented--compact .nexus-ui-segmented__button {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text-muted);
+  font-size: 0.73rem;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  transform: none;
+  transition: color var(--duration-fast) var(--ease-standard);
+  backface-visibility: hidden;
+}
+
+.nexus-ui-segmented--compact .nexus-ui-segmented__button:hover,
+.nexus-ui-segmented--compact .nexus-ui-segmented__button:focus-visible {
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text);
+  transform: none;
+}
+
+.nexus-ui-segmented--compact .nexus-ui-segmented__button.is-active {
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text);
+  transform: none;
+}
+
+.nexus-ui-segmented__button.is-disabled,
+.nexus-ui-segmented__button:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.nexus-ui-segmented--compact .nexus-ui-segmented__button.is-disabled,
+.nexus-ui-segmented--compact .nexus-ui-segmented__button:disabled {
+  color: color-mix(in srgb, var(--color-text-muted) 78%, transparent);
+}
+
+.nexus-ui-segmented--compact .nexus-ui-segmented__button.is-disabled:hover,
+.nexus-ui-segmented--compact .nexus-ui-segmented__button.is-disabled:focus-visible,
+.nexus-ui-segmented--compact .nexus-ui-segmented__button:disabled:hover,
+.nexus-ui-segmented--compact .nexus-ui-segmented__button:disabled:focus-visible {
+  background: transparent;
+  box-shadow: none;
+  color: color-mix(in srgb, var(--color-text-muted) 78%, transparent);
+}
+
+.nexus-ui-segmented__label {
+  @include truncate;
+  min-width: 0;
+}
+
+.nexus-ui-segmented__button.is-active {
+  @include interactive-active($shadow: 0 10px 18px rgba(0, 0, 0, 0.14));
+}
+
+.nexus-ui-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+
+  @media (max-width: 780px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nexus-ui-field,
+.nexus-ui-inline-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nexus-ui-field--wide {
+  grid-column: 1 / -1;
+}
+
+.nexus-ui-field__label,
+.nexus-ui-inline-field__label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nexus-ui-field__description {
+  color: var(--color-text-subtle);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.nexus-ui-inline-field {
+  justify-content: flex-end;
+}
+
+.nexus-ui-inline-field--grow {
+  flex: 1 1 auto;
+}
+
+.nexus-ui-field__control,
+.nexus-ui-inline-field__control {
+  min-width: 0;
+}
+
+.nexus-ui-field input,
+.nexus-ui-field textarea,
+.nexus-ui-field select,
+.nexus-ui-inline-field input,
+.nexus-ui-inline-field textarea,
+.nexus-ui-inline-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-height-m);
+  border-radius: var(--ui-radius-control);
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--field-text);
+  padding: 0 12px;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+  user-select: text;
+  -webkit-user-select: text;
+
+  &::placeholder {
+    color: var(--field-placeholder);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--field-border-focus);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  }
+}
+
+.nexus-ui-field textarea,
+.nexus-ui-inline-field textarea {
+  min-height: 88px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.nexus-ui-notice {
+  padding: 10px 12px;
+  border-radius: var(--ui-radius-panel);
+  border: 1px solid var(--notice-info-border);
+  background: var(--notice-info-bg);
+  color: var(--color-text);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nexus-ui-notice--success {
+  border-color: var(--notice-success-border);
+  background: var(--notice-success-bg);
+}
+
+.nexus-ui-notice--warning {
+  border-color: var(--notice-warning-border);
+  background: var(--notice-warning-bg);
+}
+
+.nexus-ui-notice--danger {
+  border-color: var(--notice-danger-border);
+  background: var(--notice-danger-bg);
+}
+
+.nexus-ui-state,
+.nexus-ui-metric {
+  @include state-block();
+  display: grid;
+  gap: var(--space-2);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nexus-ui-state--centered {
+  place-items: center;
+  text-align: center;
+  align-content: center;
+}
+
+.nexus-ui-state--danger {
+  background: var(--state-danger-bg);
+  border-color: var(--state-danger-border);
+}
+
+.nexus-ui-metric {
+  @include metric-card();
+}
+
+.nexus-ui-metric--highlight {
+  @include metric-card(highlight);
+}
+
+.nexus-ui-metric--soft {
+  @include metric-card(soft);
+}
+
+.nexus-ui-metric strong {
+  font-size: clamp(1.15rem, 2vw, 1.6rem);
+  line-height: 1.02;
+}

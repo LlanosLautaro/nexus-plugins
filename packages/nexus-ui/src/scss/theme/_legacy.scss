@@ -1,0 +1,29 @@
+// Compatibility aliases retained for the staged host/plugin migration.
+@mixin register-legacy-aliases() {
+  --font-ui-sans: var(--font-sans);
+  --font-color: var(--color-text);
+
+  --color-base-00: var(--color-canvas);
+  --color-base-05: var(--color-surface-0);
+  --color-base-10: var(--color-surface-1);
+  --color-base-20: var(--color-surface-2);
+  --color-base-25: var(--color-surface-3);
+  --color-base-30: color-mix(in srgb, var(--color-surface-3) 86%, white 14%);
+  --color-base-32: var(--color-line);
+  --color-base-35: color-mix(in srgb, var(--color-canvas) 70%, white 30%);
+  --color-base-40: color-mix(in srgb, var(--color-canvas) 60%, white 40%);
+  --color-base-45: color-mix(in srgb, var(--color-canvas) 52%, white 48%);
+  --color-base-50: color-mix(in srgb, var(--color-canvas) 44%, white 56%);
+  --color-base-60: color-mix(in srgb, var(--color-canvas) 30%, white 70%);
+  --color-base-70: color-mix(in srgb, var(--color-canvas) 20%, white 80%);
+  --color-base-80: color-mix(in srgb, var(--color-canvas) 14%, white 86%);
+  --color-base-90: color-mix(in srgb, var(--color-canvas) 8%, white 92%);
+  --color-base-95: color-mix(in srgb, var(--color-canvas) 5%, white 95%);
+  --color-base-100: var(--color-text);
+
+  --border-line-1: 1px solid var(--color-line);
+
+  --explorer-surface: var(--explorer-bg);
+  --shell-titlebar: var(--shell-titlebar-bg);
+  --shell-titlebar-border: var(--color-panel-border);
+}

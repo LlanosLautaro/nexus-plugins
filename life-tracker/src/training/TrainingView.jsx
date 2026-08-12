@@ -68,10 +68,13 @@ import {
   WorkspaceTitle,
   WorkspaceTopbar,
 } from "@nexus/ui";
-import {
-  EmbeddedMarkdownLiveEditor as MarkdownLiveEditor,
-  EmbeddedMarkdownReadSurface as MarkdownReadSurface,
-} from "../../../../nexus-frontend/src/editors/Markdown/embeddedSurface.jsx";
+let MarkdownLiveEditor;
+let MarkdownReadSurface;
+
+export function configureTrainingHostUi(ui) {
+  MarkdownLiveEditor = ui.markdown.EmbeddedMarkdownLiveEditor;
+  MarkdownReadSurface = ui.markdown.EmbeddedMarkdownReadSurface;
+}
 
 const LIFE_TRACKER_TRAINING_CHANNEL_PREFIX = "life-tracker:training";
 

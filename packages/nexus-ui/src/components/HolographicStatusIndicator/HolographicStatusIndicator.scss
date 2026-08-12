@@ -1,0 +1,112 @@
+.nexus-ui-holo-status {
+  --holo-status-color: var(--color-success);
+  display: grid;
+  width: 46px;
+  height: 46px;
+  position: relative;
+  place-items: center;
+}
+
+.nexus-ui-holo-status.is-busy {
+  --holo-status-color: var(--color-accent);
+}
+
+.nexus-ui-holo-status.is-error {
+  --holo-status-color: var(--color-danger);
+}
+
+.nexus-ui-holo-status.is-compact {
+  width: 28px;
+  height: 28px;
+}
+
+.nexus-ui-holo-status__aura {
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, var(--holo-status-color) 16%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--holo-status-color) 24%, transparent) 0 18%,
+    transparent 68%
+  );
+  animation: nexus-ui-holo-breathe var(--duration-ambient, 2400ms) ease-in-out infinite;
+}
+
+.nexus-ui-holo-status__orb {
+  position: relative;
+  display: block;
+  width: 25px;
+  height: 25px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--holo-status-color) 68%, transparent);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 37% 31%, white 0 3%, transparent 9%),
+    radial-gradient(
+      circle,
+      color-mix(in srgb, var(--holo-status-color) 92%, transparent) 0 17%,
+      color-mix(in srgb, var(--holo-status-color) 26%, transparent) 36%,
+      var(--ui-canvas) 69%
+    );
+  box-shadow:
+    0 0 8px color-mix(in srgb, var(--holo-status-color) 82%, transparent),
+    0 0 20px color-mix(in srgb, var(--holo-status-color) 38%, transparent);
+}
+
+.is-compact .nexus-ui-holo-status__orb {
+  width: 16px;
+  height: 16px;
+}
+
+.nexus-ui-holo-status__core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--holo-status-color);
+  box-shadow: 0 0 8px var(--holo-status-color);
+  transform: translate(-50%, -50%);
+}
+
+.nexus-ui-holo-status__scan {
+  position: absolute;
+  top: 10%;
+  left: 8%;
+  width: 84%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--holo-status-color) 76%, transparent),
+    transparent
+  );
+  animation: nexus-ui-holo-scan var(--duration-scan, 1900ms) linear infinite;
+}
+
+.nexus-ui-holo-status.is-busy .nexus-ui-holo-status__orb {
+  animation: nexus-ui-holo-turn var(--duration-ambient, 2400ms) linear infinite;
+}
+
+@keyframes nexus-ui-holo-breathe {
+  0%, 100% { opacity: .58; transform: scale(.88); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes nexus-ui-holo-scan {
+  to { transform: translateY(19px); }
+}
+
+@keyframes nexus-ui-holo-turn {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexus-ui-holo-status__aura,
+  .nexus-ui-holo-status__orb,
+  .nexus-ui-holo-status__scan {
+    animation: none;
+  }
+}

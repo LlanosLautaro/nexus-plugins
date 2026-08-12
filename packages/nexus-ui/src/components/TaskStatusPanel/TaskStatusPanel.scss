@@ -1,0 +1,151 @@
+.nexus-ui-task-status-panel {
+  position: fixed;
+  z-index: var(--z-popover, 1100);
+  width: min(320px, calc(100vw - 16px));
+  max-height: min(440px, calc(100vh - 16px));
+  overflow: auto;
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 26%, var(--ui-border-divider));
+  border-radius: var(--ui-radius-panel);
+  outline: 0;
+  background:
+    radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--color-accent) 12%, transparent),
+      transparent 44%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ui-text-primary) 4%, transparent),
+      transparent 24%
+    ),
+    color-mix(in srgb, var(--ui-surface-elevated) 98%, transparent);
+  box-shadow:
+    0 18px 42px rgb(0 0 0 / 58%),
+    0 0 26px color-mix(in srgb, var(--color-accent) 10%, transparent);
+  color: var(--ui-text-primary);
+  font-family: var(--font-sans);
+}
+
+.nexus-ui-task-status-panel__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  min-height: 28px;
+  padding: 4px 6px 8px;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--ui-border-divider);
+}
+
+.nexus-ui-task-status-panel__header strong {
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.nexus-ui-task-status-panel__header span,
+.nexus-ui-task-status-panel__taskHeader,
+.nexus-ui-task-status-panel__task p,
+.nexus-ui-task-status-panel__empty {
+  color: var(--ui-text-muted);
+  font-size: 0.66rem;
+}
+
+.nexus-ui-task-status-panel__list {
+  display: grid;
+}
+
+.nexus-ui-task-status-panel__task {
+  position: relative;
+  display: grid;
+  padding: 9px 7px;
+  gap: 4px;
+}
+
+.nexus-ui-task-status-panel__task + .nexus-ui-task-status-panel__task {
+  border-top: 1px solid var(--ui-border-divider);
+}
+
+.nexus-ui-task-status-panel__task::before {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 2px;
+  border-radius: var(--radius-xs);
+  background: var(--color-accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-accent) 52%, transparent);
+  content: "";
+}
+
+.nexus-ui-task-status-panel__task.is-error::before {
+  background: var(--color-danger);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-danger) 48%, transparent);
+}
+
+.nexus-ui-task-status-panel__taskHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.nexus-ui-task-status-panel__taskHeader span {
+  color: var(--color-accent);
+  font-weight: 650;
+}
+
+.nexus-ui-task-status-panel__task.is-error .nexus-ui-task-status-panel__taskHeader span {
+  color: var(--color-danger);
+}
+
+.nexus-ui-task-status-panel__task > strong {
+  padding-right: 2px;
+  font-size: 0.73rem;
+  font-weight: 620;
+}
+
+.nexus-ui-task-status-panel__task p,
+.nexus-ui-task-status-panel__empty {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.nexus-ui-task-status-panel__progress {
+  height: 3px;
+  overflow: hidden;
+  margin-top: 3px;
+  border-radius: var(--radius-xs);
+  background: var(--ui-surface-inset);
+}
+
+.nexus-ui-task-status-panel__progress span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-accent) 56%, transparent);
+  transition: width var(--duration-fast) var(--ease-standard);
+}
+
+.nexus-ui-task-status-panel__task.is-error .nexus-ui-task-status-panel__progress span {
+  background: var(--color-danger);
+  box-shadow: none;
+}
+
+.nexus-ui-task-status-panel__dismiss {
+  justify-self: start;
+  min-height: 25px;
+  margin-top: 3px;
+  padding-inline: 8px;
+  color: var(--color-danger);
+  font-size: 0.66rem;
+}
+
+.nexus-ui-task-status-panel__empty {
+  padding: 14px 8px;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexus-ui-task-status-panel__progress span {
+    transition: none;
+  }
+}

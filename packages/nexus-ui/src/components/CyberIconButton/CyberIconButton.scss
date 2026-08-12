@@ -1,0 +1,104 @@
+.nexus-ui-cyber-icon-button {
+  position: relative;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
+  background: transparent;
+  color: var(--ui-text-muted);
+  line-height: 0;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    color 300ms ease;
+  transform: none;
+  filter: none;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--ui-border-control);
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+    filter: none;
+  }
+
+  &:hover .nexus-ui-cyber-icon-button__icon,
+  &:focus-visible .nexus-ui-cyber-icon-button__icon {
+    color: var(--ui-selector-icon-hover);
+  }
+
+  &:hover .nexus-ui-cyber-icon-button__glare,
+  &:focus-visible .nexus-ui-cyber-icon-button__glare {
+    opacity: 1;
+  }
+
+  &.is-active,
+  &.is-active:hover {
+    color: var(--ui-text-primary);
+    border-color: var(--color-accent);
+  }
+
+  &.nexus-ui-cyber-icon-button--primary {
+    color: var(--color-accent);
+  }
+
+  &.nexus-ui-cyber-icon-button--danger {
+    color: var(--color-danger);
+  }
+
+  &.is-tooltip-dismissed > .nexus-ui-tooltip,
+  &[aria-expanded="true"] > .nexus-ui-tooltip {
+    opacity: 0;
+    transform: translate(-3px, -50%);
+    transition-delay: 0ms;
+  }
+
+  > .nexus-ui-tooltip {
+    top: 50%;
+    left: calc(100% + 10px);
+    transform: translate(-3px, -50%);
+  }
+
+  &:hover > .nexus-ui-tooltip,
+  &:focus-visible > .nexus-ui-tooltip {
+    transform: translate(0, -50%);
+  }
+
+}
+
+.nexus-ui-cyber-icon-button__icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  color: inherit;
+  transform: none;
+  filter: none;
+
+  svg {
+    display: block;
+    width: 22px;
+    height: 22px;
+    transform: none;
+    filter: none;
+  }
+}
+
+.nexus-ui-cyber-icon-button__glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at 50% -20%,
+    color-mix(in srgb, var(--ui-text-primary) 10%, transparent),
+    transparent 60%
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease;
+}

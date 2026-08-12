@@ -2,7 +2,7 @@ import type {
   NexusBackendPluginContext,
   NexusBackendPluginModule,
   NexusPluginIpcRequestContext,
-} from "../../../nexus-backend/src/plugins/types.ts";
+} from "@nexus/plugin-sdk";
 
 const LM_STUDIO_BASE_URL = "http://127.0.0.1:1234";
 const MODELS_ENDPOINT = "/api/v1/models";

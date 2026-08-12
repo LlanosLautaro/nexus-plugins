@@ -1,0 +1,14 @@
+@use "sass:math";
+// Public @nexus/ui Sass functions.
+
+@function rem($px, $base: 16) {
+  @return math.div($px, $base) * 1rem;
+}
+
+@function strip-unit($number) {
+  @if math.is-unitless($number) {
+    @return $number;
+  }
+
+  @return math.div($number, $number * 0 + 1);
+}

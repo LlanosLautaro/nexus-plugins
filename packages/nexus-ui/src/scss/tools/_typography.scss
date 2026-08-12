@@ -1,0 +1,22 @@
+// Public @nexus/ui typography mixins.
+@mixin eyebrow($color: var(--color-text-subtle), $spacing: 0.18em) {
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: $spacing;
+  text-transform: uppercase;
+  color: $color;
+}
+
+@mixin truncate {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@mixin section-title($size: 1rem) {
+  font-size: $size;
+  line-height: 1.15;
+  color: var(--color-text);
+  font-weight: 650;
+}

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type {
   NexusBackendPluginContext,
   NexusBackendPluginModule,
-} from "../../../../nexus-backend/src/plugins/types.ts";
+} from "@nexus/plugin-sdk";
 import {
   FINANCE_CASH_DENOMINATIONS,
   FINANCE_MOVEMENT_KINDS,

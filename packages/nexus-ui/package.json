@@ -1,0 +1,23 @@
+{
+  "name": "@nexus/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": [
+    "**/*.scss"
+  ],
+  "scripts": {
+    "test": "node --test tests/contracts.test.mjs tests/theme.test.mjs"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./scss": {
+      "sass": "./src/scss/_index.scss",
+      "default": "./src/scss/_index.scss"
+    }
+  },
+  "peerDependencies": {
+    "react": ">=19",
+    "react-dom": ">=19"
+  }
+}

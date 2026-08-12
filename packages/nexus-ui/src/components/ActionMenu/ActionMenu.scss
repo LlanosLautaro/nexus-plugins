@@ -1,0 +1,131 @@
+.nexus-ui-action-menu {
+  position: fixed;
+  z-index: var(--z-popover, 1100);
+  min-width: 208px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 26%, var(--ui-border-divider));
+  border-radius: var(--ui-radius-panel);
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--color-accent) 12%, transparent), transparent 44%),
+    linear-gradient(180deg, color-mix(in srgb, var(--ui-text-primary) 4%, transparent), transparent 24%),
+    color-mix(in srgb, var(--ui-surface-elevated) 98%, transparent);
+  box-shadow:
+    0 18px 42px rgb(0 0 0 / 58%),
+    0 0 26px color-mix(in srgb, var(--color-accent) 10%, transparent);
+  color: var(--ui-text-primary);
+  font-family: var(--font-sans);
+  user-select: none;
+}
+
+.nexus-ui-action-menu__group + .nexus-ui-action-menu__group {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--ui-border-divider);
+}
+
+.nexus-ui-action-menu button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  gap: 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.nexus-ui-action-menu__item {
+  position: relative;
+}
+
+.nexus-ui-action-menu__submenu {
+  position: absolute;
+  top: -4px;
+  left: calc(100% + 4px);
+  z-index: calc(var(--z-popover, 1100) + 1);
+  display: none;
+}
+
+.nexus-ui-action-menu__item.has-children:hover > .nexus-ui-action-menu__submenu,
+.nexus-ui-action-menu__item.has-children:focus-within > .nexus-ui-action-menu__submenu {
+  display: block;
+}
+
+.nexus-ui-action-menu.has-submenus-left
+  .nexus-ui-action-menu__item
+  > .nexus-ui-action-menu__submenu {
+  right: calc(100% + 4px);
+  left: auto;
+}
+
+.nexus-ui-action-menu button::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-accent) 18%, transparent),
+    transparent
+  );
+  transform: translateX(-18%);
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.nexus-ui-action-menu button:hover,
+.nexus-ui-action-menu button.is-selected {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.nexus-ui-action-menu button:hover::before,
+.nexus-ui-action-menu button.is-selected::before {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.nexus-ui-action-menu button.is-danger {
+  color: var(--color-danger);
+}
+
+.nexus-ui-action-menu button.is-danger:hover {
+  background: var(--surface-danger-soft);
+}
+
+.nexus-ui-action-menu__copy,
+.nexus-ui-action-menu__icon,
+.nexus-ui-action-menu__end {
+  position: relative;
+  z-index: 1;
+}
+
+.nexus-ui-action-menu__copy {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 2px;
+}
+
+.nexus-ui-action-menu__copy strong {
+  font-size: 0.72rem;
+  font-weight: 620;
+}
+
+.nexus-ui-action-menu__copy small {
+  color: var(--ui-text-muted);
+  font-size: 0.65rem;
+}
+
+.nexus-ui-action-menu__icon,
+.nexus-ui-action-menu__end {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--ui-text-muted);
+}

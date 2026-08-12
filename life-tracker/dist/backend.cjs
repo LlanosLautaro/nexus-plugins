@@ -26,7 +26,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// ../nexus-plugins/life-tracker/src/backend.ts
+// life-tracker/src/backend.ts
 var backend_exports = {};
 __export(backend_exports, {
   buildTrainingManagedDocAssets: () => buildTrainingManagedDocAssets,
@@ -34,7 +34,7 @@ __export(backend_exports, {
 });
 module.exports = __toCommonJS(backend_exports);
 
-// ../nexus-plugins/life-tracker/src/habitos-core.js
+// life-tracker/src/habitos-core.js
 var TASK_STATUS_VALUES = /* @__PURE__ */ new Set(["open", "completed", "failed"]);
 var HABIT_STATUS_VALUES = /* @__PURE__ */ new Set(["active", "archived"]);
 var OCCURRENCE_STATUS_VALUES = /* @__PURE__ */ new Set(["pending", "completed", "failed", "recorded"]);
@@ -1744,15 +1744,15 @@ function buildHabitosHomeSnapshot(sqlite, options = {}) {
   };
 }
 
-// ../nexus-plugins/life-tracker/src/finance/backend.ts
+// life-tracker/src/finance/backend.ts
 var import_node_crypto = require("node:crypto");
 
-// ../nexus-plugins/life-tracker/src/finance/constants.js
+// life-tracker/src/finance/constants.js
 var FINANCE_MOVEMENT_KINDS = ["income", "expense"];
 var FINANCE_MOVEMENT_STATUSES = ["posted", "planned"];
 var FINANCE_CASH_DENOMINATIONS = [50, 100, 200, 500, 1e3, 2e3, 1e4, 2e4];
 
-// ../nexus-plugins/life-tracker/src/finance/backend.ts
+// life-tracker/src/finance/backend.ts
 function createSuccess(data) {
   return {
     ok: true,
@@ -2212,11 +2212,11 @@ var lifeTrackerFinancePlugin = {
 };
 var backend_default = lifeTrackerFinancePlugin;
 
-// ../nexus-plugins/life-tracker/src/training/backend.ts
+// life-tracker/src/training/backend.ts
 var import_node_crypto2 = require("node:crypto");
-var import_promises = __toESM(require("node:fs/promises"));
+var import_promises = __toESM(require("node:fs/promises"), 1);
 var import_node_fs = require("node:fs");
-var import_node_path = __toESM(require("node:path"));
+var import_node_path = __toESM(require("node:path"), 1);
 
 // node_modules/js-yaml/dist/js-yaml.mjs
 function getDefaultExportFromCjs(x) {
@@ -5276,43 +5276,19 @@ var {
   safeDump
 } = yaml;
 
-// src/internalModules/core/markdown-frontmatter.ts
+// life-tracker/src/training/markdown-frontmatter.ts
 function isPlainObject(value) {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
-function normalizeSource(source) {
-  return String(source || "").replace(/\r\n/g, "\n");
-}
 function extractYamlFrontmatter(source) {
-  const text = normalizeSource(source);
+  const text = String(source || "").replace(/\r\n/g, "\n");
   const lines = text.split("\n");
   if (!lines.length || lines[0].trim() !== "---") {
-    return {
-      hasFrontmatter: false,
-      frontmatter: {},
-      rawFrontmatter: "",
-      body: text,
-      bodyStartLine: 0,
-      parseError: null
-    };
+    return { hasFrontmatter: false, frontmatter: {}, rawFrontmatter: "", body: text, bodyStartLine: 0, parseError: null };
   }
-  let delimiterLineIndex = -1;
-  for (let index = 1; index < lines.length; index += 1) {
-    const trimmed = lines[index].trim();
-    if (trimmed === "---" || trimmed === "...") {
-      delimiterLineIndex = index;
-      break;
-    }
-  }
+  const delimiterLineIndex = lines.findIndex((line, index) => index > 0 && ["---", "..."].includes(line.trim()));
   if (delimiterLineIndex < 0) {
-    return {
-      hasFrontmatter: false,
-      frontmatter: {},
-      rawFrontmatter: "",
-      body: text,
-      bodyStartLine: 0,
-      parseError: null
-    };
+    return { hasFrontmatter: false, frontmatter: {}, rawFrontmatter: "", body: text, bodyStartLine: 0, parseError: null };
   }
   const rawFrontmatter = lines.slice(1, delimiterLineIndex).join("\n");
   const body = lines.slice(delimiterLineIndex + 1).join("\n");
@@ -5333,47 +5309,31 @@ function extractYamlFrontmatter(source) {
       rawFrontmatter: "",
       body: text,
       bodyStartLine: 0,
-      parseError: error instanceof Error ? error.message : "No se pudo parsear el frontmatter YAML."
+      parseError: error instanceof Error ? error.message : "Frontmatter YAML invalido."
     };
   }
 }
 function stringifyYamlFrontmatter(frontmatter) {
-  if (!isPlainObject(frontmatter) || !Object.keys(frontmatter).length) {
-    return "";
-  }
-  const dumped = yaml.dump(frontmatter, {
-    lineWidth: 120,
-    noRefs: true,
-    sortKeys: false
-  }).trimEnd();
-  if (!dumped) {
-    return "";
-  }
-  return `---
+  if (!isPlainObject(frontmatter) || !Object.keys(frontmatter).length) return "";
+  const dumped = yaml.dump(frontmatter, { lineWidth: 120, noRefs: true, sortKeys: false }).trimEnd();
+  return dumped ? `---
 ${dumped}
----`;
+---` : "";
 }
-function buildMarkdownDocumentWithFrontmatter({
-  frontmatter,
-  body
-}) {
+function buildMarkdownDocumentWithFrontmatter({ frontmatter, body }) {
   const serializedFrontmatter = stringifyYamlFrontmatter(frontmatter);
   const normalizedBody = typeof body === "string" ? body.trim() : "";
-  if (!serializedFrontmatter) {
-    return normalizedBody ? `${normalizedBody}
+  if (!serializedFrontmatter) return normalizedBody ? `${normalizedBody}
 ` : "";
-  }
-  if (!normalizedBody) {
-    return `${serializedFrontmatter}
+  if (!normalizedBody) return `${serializedFrontmatter}
 `;
-  }
   return `${serializedFrontmatter}
 
 ${normalizedBody}
 `;
 }
 
-// ../nexus-plugins/life-tracker/src/training/training-schedule.js
+// life-tracker/src/training/training-schedule.js
 var TRAINING_SCHEDULE_TYPES = /* @__PURE__ */ new Set(["daily", "weekdays"]);
 function todayLocalDate3(baseDate = /* @__PURE__ */ new Date()) {
   const year = baseDate.getFullYear();
@@ -5454,7 +5414,7 @@ function getOccurrenceWindowEndAt2(occurrenceDate) {
   return `${occurrenceDate}T23:59:59.999`;
 }
 
-// ../nexus-plugins/life-tracker/src/training/training-muscles.js
+// life-tracker/src/training/training-muscles.js
 function normalizeComparableText2(value) {
   return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 }
@@ -5945,7 +5905,7 @@ function listTrainingMuscles({
   });
 }
 
-// ../nexus-plugins/life-tracker/src/training/training-starter-library.js
+// life-tracker/src/training/training-starter-library.js
 var TRAINING_STARTER_LIBRARY_VERSION = 5;
 function createStarterExercise(definition) {
   return Object.freeze({
@@ -7472,7 +7432,7 @@ var TRAINING_STARTER_EXERCISES = Object.freeze([
   })
 ]);
 
-// ../nexus-plugins/life-tracker/src/training/training-utils.js
+// life-tracker/src/training/training-utils.js
 function normalizeText(value) {
   return String(value ?? "").trim();
 }
@@ -8040,7 +8000,7 @@ function normalizeTrainingOccurrenceResult(value, completionMode = "yes-no") {
   };
 }
 
-// ../nexus-plugins/life-tracker/src/training/backend.ts
+// life-tracker/src/training/backend.ts
 var TRAINING_PLUGIN_ID = "nexus.life-tracker.training";
 var TRAINING_EXERCISE_KIND = "training_exercise";
 var TRAINING_ROUTINE_KIND = "training_routine";
@@ -11721,7 +11681,7 @@ var trainingPlugin = {
 };
 var backend_default2 = trainingPlugin;
 
-// ../nexus-plugins/life-tracker/src/backend.ts
+// life-tracker/src/backend.ts
 var LIFE_TRACKER_SETTINGS_STATE_KEY = "plugins.settings.nexus.life-tracker";
 var LEGACY_HABITS_SETTINGS_STATE_KEY = "plugins.settings.nexus.habitos";
 var LIFE_TRACKER_CANVAS_STATE_KEY = "lifeTrackerCanvases";

@@ -1,0 +1,78 @@
+@use "../tools" as *;
+// Shared renderer baseline.
+
+html,
+body,
+#root {
+  min-height: 100%;
+  height: 100%;
+}
+
+html {
+  font-size: var(--font-size-root, 16px);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--gradient-app-bg);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  border: 0;
+  background: none;
+  padding: 0;
+}
+
+button,
+label,
+summary,
+[role="button"],
+[role="tab"],
+[role="menuitem"],
+[role="switch"],
+[role="option"] {
+  @include chrome-static();
+}
+
+img,
+svg {
+  display: block;
+  @include chrome-static();
+}
+
+[draggable="false"] {
+  -webkit-user-drag: none;
+}
+
+::selection {
+  background: var(--selection-bg-active);
+  color: var(--selection-text);
+}
+
+.main-content {
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  background: var(--gradient-app-bg);
+  color: var(--color-text);
+  isolation: isolate;
+}

@@ -1,0 +1,6 @@
+@use "../../scss" as *;
+
+.nexus-ui-input {
+  @include field-control();
+  padding: 0 11px;
+}

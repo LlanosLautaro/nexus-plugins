@@ -5,11 +5,11 @@ import path from "node:path";
 import type {
   NexusBackendPluginContext,
   NexusBackendPluginModule,
-} from "../../../../nexus-backend/src/plugins/types.ts";
+} from "@nexus/plugin-sdk";
 import {
   buildMarkdownDocumentWithFrontmatter,
   extractYamlFrontmatter,
-} from "../../../../nexus-backend/src/internalModules/core/markdown-frontmatter.ts";
+} from "./markdown-frontmatter";
 import {
   addDaysToLocalDate,
   buildOccurrenceDates,

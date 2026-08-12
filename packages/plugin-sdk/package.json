@@ -1,0 +1,15 @@
+{
+  "name": "@nexus/plugin-sdk",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
+  }
+}

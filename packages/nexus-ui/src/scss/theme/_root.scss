@@ -1,0 +1,47 @@
+@use "./color" as color;
+@use "./layout" as layout;
+@use "./semantic" as semantic;
+@use "./legacy" as legacy;
+
+@mixin register-theme(
+  $surface-h: 0,
+  $surface-s: 0%,
+  $surface-base-l: 0%,
+  $accent-h: 266,
+  $accent-s: 86%,
+  $accent-l: 62%
+) {
+  @include color.register-color-seeds(
+    $surface-h: $surface-h,
+    $surface-s: $surface-s,
+    $surface-base-l: $surface-base-l,
+    $accent-h: $accent-h,
+    $accent-s: $accent-s,
+    $accent-l: $accent-l
+  );
+  @include layout.register-layout-tokens();
+  @include semantic.register-semantic-tokens();
+  @include legacy.register-legacy-aliases();
+}
+
+:root,
+[data-theme="nexus-default"],
+[data-theme="nexus-violet"] {
+  color-scheme: dark;
+  @include register-theme(
+    $surface-h: 0,
+    $surface-s: 0%,
+    $surface-base-l: 0%,
+    $accent-h: 266,
+    $accent-s: 86%,
+    $accent-l: 62%
+  );
+}
+
+[data-theme="nexus-emerald"] {
+  @include register-theme();
+}
+
+[data-theme="nexus-amber"] {
+  @include register-theme($accent-h: 38, $accent-s: 92%, $accent-l: 60%);
+}

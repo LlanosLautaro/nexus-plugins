@@ -1,0 +1,72 @@
+@use "./interaction" as *;
+// Public @nexus/ui surface mixins.
+
+@mixin chrome-strip($padding: 0 12px, $justify: space-between) {
+  @include chrome-static();
+  display: flex;
+  align-items: center;
+  justify-content: $justify;
+  padding: $padding;
+  background: var(--shell-titlebar-bg);
+  border-bottom: 1px solid var(--color-panel-border);
+  box-shadow: inset 0 -1px 0 var(--fx-sheen-soft);
+}
+
+@mixin frosted-panel(
+  $radius: var(--ui-radius-panel, var(--radius-m)),
+  $background: var(--gradient-panel),
+  $border: var(--color-panel-border),
+  $shadow: inset 0 1px 0 var(--fx-sheen-soft)
+) {
+  border-radius: $radius;
+  border: 1px solid $border;
+  background: $background;
+  box-shadow: $shadow;
+}
+
+@mixin icon-frame($size: 22px, $radius: var(--ui-radius-control, var(--radius-m))) {
+  @include chrome-static();
+  width: $size;
+  height: $size;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: $radius;
+  background: var(--gradient-tile);
+  border: 1px solid color-mix(in srgb, white 5%, transparent);
+  box-shadow: inset 0 1px 0 var(--fx-sheen-soft);
+}
+
+@mixin section-panel(
+  $padding: var(--panel-padding-m),
+  $radius: var(--ui-radius-panel, var(--radius-m)),
+  $background: var(--shell-panel-bg),
+  $border: var(--color-line)
+) {
+  border-radius: $radius;
+  border: 1px solid $border;
+  background: $background;
+  padding: $padding;
+  box-shadow: inset 0 1px 0 var(--fx-sheen-soft);
+}
+
+@mixin state-block(
+  $padding: var(--panel-padding-m),
+  $background: var(--state-bg),
+  $border: var(--state-border)
+) {
+  @include section-panel($padding: $padding, $radius: var(--radius-m), $background: $background, $border: $border);
+}
+
+@mixin metric-card($tone: default) {
+  $background: var(--shell-panel-bg);
+
+  @if $tone == highlight {
+    $background: var(--shell-panel-highlight);
+  } @else if $tone == soft {
+    $background: var(--shell-panel-soft);
+  }
+
+  @include section-panel($padding: var(--panel-padding-m), $radius: var(--ui-radius-panel, var(--radius-m)), $background: $background, $border: var(--color-line));
+}

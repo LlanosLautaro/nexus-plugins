@@ -43,9 +43,9 @@ var init_define_process = __esm({
   }
 });
 
-// scripts/plugins/shims/react.cjs
+// scripts/shims/react.cjs
 var require_react = __commonJS({
-  "scripts/plugins/shims/react.cjs"(exports, module) {
+  "scripts/shims/react.cjs"(exports, module) {
     init_define_process();
     function requireReact() {
       const hostReact = globalThis?.window?.__NEXUS_HOST_REACT__ || globalThis?.window?.React;
@@ -58,9 +58,9 @@ var require_react = __commonJS({
   }
 });
 
-// scripts/plugins/shims/react-dom.cjs
+// scripts/shims/react-dom.cjs
 var require_react_dom = __commonJS({
-  "scripts/plugins/shims/react-dom.cjs"(exports, module) {
+  "scripts/shims/react-dom.cjs"(exports, module) {
     init_define_process();
     function requireReactDom() {
       const hostReactDom = globalThis?.window?.__NEXUS_HOST_REACT_DOM__;
@@ -73,13 +73,13 @@ var require_react_dom = __commonJS({
   }
 });
 
-// ../nexus-plugins/booru/src/renderer.js
+// booru/src/renderer.js
 init_define_process();
 
-// ../nexus-plugins/booru/src/BooruWorkspaceView.jsx
+// booru/src/BooruWorkspaceView.jsx
 init_define_process();
 
-// ../nexus-plugins/booru/src/constants.js
+// booru/src/constants.js
 init_define_process();
 var BOORU_PLUGIN_ID = "nexus.booru";
 var BOORU_WORKSPACE_VIEW_ID = "nexus.booru.workspace";
@@ -119,213 +119,7 @@ var BOORU_ENTITY_KIND_LABELS = Object.freeze({
   universe: "Universe"
 });
 
-// ../nexus-frontend/src/utils/devLog.js
-init_define_process();
-
-// ../nexus-frontend/src/utils/coreCapabilities.mjs
-init_define_process();
-function splitKey(key) {
-  const segments = String(key || "").split(":");
-  if (segments[0] === "nexus" && segments.length > 2) {
-    return [segments[1], segments.slice(2).join(":")];
-  }
-  return [segments[0], segments.slice(1).join(":")];
-}
-function requireCapability(root, key) {
-  const [family, operation] = splitKey(key);
-  const capability = root?.[family]?.[operation];
-  if (!capability) throw new Error(`IPC_CONTRACT_UNKNOWN:${family}.${operation}`);
-  return capability;
-}
-function sendCoreEvent(key, ...args) {
-  return requireCapability(window.nexus.events, key).send(...args);
-}
-
-// ../nexus-frontend/src/utils/devLog.js
-var DEV_LOG_BATCH_CHANNEL = "dev-log:append-batch";
-var rendererDevLoggingEnabled = window.location.protocol !== "file:";
-var devLogRawConsole = {
-  debug: console.debug.bind(console),
-  log: console.log.bind(console),
-  info: console.info.bind(console),
-  warn: console.warn.bind(console),
-  error: console.error.bind(console)
-};
-var rendererDevLogState = {
-  queue: Array.isArray(window.__NEXUS_DEV_LOG_BUFFER__) ? window.__NEXUS_DEV_LOG_BUFFER__ : [],
-  flushTimer: null,
-  consoleBridgeInstalled: false,
-  ipcBridgeInstalled: false,
-  initialized: false,
-  verbose: window.localStorage?.getItem("NEXUS_DEV_LOG_VERBOSE") === "1"
-};
-window.__NEXUS_DEV_LOG_BUFFER__ = rendererDevLogState.queue;
-window.__NEXUS_DEV_LOG_RUN_ID__ = window.__NEXUS_DEV_LOG_RUN_ID__ || (globalThis.crypto?.randomUUID?.() || `renderer-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
-function getRendererRunId() {
-  return window.__NEXUS_DEV_LOG_RUN_ID__;
-}
-function shouldMirrorRendererConsole(level) {
-  return level === "warn" || level === "error" || level === "fatal";
-}
-function resolveRendererScope(scope) {
-  const normalizedScope = String(scope || "").trim() || "renderer.startup";
-  if (normalizedScope.startsWith("renderer.startup")) {
-    return {
-      process: "renderer",
-      surface: "startup",
-      subsystem: normalizedScope,
-      shard: "40-renderer-startup.jsonl"
-    };
-  }
-  if (normalizedScope.startsWith("renderer.store") || normalizedScope.startsWith("renderer.items")) {
-    return {
-      process: "renderer",
-      surface: "store",
-      subsystem: normalizedScope,
-      shard: "41-renderer-store.jsonl"
-    };
-  }
-  if (normalizedScope.startsWith("renderer.explorer")) {
-    return {
-      process: "renderer",
-      surface: "explorer",
-      subsystem: normalizedScope,
-      shard: "42-renderer-explorer.jsonl"
-    };
-  }
-  if (normalizedScope.startsWith("renderer.editors")) {
-    return {
-      process: "renderer",
-      surface: "editors",
-      subsystem: normalizedScope,
-      shard: "43-renderer-editors.jsonl"
-    };
-  }
-  if (normalizedScope.startsWith("renderer.plugins")) {
-    return {
-      process: "renderer",
-      surface: "plugins",
-      subsystem: normalizedScope,
-      shard: "44-renderer-plugins.jsonl"
-    };
-  }
-  if (normalizedScope.startsWith("renderer.ipc")) {
-    return {
-      process: "renderer",
-      surface: "ipc",
-      subsystem: normalizedScope,
-      shard: "50-ipc.jsonl"
-    };
-  }
-  return {
-    process: "renderer",
-    surface: "startup",
-    subsystem: normalizedScope,
-    shard: "40-renderer-startup.jsonl"
-  };
-}
-function serializeUnknown(value, seen = /* @__PURE__ */ new WeakSet()) {
-  if (value instanceof Error) {
-    return {
-      name: value.name,
-      message: value.message,
-      stack: value.stack || null,
-      cause: serializeUnknown(value.cause, seen)
-    };
-  }
-  if (typeof value === "bigint") {
-    return value.toString();
-  }
-  if (Array.isArray(value)) {
-    return value.map((entry) => serializeUnknown(entry, seen));
-  }
-  if (value && typeof value === "object") {
-    if (seen.has(value)) {
-      return "[circular]";
-    }
-    seen.add(value);
-    const serialized = Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, serializeUnknown(entry, seen)])
-    );
-    seen.delete(value);
-    return serialized;
-  }
-  return value ?? null;
-}
-function buildRendererEvent(partialEvent = {}) {
-  return {
-    ts: partialEvent.ts || (/* @__PURE__ */ new Date()).toISOString(),
-    rendererRunId: partialEvent.rendererRunId || getRendererRunId(),
-    process: "renderer",
-    surface: partialEvent.surface || "startup",
-    subsystem: partialEvent.subsystem || "renderer.startup",
-    level: partialEvent.level || "info",
-    event: partialEvent.event || "renderer.unspecified",
-    message: partialEvent.message || "",
-    durationMs: typeof partialEvent.durationMs === "number" ? Number(partialEvent.durationMs.toFixed(2)) : null,
-    requestId: partialEvent.requestId || null,
-    data: partialEvent.data ? serializeUnknown(partialEvent.data) : null,
-    shard: partialEvent.shard || null
-  };
-}
-function queueRendererDevLogEvent(partialEvent = {}) {
-  if (!rendererDevLoggingEnabled) {
-    return;
-  }
-  rendererDevLogState.queue.push(buildRendererEvent(partialEvent));
-  if (shouldMirrorRendererConsole(partialEvent.level || "info")) {
-    const rawMethod = partialEvent.level === "warn" ? devLogRawConsole.warn : devLogRawConsole.error;
-    rawMethod(partialEvent.message || partialEvent.event || "", partialEvent.data || "");
-  }
-  scheduleRendererDevLogFlush();
-}
-function scheduleRendererDevLogFlush() {
-  if (rendererDevLogState.flushTimer) {
-    return;
-  }
-  rendererDevLogState.flushTimer = window.setTimeout(() => {
-    rendererDevLogState.flushTimer = null;
-    flushRendererDevLogBuffer();
-  }, 80);
-}
-function flushRendererDevLogBuffer() {
-  if (!rendererDevLoggingEnabled) {
-    rendererDevLogState.queue.length = 0;
-    return;
-  }
-  if (!rendererDevLogState.queue.length) {
-    return;
-  }
-  const events = rendererDevLogState.queue.splice(0, rendererDevLogState.queue.length);
-  try {
-    sendCoreEvent(DEV_LOG_BATCH_CHANNEL, {
-      events
-    });
-  } catch (error) {
-    rendererDevLogState.queue.unshift(...events);
-    devLogRawConsole.error("[dev-log] No se pudo flush-ear el batch del renderer.", error);
-  }
-}
-function createRendererDevLogger(scope) {
-  const context = resolveRendererScope(scope);
-  return {
-    context,
-    debug(event, message, data = null) {
-      queueRendererDevLogEvent({ ...context, level: "debug", event, message, data });
-    },
-    info(event, message, data = null) {
-      queueRendererDevLogEvent({ ...context, level: "info", event, message, data });
-    },
-    warn(event, message, data = null) {
-      queueRendererDevLogEvent({ ...context, level: "warn", event, message, data });
-    },
-    error(event, message, data = null) {
-      queueRendererDevLogEvent({ ...context, level: "error", event, message, data });
-    }
-  };
-}
-
-// ../nexus-plugins/booru/src/icons.jsx
+// booru/src/icons.jsx
 init_define_process();
 function BaseIcon({ children, size = 18, strokeWidth = 1.8 }) {
   return /* @__PURE__ */ React.createElement(
@@ -354,19 +148,19 @@ function DownloadIcon(props) {
   return /* @__PURE__ */ React.createElement(BaseIcon, { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 3.8v10.1" }), /* @__PURE__ */ React.createElement("path", { d: "m8.4 10.6 3.6 3.7 3.6-3.7" }), /* @__PURE__ */ React.createElement("path", { d: "M5 18.4v1.1A1.7 1.7 0 0 0 6.7 21h10.6a1.7 1.7 0 0 0 1.7-1.5v-1.1" }));
 }
 
-// ../packages/nexus-ui/src/index.js
+// packages/nexus-ui/src/index.js
 init_define_process();
 
-// ../packages/nexus-ui/src/components/Button/Button.jsx
+// packages/nexus-ui/src/components/Button/Button.jsx
 init_define_process();
 
-// ../packages/nexus-ui/src/utils/cx.js
+// packages/nexus-ui/src/utils/cx.js
 init_define_process();
 function cx(...values) {
   return values.filter(Boolean).join(" ");
 }
 
-// ../packages/nexus-ui/src/components/Button/Button.jsx
+// packages/nexus-ui/src/components/Button/Button.jsx
 function Button({
   className = "",
   tone = "secondary",
@@ -387,7 +181,7 @@ function Button({
   );
 }
 
-// ../packages/nexus-ui/src/components/SegmentedControl/SegmentedControl.jsx
+// packages/nexus-ui/src/components/SegmentedControl/SegmentedControl.jsx
 init_define_process();
 function readOptionValue(option) {
   return option?.value ?? option?.id;
@@ -464,7 +258,7 @@ function SegmentedControl({
   );
 }
 
-// ../packages/nexus-ui/src/components/ActionMenu/ActionMenu.jsx
+// packages/nexus-ui/src/components/ActionMenu/ActionMenu.jsx
 init_define_process();
 var import_react = __toESM(require_react(), 1);
 var import_react_dom = __toESM(require_react_dom(), 1);
@@ -599,7 +393,7 @@ function ActionMenu({
   );
 }
 
-// ../packages/nexus-ui/src/components/Input/Input.jsx
+// packages/nexus-ui/src/components/Input/Input.jsx
 init_define_process();
 var import_react2 = __toESM(require_react(), 1);
 var Input = (0, import_react2.forwardRef)(function Input2({ className = "", type = "text", ...props }, ref) {
@@ -614,7 +408,7 @@ var Input = (0, import_react2.forwardRef)(function Input2({ className = "", type
   );
 });
 
-// ../packages/nexus-ui/src/components/TextArea/TextArea.jsx
+// packages/nexus-ui/src/components/TextArea/TextArea.jsx
 init_define_process();
 var import_react3 = __toESM(require_react(), 1);
 var TextArea = (0, import_react3.forwardRef)(function TextArea2({ className = "", ...props }, ref) {
@@ -628,7 +422,7 @@ var TextArea = (0, import_react3.forwardRef)(function TextArea2({ className = ""
   );
 });
 
-// ../packages/nexus-ui/src/components/Select/Select.jsx
+// packages/nexus-ui/src/components/Select/Select.jsx
 init_define_process();
 var import_react4 = __toESM(require_react(), 1);
 var Select = (0, import_react4.forwardRef)(function Select2({ className = "", children, ...props }, ref) {
@@ -643,7 +437,7 @@ var Select = (0, import_react4.forwardRef)(function Select2({ className = "", ch
   );
 });
 
-// ../packages/nexus-ui/src/components/SearchField/SearchField.jsx
+// packages/nexus-ui/src/components/SearchField/SearchField.jsx
 init_define_process();
 var import_react5 = __toESM(require_react(), 1);
 function DefaultSearchIcon() {
@@ -667,7 +461,7 @@ var SearchField = (0, import_react5.forwardRef)(function SearchField2({
   ), endAction ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-search-field__action" }, endAction) : null);
 });
 
-// ../packages/nexus-ui/src/components/Gallery/Gallery.jsx
+// packages/nexus-ui/src/components/Gallery/Gallery.jsx
 init_define_process();
 var import_react6 = __toESM(require_react(), 1);
 function normalizeColumnCount(value, fallback = null) {
@@ -826,7 +620,7 @@ function GalleryCardMeta({ as: Component = "span", className = "", children }) {
   return /* @__PURE__ */ React.createElement(Component, { className: cx("nexus-ui-gallery-card__meta", className) }, children);
 }
 
-// ../packages/nexus-ui/src/components/ReloadIcon/ReloadIcon.jsx
+// packages/nexus-ui/src/components/ReloadIcon/ReloadIcon.jsx
 init_define_process();
 function ReloadIcon({ size = 18, className = "" }) {
   return /* @__PURE__ */ React.createElement(
@@ -850,13 +644,13 @@ function ReloadIcon({ size = 18, className = "" }) {
   );
 }
 
-// ../packages/nexus-ui/src/legacy/Fields.jsx
+// packages/nexus-ui/src/legacy/Fields.jsx
 init_define_process();
 function Field({ className = "", label = "", description = "", wide = false, children }) {
   return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-field", wide && "nexus-ui-field--wide", className) }, /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-field__label" }, label), description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-field__description" }, description) : null, /* @__PURE__ */ React.createElement("div", { className: "nexus-ui-field__control" }, children));
 }
 
-// ../packages/nexus-ui/src/legacy/Panels.jsx
+// packages/nexus-ui/src/legacy/Panels.jsx
 init_define_process();
 function SectionPanel({ className = "", tone = "default", padding = "default", children }) {
   return /* @__PURE__ */ React.createElement("section", { className: cx(
@@ -870,7 +664,7 @@ function PanelStack({ className = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-stack", className) }, children);
 }
 
-// ../packages/nexus-ui/src/legacy/States.jsx
+// packages/nexus-ui/src/legacy/States.jsx
 init_define_process();
 function Notice({ className = "", tone = "info", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-notice", `nexus-ui-notice--${tone}`, className) }, children);
@@ -906,7 +700,7 @@ function MetricCard({
   ) }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, /* @__PURE__ */ React.createElement("strong", null, value), description ? /* @__PURE__ */ React.createElement("p", null, description) : null, children);
 }
 
-// ../packages/nexus-ui/src/legacy/Workspace.jsx
+// packages/nexus-ui/src/legacy/Workspace.jsx
 init_define_process();
 function WorkspacePage({ className = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-page", className) }, children);
@@ -931,7 +725,7 @@ function ScrollRegion({ className = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-scroll-region", className) }, children);
 }
 
-// ../nexus-plugins/booru/src/booru-utils.js
+// booru/src/booru-utils.js
 init_define_process();
 function normalizeBooruText(value) {
   return String(value ?? "").trim();
@@ -1264,7 +1058,7 @@ function parseBooruSearchSyntax(value) {
   };
 }
 
-// ../nexus-plugins/booru/src/domain/classification-policy.js
+// booru/src/domain/classification-policy.js
 init_define_process();
 var BOORU_REALITY_AUTO = "auto";
 var BOORU_REALITY_MANUAL = "manual";
@@ -1349,7 +1143,7 @@ function getBooruEssentialState({
   };
 }
 
-// ../nexus-plugins/booru/src/domain/details-policy.js
+// booru/src/domain/details-policy.js
 init_define_process();
 var DETAILS_FIELD_CONFIG = Object.freeze({
   author: Object.freeze({
@@ -1424,10 +1218,10 @@ function getBooruDetailsRealityState(draft = null) {
   };
 }
 
-// ../nexus-plugins/booru/src/domain/entity-relations.js
+// booru/src/domain/entity-relations.js
 init_define_process();
 
-// ../nexus-plugins/booru/src/domain/contextual-browse.js
+// booru/src/domain/contextual-browse.js
 init_define_process();
 var BOORU_BROWSE_DIRECTIONS = Object.freeze({ ASC: "asc", DESC: "desc" });
 var BOORU_BROWSE_GROUPINGS = Object.freeze({ CONTINUOUS: "continuous", SECTIONED: "sectioned" });
@@ -1498,7 +1292,7 @@ function getBooruEntitySortOptions({ allowUniverseSort = false } = {}) {
   ];
 }
 
-// ../nexus-plugins/booru/src/domain/entity-relations.js
+// booru/src/domain/entity-relations.js
 var ENTITY_RELATION_TARGETS = Object.freeze({
   author: Object.freeze([]),
   character: Object.freeze(["artist"]),
@@ -1535,7 +1329,7 @@ function getBooruEntityProfileTabOptions(sourceKind) {
   ];
 }
 
-// ../nexus-plugins/booru/src/domain/resource-actions.js
+// booru/src/domain/resource-actions.js
 init_define_process();
 var UNIVERSAL_IMAGE_ACTIONS = Object.freeze([
   { id: "copy", label: "Copiar al portapapeles" },
@@ -1577,7 +1371,7 @@ function buildBooruResourceActions({
   ];
 }
 
-// ../nexus-plugins/booru/src/domain/contextual-paste.js
+// booru/src/domain/contextual-paste.js
 init_define_process();
 var ASSOCIATION_KINDS = /* @__PURE__ */ new Set(["author", "artist", "character", "universe", "tag"]);
 function normalizeBooruClipboardAssociation(value) {
@@ -1607,7 +1401,7 @@ function mergeBooruClipboardAssociations(...sources) {
   return associations;
 }
 
-// ../nexus-plugins/booru/src/domain/floating-details.js
+// booru/src/domain/floating-details.js
 init_define_process();
 var BOORU_FLOATING_DETAILS_MIN_WIDTH = 360;
 var BOORU_FLOATING_DETAILS_MIN_HEIGHT = 320;
@@ -1642,7 +1436,7 @@ function clampBooruFloatingDetailsGeometry(value, viewport = {}) {
   };
 }
 
-// ../nexus-plugins/booru/src/domain/workspace-navigation.js
+// booru/src/domain/workspace-navigation.js
 init_define_process();
 var BOORU_WORKSPACE_SECTIONS = Object.freeze([
   "media",
@@ -1852,7 +1646,7 @@ function resolveBooruProfileForRoute(routeValue, sessionProfile = null, currentP
   return [currentProfile, sessionProfile].find((candidate) => String(candidate?.kind || "").trim() === route.profile.kind && String(candidate?.id || "").trim() === route.profile.id) || null;
 }
 
-// ../nexus-plugins/booru/src/domain/pending-workflow.js
+// booru/src/domain/pending-workflow.js
 init_define_process();
 var BOORU_NO_MISSING_FILTER = "none";
 var BOORU_RECOMMENDATION_SCOPES = Object.freeze({
@@ -2000,7 +1794,7 @@ function isBooruMissingFilterCompatible(missingFilter, options = []) {
   return options.some((option) => option?.value === missingFilter && !option?.disabled);
 }
 
-// ../nexus-plugins/booru/src/domain/resource-mutations.js
+// booru/src/domain/resource-mutations.js
 init_define_process();
 function normalizeBooruResourceMutationResult(value) {
   const source = value && typeof value === "object" ? value : {};
@@ -2091,13 +1885,13 @@ function isBooruResourceWindowContextCurrent(requestContext, currentContext) {
   return Boolean(currentContext.showResourceWorkspace) && String(currentContext.activeResourceSection || "") === String(requestContext.activeResourceSection || "") && String(currentContext.querySignature || "") === String(requestContext.querySignature || "") && Number(currentContext.currentResourcePage || 1) === Number(requestContext.currentResourcePage || 1) && Number(currentContext.itemCount || 0) === Number(requestContext.itemCount || 0);
 }
 
-// ../nexus-plugins/booru/src/components/index.js
+// booru/src/components/index.js
 init_define_process();
 
-// ../nexus-plugins/booru/src/components/EntityVisualCropper.jsx
+// booru/src/components/EntityVisualCropper.jsx
 init_define_process();
 
-// ../nexus-plugins/booru/src/domain/entity-visual-policy.js
+// booru/src/domain/entity-visual-policy.js
 init_define_process();
 var DEFAULT_ENTITY_VISUAL_LAYOUT = Object.freeze({
   scale: 1,
@@ -2143,7 +1937,7 @@ function getBooruEntityVisualRenderProps(visual = null) {
   };
 }
 
-// ../nexus-plugins/booru/src/ipc-client.js
+// booru/src/ipc-client.js
 init_define_process();
 var runtimeIpc = null;
 function configurePluginIpc(ipc) {
@@ -2159,7 +1953,7 @@ var pluginIpc = Object.freeze({
   }
 });
 
-// ../nexus-plugins/booru/src/components/EntityVisualCropper.jsx
+// booru/src/components/EntityVisualCropper.jsx
 var React2 = window.React;
 var { useEffect: useEffect3, useMemo, useRef: useRef3, useState: useState3 } = React2;
 async function invoke(channel, payload) {
@@ -2280,7 +2074,7 @@ function EntityVisualCropper({
   ), /* @__PURE__ */ React2.createElement(Button, { type: "button", tone: "primary", onClick: () => void save(), disabled: busy || saving }, saving ? "Guardando" : "Confirmar")));
 }
 
-// ../nexus-plugins/booru/src/components/ClipboardAssociationComposer.jsx
+// booru/src/components/ClipboardAssociationComposer.jsx
 init_define_process();
 var React3 = window.React;
 var { useEffect: useEffect4, useState: useState4 } = React3;
@@ -2415,7 +2209,7 @@ function ClipboardAssociationComposer({
   ));
 }
 
-// ../nexus-plugins/booru/src/components/entities/CharacterCreationDialog.jsx
+// booru/src/components/entities/CharacterCreationDialog.jsx
 init_define_process();
 var React4 = window.React;
 var { useState: useState5 } = React4;
@@ -2466,7 +2260,7 @@ function CharacterCreationDialog({
   ), error ? /* @__PURE__ */ React4.createElement(Notice, { tone: "danger" }, error) : null, /* @__PURE__ */ React4.createElement("div", { className: "booruCharacterCreation__actions" }, /* @__PURE__ */ React4.createElement(Button, { type: "button", onClick: () => onCancel?.(), disabled: busy }, "Cancelar"), /* @__PURE__ */ React4.createElement(Button, { type: "button", tone: "primary", onClick: () => void submit(), disabled: !universe?.id || busy }, "Crear")));
 }
 
-// ../nexus-plugins/booru/src/components/entities/EntityCreationDialog.jsx
+// booru/src/components/entities/EntityCreationDialog.jsx
 init_define_process();
 var React5 = window.React;
 var { useState: useState6 } = React5;
@@ -2549,7 +2343,7 @@ function EntityCreationDialog({
   );
 }
 
-// ../nexus-plugins/booru/src/components/settings/SettingsSection.jsx
+// booru/src/components/settings/SettingsSection.jsx
 init_define_process();
 var React6 = window.React;
 var { useEffect: useEffect5, useState: useState7 } = React6;
@@ -2680,10 +2474,10 @@ function SettingsSection({
   ].map((example) => /* @__PURE__ */ React6.createElement("span", { key: example, className: "booruView__selectionChip booruView__selectionChip--syntax" }, example)))))));
 }
 
-// ../nexus-plugins/booru/src/components/entities/EntityGrid.jsx
+// booru/src/components/entities/EntityGrid.jsx
 init_define_process();
 
-// ../nexus-plugins/booru/src/components/entities/EntityVisualMedia.jsx
+// booru/src/components/entities/EntityVisualMedia.jsx
 init_define_process();
 function EntityVisualMedia({
   visual,
@@ -2704,7 +2498,7 @@ function EntityVisualMedia({
   );
 }
 
-// ../nexus-plugins/booru/src/components/shared/CollapsibleGalleryGroup.jsx
+// booru/src/components/shared/CollapsibleGalleryGroup.jsx
 init_define_process();
 var React7 = window.React;
 var { useState: useState8 } = React7;
@@ -2733,7 +2527,7 @@ function CollapsibleGalleryGroup({ label, association = null, onAssociationHover
   );
 }
 
-// ../nexus-plugins/booru/src/components/entities/EntityGrid.jsx
+// booru/src/components/entities/EntityGrid.jsx
 var React8 = window.React;
 var { useEffect: useEffect6, useMemo: useMemo2, useRef: useRef4 } = React8;
 function EntityGrid({
@@ -2862,7 +2656,7 @@ function EntityGrid({
   return /* @__PURE__ */ React8.createElement(SectionPanel, { className: "booruView__panel booruView__panel--fill" }, content);
 }
 
-// ../nexus-plugins/booru/src/components/entities/EntityNavigationBar.jsx
+// booru/src/components/entities/EntityNavigationBar.jsx
 init_define_process();
 function EntityNavigationBar({
   kind,
@@ -2916,7 +2710,7 @@ function EntityNavigationBar({
   )));
 }
 
-// ../nexus-plugins/booru/src/components/entities/EntityRelationsGrid.jsx
+// booru/src/components/entities/EntityRelationsGrid.jsx
 init_define_process();
 var React9 = window.React;
 var { useEffect: useEffect7, useRef: useRef5 } = React9;
@@ -2973,10 +2767,10 @@ function EntityRelationsGrid({
   ), state?.hasMore ? /* @__PURE__ */ React9.createElement("div", { ref: sentinelRef, className: "booruView__resourceLoadSentinel", "aria-hidden": "true" }) : null, loading && items.length ? /* @__PURE__ */ React9.createElement("span", { className: "booruView__resourceLoadingMore" }, "Cargando mas perfiles...") : null);
 }
 
-// ../nexus-plugins/booru/src/components/entities/EntityProfileGallery.jsx
+// booru/src/components/entities/EntityProfileGallery.jsx
 init_define_process();
 
-// ../nexus-plugins/booru/src/domain/video-preview-policy.js
+// booru/src/domain/video-preview-policy.js
 init_define_process();
 var BOORU_VIDEO_AUTOPLAY_MAX_ORIGINAL_MS = 15e3;
 var BOORU_VIDEO_SHORT_VARIANT = "first-15s-muted-v2";
@@ -2998,7 +2792,7 @@ function resolveBooruVideoAutoplay({
   return validShort ? { autoplay: true, autoplayPath: shortPath, source: "derivative" } : { autoplay: false, autoplayPath: "", source: "pending" };
 }
 
-// ../nexus-plugins/booru/src/components/entities/EntityProfileGallery.jsx
+// booru/src/components/entities/EntityProfileGallery.jsx
 var React10 = window.React;
 var { useEffect: useEffect8, useMemo: useMemo3, useRef: useRef6, useState: useState9 } = React10;
 function EntityProfileGalleryGrid({
@@ -3135,7 +2929,7 @@ function EntityProfileGalleryGrid({
   ), hasMore ? /* @__PURE__ */ React10.createElement("div", { ref: sentinelRef, className: "booruView__resourceLoadSentinel", "aria-hidden": "true" }) : null, loading && items.length ? /* @__PURE__ */ React10.createElement("span", { className: "booruView__resourceLoadingMore" }, "Cargando mas recursos...") : null);
 }
 
-// ../nexus-plugins/booru/src/components/media/ResourceHeroOverlay.jsx
+// booru/src/components/media/ResourceHeroOverlay.jsx
 init_define_process();
 var React11 = window.React;
 var { useCallback: useCallback2, useEffect: useEffect9, useMemo: useMemo4, useRef: useRef7, useState: useState10 } = React11;
@@ -3304,7 +3098,7 @@ function ResourceHeroOverlay({
   ), /* @__PURE__ */ React11.createElement("div", { className: "booruView__heroMeta" }, /* @__PURE__ */ React11.createElement("strong", null, item.originalFilename), /* @__PURE__ */ React11.createElement("span", null, mediaKindLabels[item.mediaKind] || item.mediaKind, " \xB7 ", index + 1, " / ", Math.max(1, totalCount), " \xB7 ", Math.round(zoom * 100), "%"))), /* @__PURE__ */ React11.createElement("button", { type: "button", className: "booruView__heroNav booruView__heroNav--next", onClick: () => onNext?.(), "aria-label": "Siguiente recurso" }, ">")));
 }
 
-// ../nexus-plugins/booru/src/components/resources/FloatingDetailsWindow.jsx
+// booru/src/components/resources/FloatingDetailsWindow.jsx
 init_define_process();
 var React12 = window.React;
 var { useEffect: useEffect10, useRef: useRef8 } = React12;
@@ -3380,7 +3174,7 @@ function FloatingDetailsWindow({ geometry, onGeometryChange, onClose, children }
   );
 }
 
-// ../nexus-plugins/booru/src/components/shared/FloatingContextMenu.jsx
+// booru/src/components/shared/FloatingContextMenu.jsx
 init_define_process();
 function FloatingContextMenu({ state, onClose, onAction }) {
   if (!state?.items?.length) return null;
@@ -3397,7 +3191,7 @@ function FloatingContextMenu({ state, onClose, onAction }) {
   );
 }
 
-// ../nexus-plugins/booru/src/components/shared/ContextBrowseControls.jsx
+// booru/src/components/shared/ContextBrowseControls.jsx
 init_define_process();
 function ContextBrowseControls({
   value,
@@ -3486,7 +3280,7 @@ function ContextBrowseControls({
   ));
 }
 
-// ../nexus-plugins/booru/src/components/shared/ResizableRailHandle.jsx
+// booru/src/components/shared/ResizableRailHandle.jsx
 init_define_process();
 var React13 = window.React;
 var { useEffect: useEffect11, useRef: useRef9 } = React13;
@@ -3557,7 +3351,7 @@ function ResizableRailHandle({
   );
 }
 
-// ../nexus-plugins/booru/src/components/media/BooruDragPreviewLayer.jsx
+// booru/src/components/media/BooruDragPreviewLayer.jsx
 init_define_process();
 var React14 = window.React;
 var { useMemo: useMemo5 } = React14;
@@ -3634,7 +3428,7 @@ function BooruDragPreviewLayer({ resourcesById, customDragState = null, MediaPre
   ));
 }
 
-// ../nexus-plugins/booru/src/components/media/MediaThumbnail.jsx
+// booru/src/components/media/MediaThumbnail.jsx
 init_define_process();
 var React15 = window.React;
 var { useEffect: useEffect12, useRef: useRef10, useState: useState11 } = React15;
@@ -3787,7 +3581,7 @@ function MediaThumbnail({
   return /* @__PURE__ */ React15.createElement("div", { className: ["booruView__previewFallback", large ? "is-large" : "", className].filter(Boolean).join(" ") }, /* @__PURE__ */ React15.createElement("span", null, erroredThumbnail ? "Preview" : mediaKindLabels[mediaKind] || "Media"));
 }
 
-// ../nexus-plugins/booru/src/components/search/ResourceSearchComposer.jsx
+// booru/src/components/search/ResourceSearchComposer.jsx
 init_define_process();
 var React16 = window.React;
 var { useCallback: useCallback3, useEffect: useEffect13, useMemo: useMemo6, useState: useState12 } = React16;
@@ -4029,7 +3823,7 @@ function ResourceSearchComposer({
   )) : /* @__PURE__ */ React16.createElement("span", { className: "booruView__suggestionsHint" }, "Enter conserva el texto libre. Elige una sugerencia para filtrar por su ID exacto.")) : null);
 }
 
-// ../nexus-plugins/booru/src/components/search/SingleEntityAutocompleteField.jsx
+// booru/src/components/search/SingleEntityAutocompleteField.jsx
 init_define_process();
 var React17 = window.React;
 var { useEffect: useEffect14, useMemo: useMemo7, useState: useState13 } = React17;
@@ -4191,12 +3985,12 @@ function SingleEntityAutocompleteField({
   )) : /* @__PURE__ */ React17.createElement("span", { className: "booruView__suggestionsHint" }, "Sin coincidencias. Enter crea ", entityKindLabels[kind]?.toLowerCase() || "la entidad", ".")) : null);
 }
 
-// ../nexus-plugins/booru/src/components/search/EntityAutocompleteField.jsx
+// booru/src/components/search/EntityAutocompleteField.jsx
 init_define_process();
 var React18 = window.React;
 var { useEffect: useEffect15, useMemo: useMemo8, useState: useState14 } = React18;
 
-// ../nexus-plugins/booru/src/components/search/TagAutocompleteField.jsx
+// booru/src/components/search/TagAutocompleteField.jsx
 init_define_process();
 var React19 = window.React;
 var { useEffect: useEffect16, useMemo: useMemo9, useState: useState15 } = React19;
@@ -4368,7 +4162,7 @@ function TagAutocompleteField({
   );
 }
 
-// ../nexus-plugins/booru/src/components/recommendations/RecommendationKindBadge.jsx
+// booru/src/components/recommendations/RecommendationKindBadge.jsx
 init_define_process();
 var React20 = window.React;
 var { useCallback: useCallback4, useEffect: useEffect17, useRef: useRef11, useState: useState16 } = React20;
@@ -4420,7 +4214,7 @@ function RecommendationKindBadge({
   );
 }
 
-// ../nexus-plugins/booru/src/components/recommendations/RecommendationEntityDropTarget.jsx
+// booru/src/components/recommendations/RecommendationEntityDropTarget.jsx
 init_define_process();
 var React21 = window.React;
 var { useCallback: useCallback5, useEffect: useEffect18, useMemo: useMemo10, useRef: useRef12 } = React21;
@@ -4587,7 +4381,7 @@ function RecommendationEntityDropTarget({
   );
 }
 
-// ../nexus-plugins/booru/src/components/media/ResourceGrid.jsx
+// booru/src/components/media/ResourceGrid.jsx
 init_define_process();
 var React22 = window.React;
 var { useEffect: useEffect19, useMemo: useMemo11, useRef: useRef13, useState: useState17 } = React22;
@@ -4901,7 +4695,7 @@ function ResourceGrid({
   ));
 }
 
-// ../nexus-plugins/booru/src/components/media/ResourcePagination.jsx
+// booru/src/components/media/ResourcePagination.jsx
 init_define_process();
 var React23 = window.React;
 var { useEffect: useEffect20, useState: useState18 } = React23;
@@ -5005,7 +4799,7 @@ function ResourcePagination({
   )));
 }
 
-// ../nexus-plugins/booru/src/components/media/ResourceGridCard.jsx
+// booru/src/components/media/ResourceGridCard.jsx
 init_define_process();
 var React24 = window.React;
 var { useCallback: useCallback6, useEffect: useEffect21, useMemo: useMemo12 } = React24;
@@ -5175,7 +4969,7 @@ function ResourceGridCard({
   );
 }
 
-// ../nexus-plugins/booru/src/components/recommendations/RecommendationPanel.jsx
+// booru/src/components/recommendations/RecommendationPanel.jsx
 init_define_process();
 var React25 = window.React;
 var { useCallback: useCallback7, useDeferredValue, useEffect: useEffect22, useMemo: useMemo13, useRef: useRef14, useState: useState19 } = React25;
@@ -5457,10 +5251,10 @@ function RecommendationPanel({
   ) : null);
 }
 
-// ../nexus-plugins/booru/src/components/resources/ResourceInspector.jsx
+// booru/src/components/resources/ResourceInspector.jsx
 init_define_process();
 
-// ../nexus-plugins/booru/src/domain/effective-details.js
+// booru/src/domain/effective-details.js
 init_define_process();
 var CHIP_FIELDS = Object.freeze([
   ["author", "authors"],
@@ -5518,7 +5312,7 @@ function buildBooruEffectiveDetailChips(resources = [], draft = null) {
   return chips.filter((chip) => chip.label);
 }
 
-// ../nexus-plugins/booru/src/components/resources/ResourceInspector.jsx
+// booru/src/components/resources/ResourceInspector.jsx
 function formatDuration(value) {
   if (value == null || value === "") {
     return "\u2014";
@@ -5736,7 +5530,7 @@ function ResourceInspector({
   }))) : null, /* @__PURE__ */ React.createElement("span", { className: "booruView__suggestionsHint booruView__detailsSaveState" }, saving ? "Guardando cambios..." : canSaveProgress ? "Preparando guardado autom\xE1tico..." : "Los cambios se guardan al confirmar cada campo."))));
 }
 
-// ../nexus-plugins/booru/src/components/entities/EntityProfileView.jsx
+// booru/src/components/entities/EntityProfileView.jsx
 init_define_process();
 var React26 = window.React;
 var { useEffect: useEffect23, useRef: useRef15, useState: useState20 } = React26;
@@ -5953,7 +5747,7 @@ function EntityProfileView({
   ));
 }
 
-// ../nexus-plugins/booru/src/components/entities/EntityProfileDataTab.jsx
+// booru/src/components/entities/EntityProfileDataTab.jsx
 init_define_process();
 var React27 = window.React;
 var { useEffect: useEffect24, useState: useState21 } = React27;
@@ -6029,7 +5823,7 @@ function EntityProfileDataTab({
   }, placeholder: "Crear character para este universe", disabled: busy }), /* @__PURE__ */ React27.createElement(Button, { type: "button", onClick: () => void onCreateCharacterInUniverse?.(), disabled: !String(universeCharacterCreateValue || "").trim() || busy }, "Crear"))) : null, kind === "author" || kind === "artist" ? /* @__PURE__ */ React27.createElement(React27.Fragment, null, /* @__PURE__ */ React27.createElement(Field, { label: "Otros nombres", description: "Uno por linea. Son aliases de esta misma entidad, no tags.", className: "booruView__field" }, /* @__PURE__ */ React27.createElement(TextArea, { value: aliases, onChange: (event) => setAliases(event.target.value), placeholder: "Otro nombre conocido", disabled: busy || saving })), /* @__PURE__ */ React27.createElement(Field, { label: "Redes", description: "Elige una plataforma registrada y pega su enlace.", className: "booruView__field" }, /* @__PURE__ */ React27.createElement("div", { className: "booruView__entityProfileLinks" }, socialLinks.map((link, index) => /* @__PURE__ */ React27.createElement("div", { key: `${link?.id || index}`, className: "booruView__entityInputRow" }, /* @__PURE__ */ React27.createElement("select", { value: link?.platform?.id || link?.platformId || "", onChange: (event) => setSocialLinks((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, platformId: event.target.value, platform: platforms.find((platform) => platform.id === event.target.value) || item.platform } : item)), disabled: busy || saving }, /* @__PURE__ */ React27.createElement("option", { value: "" }, "Plataforma"), platforms.map((platform) => /* @__PURE__ */ React27.createElement("option", { key: platform.id, value: platform.id }, platform.displayName))), /* @__PURE__ */ React27.createElement("input", { type: "url", value: link?.url || "", onChange: (event) => setSocialLinks((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, url: event.target.value } : item)), placeholder: "https://", disabled: busy || saving }), /* @__PURE__ */ React27.createElement(Button, { type: "button", onClick: () => setSocialLinks((items) => items.filter((_item, itemIndex) => itemIndex !== index)), disabled: busy || saving }, "Quitar"))), /* @__PURE__ */ React27.createElement(Button, { type: "button", onClick: () => setSocialLinks((items) => [...items, { platformId: "", url: "" }]), disabled: busy || saving || !platforms.length }, "Anadir red"))), /* @__PURE__ */ React27.createElement(Button, { type: "button", tone: "primary", onClick: () => void saveIdentity(), disabled: busy || saving }, saving ? "Guardando" : "Guardar datos")) : null);
 }
 
-// ../nexus-plugins/booru/src/components/entities/EntityProfileTagsTab.jsx
+// booru/src/components/entities/EntityProfileTagsTab.jsx
 init_define_process();
 var React28 = window.React;
 var { useEffect: useEffect25, useState: useState22 } = React28;
@@ -6088,7 +5882,7 @@ function EntityProfileTagsTab({
   ), saving ? /* @__PURE__ */ React28.createElement("span", { className: "booruView__suggestionsHint" }, "Sincronizando tags heredadas...") : null);
 }
 
-// ../nexus-plugins/booru/src/components/entities/EntityContextDialog.jsx
+// booru/src/components/entities/EntityContextDialog.jsx
 init_define_process();
 var React29 = window.React;
 var { useEffect: useEffect26, useRef: useRef16, useState: useState23 } = React29;
@@ -6166,7 +5960,7 @@ function EntityContextDialog({
   ))) : /* @__PURE__ */ React29.createElement(StateBlock, { centered: true, title: "Sin recursos", description: "Esta entidad todav\xEDa no tiene media compatible para usar como visual." })) : /* @__PURE__ */ React29.createElement("div", { className: "booruEntityContextDialog__details" }, /* @__PURE__ */ React29.createElement("section", null, /* @__PURE__ */ React29.createElement("span", { className: "booruView__groupLabel" }, "Nombre principal"), /* @__PURE__ */ React29.createElement("strong", null, profile?.displayName || state?.item?.displayName || "Entidad")), /* @__PURE__ */ React29.createElement("section", null, /* @__PURE__ */ React29.createElement("span", { className: "booruView__groupLabel" }, "Aliases"), /* @__PURE__ */ React29.createElement("div", { className: "booruEntityContextDialog__chips" }, (profile?.aliases || []).length ? profile.aliases.map((alias) => /* @__PURE__ */ React29.createElement("span", { key: alias, className: "booruView__selectionChip" }, alias)) : /* @__PURE__ */ React29.createElement("span", { className: "booruView__suggestionsHint" }, "Sin aliases."))), /* @__PURE__ */ React29.createElement("section", null, /* @__PURE__ */ React29.createElement("span", { className: "booruView__groupLabel" }, "Tags de entidad"), /* @__PURE__ */ React29.createElement("div", { className: "booruEntityContextDialog__chips" }, (profile?.tags || []).length ? profile.tags.map((tag) => /* @__PURE__ */ React29.createElement("span", { key: tag.id, className: "booruView__selectionChip booruView__selectionChip--tag" }, tag.name)) : /* @__PURE__ */ React29.createElement("span", { className: "booruView__suggestionsHint" }, "Sin tags."))))));
 }
 
-// ../nexus-plugins/booru/src/BooruWorkspaceView.jsx
+// booru/src/BooruWorkspaceView.jsx
 var ipcRenderer = pluginIpc;
 var { pathToFileUrl } = window.nexus.urls;
 var React30 = window.React;
@@ -6183,7 +5977,7 @@ var safeUseDragLayer = typeof useDragLayer === "function" ? useDragLayer : (() =
   item: null
 }));
 var safeUseDrop = typeof useDrop === "function" ? useDrop : (() => [{ isOver: false, canDrop: false }, () => void 0]);
-var booruViewLogger = createRendererDevLogger("renderer.plugins.booru");
+var booruViewLogger = null;
 var WORKSPACE_FRAME_SECTION_NONCE_KEY = "workspaceFrameSectionNonce";
 var SETTINGS_SUBVIEW_OPTIONS = /* @__PURE__ */ new Set(["overview", "duplicates", "trash"]);
 var RESOURCE_SECTIONS = /* @__PURE__ */ new Set(["media", "pending", "duplicates", "trash"]);
@@ -7323,6 +7117,7 @@ function createResourceSearchTokenFromFragment(fragment) {
   return createSearchTokenFromParsedToken(parsedSearch?.tokens?.[0] || null);
 }
 function BooruWorkspaceView({ input = null, ctx }) {
+  booruViewLogger = ctx.log;
   const uiPreferencesApi = useMemo14(
     () => ctx.createPluginSettingsApi("nexus.booru.ui", {
       gridColumns: BOORU_DEFAULT_GRID_COLUMNS,
@@ -11175,7 +10970,7 @@ function BooruWorkspaceView({ input = null, ctx }) {
   )) : null));
 }
 
-// ../nexus-plugins/booru/src/renderer.js
+// booru/src/renderer.js
 var styleElement = null;
 function ensureStylesheet() {
   if (styleElement || typeof document === "undefined") {

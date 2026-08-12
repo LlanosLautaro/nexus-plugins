@@ -1,8 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseFile } from "music-metadata";
-import type { VaultRepositories } from "../../../nexus-backend/src/backend/vault-runtime/db/repositories.ts";
-import { getPluginSettingsStateKey } from "../../../nexus-backend/src/plugins/state-keys.ts";
 import { MusicaAudioRepository } from "./audio-repository";
 import {
   isMusicaEmbeddedCoverArtEnabled,
@@ -28,7 +26,12 @@ const AUDIO_EXTENSIONS = new Set([
   "wma",
 ]);
 
+type VaultRepositories = any;
 type MusicaVaultRepositories = Pick<VaultRepositories, "items" | "sqlite">;
+
+function getPluginSettingsStateKey(pluginId: string) {
+  return `plugins.settings.${pluginId}`;
+}
 
 export function getMusicaAudioRepository(repositories: Pick<VaultRepositories, "sqlite">) {
   return new MusicaAudioRepository(repositories.sqlite);

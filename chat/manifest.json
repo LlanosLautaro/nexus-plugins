@@ -1,7 +1,7 @@
 {
   "id": "nexus.chat",
   "displayName": "Chat",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "apiVersion": 2,
   "schemaVersion": 1,
   "description": "Chat local minimo para LM Studio dentro de Nexus.",

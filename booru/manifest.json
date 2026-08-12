@@ -1,7 +1,7 @@
 {
   "id": "nexus.booru",
   "displayName": "Booru",
-  "version": "0.3.129",
+  "version": "0.3.130",
   "apiVersion": 2,
   "schemaVersion": 1,
   "description": "Catalogo media-first con storage oculto, dedupe exacto y clasificacion propia dentro de Nexus.",

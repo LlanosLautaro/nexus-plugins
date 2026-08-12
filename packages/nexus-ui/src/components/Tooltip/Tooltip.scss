@@ -1,0 +1,29 @@
+.nexus-ui-tooltip {
+  position: absolute;
+  z-index: var(--z-tooltip, 1200);
+  pointer-events: none;
+  opacity: 0;
+  padding: 6px 9px;
+  border: 1px solid var(--ui-border-control);
+  border-radius: var(--ui-radius-control);
+  background: color-mix(in srgb, var(--ui-surface-elevated) 96%, black);
+  box-shadow: var(--shadow-m);
+  color: var(--ui-text-primary);
+  font: 600 0.7rem/1 var(--font-sans);
+  white-space: nowrap;
+  transition:
+    opacity 70ms var(--ease-standard),
+    transform 70ms var(--ease-standard);
+}
+
+*:hover > .nexus-ui-tooltip,
+*:focus-visible > .nexus-ui-tooltip {
+  opacity: 1;
+  transition-delay: 450ms;
+}
+
+*:active > .nexus-ui-tooltip,
+*[aria-expanded="true"] > .nexus-ui-tooltip {
+  opacity: 0;
+  transition-delay: 0ms;
+}

@@ -1,0 +1,97 @@
+.nexus-ui-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.nexus-ui-switch__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.nexus-ui-switch__track {
+  position: relative;
+  width: 38px;
+  height: 20px;
+  flex: 0 0 38px;
+  border: 1px solid var(--ui-border-control-strong);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-inset);
+  box-shadow: inset 0 1px 4px rgb(0 0 0 / 64%);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.nexus-ui-switch__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--ui-border-control-strong);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-text-muted);
+  transition:
+    transform var(--duration-normal) var(--ease-emphasized),
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.nexus-ui-switch:hover .nexus-ui-switch__track {
+  border-color: var(--ui-selector-icon-hover);
+}
+
+.nexus-ui-switch__input:focus-visible + .nexus-ui-switch__track {
+  border-color: var(--ui-border-focus);
+  box-shadow:
+    inset 0 1px 4px rgb(0 0 0 / 64%),
+    0 0 0 1px color-mix(in srgb, var(--ui-accent) 24%, transparent);
+}
+
+.nexus-ui-switch__input:checked + .nexus-ui-switch__track {
+  border-color: color-mix(in srgb, var(--ui-accent) 64%, var(--ui-border-control));
+  background: color-mix(in srgb, var(--ui-accent) 17%, var(--ui-surface-inset));
+  box-shadow:
+    inset 0 1px 4px rgb(0 0 0 / 64%),
+    0 0 10px color-mix(in srgb, var(--ui-accent) 18%, transparent);
+}
+
+.nexus-ui-switch__input:checked + .nexus-ui-switch__track .nexus-ui-switch__thumb {
+  border-color: color-mix(in srgb, var(--ui-accent) 68%, var(--ui-text-primary));
+  background: var(--ui-text-primary);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--ui-accent) 44%, transparent);
+  transform: translateX(18px);
+}
+
+.nexus-ui-switch__input:disabled ~ * {
+  cursor: default;
+  opacity: 0.54;
+}
+
+.nexus-ui-switch__copy {
+  display: grid;
+  gap: 3px;
+}
+
+.nexus-ui-switch__label {
+  color: var(--ui-text-primary);
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.nexus-ui-switch__description {
+  color: var(--ui-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}

@@ -1,0 +1,38 @@
+// Public @nexus/ui layout mixins.
+@mixin flex-center($inline: false) {
+  @if $inline {
+    display: inline-flex;
+  } @else {
+    display: flex;
+  }
+
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin size($width, $height: $width) {
+  width: $width;
+  height: $height;
+}
+
+@mixin split-main-aside($aside-width: 360px, $gap: var(--space-4)) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, $aside-width);
+  gap: $gap;
+  min-height: 0;
+
+  @media (max-width: 1100px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+@mixin split-sidebar-detail($sidebar-width: 320px, $gap: 0) {
+  display: grid;
+  grid-template-columns: minmax(260px, $sidebar-width) minmax(0, 1fr);
+  gap: $gap;
+  min-height: 0;
+
+  @media (max-width: 980px) {
+    grid-template-columns: 1fr;
+  }
+}

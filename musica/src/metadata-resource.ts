@@ -1,14 +1,8 @@
 import path from "node:path";
-import {
-  buildFileNameFromBaseName,
-  rollbackRenamedVaultItem,
-  renameVaultItem,
-} from "../../../nexus-backend/src/backend/vault-runtime/file-system/operations/rename-item.ts";
-import type { MetadataFieldDefinition } from "../../../nexus-backend/src/shared/types.ts";
 import type {
   MetadataResourceDefinition,
   NexusBackendPluginContext,
-} from "../../../nexus-backend/src/plugins/types.ts";
+} from "@nexus/plugin-sdk";
 import {
   ensureAudioTrackWithAuthors,
   getAudioTrackAuthorNames,
@@ -23,6 +17,28 @@ import {
 
 const AUDIO_TRACK_RESOURCE_ID = "audio.track";
 const AUDIO_TRACK_VARIANT_ID = "basic";
+
+type MetadataFieldDefinition = {
+  name: string;
+  type: "text" | "textarea" | "number" | "boolean" | "string-list";
+  label: string;
+  description?: string;
+  placeholder?: string;
+  required?: boolean;
+  addLabel?: string;
+};
+
+function buildFileNameFromBaseName(baseName: unknown, extension: unknown) {
+  const normalizedBaseName = String(baseName ?? "").trim();
+  if (!normalizedBaseName || normalizedBaseName === "." || normalizedBaseName === "..") {
+    throw new Error("El nombre no es valido.");
+  }
+  if (/[<>:"/\\|?*\u0000-\u001F]/.test(normalizedBaseName) || /[. ]$/.test(normalizedBaseName)) {
+    throw new Error("El nombre contiene caracteres no permitidos.");
+  }
+  const normalizedExtension = String(extension ?? "").replace(/^\./, "").trim();
+  return normalizedExtension ? `${normalizedBaseName}.${normalizedExtension}` : normalizedBaseName;
+}
 
 const AUDIO_TRACK_FIELDS: MetadataFieldDefinition[] = [
   {
@@ -310,7 +326,7 @@ const audioTrackMetadataResource: MetadataResourceDefinition = {
 
     try {
       if (normalizedValues.fullFileName !== getModelValue(item, "name")) {
-        renameResult = await renameVaultItem(item, normalizedValues.fullFileName);
+        renameResult = await ctx.items.rename(item, normalizedValues.fullFileName);
       }
 
       item.name = normalizedValues.fullFileName;
@@ -369,7 +385,7 @@ const audioTrackMetadataResource: MetadataResourceDefinition = {
     } catch (error) {
       if (renameResult?.renamed) {
         try {
-          await rollbackRenamedVaultItem(item, renameResult);
+          await ctx.items.rollbackRename(item, renameResult);
         } catch (rollbackError) {
           console.error("Error revirtiendo rename del audio:", rollbackError);
         }

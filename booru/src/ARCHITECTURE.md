@@ -104,10 +104,10 @@ una pieza visual.
 
 ## Validacion de regresion
 
-`nexus-backend/tests/booru-phase2.test.mjs` valida el catalogo aislado, el
+`tests/booru-phase2.test.mjs` valida el catalogo aislado, el
 contrato de mutaciones, el ancla de Details y las carreras de reconciliacion. Para
 comprobar el renderer real se puede generar una biblioteca persistente en `zzz
-test vault` con `node nexus-backend/tests/seed-booru-runtime-fixtures.mjs`. El
+vault sintetico se construye dentro de la suite publica. El
 set contiene mas de una pagina de imagenes, GIF, WebP, video y un duplicado;
 se ingiere mediante la carpeta vigilada configurada en los settings del plugin.
 Despues de una modificacion, construir, sincronizar ese vault y verificar en

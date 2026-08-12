@@ -43,9 +43,9 @@ var init_define_process = __esm({
   }
 });
 
-// scripts/plugins/shims/react.cjs
+// scripts/shims/react.cjs
 var require_react = __commonJS({
-  "scripts/plugins/shims/react.cjs"(exports, module) {
+  "scripts/shims/react.cjs"(exports, module) {
     init_define_process();
     function requireReact() {
       const hostReact = globalThis?.window?.__NEXUS_HOST_REACT__ || globalThis?.window?.React;
@@ -58,25 +58,25 @@ var require_react = __commonJS({
   }
 });
 
-// ../nexus-plugins/chat/src/renderer.js
+// chat/src/renderer.js
 init_define_process();
 
-// ../nexus-plugins/chat/src/ChatView.jsx
+// chat/src/ChatView.jsx
 init_define_process();
 
-// ../packages/nexus-ui/src/index.js
+// packages/nexus-ui/src/index.js
 init_define_process();
 
-// ../packages/nexus-ui/src/components/Button/Button.jsx
+// packages/nexus-ui/src/components/Button/Button.jsx
 init_define_process();
 
-// ../packages/nexus-ui/src/utils/cx.js
+// packages/nexus-ui/src/utils/cx.js
 init_define_process();
 function cx(...values) {
   return values.filter(Boolean).join(" ");
 }
 
-// ../packages/nexus-ui/src/components/Button/Button.jsx
+// packages/nexus-ui/src/components/Button/Button.jsx
 function Button({
   className = "",
   tone = "secondary",
@@ -97,7 +97,7 @@ function Button({
   );
 }
 
-// ../packages/nexus-ui/src/components/TextArea/TextArea.jsx
+// packages/nexus-ui/src/components/TextArea/TextArea.jsx
 init_define_process();
 var import_react = __toESM(require_react(), 1);
 var TextArea = (0, import_react.forwardRef)(function TextArea2({ className = "", ...props }, ref) {
@@ -111,7 +111,7 @@ var TextArea = (0, import_react.forwardRef)(function TextArea2({ className = "",
   );
 });
 
-// ../packages/nexus-ui/src/components/LoadingIndicator/LoadingIndicator.jsx
+// packages/nexus-ui/src/components/LoadingIndicator/LoadingIndicator.jsx
 init_define_process();
 function LoadingIndicator({
   className = "",
@@ -133,7 +133,7 @@ function LoadingIndicator({
   );
 }
 
-// ../packages/nexus-ui/src/components/ReloadIcon/ReloadIcon.jsx
+// packages/nexus-ui/src/components/ReloadIcon/ReloadIcon.jsx
 init_define_process();
 function ReloadIcon({ size = 18, className = "" }) {
   return /* @__PURE__ */ React.createElement(
@@ -157,7 +157,7 @@ function ReloadIcon({ size = 18, className = "" }) {
   );
 }
 
-// ../packages/nexus-ui/src/legacy/States.jsx
+// packages/nexus-ui/src/legacy/States.jsx
 init_define_process();
 function Notice({ className = "", tone = "info", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-notice", `nexus-ui-notice--${tone}`, className) }, children);
@@ -179,7 +179,7 @@ function StateBlock({
   ) }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null, children);
 }
 
-// ../packages/nexus-ui/src/legacy/Workspace.jsx
+// packages/nexus-ui/src/legacy/Workspace.jsx
 init_define_process();
 function WorkspacePage({ className = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-page", className) }, children);
@@ -188,7 +188,7 @@ function WorkspaceBody({ className = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-body", className) }, children);
 }
 
-// ../nexus-plugins/chat/src/icons.jsx
+// chat/src/icons.jsx
 init_define_process();
 var React2 = window.React;
 function BaseIcon({ children, size = 18, strokeWidth = 1.8 }) {
@@ -218,12 +218,12 @@ function SendIcon(props) {
   return /* @__PURE__ */ React2.createElement(BaseIcon, { ...props }, /* @__PURE__ */ React2.createElement("path", { d: "m4.75 12 14-6.25-3.5 12.5-4.25-4.25L4.75 12Z" }), /* @__PURE__ */ React2.createElement("path", { d: "M10.75 13.75 18.75 5.75" }));
 }
 
-// ../nexus-plugins/chat/src/constants.js
+// chat/src/constants.js
 init_define_process();
 var CHAT_PLUGIN_ID = "nexus.chat";
 var CHAT_VIEW_ID = "nexus.chat.panel";
 
-// ../nexus-plugins/chat/src/ipc-client.js
+// chat/src/ipc-client.js
 init_define_process();
 var runtimeIpc = null;
 function configurePluginIpc(ipc) {
@@ -239,7 +239,7 @@ var pluginIpc = Object.freeze({
   }
 });
 
-// ../nexus-plugins/chat/src/ChatView.jsx
+// chat/src/ChatView.jsx
 var { startTransition, useEffect, useLayoutEffect, useRef, useState } = window.React;
 var ipcRenderer = pluginIpc;
 function createMessage(role, content, meta = null) {
@@ -561,7 +561,7 @@ function ChatView({ ctx }) {
   ))), error ? /* @__PURE__ */ React.createElement(Notice, { tone: "danger" }, error) : null));
 }
 
-// ../nexus-plugins/chat/src/renderer.js
+// chat/src/renderer.js
 var styleElement = null;
 function ensureStylesheet() {
   if (styleElement || typeof document === "undefined") {

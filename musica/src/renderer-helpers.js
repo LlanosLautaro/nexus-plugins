@@ -5,7 +5,7 @@ import {
   readMusicaEngineAssignments,
   writeMusicaEngineAssignments,
 } from "./plugin-settings.js";
-import { resolveItemLocationFromItemsState } from "../../../nexus-frontend/src/store/items/location.mjs";
+import { resolveItemLocationFromItemsState } from "@nexus/plugin-sdk";
 
 function getCurrentVaultInfo() {
   return window.nexus.vault.getCurrent() || null;

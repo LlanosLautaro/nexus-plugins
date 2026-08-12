@@ -1,9 +1,9 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { electron } from "../../../nexus-backend/src/shared/electron.js";
-import { getNodeModulesPath } from "../../../nexus-backend/src/shared/runtime-paths.js";
+import { createRequire } from "node:module";
+import { BrowserWindow } from "electron";
 
-const { BrowserWindow } = electron;
+const runtimeRequire = createRequire(__filename);
 
 const COVER_PREVIEW_WIDTH = 220;
 const COVER_PREVIEW_HEIGHT = 320;
@@ -154,14 +154,14 @@ export function createPdfCoverPreviewRenderer() {
   let renderWindowReady: Promise<any> | null = null;
   let renderQueue = Promise.resolve();
 
-  const nodeModulesPath = getNodeModulesPath();
+  const pdfPackageRoot = path.dirname(runtimeRequire.resolve("pdfjs-dist/package.json"));
   const pdfModuleUrl = pathToFileURL(
-    path.join(nodeModulesPath, "pdfjs-dist", "legacy", "build", "pdf.mjs"),
+    path.join(pdfPackageRoot, "legacy", "build", "pdf.mjs"),
   ).href;
   const workerModuleUrl = pathToFileURL(
-    path.join(nodeModulesPath, "pdfjs-dist", "legacy", "build", "pdf.worker.mjs"),
+    path.join(pdfPackageRoot, "legacy", "build", "pdf.worker.mjs"),
   ).href;
-  const wasmUrl = `${pathToFileURL(path.join(nodeModulesPath, "pdfjs-dist", "wasm")).href}/`;
+  const wasmUrl = `${pathToFileURL(path.join(pdfPackageRoot, "wasm")).href}/`;
 
   const resetWindow = async () => {
     const windowToClose = renderWindow;

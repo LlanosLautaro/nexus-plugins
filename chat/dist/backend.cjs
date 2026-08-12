@@ -16,7 +16,7 @@ var __copyProps = (to, from, except, desc) => {
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// ../nexus-plugins/chat/src/backend.ts
+// chat/src/backend.ts
 var backend_exports = {};
 __export(backend_exports, {
   default: () => backend_default

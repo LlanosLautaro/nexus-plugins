@@ -1,7 +1,7 @@
 {
   "id": "nexus.tab-repository",
   "displayName": "Tab Repository",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "apiVersion": 2,
   "schemaVersion": 1,
   "description": "Repositorio por vault para descargar tabs de Brave, organizarlas y devolverlas por lotes.",

@@ -43,9 +43,9 @@ var init_define_process = __esm({
   }
 });
 
-// scripts/plugins/shims/react.cjs
+// scripts/shims/react.cjs
 var require_react = __commonJS({
-  "scripts/plugins/shims/react.cjs"(exports, module) {
+  "scripts/shims/react.cjs"(exports, module) {
     init_define_process();
     function requireReact() {
       const hostReact = globalThis?.window?.__NEXUS_HOST_REACT__ || globalThis?.window?.React;
@@ -58,16 +58,16 @@ var require_react = __commonJS({
   }
 });
 
-// ../nexus-plugins/musica/src/renderer.js
+// musica/src/renderer.js
 init_define_process();
 
-// ../nexus-plugins/musica/src/MusicAudioEngine.jsx
+// musica/src/MusicAudioEngine.jsx
 init_define_process();
 
-// ../nexus-plugins/musica/src/PluginMetadataForm.jsx
+// musica/src/PluginMetadataForm.jsx
 init_define_process();
 
-// ../nexus-plugins/musica/src/ipc-client.js
+// musica/src/ipc-client.js
 init_define_process();
 var runtimeIpc = null;
 function configurePluginIpc(ipc) {
@@ -84,7 +84,7 @@ var pluginIpc = Object.freeze({
   }
 });
 
-// ../nexus-plugins/musica/src/PluginMetadataForm.jsx
+// musica/src/PluginMetadataForm.jsx
 var { useEffect, useMemo, useState } = window.React;
 var ipcRenderer = pluginIpc;
 function normalizeFieldValue(field, value) {
@@ -309,10 +309,10 @@ function PluginMetadataForm({ itemId, formInstance, onSubmitted }) {
   )));
 }
 
-// ../nexus-plugins/musica/src/renderer-helpers.js
+// musica/src/renderer-helpers.js
 init_define_process();
 
-// ../nexus-plugins/musica/src/plugin-settings.js
+// musica/src/plugin-settings.js
 init_define_process();
 var MUSICA_ENGINE_ID = "nexus.musica.audio";
 var MUSICA_SETTINGS_DEFAULTS = Object.freeze({
@@ -320,8 +320,8 @@ var MUSICA_SETTINGS_DEFAULTS = Object.freeze({
   engineAssignments: []
 });
 function normalizeItemId(value) {
-  const normalized = String(value || "").trim();
-  return normalized || "";
+  const normalized2 = String(value || "").trim();
+  return normalized2 || "";
 }
 function normalizeRelativePath(value) {
   return String(value || "").replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+/g, "/").replace(/\/$/, "").trim();
@@ -364,111 +364,55 @@ function writeMusicaEngineAssignments(settingsValue, assignments) {
   };
 }
 
-// ../nexus-frontend/src/store/items/location.mjs
+// packages/plugin-sdk/src/index.js
 init_define_process();
-function normalizeItemId2(value) {
-  const normalizedValue = String(value || "").trim();
-  return normalizedValue || "";
-}
-function normalizeName(value) {
+
+// packages/plugin-sdk/src/item-location.js
+init_define_process();
+function normalized(value) {
   return String(value || "").trim();
 }
-function trimTrailingSeparators(value) {
-  return String(value || "").replace(/[\\/]+$/, "");
-}
-function guessSeparator(...values) {
-  return values.some((value) => String(value || "").includes("\\")) ? "\\" : "/";
-}
-function joinSegments(basePath, segments, separator) {
-  const normalizedBasePath = trimTrailingSeparators(basePath);
-  if (!segments.length) {
-    return normalizedBasePath;
-  }
-  return [normalizedBasePath, ...segments].filter(Boolean).join(separator);
-}
-function joinRelativePath(segments, separator) {
-  return segments.length ? segments.join(separator) : null;
-}
-function getFallbackRootItem(itemsState, byId) {
-  const normalizedRootId = normalizeItemId2(itemsState?.rootId);
-  if (normalizedRootId && byId[normalizedRootId]) {
-    return byId[normalizedRootId];
-  }
-  return Object.values(byId).find((candidate) => {
-    if (!candidate?.id) {
-      return false;
-    }
-    return !normalizeItemId2(candidate.parentId);
-  }) || null;
-}
-function getRootPathFromItemsState(itemsState, rootItem, options = {}) {
-  const explicitRootPath = trimTrailingSeparators(
-    options.rootPath || options.vaultContentPath || ""
-  );
-  if (explicitRootPath) {
-    return explicitRootPath;
-  }
+function resolveItemLocationFromItemsState(itemsState, itemId) {
   const byId = itemsState?.byId || {};
-  const preferredRootItem = rootItem || getFallbackRootItem(itemsState, byId);
-  return trimTrailingSeparators(preferredRootItem?.path || "");
-}
-function resolveItemLocationFromItemsState(itemsState, itemId, options = {}) {
-  const byId = itemsState?.byId || {};
-  const normalizedItemId = normalizeItemId2(itemId);
-  if (!normalizedItemId) {
-    return null;
-  }
-  const item = byId[normalizedItemId];
-  if (!item) {
-    return null;
-  }
-  const visitedIds = /* @__PURE__ */ new Set();
+  const item = byId[normalized(itemId)];
+  if (!item) return null;
+  const visited = /* @__PURE__ */ new Set();
   const ancestorIds = [];
-  const relativeSegments = [];
-  let currentItem = item;
-  let rootItem = null;
-  while (currentItem?.id) {
-    const currentItemId = normalizeItemId2(currentItem.id);
-    if (!currentItemId || visitedIds.has(currentItemId)) {
-      return null;
-    }
-    visitedIds.add(currentItemId);
-    const currentParentId = normalizeItemId2(currentItem.parentId);
-    if (!currentParentId) {
-      rootItem = currentItem;
+  const segments = [];
+  let current = item;
+  let root = null;
+  while (current?.id) {
+    const currentId = normalized(current.id);
+    if (!currentId || visited.has(currentId)) return null;
+    visited.add(currentId);
+    const parentId = normalized(current.parentId);
+    if (!parentId) {
+      root = current;
       break;
     }
-    const currentName = normalizeName(currentItem.name);
-    if (currentName) {
-      relativeSegments.push(currentName);
-    }
-    ancestorIds.push(currentParentId);
-    const parentItem = byId[currentParentId];
-    if (!parentItem) {
-      return null;
-    }
-    currentItem = parentItem;
+    if (normalized(current.name)) segments.push(normalized(current.name));
+    ancestorIds.push(parentId);
+    current = byId[parentId];
+    if (!current) return null;
   }
-  if (!rootItem) {
-    return null;
-  }
-  const rootPathCandidate = getRootPathFromItemsState(itemsState, rootItem, options);
-  const separator = guessSeparator(rootPathCandidate, rootItem?.path, item?.path);
-  const orderedSegments = [...relativeSegments].reverse();
-  const resolvedRelativePath = joinRelativePath(orderedSegments, separator);
+  if (!root) return null;
+  const orderedSegments = segments.reverse();
+  const rootPath = String(root.path || "").replace(/[\\/]+$/, "");
+  const separator = rootPath.includes("\\") || String(item.path || "").includes("\\") ? "\\" : "/";
+  const relativePath = orderedSegments.length ? orderedSegments.join(separator) : null;
   return {
     itemId: String(item.id),
     parentId: item.parentId ?? null,
     name: String(item.name || ""),
     type: item.type === "folder" ? "folder" : "file",
-    path: joinSegments(rootPathCandidate, orderedSegments, separator),
-    relativePath: resolvedRelativePath,
+    path: [rootPath, ...orderedSegments].filter(Boolean).join(separator),
+    relativePath,
     contentRelativePath: orderedSegments.length ? orderedSegments.join("/") : null,
     ancestorIds
   };
 }
 
-// ../nexus-plugins/musica/src/renderer-helpers.js
+// musica/src/renderer-helpers.js
 var SUPPORTED_AUDIO_EXTENSIONS = /* @__PURE__ */ new Set([
   "aac",
   "flac",
@@ -542,7 +486,7 @@ function hydrateAssignmentsWithFolderOptions(assignments, folderOptions = []) {
 var readEngineAssignments = readMusicaEngineAssignments;
 var writeEngineAssignments = writeMusicaEngineAssignments;
 
-// ../nexus-plugins/musica/src/MusicAudioEngine.jsx
+// musica/src/MusicAudioEngine.jsx
 var { useEffect: useEffect2, useMemo: useMemo2, useRef, useState: useState2 } = window.React;
 var ipcRenderer2 = pluginIpc;
 var DEFAULT_AUDIO_STATE = {
@@ -890,22 +834,22 @@ function MusicAudioEngine({
   ))) : null);
 }
 
-// ../nexus-plugins/musica/src/MusicaSettingsSection.jsx
+// musica/src/MusicaSettingsSection.jsx
 init_define_process();
 
-// ../packages/nexus-ui/src/index.js
+// packages/nexus-ui/src/index.js
 init_define_process();
 
-// ../packages/nexus-ui/src/components/Button/Button.jsx
+// packages/nexus-ui/src/components/Button/Button.jsx
 init_define_process();
 
-// ../packages/nexus-ui/src/utils/cx.js
+// packages/nexus-ui/src/utils/cx.js
 init_define_process();
 function cx(...values) {
   return values.filter(Boolean).join(" ");
 }
 
-// ../packages/nexus-ui/src/components/Button/Button.jsx
+// packages/nexus-ui/src/components/Button/Button.jsx
 function Button({
   className = "",
   tone = "secondary",
@@ -926,7 +870,7 @@ function Button({
   );
 }
 
-// ../packages/nexus-ui/src/components/Select/Select.jsx
+// packages/nexus-ui/src/components/Select/Select.jsx
 init_define_process();
 var import_react = __toESM(require_react(), 1);
 var Select = (0, import_react.forwardRef)(function Select2({ className = "", children, ...props }, ref) {
@@ -941,7 +885,7 @@ var Select = (0, import_react.forwardRef)(function Select2({ className = "", chi
   );
 });
 
-// ../packages/nexus-ui/src/components/Checkbox/Checkbox.jsx
+// packages/nexus-ui/src/components/Checkbox/Checkbox.jsx
 init_define_process();
 function Checkbox({
   className = "",
@@ -952,7 +896,7 @@ function Checkbox({
   return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-checkbox", className) }, /* @__PURE__ */ React.createElement("input", { ...props, className: "nexus-ui-checkbox__input", type: "checkbox" }), /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__box", "aria-hidden": "true" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 12 10" }, /* @__PURE__ */ React.createElement("path", { d: "M1 5.1 4.2 8 11 1" }))), label || description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__copy" }, label ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__label" }, label) : null, description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__description" }, description) : null) : null);
 }
 
-// ../nexus-plugins/musica/src/MusicaSettingsSection.jsx
+// musica/src/MusicaSettingsSection.jsx
 var { useEffect: useEffect3, useMemo: useMemo3, useState: useState3 } = window.React;
 function createEmptyAssignment() {
   return {
@@ -1123,7 +1067,7 @@ function MusicaSettingsSection({ ctx }) {
   )), notice ? /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__notice" }, notice) : null, error ? /* @__PURE__ */ React.createElement("div", { className: "musicaPluginSettings__error" }, error) : null);
 }
 
-// ../nexus-plugins/musica/src/renderer.js
+// musica/src/renderer.js
 var styleElement = null;
 function ensureStylesheet() {
   if (styleElement || typeof document === "undefined") {

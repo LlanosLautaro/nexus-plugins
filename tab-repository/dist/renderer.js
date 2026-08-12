@@ -43,9 +43,9 @@ var init_define_process = __esm({
   }
 });
 
-// scripts/plugins/shims/react.cjs
+// scripts/shims/react.cjs
 var require_react = __commonJS({
-  "scripts/plugins/shims/react.cjs"(exports, module) {
+  "scripts/shims/react.cjs"(exports, module) {
     init_define_process();
     function requireReact() {
       const hostReact = globalThis?.window?.__NEXUS_HOST_REACT__ || globalThis?.window?.React;
@@ -58,9 +58,9 @@ var require_react = __commonJS({
   }
 });
 
-// scripts/plugins/shims/react-dom.cjs
+// scripts/shims/react-dom.cjs
 var require_react_dom = __commonJS({
-  "scripts/plugins/shims/react-dom.cjs"(exports, module) {
+  "scripts/shims/react-dom.cjs"(exports, module) {
     init_define_process();
     function requireReactDom() {
       const hostReactDom = globalThis?.window?.__NEXUS_HOST_REACT_DOM__;
@@ -73,25 +73,25 @@ var require_react_dom = __commonJS({
   }
 });
 
-// ../nexus-plugins/tab-repository/src/renderer.js
+// tab-repository/src/renderer.js
 init_define_process();
 
-// ../nexus-plugins/tab-repository/src/TabRepositoryView.jsx
+// tab-repository/src/TabRepositoryView.jsx
 init_define_process();
 
-// ../packages/nexus-ui/src/index.js
+// packages/nexus-ui/src/index.js
 init_define_process();
 
-// ../packages/nexus-ui/src/components/Button/Button.jsx
+// packages/nexus-ui/src/components/Button/Button.jsx
 init_define_process();
 
-// ../packages/nexus-ui/src/utils/cx.js
+// packages/nexus-ui/src/utils/cx.js
 init_define_process();
 function cx(...values) {
   return values.filter(Boolean).join(" ");
 }
 
-// ../packages/nexus-ui/src/components/Button/Button.jsx
+// packages/nexus-ui/src/components/Button/Button.jsx
 function Button({
   className = "",
   tone = "secondary",
@@ -112,17 +112,17 @@ function Button({
   );
 }
 
-// ../packages/nexus-ui/src/components/CyberIconButton/CyberIconButton.jsx
+// packages/nexus-ui/src/components/CyberIconButton/CyberIconButton.jsx
 init_define_process();
 var import_react = __toESM(require_react(), 1);
 
-// ../packages/nexus-ui/src/components/Tooltip/Tooltip.jsx
+// packages/nexus-ui/src/components/Tooltip/Tooltip.jsx
 init_define_process();
 function Tooltip({ className = "", children }) {
   return /* @__PURE__ */ React.createElement("span", { className: cx("nexus-ui-tooltip", className) }, children);
 }
 
-// ../packages/nexus-ui/src/components/CyberIconButton/CyberIconButton.jsx
+// packages/nexus-ui/src/components/CyberIconButton/CyberIconButton.jsx
 function CyberIconButton({
   active = false,
   className = "",
@@ -167,7 +167,7 @@ function CyberIconButton({
   );
 }
 
-// ../packages/nexus-ui/src/components/ActionMenu/ActionMenu.jsx
+// packages/nexus-ui/src/components/ActionMenu/ActionMenu.jsx
 init_define_process();
 var import_react2 = __toESM(require_react(), 1);
 var import_react_dom = __toESM(require_react_dom(), 1);
@@ -302,7 +302,7 @@ function ActionMenu({
   );
 }
 
-// ../packages/nexus-ui/src/components/Input/Input.jsx
+// packages/nexus-ui/src/components/Input/Input.jsx
 init_define_process();
 var import_react3 = __toESM(require_react(), 1);
 var Input = (0, import_react3.forwardRef)(function Input2({ className = "", type = "text", ...props }, ref) {
@@ -317,7 +317,7 @@ var Input = (0, import_react3.forwardRef)(function Input2({ className = "", type
   );
 });
 
-// ../packages/nexus-ui/src/components/TextArea/TextArea.jsx
+// packages/nexus-ui/src/components/TextArea/TextArea.jsx
 init_define_process();
 var import_react4 = __toESM(require_react(), 1);
 var TextArea = (0, import_react4.forwardRef)(function TextArea2({ className = "", ...props }, ref) {
@@ -331,7 +331,7 @@ var TextArea = (0, import_react4.forwardRef)(function TextArea2({ className = ""
   );
 });
 
-// ../packages/nexus-ui/src/components/Checkbox/Checkbox.jsx
+// packages/nexus-ui/src/components/Checkbox/Checkbox.jsx
 init_define_process();
 function Checkbox({
   className = "",
@@ -342,7 +342,7 @@ function Checkbox({
   return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-checkbox", className) }, /* @__PURE__ */ React.createElement("input", { ...props, className: "nexus-ui-checkbox__input", type: "checkbox" }), /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__box", "aria-hidden": "true" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 12 10" }, /* @__PURE__ */ React.createElement("path", { d: "M1 5.1 4.2 8 11 1" }))), label || description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__copy" }, label ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__label" }, label) : null, description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__description" }, description) : null) : null);
 }
 
-// ../packages/nexus-ui/src/components/SearchField/SearchField.jsx
+// packages/nexus-ui/src/components/SearchField/SearchField.jsx
 init_define_process();
 var import_react5 = __toESM(require_react(), 1);
 function DefaultSearchIcon() {
@@ -366,7 +366,7 @@ var SearchField = (0, import_react5.forwardRef)(function SearchField2({
   ), endAction ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-search-field__action" }, endAction) : null);
 });
 
-// ../packages/nexus-ui/src/components/LoadingIndicator/LoadingIndicator.jsx
+// packages/nexus-ui/src/components/LoadingIndicator/LoadingIndicator.jsx
 init_define_process();
 function LoadingIndicator({
   className = "",
@@ -388,7 +388,7 @@ function LoadingIndicator({
   );
 }
 
-// ../packages/nexus-ui/src/legacy/States.jsx
+// packages/nexus-ui/src/legacy/States.jsx
 init_define_process();
 function Notice({ className = "", tone = "info", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-notice", `nexus-ui-notice--${tone}`, className) }, children);
@@ -410,7 +410,7 @@ function StateBlock({
   ) }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null, children);
 }
 
-// ../packages/nexus-ui/src/legacy/Workspace.jsx
+// packages/nexus-ui/src/legacy/Workspace.jsx
 init_define_process();
 function WorkspacePage({ className = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-page", className) }, children);
@@ -425,7 +425,7 @@ function WorkspaceBody({ className = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-body", className) }, children);
 }
 
-// ../nexus-plugins/tab-repository/src/settings.js
+// tab-repository/src/settings.js
 init_define_process();
 var TAB_REPOSITORY_PLUGIN_ID = "nexus.tab-repository";
 var TAB_REPOSITORY_VIEW_ID = "nexus.tab-repository.workspace";
@@ -456,7 +456,7 @@ function normalizeSettings(value) {
   };
 }
 
-// ../nexus-plugins/tab-repository/src/icons.jsx
+// tab-repository/src/icons.jsx
 init_define_process();
 function RepositoryIcon({ className = "" }) {
   return /* @__PURE__ */ React.createElement("svg", { "aria-hidden": "true", className, fill: "none", viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M5 5.5h14v4H5zM5 10.5h14v4H5zM5 15.5h14v3H5z" }), /* @__PURE__ */ React.createElement("path", { d: "M8 7.5h8M8 12.5h8M8 17h5" }));
@@ -477,7 +477,7 @@ function FolderIcon() {
   return /* @__PURE__ */ React.createElement("svg", { "aria-hidden": "true", fill: "none", viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M4 6.5h6l2 2h8v9H4z" }));
 }
 
-// ../nexus-plugins/tab-repository/src/ui-helpers.mjs
+// tab-repository/src/ui-helpers.mjs
 init_define_process();
 function filterTabs(tabs, query) {
   const normalized = String(query || "").trim().toLocaleLowerCase("es");
@@ -514,7 +514,7 @@ function shouldSendTabOnDoubleClick(target, { disabled = false, trashed = false 
   return !target.closest("button, input, label, a, textarea, select, [role='button'], [role='menuitem'], .tabRepositoryRow__drag");
 }
 
-// ../nexus-plugins/tab-repository/src/ipc-client.js
+// tab-repository/src/ipc-client.js
 init_define_process();
 var runtimeIpc = null;
 function configurePluginIpc(ipc) {
@@ -530,7 +530,7 @@ var pluginIpc = Object.freeze({
   }
 });
 
-// ../nexus-plugins/tab-repository/src/TabRepositoryView.jsx
+// tab-repository/src/TabRepositoryView.jsx
 var {
   useEffect: useEffect2,
   useLayoutEffect: useLayoutEffect2,
@@ -1271,7 +1271,7 @@ function TabRepositoryView({ ctx }) {
   ) : null);
 }
 
-// ../nexus-plugins/tab-repository/src/TabRepositorySettings.jsx
+// tab-repository/src/TabRepositorySettings.jsx
 init_define_process();
 function TabRepositorySettings({ ctx }) {
   const settings = normalizeSettings(ctx.settings.useValue?.() || DEFAULT_SETTINGS);
@@ -1298,7 +1298,7 @@ function TabRepositorySettings({ ctx }) {
   ))), /* @__PURE__ */ React.createElement(Notice, { tone: "info" }, "Al menos uno de los dos campos debe permanecer visible."));
 }
 
-// ../nexus-plugins/tab-repository/src/renderer.js
+// tab-repository/src/renderer.js
 var styleElement = null;
 function ensureStylesheet() {
   if (styleElement || typeof document === "undefined") return;

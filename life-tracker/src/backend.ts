@@ -1,7 +1,7 @@
 import type {
   NexusBackendPluginContext,
   NexusBackendPluginModule,
-} from "../../../nexus-backend/src/plugins/types.ts";
+} from "@nexus/plugin-sdk";
 import {
   buildHabitosHomeSnapshot,
   compareDailyQueueItems,

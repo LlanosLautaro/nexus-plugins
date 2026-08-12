@@ -1,0 +1,8 @@
+@use "../../scss" as *;
+
+.nexus-ui-textarea {
+  @include field-control(82px);
+  padding: 9px 11px;
+  line-height: 1.45;
+  resize: vertical;
+}

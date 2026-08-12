@@ -49,9 +49,9 @@ var init_define_process = __esm({
   }
 });
 
-// scripts/plugins/shims/react.cjs
+// scripts/shims/react.cjs
 var require_react = __commonJS({
-  "scripts/plugins/shims/react.cjs"(exports, module) {
+  "scripts/shims/react.cjs"(exports, module) {
     init_define_process();
     function requireReact() {
       const hostReact = globalThis?.window?.__NEXUS_HOST_REACT__ || globalThis?.window?.React;
@@ -64,9 +64,9 @@ var require_react = __commonJS({
   }
 });
 
-// scripts/plugins/shims/react-dom.cjs
+// scripts/shims/react-dom.cjs
 var require_react_dom = __commonJS({
-  "scripts/plugins/shims/react-dom.cjs"(exports, module) {
+  "scripts/shims/react-dom.cjs"(exports, module) {
     init_define_process();
     function requireReactDom() {
       const hostReactDom = globalThis?.window?.__NEXUS_HOST_REACT_DOM__;
@@ -31889,25 +31889,25 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   }
 });
 
-// ../nexus-plugins/Books/src/renderer.js
+// Books/src/renderer.js
 init_define_process();
 
-// ../nexus-plugins/Books/src/BooksDocumentEngine.jsx
+// Books/src/BooksDocumentEngine.jsx
 init_define_process();
 
-// ../packages/nexus-ui/src/index.js
+// packages/nexus-ui/src/index.js
 init_define_process();
 
-// ../packages/nexus-ui/src/components/Button/Button.jsx
+// packages/nexus-ui/src/components/Button/Button.jsx
 init_define_process();
 
-// ../packages/nexus-ui/src/utils/cx.js
+// packages/nexus-ui/src/utils/cx.js
 init_define_process();
 function cx(...values) {
   return values.filter(Boolean).join(" ");
 }
 
-// ../packages/nexus-ui/src/components/Button/Button.jsx
+// packages/nexus-ui/src/components/Button/Button.jsx
 function Button({
   className = "",
   tone = "secondary",
@@ -31928,17 +31928,17 @@ function Button({
   );
 }
 
-// ../packages/nexus-ui/src/components/CyberIconButton/CyberIconButton.jsx
+// packages/nexus-ui/src/components/CyberIconButton/CyberIconButton.jsx
 init_define_process();
 var import_react = __toESM(require_react(), 1);
 
-// ../packages/nexus-ui/src/components/Tooltip/Tooltip.jsx
+// packages/nexus-ui/src/components/Tooltip/Tooltip.jsx
 init_define_process();
 function Tooltip({ className = "", children }) {
   return /* @__PURE__ */ React.createElement("span", { className: cx("nexus-ui-tooltip", className) }, children);
 }
 
-// ../packages/nexus-ui/src/components/CyberIconButton/CyberIconButton.jsx
+// packages/nexus-ui/src/components/CyberIconButton/CyberIconButton.jsx
 function CyberIconButton({
   active = false,
   className = "",
@@ -31983,7 +31983,7 @@ function CyberIconButton({
   );
 }
 
-// ../packages/nexus-ui/src/components/SegmentedControl/SegmentedControl.jsx
+// packages/nexus-ui/src/components/SegmentedControl/SegmentedControl.jsx
 init_define_process();
 function readOptionValue(option) {
   return option?.value ?? option?.id;
@@ -32060,7 +32060,7 @@ function SegmentedControl({
   );
 }
 
-// ../packages/nexus-ui/src/components/ActionMenu/ActionMenu.jsx
+// packages/nexus-ui/src/components/ActionMenu/ActionMenu.jsx
 init_define_process();
 var import_react2 = __toESM(require_react(), 1);
 var import_react_dom = __toESM(require_react_dom(), 1);
@@ -32195,7 +32195,7 @@ function ActionMenu({
   );
 }
 
-// ../packages/nexus-ui/src/components/Input/Input.jsx
+// packages/nexus-ui/src/components/Input/Input.jsx
 init_define_process();
 var import_react3 = __toESM(require_react(), 1);
 var Input = (0, import_react3.forwardRef)(function Input2({ className = "", type = "text", ...props }, ref) {
@@ -32210,7 +32210,7 @@ var Input = (0, import_react3.forwardRef)(function Input2({ className = "", type
   );
 });
 
-// ../packages/nexus-ui/src/components/Select/Select.jsx
+// packages/nexus-ui/src/components/Select/Select.jsx
 init_define_process();
 var import_react4 = __toESM(require_react(), 1);
 var Select = (0, import_react4.forwardRef)(function Select2({ className = "", children, ...props }, ref) {
@@ -32225,7 +32225,7 @@ var Select = (0, import_react4.forwardRef)(function Select2({ className = "", ch
   );
 });
 
-// ../packages/nexus-ui/src/components/Checkbox/Checkbox.jsx
+// packages/nexus-ui/src/components/Checkbox/Checkbox.jsx
 init_define_process();
 function Checkbox({
   className = "",
@@ -32236,7 +32236,7 @@ function Checkbox({
   return /* @__PURE__ */ React.createElement("label", { className: cx("nexus-ui-checkbox", className) }, /* @__PURE__ */ React.createElement("input", { ...props, className: "nexus-ui-checkbox__input", type: "checkbox" }), /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__box", "aria-hidden": "true" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 12 10" }, /* @__PURE__ */ React.createElement("path", { d: "M1 5.1 4.2 8 11 1" }))), label || description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__copy" }, label ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__label" }, label) : null, description ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-checkbox__description" }, description) : null) : null);
 }
 
-// ../packages/nexus-ui/src/components/SearchField/SearchField.jsx
+// packages/nexus-ui/src/components/SearchField/SearchField.jsx
 init_define_process();
 var import_react5 = __toESM(require_react(), 1);
 function DefaultSearchIcon() {
@@ -32260,7 +32260,7 @@ var SearchField = (0, import_react5.forwardRef)(function SearchField2({
   ), endAction ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-search-field__action" }, endAction) : null);
 });
 
-// ../packages/nexus-ui/src/components/Gallery/Gallery.jsx
+// packages/nexus-ui/src/components/Gallery/Gallery.jsx
 init_define_process();
 var import_react6 = __toESM(require_react(), 1);
 function normalizeColumnCount(value, fallback = null) {
@@ -32416,7 +32416,7 @@ function GalleryCardMeta({ as: Component = "span", className = "", children }) {
   return /* @__PURE__ */ React.createElement(Component, { className: cx("nexus-ui-gallery-card__meta", className) }, children);
 }
 
-// ../packages/nexus-ui/src/components/ReloadIcon/ReloadIcon.jsx
+// packages/nexus-ui/src/components/ReloadIcon/ReloadIcon.jsx
 init_define_process();
 function ReloadIcon({ size = 18, className = "" }) {
   return /* @__PURE__ */ React.createElement(
@@ -32440,7 +32440,7 @@ function ReloadIcon({ size = 18, className = "" }) {
   );
 }
 
-// ../packages/nexus-ui/src/legacy/Panels.jsx
+// packages/nexus-ui/src/legacy/Panels.jsx
 init_define_process();
 function SectionPanel({ className = "", tone = "default", padding = "default", children }) {
   return /* @__PURE__ */ React.createElement("section", { className: cx(
@@ -32451,7 +32451,7 @@ function SectionPanel({ className = "", tone = "default", padding = "default", c
   ) }, children);
 }
 
-// ../packages/nexus-ui/src/legacy/States.jsx
+// packages/nexus-ui/src/legacy/States.jsx
 init_define_process();
 function Notice({ className = "", tone = "info", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-notice", `nexus-ui-notice--${tone}`, className) }, children);
@@ -32473,7 +32473,7 @@ function StateBlock({
   ) }, eyebrow ? /* @__PURE__ */ React.createElement("span", { className: "nexus-ui-eyebrow" }, eyebrow) : null, title ? /* @__PURE__ */ React.createElement("strong", null, title) : null, description ? /* @__PURE__ */ React.createElement("p", null, description) : null, children);
 }
 
-// ../packages/nexus-ui/src/legacy/Workspace.jsx
+// packages/nexus-ui/src/legacy/Workspace.jsx
 init_define_process();
 function WorkspacePage({ className = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-page", className) }, children);
@@ -32482,7 +32482,7 @@ function WorkspaceBody({ className = "", children }) {
   return /* @__PURE__ */ React.createElement("div", { className: cx("nexus-ui-body", className) }, children);
 }
 
-// ../nexus-plugins/Books/src/icons.jsx
+// Books/src/icons.jsx
 init_define_process();
 var React2 = window.React;
 function BaseIcon({ children, size = 18, strokeWidth = 1.8 }) {
@@ -32518,10 +32518,10 @@ function ZoomOutIcon(props) {
   return /* @__PURE__ */ React2.createElement(BaseIcon, { ...props }, /* @__PURE__ */ React2.createElement("circle", { cx: "11", cy: "11", r: "6.5" }), /* @__PURE__ */ React2.createElement("path", { d: "M8 11h6" }), /* @__PURE__ */ React2.createElement("path", { d: "m16 16 4 4" }));
 }
 
-// ../nexus-plugins/Books/src/BooksPdfViewer.jsx
+// Books/src/BooksPdfViewer.jsx
 init_define_process();
 
-// ../nexus-plugins/Books/src/pdfjs-runtime.js
+// Books/src/pdfjs-runtime.js
 init_define_process();
 var pdfJsRuntimePromise = null;
 async function loadBooksPdfJsRuntime() {
@@ -32542,10 +32542,10 @@ async function loadBooksPdfJsRuntime() {
   return pdfJsRuntimePromise;
 }
 
-// ../nexus-plugins/Books/src/renderer-helpers.js
+// Books/src/renderer-helpers.js
 init_define_process();
 
-// ../nexus-plugins/Books/src/constants.js
+// Books/src/constants.js
 init_define_process();
 var BOOKS_ENGINE_ID = "nexus.books.document";
 var BOOKS_LIBRARY_VIEW_ID = "nexus.books.library";
@@ -32556,14 +32556,14 @@ var BOOK_READING_STATUSES = [
   "abandoned"
 ];
 
-// ../nexus-plugins/Books/src/plugin-settings.js
+// Books/src/plugin-settings.js
 init_define_process();
 var BOOKS_SETTINGS_DEFAULTS = Object.freeze({
   engineAssignments: []
 });
 function normalizeItemId(value) {
-  const normalized = String(value || "").trim();
-  return normalized || "";
+  const normalized2 = String(value || "").trim();
+  return normalized2 || "";
 }
 function normalizeBooksSettings(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -32604,111 +32604,55 @@ function writeBooksEngineAssignments(settingsValue, assignments) {
   };
 }
 
-// ../nexus-frontend/src/store/items/location.mjs
+// packages/plugin-sdk/src/index.js
 init_define_process();
-function normalizeItemId2(value) {
-  const normalizedValue = String(value || "").trim();
-  return normalizedValue || "";
-}
-function normalizeName(value) {
+
+// packages/plugin-sdk/src/item-location.js
+init_define_process();
+function normalized(value) {
   return String(value || "").trim();
 }
-function trimTrailingSeparators(value) {
-  return String(value || "").replace(/[\\/]+$/, "");
-}
-function guessSeparator(...values) {
-  return values.some((value) => String(value || "").includes("\\")) ? "\\" : "/";
-}
-function joinSegments(basePath, segments, separator) {
-  const normalizedBasePath = trimTrailingSeparators(basePath);
-  if (!segments.length) {
-    return normalizedBasePath;
-  }
-  return [normalizedBasePath, ...segments].filter(Boolean).join(separator);
-}
-function joinRelativePath(segments, separator) {
-  return segments.length ? segments.join(separator) : null;
-}
-function getFallbackRootItem(itemsState, byId) {
-  const normalizedRootId = normalizeItemId2(itemsState?.rootId);
-  if (normalizedRootId && byId[normalizedRootId]) {
-    return byId[normalizedRootId];
-  }
-  return Object.values(byId).find((candidate) => {
-    if (!candidate?.id) {
-      return false;
-    }
-    return !normalizeItemId2(candidate.parentId);
-  }) || null;
-}
-function getRootPathFromItemsState(itemsState, rootItem, options = {}) {
-  const explicitRootPath = trimTrailingSeparators(
-    options.rootPath || options.vaultContentPath || ""
-  );
-  if (explicitRootPath) {
-    return explicitRootPath;
-  }
+function resolveItemLocationFromItemsState(itemsState, itemId) {
   const byId = itemsState?.byId || {};
-  const preferredRootItem = rootItem || getFallbackRootItem(itemsState, byId);
-  return trimTrailingSeparators(preferredRootItem?.path || "");
-}
-function resolveItemLocationFromItemsState(itemsState, itemId, options = {}) {
-  const byId = itemsState?.byId || {};
-  const normalizedItemId = normalizeItemId2(itemId);
-  if (!normalizedItemId) {
-    return null;
-  }
-  const item = byId[normalizedItemId];
-  if (!item) {
-    return null;
-  }
-  const visitedIds = /* @__PURE__ */ new Set();
+  const item = byId[normalized(itemId)];
+  if (!item) return null;
+  const visited = /* @__PURE__ */ new Set();
   const ancestorIds = [];
-  const relativeSegments = [];
-  let currentItem = item;
-  let rootItem = null;
-  while (currentItem?.id) {
-    const currentItemId = normalizeItemId2(currentItem.id);
-    if (!currentItemId || visitedIds.has(currentItemId)) {
-      return null;
-    }
-    visitedIds.add(currentItemId);
-    const currentParentId = normalizeItemId2(currentItem.parentId);
-    if (!currentParentId) {
-      rootItem = currentItem;
+  const segments = [];
+  let current = item;
+  let root = null;
+  while (current?.id) {
+    const currentId = normalized(current.id);
+    if (!currentId || visited.has(currentId)) return null;
+    visited.add(currentId);
+    const parentId = normalized(current.parentId);
+    if (!parentId) {
+      root = current;
       break;
     }
-    const currentName = normalizeName(currentItem.name);
-    if (currentName) {
-      relativeSegments.push(currentName);
-    }
-    ancestorIds.push(currentParentId);
-    const parentItem = byId[currentParentId];
-    if (!parentItem) {
-      return null;
-    }
-    currentItem = parentItem;
+    if (normalized(current.name)) segments.push(normalized(current.name));
+    ancestorIds.push(parentId);
+    current = byId[parentId];
+    if (!current) return null;
   }
-  if (!rootItem) {
-    return null;
-  }
-  const rootPathCandidate = getRootPathFromItemsState(itemsState, rootItem, options);
-  const separator = guessSeparator(rootPathCandidate, rootItem?.path, item?.path);
-  const orderedSegments = [...relativeSegments].reverse();
-  const resolvedRelativePath = joinRelativePath(orderedSegments, separator);
+  if (!root) return null;
+  const orderedSegments = segments.reverse();
+  const rootPath = String(root.path || "").replace(/[\\/]+$/, "");
+  const separator = rootPath.includes("\\") || String(item.path || "").includes("\\") ? "\\" : "/";
+  const relativePath = orderedSegments.length ? orderedSegments.join(separator) : null;
   return {
     itemId: String(item.id),
     parentId: item.parentId ?? null,
     name: String(item.name || ""),
     type: item.type === "folder" ? "folder" : "file",
-    path: joinSegments(rootPathCandidate, orderedSegments, separator),
-    relativePath: resolvedRelativePath,
+    path: [rootPath, ...orderedSegments].filter(Boolean).join(separator),
+    relativePath,
     contentRelativePath: orderedSegments.length ? orderedSegments.join("/") : null,
     ancestorIds
   };
 }
 
-// ../nexus-plugins/Books/src/renderer-helpers.js
+// Books/src/renderer-helpers.js
 var path = window.nexus.paths;
 var SUPPORTED_BOOK_EXTENSIONS = /* @__PURE__ */ new Set(["pdf"]);
 function getCurrentVaultInfo() {
@@ -32805,8 +32749,8 @@ function getReadingStatusLabel(status) {
   return "Pendiente";
 }
 function formatPercent(value) {
-  const normalized = Number.isFinite(Number(value)) ? Number(value) : 0;
-  return `${Math.round(normalized)}%`;
+  const normalized2 = Number.isFinite(Number(value)) ? Number(value) : 0;
+  return `${Math.round(normalized2)}%`;
 }
 function formatDateTime(value) {
   if (!value) {
@@ -32837,7 +32781,7 @@ function queueBooksEditorLogEvent(event, message, data = null, level = "info") {
   }
 }
 
-// ../nexus-plugins/Books/src/BooksPdfViewer.jsx
+// Books/src/BooksPdfViewer.jsx
 var { useEffect: useEffect3, useMemo, useRef: useRef3, useState: useState4 } = window.React;
 var PAGE_OBSERVER_ROOT_MARGIN = "1200px 0px";
 var DEFAULT_PAGE_ASPECT_RATIO = 1.414;
@@ -33231,7 +33175,7 @@ function BooksPdfViewer({
   ))) : /* @__PURE__ */ React.createElement("div", { className: "booksEngine__state" }, "El visor PDF no pudo inicializarse."));
 }
 
-// ../nexus-plugins/Books/src/ipc-client.js
+// Books/src/ipc-client.js
 init_define_process();
 var runtimeIpc = null;
 function configurePluginIpc(ipc) {
@@ -33248,7 +33192,7 @@ var pluginIpc = Object.freeze({
   }
 });
 
-// ../nexus-plugins/Books/src/BooksDocumentEngine.jsx
+// Books/src/BooksDocumentEngine.jsx
 var { useCallback: useCallback2, useEffect: useEffect4, useMemo: useMemo2, useRef: useRef4, useState: useState5 } = window.React;
 var ipcRenderer = pluginIpc;
 var PDF_VIEWER_CLOSE_SETTLE_MS = 32;
@@ -33457,10 +33401,10 @@ function BooksDocumentEngine({ itemId, filePath, hostApi, tabId }) {
   ))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__field" }, /* @__PURE__ */ React.createElement("span", null, "Ultima apertura"), /* @__PURE__ */ React.createElement("strong", null, formatDateTime(book.lastOpenedAt))), /* @__PURE__ */ React.createElement("div", { className: "booksEngine__field" }, /* @__PURE__ */ React.createElement("span", null, "Ruta"), /* @__PURE__ */ React.createElement("strong", null, resolvedFilePath || filePath)))) : /* @__PURE__ */ React.createElement(StateBlock, { className: "booksEngine__state", title: "No se pudo resolver el libro actual" }), error ? /* @__PURE__ */ React.createElement("div", { className: "booksEngine__state booksEngine__state--error" }, error) : null)));
 }
 
-// ../nexus-plugins/Books/src/BooksLibraryView.jsx
+// Books/src/BooksLibraryView.jsx
 init_define_process();
 
-// ../nexus-plugins/Books/src/library-preferences.js
+// Books/src/library-preferences.js
 init_define_process();
 var BOOKS_GRID_COLUMN_LIMITS = Object.freeze({ min: 1, max: 8 });
 var BOOKS_DEFAULT_LIBRARY_PREFERENCES = Object.freeze({
@@ -33492,216 +33436,10 @@ function writeBooksGridColumns(currentValue, nextColumnCount) {
   };
 }
 
-// ../nexus-frontend/src/utils/devLog.js
-init_define_process();
-
-// ../nexus-frontend/src/utils/coreCapabilities.mjs
-init_define_process();
-function splitKey(key) {
-  const segments = String(key || "").split(":");
-  if (segments[0] === "nexus" && segments.length > 2) {
-    return [segments[1], segments.slice(2).join(":")];
-  }
-  return [segments[0], segments.slice(1).join(":")];
-}
-function requireCapability(root, key) {
-  const [family, operation] = splitKey(key);
-  const capability = root?.[family]?.[operation];
-  if (!capability) throw new Error(`IPC_CONTRACT_UNKNOWN:${family}.${operation}`);
-  return capability;
-}
-function sendCoreEvent(key, ...args) {
-  return requireCapability(window.nexus.events, key).send(...args);
-}
-
-// ../nexus-frontend/src/utils/devLog.js
-var DEV_LOG_BATCH_CHANNEL = "dev-log:append-batch";
-var rendererDevLoggingEnabled = window.location.protocol !== "file:";
-var devLogRawConsole = {
-  debug: console.debug.bind(console),
-  log: console.log.bind(console),
-  info: console.info.bind(console),
-  warn: console.warn.bind(console),
-  error: console.error.bind(console)
-};
-var rendererDevLogState = {
-  queue: Array.isArray(window.__NEXUS_DEV_LOG_BUFFER__) ? window.__NEXUS_DEV_LOG_BUFFER__ : [],
-  flushTimer: null,
-  consoleBridgeInstalled: false,
-  ipcBridgeInstalled: false,
-  initialized: false,
-  verbose: window.localStorage?.getItem("NEXUS_DEV_LOG_VERBOSE") === "1"
-};
-window.__NEXUS_DEV_LOG_BUFFER__ = rendererDevLogState.queue;
-window.__NEXUS_DEV_LOG_RUN_ID__ = window.__NEXUS_DEV_LOG_RUN_ID__ || (globalThis.crypto?.randomUUID?.() || `renderer-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
-function getRendererRunId() {
-  return window.__NEXUS_DEV_LOG_RUN_ID__;
-}
-function shouldMirrorRendererConsole(level) {
-  return level === "warn" || level === "error" || level === "fatal";
-}
-function resolveRendererScope(scope) {
-  const normalizedScope = String(scope || "").trim() || "renderer.startup";
-  if (normalizedScope.startsWith("renderer.startup")) {
-    return {
-      process: "renderer",
-      surface: "startup",
-      subsystem: normalizedScope,
-      shard: "40-renderer-startup.jsonl"
-    };
-  }
-  if (normalizedScope.startsWith("renderer.store") || normalizedScope.startsWith("renderer.items")) {
-    return {
-      process: "renderer",
-      surface: "store",
-      subsystem: normalizedScope,
-      shard: "41-renderer-store.jsonl"
-    };
-  }
-  if (normalizedScope.startsWith("renderer.explorer")) {
-    return {
-      process: "renderer",
-      surface: "explorer",
-      subsystem: normalizedScope,
-      shard: "42-renderer-explorer.jsonl"
-    };
-  }
-  if (normalizedScope.startsWith("renderer.editors")) {
-    return {
-      process: "renderer",
-      surface: "editors",
-      subsystem: normalizedScope,
-      shard: "43-renderer-editors.jsonl"
-    };
-  }
-  if (normalizedScope.startsWith("renderer.plugins")) {
-    return {
-      process: "renderer",
-      surface: "plugins",
-      subsystem: normalizedScope,
-      shard: "44-renderer-plugins.jsonl"
-    };
-  }
-  if (normalizedScope.startsWith("renderer.ipc")) {
-    return {
-      process: "renderer",
-      surface: "ipc",
-      subsystem: normalizedScope,
-      shard: "50-ipc.jsonl"
-    };
-  }
-  return {
-    process: "renderer",
-    surface: "startup",
-    subsystem: normalizedScope,
-    shard: "40-renderer-startup.jsonl"
-  };
-}
-function serializeUnknown(value, seen = /* @__PURE__ */ new WeakSet()) {
-  if (value instanceof Error) {
-    return {
-      name: value.name,
-      message: value.message,
-      stack: value.stack || null,
-      cause: serializeUnknown(value.cause, seen)
-    };
-  }
-  if (typeof value === "bigint") {
-    return value.toString();
-  }
-  if (Array.isArray(value)) {
-    return value.map((entry) => serializeUnknown(entry, seen));
-  }
-  if (value && typeof value === "object") {
-    if (seen.has(value)) {
-      return "[circular]";
-    }
-    seen.add(value);
-    const serialized = Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, serializeUnknown(entry, seen)])
-    );
-    seen.delete(value);
-    return serialized;
-  }
-  return value ?? null;
-}
-function buildRendererEvent(partialEvent = {}) {
-  return {
-    ts: partialEvent.ts || (/* @__PURE__ */ new Date()).toISOString(),
-    rendererRunId: partialEvent.rendererRunId || getRendererRunId(),
-    process: "renderer",
-    surface: partialEvent.surface || "startup",
-    subsystem: partialEvent.subsystem || "renderer.startup",
-    level: partialEvent.level || "info",
-    event: partialEvent.event || "renderer.unspecified",
-    message: partialEvent.message || "",
-    durationMs: typeof partialEvent.durationMs === "number" ? Number(partialEvent.durationMs.toFixed(2)) : null,
-    requestId: partialEvent.requestId || null,
-    data: partialEvent.data ? serializeUnknown(partialEvent.data) : null,
-    shard: partialEvent.shard || null
-  };
-}
-function queueRendererDevLogEvent(partialEvent = {}) {
-  if (!rendererDevLoggingEnabled) {
-    return;
-  }
-  rendererDevLogState.queue.push(buildRendererEvent(partialEvent));
-  if (shouldMirrorRendererConsole(partialEvent.level || "info")) {
-    const rawMethod = partialEvent.level === "warn" ? devLogRawConsole.warn : devLogRawConsole.error;
-    rawMethod(partialEvent.message || partialEvent.event || "", partialEvent.data || "");
-  }
-  scheduleRendererDevLogFlush();
-}
-function scheduleRendererDevLogFlush() {
-  if (rendererDevLogState.flushTimer) {
-    return;
-  }
-  rendererDevLogState.flushTimer = window.setTimeout(() => {
-    rendererDevLogState.flushTimer = null;
-    flushRendererDevLogBuffer();
-  }, 80);
-}
-function flushRendererDevLogBuffer() {
-  if (!rendererDevLoggingEnabled) {
-    rendererDevLogState.queue.length = 0;
-    return;
-  }
-  if (!rendererDevLogState.queue.length) {
-    return;
-  }
-  const events = rendererDevLogState.queue.splice(0, rendererDevLogState.queue.length);
-  try {
-    sendCoreEvent(DEV_LOG_BATCH_CHANNEL, {
-      events
-    });
-  } catch (error) {
-    rendererDevLogState.queue.unshift(...events);
-    devLogRawConsole.error("[dev-log] No se pudo flush-ear el batch del renderer.", error);
-  }
-}
-function createRendererDevLogger(scope) {
-  const context = resolveRendererScope(scope);
-  return {
-    context,
-    debug(event, message, data = null) {
-      queueRendererDevLogEvent({ ...context, level: "debug", event, message, data });
-    },
-    info(event, message, data = null) {
-      queueRendererDevLogEvent({ ...context, level: "info", event, message, data });
-    },
-    warn(event, message, data = null) {
-      queueRendererDevLogEvent({ ...context, level: "warn", event, message, data });
-    },
-    error(event, message, data = null) {
-      queueRendererDevLogEvent({ ...context, level: "error", event, message, data });
-    }
-  };
-}
-
-// ../nexus-plugins/Books/src/BooksLibraryView.jsx
+// Books/src/BooksLibraryView.jsx
 var { startTransition, useCallback: useCallback3, useDeferredValue, useEffect: useEffect5, useMemo: useMemo3, useRef: useRef5, useState: useState6 } = window.React;
 var ipcRenderer2 = pluginIpc;
-var booksLibraryLogger = createRendererDevLogger("renderer.plugins.books");
+var booksLibraryLogger = null;
 var BOOK_GRID_ASPECT_RATIO = 0.72;
 var BOOK_GRID_BODY_HEIGHT = 114;
 var BOOK_GRID_OVERSCAN_ROWS = 1;
@@ -34025,6 +33763,7 @@ function ProgressBar({ value }) {
   )), /* @__PURE__ */ React.createElement("span", { className: "booksLibrary__progressValue" }, formatPercent(normalizedValue)));
 }
 function BooksLibraryView({ ctx }) {
+  booksLibraryLogger = ctx.log;
   const uiPreferencesApi = useMemo3(
     () => ctx.createPluginSettingsApi("nexus.books.ui", BOOKS_DEFAULT_LIBRARY_PREFERENCES),
     [ctx]
@@ -34521,7 +34260,7 @@ function BooksLibraryView({ ctx }) {
   ) : null);
 }
 
-// ../nexus-plugins/Books/src/BooksSettingsSection.jsx
+// Books/src/BooksSettingsSection.jsx
 init_define_process();
 var { useEffect: useEffect6, useMemo: useMemo4, useState: useState7 } = window.React;
 function createEmptyAssignment() {
@@ -34704,7 +34443,7 @@ function BooksSettingsSection({ ctx }) {
   )), notice ? /* @__PURE__ */ React.createElement(Notice, { tone: "success", className: "booksPluginSettings__notice" }, notice) : null, error ? /* @__PURE__ */ React.createElement(Notice, { tone: "danger", className: "booksPluginSettings__error" }, error) : null);
 }
 
-// ../nexus-plugins/Books/src/renderer.js
+// Books/src/renderer.js
 var styleElement = null;
 function ensureStylesheet() {
   if (styleElement || typeof document === "undefined") {

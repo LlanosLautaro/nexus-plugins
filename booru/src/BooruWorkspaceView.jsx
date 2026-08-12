@@ -7,7 +7,6 @@ import {
   BOORU_SECTION_OPTIONS,
   BOORU_WORKSPACE_VIEW_ID,
 } from "./constants.js";
-import { createRendererDevLogger } from "../../../nexus-frontend/src/utils/devLog.js";
 import { DownloadIcon, FolderIcon } from "./icons.jsx";
 import {
   Button,
@@ -145,7 +144,7 @@ const safeUseDragLayer = typeof useDragLayer === "function"
 const safeUseDrop = typeof useDrop === "function"
   ? useDrop
   : (() => [{ isOver: false, canDrop: false }, () => undefined]);
-const booruViewLogger = createRendererDevLogger("renderer.plugins.booru");
+let booruViewLogger = null;
 
 const WORKSPACE_FRAME_SECTION_NONCE_KEY = "workspaceFrameSectionNonce";
 const SETTINGS_SUBVIEW_OPTIONS = new Set(["overview", "duplicates", "trash"]);
@@ -1734,6 +1733,7 @@ function createResourceSearchTokenFromFragment(fragment) {
 }
 
 export default function BooruWorkspaceView({ input = null, ctx }) {
+  booruViewLogger = ctx.log;
   const uiPreferencesApi = useMemo(
     () => ctx.createPluginSettingsApi("nexus.booru.ui", {
       gridColumns: BOORU_DEFAULT_GRID_COLUMNS,

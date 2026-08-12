@@ -1,0 +1,72 @@
+// Canonical color seeds for @nexus/ui.
+@mixin register-color-seeds(
+  $surface-h: 0,
+  $surface-s: 0%,
+  $surface-base-l: 0%,
+  $accent-h: 266,
+  $accent-s: 86%,
+  $accent-l: 62%
+) {
+  --canvas-base: #000000;
+  --surface-h: #{$surface-h};
+  --surface-s: #{$surface-s};
+  --surface-base-l: #{$surface-base-l};
+
+  --accent-h: #{$accent-h};
+  --accent-s: #{$accent-s};
+  --accent-l: #{$accent-l};
+  // Retained as a compatibility variable for persisted themes. Nexus has one
+  // visible accent, so no derivative may rotate its hue.
+  --accent-shift: 0;
+  --atmosphere-strength: 18%;
+
+  --accent-lift-1: clamp(0%, calc(var(--accent-l) + 8%), 100%);
+  --accent-lift-2: clamp(0%, calc(var(--accent-l) + 16%), 100%);
+  --accent-drop-1: clamp(0%, calc(var(--accent-l) - 10%), 100%);
+  --accent-echo-h: var(--accent-h);
+  --accent-echo-s: var(--accent-s);
+  --accent-echo-l: var(--accent-l);
+
+  // Surface 0 is the exact Theme Editor background. The remaining levels only
+  // introduce a narrow elevation range so a black theme stays visibly black.
+  --color-surface-0: var(--canvas-base);
+  --color-surface-1: hsl(
+    var(--surface-h)
+    clamp(0%, var(--surface-s), 100%)
+    clamp(0%, calc(var(--surface-base-l) + 1.5%), 100%)
+  );
+  --color-surface-2: hsl(
+    var(--surface-h)
+    clamp(0%, calc(var(--surface-s) - 4%), 100%)
+    clamp(0%, calc(var(--surface-base-l) + 3%), 100%)
+  );
+  --color-surface-3: hsl(
+    var(--surface-h)
+    clamp(0%, calc(var(--surface-s) - 8%), 100%)
+    clamp(0%, calc(var(--surface-base-l) + 5%), 100%)
+  );
+  --color-surface-inset: hsl(
+    var(--surface-h)
+    clamp(0%, calc(var(--surface-s) + 8%), 100%)
+    clamp(0%, calc(var(--surface-base-l) - 0.5%), 100%)
+  );
+  --color-canvas: var(--canvas-base);
+  --color-canvas-elevated: color-mix(in srgb, var(--canvas-base) 76%, var(--color-surface-0));
+
+  --text-base: hsl(var(--surface-h) 28% 95%);
+  --color-text: var(--text-base);
+  --color-text-soft: color-mix(in srgb, var(--text-base) 88%, var(--color-canvas));
+  --color-text-muted: color-mix(in srgb, var(--text-base) 72%, var(--color-canvas));
+  --color-text-subtle: color-mix(in srgb, var(--text-base) 58%, var(--color-canvas));
+
+  --color-accent: hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+  // Compatibility aliases. The host has one accent seed: intensity changes
+  // through semantic alpha mixes, never through a second hue or a local tint.
+  --color-accent-1: var(--color-accent);
+  --color-accent-strong: var(--color-accent);
+  --color-accent-2: var(--color-accent);
+  --color-accent-3: var(--color-accent);
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  --color-accent-softer: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  --color-accent-fade: color-mix(in srgb, var(--color-accent) 34%, var(--color-canvas));
+}

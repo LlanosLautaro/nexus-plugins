@@ -1,0 +1,40 @@
+{
+  "name": "nexus-plugins",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.6.2",
+  "engines": { "node": "24.x", "npm": "11.6.2" },
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "node ./scripts/build-all.mjs",
+    "release:build": "node ./scripts/build-all.mjs --release",
+    "check:dependencies": "npm audit --audit-level=low",
+    "check:snapshots": "node ./scripts/verify-snapshots.mjs",
+    "check:source-boundary": "node ./scripts/check-source-boundary.mjs",
+    "test": "node --test ./tests/*.test.mjs",
+    "check:baseline": "npm run check:dependencies && npm run check:snapshots && npm run check:source-boundary && npm test"
+  },
+  "dependencies": {
+    "@nexus/plugin-sdk": "2.0.0",
+    "@nexus/ui": "0.1.0",
+    "better-sqlite3": "^12.11.1",
+    "chart.js": "^4.5.1",
+    "chokidar": "^5.0.0",
+    "electron": "^43.0.0",
+    "js-yaml": "4.3.1",
+    "music-metadata": "^11.12.3",
+    "pdfjs-dist": "^6.2.108",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "tldts": "^7.4.10"
+  },
+  "devDependencies": { "esbuild": "0.28.2", "sass": "^1.102.0" },
+  "overrides": {
+    "esbuild": "$esbuild",
+    "js-yaml": "4.3.1",
+    "minimatch@10.2.5": { "brace-expansion": "5.0.9" },
+    "sass": { "immutable": "5.1.9" },
+    "tar": "7.5.22"
+  }
+}

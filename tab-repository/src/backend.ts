@@ -6,7 +6,7 @@ import type {
   NexusBackendPluginContext,
   NexusBackendPluginModule,
   NexusPluginIpcRequestContext,
-} from "../../../nexus-backend/src/plugins/types.ts";
+} from "@nexus/plugin-sdk";
 import {
   DEFAULT_SETTINGS,
   IMPORT_PREVIEW_TTL_MS,

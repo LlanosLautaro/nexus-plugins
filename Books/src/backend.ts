@@ -1,8 +1,7 @@
 import type {
   NexusBackendPluginContext,
   NexusBackendPluginModule,
-} from "../../../nexus-backend/src/plugins/types.ts";
-import { createDevLogger } from "../../../nexus-backend/src/shared/dev-log.js";
+} from "@nexus/plugin-sdk";
 import {
   ensureBookRecord,
   getBookByItemId,
@@ -22,7 +21,7 @@ import {
 
 const COVER_PREVIEW_WARM_CONCURRENCY = 3;
 const COVER_PREVIEW_LIST_PRIME_COUNT = 6;
-const booksBackendLogger = createDevLogger("backend.plugins.books");
+let booksBackendLogger: NexusBackendPluginContext["log"];
 
 async function hydrateResolvedItem(ctx: NexusBackendPluginContext, item: any) {
   if (!item?.id) {
@@ -411,6 +410,7 @@ const booksPlugin: NexusBackendPluginModule = {
   },
 
   activate(ctx: NexusBackendPluginContext) {
+    booksBackendLogger = ctx.log;
     const coverPreviewWarmQueue = createCoverPreviewWarmQueue(ctx);
     activeCoverPreviewWarmQueue = coverPreviewWarmQueue;
     const stopOnAbort = () => {

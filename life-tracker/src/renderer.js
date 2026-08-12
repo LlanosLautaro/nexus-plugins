@@ -1,4 +1,8 @@
-import LifeTrackerView, { LIFE_TRACKER_HOME_WIDGET_PROVIDERS } from "./LifeTrackerView.jsx";
+import LifeTrackerView, {
+  LIFE_TRACKER_HOME_WIDGET_PROVIDERS,
+  configureLifeTrackerHostUi,
+} from "./LifeTrackerView.jsx";
+import { configureTrainingHostUi } from "./training/TrainingView.jsx";
 import TrainingHostSettingsSection from "./training/TrainingHostSettingsSection.jsx";
 import {
   LIFE_TRACKER_DEFAULT_SECTION,
@@ -30,6 +34,8 @@ function disposeStylesheet() {
 
 const lifeTrackerRendererPlugin = {
   activate(ctx) {
+    configureLifeTrackerHostUi(ctx.ui);
+    configureTrainingHostUi(ctx.ui);
     configurePluginIpc(ctx.ipc);
     ensureStylesheet();
 

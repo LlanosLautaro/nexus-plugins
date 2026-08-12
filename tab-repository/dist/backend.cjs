@@ -813,7 +813,7 @@ var require_cjs = __commonJS({
   }
 });
 
-// ../nexus-plugins/tab-repository/src/backend.ts
+// tab-repository/src/backend.ts
 var backend_exports = {};
 __export(backend_exports, {
   default: () => backend_default,
@@ -825,15 +825,15 @@ __export(backend_exports, {
   tabRepositoryTestApi: () => tabRepositoryTestApi
 });
 module.exports = __toCommonJS(backend_exports);
-var import_node_crypto = __toESM(require("node:crypto"));
-var import_promises = __toESM(require("node:fs/promises"));
-var import_node_path = __toESM(require("node:path"));
+var import_node_crypto = __toESM(require("node:crypto"), 1);
+var import_promises = __toESM(require("node:fs/promises"), 1);
+var import_node_path = __toESM(require("node:path"), 1);
 var import_node_sqlite = require("node:sqlite");
 
-// ../nexus-plugins/tab-repository/src/domain.ts
-var import_tldts = __toESM(require_cjs());
+// tab-repository/src/domain.ts
+var import_tldts = __toESM(require_cjs(), 1);
 
-// ../nexus-plugins/tab-repository/src/settings.js
+// tab-repository/src/settings.js
 var TAB_REPOSITORY_PLUGIN_ID = "nexus.tab-repository";
 var MIN_SIDEBAR_WIDTH = 180;
 var MAX_SIDEBAR_WIDTH = 440;
@@ -862,7 +862,7 @@ function normalizeSettings(value) {
   };
 }
 
-// ../nexus-plugins/tab-repository/src/domain.ts
+// tab-repository/src/domain.ts
 var IMPORT_PREVIEW_TTL_MS = 2 * 6e4;
 function normalizeHttpUrl(value) {
   if (typeof value !== "string") return null;
@@ -908,7 +908,7 @@ function isSystemicBrowserError(code) {
   ].includes(String(code || ""));
 }
 
-// ../nexus-plugins/tab-repository/src/backend.ts
+// tab-repository/src/backend.ts
 var importPreviews = /* @__PURE__ */ new Map();
 var runtimeDb = null;
 function nowIso() {
