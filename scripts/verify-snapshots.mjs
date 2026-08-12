@@ -30,7 +30,10 @@ async function buildManifest() {
     const entries = [];
     const digest = createHash("sha256");
     for (const file of files) {
-      const contents = await fs.readFile(path.join(packageRoot, file));
+      const rawContents = await fs.readFile(path.join(packageRoot, file));
+      const contents = /\.(?:cjs|css|d\.ts|js|json|jsx|md|mjs|scss|ts|tsx)$/i.test(file)
+        ? Buffer.from(rawContents.toString("utf8").replace(/\r\n/g, "\n"), "utf8")
+        : rawContents;
       const sha256 = createHash("sha256").update(contents).digest("hex");
       entries.push({ file, sha256 });
       digest.update(file).update("\0").update(contents).update("\0");
