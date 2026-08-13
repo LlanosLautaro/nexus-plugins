@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "overrides": [
+    { "selector": "esbuild", "reason": "Unifica el toolchain del bundler en la version auditada.", "removeWhen": "La version directa y todas las transitivas resuelvan la misma rama segura sin override." },
+    { "selector": "js-yaml", "reason": "Fija la rama auditada compartida por tooling.", "removeWhen": "Ningun propietario transitive solicite una rama vulnerable." },
+    { "selector": "minimatch@10.2.5", "reason": "Fuerza brace-expansion corregido dentro de minimatch.", "removeWhen": "La rama propietaria seleccione una version corregida por si sola." },
+    { "selector": "sass", "reason": "Fuerza immutable corregido dentro de Sass.", "removeWhen": "Sass actualice su dependencia sin override." },
+    { "selector": "tar", "reason": "Fija la rama corregida usada por tooling de desarrollo.", "removeWhen": "Todos los consumidores seleccionen una version corregida." }
+  ]
+}

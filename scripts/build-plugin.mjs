@@ -11,6 +11,8 @@ const nexusUiRoot = path.join(workspaceRoot, "packages", "nexus-ui");
 const pluginShimsRoot = path.join(workspaceRoot, "scripts", "shims");
 const pluginName = process.argv.find((argument, index) => index >= 2 && !argument.startsWith("--"));
 const releaseBuild = process.argv.includes("--release");
+const stageArgument = process.argv.find((argument) => argument.startsWith("--stage-root="));
+const stageRoot = stageArgument ? path.resolve(stageArgument.slice("--stage-root=".length)) : null;
 
 function createHostReactAliasPlugin() {
   const shimByPackage = new Map([
@@ -74,7 +76,8 @@ const manifestPath = path.join(pluginRoot, "manifest.json");
 const backendEntry = path.join(pluginRoot, "src", "backend.ts");
 const rendererEntry = path.join(pluginRoot, "src", "renderer.js");
 const rendererStylesEntry = path.join(pluginRoot, "src", "styles.scss");
-const distRoot = path.join(pluginRoot, "dist");
+const stagedPluginRoot = stageRoot ? path.join(stageRoot, pluginName) : pluginRoot;
+const distRoot = path.join(stagedPluginRoot, "dist");
 
 function bumpPatchVersion(versionValue) {
   const version = String(versionValue || "").trim();
@@ -107,7 +110,7 @@ async function bumpManifestVersion() {
   manifest.version = nextVersion;
 
   await fs.promises.writeFile(
-    manifestPath,
+    stageRoot ? path.join(stagedPluginRoot, "manifest.json") : manifestPath,
     `${JSON.stringify(manifest, null, 2)}\n`,
     "utf8",
   );
@@ -182,7 +185,7 @@ async function generateLifeTrackerManagedDocAssetsIfNeeded() {
     throw new Error("No se pudieron generar los markdown gestionados de Life Tracker.");
   }
 
-  const assetRoot = path.join(pluginRoot, "assets", "training", "managed-docs");
+  const assetRoot = path.join(stagedPluginRoot, "assets", "training", "managed-docs");
   const resolvedAssetRoot = path.resolve(assetRoot);
   await fs.promises.rm(assetRoot, { recursive: true, force: true });
   await fs.promises.mkdir(assetRoot, { recursive: true });
@@ -214,6 +217,7 @@ if (!fs.existsSync(manifestPath)) {
 
 await fs.promises.rm(distRoot, { recursive: true, force: true });
 await fs.promises.mkdir(distRoot, { recursive: true });
+if (stageRoot) await fs.promises.mkdir(stagedPluginRoot, { recursive: true });
 
 if (fs.existsSync(backendEntry)) {
   await build({
