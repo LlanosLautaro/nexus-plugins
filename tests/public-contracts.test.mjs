@@ -5,7 +5,7 @@ import test from "node:test";
 
 const root = path.resolve(import.meta.dirname, "..");
 const expected = new Map([
-  ["Books", ["nexus.books", "0.1.29"]],
+  ["Books", ["nexus.books", "0.1.30"]],
   ["booru", ["nexus.booru", "0.3.130"]],
   ["chat", ["nexus.chat", "0.1.7"]],
   ["life-tracker", ["nexus.life-tracker", "0.2.44"]],
@@ -55,6 +55,12 @@ test("Books y Booru reciben logging estructurado mediante ctx.log", async () => 
   ]);
   assert.match(books, /booksBackendLogger = ctx\.log/);
   assert.match(booru, /booruBackendLogger = ctx\.log/);
+});
+
+test("Books conserva Electron como modulo provisto por el host", async () => {
+  const bundle = await fs.readFile(path.join(root, "Books", "dist", "backend.cjs"), "utf8");
+  assert.match(bundle, /require\(["']electron["']\)/);
+  assert.doesNotMatch(bundle, /Downloading Electron binary|node_modules\/electron\/index\.js/);
 });
 
 test("ningun plugin importa fuentes privadas de la plataforma", async () => {

@@ -226,6 +226,7 @@ if (fs.existsSync(backendEntry)) {
     entryPoints: [backendEntry],
     outfile: path.join(distRoot, "backend.cjs"),
     bundle: true,
+    external: ["electron"],
     format: "cjs",
     platform: "node",
     target: "node24",
